@@ -1,0 +1,14 @@
+apply plugin: 'java-library'
+
+ext {
+    reactor_bom_version = 'Dysprosium-SR21'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
+}
