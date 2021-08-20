@@ -1,6 +1,6 @@
 package telegram4j.json;
 
-public enum ChatMemberStatus {
+public enum ChatMemberType {
     OWNER,
     ADMINISTRATOR,
     MEMBER,

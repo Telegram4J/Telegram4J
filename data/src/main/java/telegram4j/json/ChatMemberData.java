@@ -9,7 +9,7 @@ import java.util.Optional;
 
 public interface ChatMemberData {
 
-    ChatMemberStatus status();
+    ChatMemberType status();
 
     UserData user();
 
@@ -18,8 +18,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberOwnerData.class)
     interface ChatMemberOwnerData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.OWNER;
+        default ChatMemberType status() {
+            return ChatMemberType.OWNER;
         }
 
         @JsonProperty("is_anonymous")
@@ -34,8 +34,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberAdministratorData.class)
     interface ChatMemberAdministratorData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.ADMINISTRATOR;
+        default ChatMemberType status() {
+            return ChatMemberType.ADMINISTRATOR;
         }
 
         @JsonProperty("can_be_edited")
@@ -83,8 +83,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberMemberData.class)
     interface ChatMemberMemberData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.MEMBER;
+        default ChatMemberType status() {
+            return ChatMemberType.MEMBER;
         }
     }
 
@@ -93,8 +93,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberRestrictedData.class)
     interface ChatMemberRestrictedData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.RESTRICTED;
+        default ChatMemberType status() {
+            return ChatMemberType.RESTRICTED;
         }
 
         @JsonProperty("is_member")
@@ -130,8 +130,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberLeftData.class)
     interface ChatMemberLeftData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.LEFT;
+        default ChatMemberType status() {
+            return ChatMemberType.LEFT;
         }
     }
 
@@ -140,8 +140,8 @@ public interface ChatMemberData {
     @JsonDeserialize(as = ImmutableChatMemberBannedData.class)
     interface ChatMemberBannedData extends ChatMemberData {
         @Override
-        default ChatMemberStatus status() {
-            return ChatMemberStatus.BANNED;
+        default ChatMemberType status() {
+            return ChatMemberType.BANNED;
         }
 
         @JsonProperty("until_date")
