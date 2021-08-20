@@ -20,6 +20,10 @@ public interface ChatData {
 
     ChatType type();
 
+    // NOTE: unrecorded attribute
+    @JsonProperty("all_members_are_administrators")
+    Optional<Boolean> allMembersAreAdministrators();
+
     Optional<String> title();
 
     Optional<String> username();
