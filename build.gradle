@@ -22,5 +22,7 @@ allprojects {
 
     dependencies {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
+
+        testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
     }
 }
