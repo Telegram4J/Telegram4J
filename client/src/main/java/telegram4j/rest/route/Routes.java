@@ -17,4 +17,7 @@ public final class Routes {
 
     /** @see <a href="https://core.telegram.org/bots/api#close">https://core.telegram.org/bots/api#close</a> */
     public static final Route CLOSE = Route.get("/close");
+
+    /** @see <a href="https://core.telegram.org/bots/api#sendMessage">https://core.telegram.org/bots/api#sendMessage</a> */
+    public static final Route SEND_MESSAGE = Route.post("/sendMessage");
 }

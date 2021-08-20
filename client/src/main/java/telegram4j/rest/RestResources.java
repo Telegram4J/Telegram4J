@@ -1,7 +1,10 @@
 package telegram4j.rest;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import reactor.netty.http.client.HttpClient;
@@ -15,6 +18,10 @@ public class RestResources {
     public static final Supplier<ObjectMapper> DEFAULT_OBJECT_MAPPER = () -> JsonMapper.builder()
             .addModules(new Jdk8Module())
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+            .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+            .visibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
+            .visibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.PUBLIC_ONLY)
+            .visibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
             .build();
 
     private final HttpClient httpClient;
