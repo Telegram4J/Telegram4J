@@ -16,7 +16,7 @@ public interface UserData {
         return ImmutableUserData.builder();
     }
 
-    int id();
+    long id();
 
     @JsonProperty("is_bot")
     boolean isBot();

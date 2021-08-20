@@ -18,7 +18,7 @@ public interface MessageData {
     }
 
     @JsonProperty("message_id")
-    int messageId();
+    long messageId();
 
     // NOTE: renamed due matches to generated #from method
     @JsonProperty("from")
@@ -38,7 +38,7 @@ public interface MessageData {
     Optional<ChatData> forwardFromChat();
 
     @JsonProperty("forward_from_message_id")
-    Optional<Integer> forwardFromMessageId();
+    Optional<Long> forwardFromMessageId();
 
     @JsonProperty("forward_signature")
     Optional<String> forwardSignature();
@@ -130,10 +130,10 @@ public interface MessageData {
     Optional<MessageAutoDeleteTimerChangedData> messageAutoDeleteTimerChanged();
 
     @JsonProperty("migrate_to_chat_id")
-    Optional<Integer> migrateToChatId();
+    Optional<Long> migrateToChatId();
 
     @JsonProperty("migrate_from_chat_id")
-    Optional<Integer> migrateFromChatId();
+    Optional<Long> migrateFromChatId();
 
     @JsonProperty("pinned_message")
     Optional<MessageData> pinnedMessage();

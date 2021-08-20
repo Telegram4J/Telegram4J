@@ -16,7 +16,7 @@ public interface ChatData {
         return ImmutableChatData.builder();
     }
 
-    int id();
+    long id();
 
     ChatType type();
 
@@ -57,7 +57,7 @@ public interface ChatData {
     Optional<Boolean> canSetStickerSet();
 
     @JsonProperty("linked_chat_id")
-    Optional<Integer> linkedChatId();
+    Optional<Long> linkedChatId();
 
     Optional<ChatLocationData> location();
 }
