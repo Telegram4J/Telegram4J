@@ -26,7 +26,7 @@ public interface ContactData {
     Optional<String> lastName();
 
     @JsonProperty("user_id")
-    Optional<Integer> userId();
+    Optional<Long> userId();
 
     Optional<String> vcard();
 }

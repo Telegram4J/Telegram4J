@@ -15,5 +15,5 @@ public interface MessageIdData {
     }
 
     @JsonProperty("message_id")
-    int messageId();
+    long messageId();
 }
