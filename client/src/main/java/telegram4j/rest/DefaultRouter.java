@@ -3,12 +3,10 @@ package telegram4j.rest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufFlux;
 import reactor.netty.http.client.HttpClient;
-import reactor.util.annotation.Nullable;
 import telegram4j.rest.route.Routes;
 
 import java.net.URLEncoder;
@@ -42,10 +40,10 @@ public class DefaultRouter implements RestRouter {
                         .flatMap(json -> Mono.fromCallable(() -> URLEncoder.encode(e.getKey(), "UTF-8") +
                                 "=" + URLEncoder.encode(json, "UTF-8"))))
                 .collect(Collectors.joining("&", "?", ""))
-                .map(parameters -> request.getRoute().getUriTemplate() + parameters)
-                .defaultIfEmpty(request.getRoute().getUriTemplate());
+                .map(parameters -> request.getRoute().getUri() + parameters)
+                .defaultIfEmpty(request.getRoute().getUri());
 
-        return new TelegramResponse(computeUri.flatMap(uri ->
+        return new TelegramResponse(request, computeUri.flatMap(uri ->
                         httpClient.headers(headers -> headers.setAll(requestHeaders))
                                 .request(request.getRoute().getMethod())
                                 .uri(uri)

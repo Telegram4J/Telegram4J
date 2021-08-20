@@ -7,28 +7,28 @@ import java.util.Objects;
 
 public class Route {
 
-    private final String uriTemplate;
+    private final String uri;
     private final HttpMethod method;
 
-    private Route(String uriTemplate, HttpMethod method) {
-        this.uriTemplate = uriTemplate;
-        this.method = method;
+    private Route(String uri, HttpMethod method) {
+        this.uri = Objects.requireNonNull(uri, "uri");
+        this.method = Objects.requireNonNull(method, "method");
     }
 
-    public static Route get(String uriTemplate) {
-        return new Route(uriTemplate, HttpMethod.GET);
+    public static Route get(String uri) {
+        return new Route(uri, HttpMethod.GET);
     }
 
-    public static Route post(String uriTemplate) {
-        return new Route(uriTemplate, HttpMethod.POST);
+    public static Route post(String uri) {
+        return new Route(uri, HttpMethod.POST);
     }
 
-    public static Route ofMethod(String uriTemplate, HttpMethod httpMethod) {
-        return new Route(uriTemplate, httpMethod);
+    public static Route ofMethod(String uri, HttpMethod httpMethod) {
+        return new Route(uri, httpMethod);
     }
 
-    public String getUriTemplate() {
-        return uriTemplate;
+    public String getUri() {
+        return uri;
     }
 
     public HttpMethod getMethod() {
@@ -48,18 +48,18 @@ public class Route {
             return false;
         }
         Route route = (Route) o;
-        return uriTemplate.equals(route.uriTemplate) && method.equals(route.method);
+        return uri.equals(route.uri) && method.equals(route.method);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uriTemplate, method);
+        return Objects.hash(uri, method);
     }
 
     @Override
     public String toString() {
         return "Route{" +
-                "uriTemplate='" + uriTemplate + '\'' +
+                "uri='" + uri + '\'' +
                 ", method=" + method +
                 '}';
     }
