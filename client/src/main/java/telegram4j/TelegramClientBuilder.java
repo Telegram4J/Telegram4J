@@ -8,6 +8,7 @@ public class TelegramClientBuilder {
 
     private String token;
     private RestResources restResources;
+    private ClientResources clientResources;
 
     TelegramClientBuilder() {}
 
@@ -21,9 +22,15 @@ public class TelegramClientBuilder {
         return this;
     }
 
+    public TelegramClientBuilder setClientResources(ClientResources clientResources) {
+        this.clientResources = Objects.requireNonNull(clientResources, "clientResources");
+        return this;
+    }
+
     public TelegramClient build() {
         RestResources restResources = getRestResources();
-        return new TelegramClient(token, restResources);
+        ClientResources clientResources = getClientResources();
+        return new TelegramClient(token, restResources, clientResources);
     }
 
     private RestResources getRestResources() {
@@ -31,5 +38,12 @@ public class TelegramClientBuilder {
             return restResources;
         }
         return new RestResources();
+    }
+
+    private ClientResources getClientResources() {
+        if (clientResources != null) {
+            return clientResources;
+        }
+        return new ClientResources();
     }
 }

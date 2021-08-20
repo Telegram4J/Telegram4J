@@ -1,6 +1,4 @@
 dependencies {
     api project(":data")
-
-    api "io.projectreactor.netty:reactor-netty"
-    api "io.projectreactor.addons:reactor-extra"
+    api project(":client")
 }

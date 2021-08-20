@@ -6,12 +6,12 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableChatData.class)
-@JsonDeserialize(as = ImmutableChatData.class)
+@JsonSerialize(as = ImmutableChatPhotoData.class)
+@JsonDeserialize(as = ImmutableChatPhotoData.class)
 public interface ChatPhotoData {
 
-    static ImmutableChatData.Builder builder() {
-        return ImmutableChatData.builder();
+    static ImmutableChatPhotoData.Builder builder() {
+        return ImmutableChatPhotoData.builder();
     }
 
     @JsonProperty("small_file_id")

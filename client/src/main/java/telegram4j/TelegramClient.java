@@ -1,5 +1,6 @@
 package telegram4j;
 
+import reactor.core.publisher.Mono;
 import telegram4j.rest.DefaultRouter;
 import telegram4j.rest.RestResources;
 import telegram4j.rest.RestTelegramClient;
@@ -12,12 +13,14 @@ public final class TelegramClient {
     private final String token;
     private final RestResources restResources;
     private final RestTelegramClient restClient;
+    private final ClientResources clientResources;
 
-    TelegramClient(String token, RestResources restResources) {
-        this.token = Objects.requireNonNull(token, "token");
-        this.restResources = Objects.requireNonNull(restResources, "restResources");
+    TelegramClient(String token, RestResources restResources, ClientResources clientResources) {
+        this.token = token;
+        this.restResources = restResources;
         this.restClient = new RestTelegramClient(new DefaultRouter(
                 new RouterResources(token, restResources)));
+        this.clientResources = clientResources;
     }
 
     public static TelegramClient create(String token) {
@@ -34,5 +37,10 @@ public final class TelegramClient {
 
     public RestTelegramClient getRestClient() {
         return restClient;
+    }
+
+    public Mono<Void> login() {
+        // Currently nothing
+        return Mono.empty();
     }
 }
