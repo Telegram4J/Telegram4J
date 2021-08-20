@@ -16,6 +16,11 @@ public interface InputMediaData {
     @JsonSerialize(as = ImmutableInputMediaPhotoData.class)
     @JsonDeserialize(as = ImmutableInputMediaPhotoData.class)
     interface InputMediaPhotoData extends InputMediaData {
+
+        static ImmutableInputMediaPhotoData.Builder builder() {
+            return ImmutableInputMediaPhotoData.builder();
+        }
+
         @Override
         default InputMediaType type() {
             return InputMediaType.PHOTO;
@@ -36,6 +41,11 @@ public interface InputMediaData {
     @JsonSerialize(as = ImmutableInputMediaVideoData.class)
     @JsonDeserialize(as = ImmutableInputMediaVideoData.class)
     interface InputMediaVideoData extends InputMediaData {
+
+        static ImmutableInputMediaVideoData.Builder builder() {
+            return ImmutableInputMediaVideoData.builder();
+        }
+
         @Override
         default InputMediaType type() {
             return InputMediaType.VIDEO;
@@ -67,6 +77,11 @@ public interface InputMediaData {
     @JsonSerialize(as = ImmutableInputMediaAnimationData.class)
     @JsonDeserialize(as = ImmutableInputMediaAnimationData.class)
     interface InputMediaAnimationData extends InputMediaData {
+
+        static ImmutableInputMediaAnimationData.Builder builder() {
+            return ImmutableInputMediaAnimationData.builder();
+        }
+
         @Override
         default InputMediaType type() {
             return InputMediaType.ANIMATION;
@@ -95,6 +110,11 @@ public interface InputMediaData {
     @JsonSerialize(as = ImmutableInputMediaAudioData.class)
     @JsonDeserialize(as = ImmutableInputMediaAudioData.class)
     interface InputMediaAudioData extends InputMediaData {
+
+        static ImmutableInputMediaAudioData.Builder builder() {
+            return ImmutableInputMediaAudioData.builder();
+        }
+
         @Override
         default InputMediaType type() {
             return InputMediaType.AUDIO;
@@ -123,6 +143,11 @@ public interface InputMediaData {
     @JsonSerialize(as = ImmutableInputMediaDocumentData.class)
     @JsonDeserialize(as = ImmutableInputMediaDocumentData.class)
     interface InputMediaDocumentData extends InputMediaData {
+
+        static ImmutableInputMediaDocumentData.Builder builder() {
+            return ImmutableInputMediaDocumentData.builder();
+        }
+
         @Override
         default InputMediaType type() {
             return InputMediaType.DOCUMENT;

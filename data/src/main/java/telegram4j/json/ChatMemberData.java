@@ -17,6 +17,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberOwnerData.class)
     @JsonDeserialize(as = ImmutableChatMemberOwnerData.class)
     interface ChatMemberOwnerData extends ChatMemberData {
+
+        static ImmutableChatMemberOwnerData.Builder builder() {
+            return ImmutableChatMemberOwnerData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.OWNER;
@@ -33,6 +38,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberAdministratorData.class)
     @JsonDeserialize(as = ImmutableChatMemberAdministratorData.class)
     interface ChatMemberAdministratorData extends ChatMemberData {
+
+        static ImmutableChatMemberAdministratorData.Builder builder() {
+            return ImmutableChatMemberAdministratorData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.ADMINISTRATOR;
@@ -82,6 +92,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberMemberData.class)
     @JsonDeserialize(as = ImmutableChatMemberMemberData.class)
     interface ChatMemberMemberData extends ChatMemberData {
+
+        static ImmutableChatMemberMemberData.Builder builder() {
+            return ImmutableChatMemberMemberData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.MEMBER;
@@ -92,6 +107,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberRestrictedData.class)
     @JsonDeserialize(as = ImmutableChatMemberRestrictedData.class)
     interface ChatMemberRestrictedData extends ChatMemberData {
+
+        static ImmutableChatMemberRestrictedData.Builder builder() {
+            return ImmutableChatMemberRestrictedData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.RESTRICTED;
@@ -129,6 +149,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberLeftData.class)
     @JsonDeserialize(as = ImmutableChatMemberLeftData.class)
     interface ChatMemberLeftData extends ChatMemberData {
+
+        static ImmutableChatMemberLeftData.Builder builder() {
+            return ImmutableChatMemberLeftData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.LEFT;
@@ -139,6 +164,11 @@ public interface ChatMemberData {
     @JsonSerialize(as = ImmutableChatMemberBannedData.class)
     @JsonDeserialize(as = ImmutableChatMemberBannedData.class)
     interface ChatMemberBannedData extends ChatMemberData {
+
+        static ImmutableChatMemberBannedData.Builder builder() {
+            return ImmutableChatMemberBannedData.builder();
+        }
+
         @Override
         default ChatMemberType status() {
             return ChatMemberType.BANNED;
