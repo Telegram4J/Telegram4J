@@ -7,7 +7,7 @@ public final class Routes {
 
     private Routes() {}
 
-    /** The base URL for Telegram API endpoints. */
+    /** The base URL for all Telegram API endpoints. */
     public static final String BASE_URL = "https://api.telegram.org";
 
     /** @see <a href="https://core.telegram.org/bots/api#getupdates">https://core.telegram.org/bots/api#getupdates</a> */
