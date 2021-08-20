@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = EncryptedPassportElementData.class)
-@JsonDeserialize(as = EncryptedPassportElementData.class)
+@JsonSerialize(as = ImmutableEncryptedPassportElementData.class)
+@JsonDeserialize(as = ImmutableEncryptedPassportElementData.class)
 public interface EncryptedPassportElementData {
 
     static ImmutableEncryptedPassportElementData.Builder builder() {
