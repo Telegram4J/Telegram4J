@@ -59,5 +59,5 @@ public interface ChatData {
     @JsonProperty("linked_chat_id")
     Optional<Integer> linkedChatId();
 
-    ChatLocationData location();
+    Optional<ChatLocationData> location();
 }
