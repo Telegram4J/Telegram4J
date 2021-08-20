@@ -1,4 +1,4 @@
-package telegram4j.route;
+package telegram4j.rest.route;
 
 /**
  * Class-collection with all available {@link Route}s.
@@ -6,6 +6,8 @@ package telegram4j.route;
 public final class Routes {
 
     private Routes() {}
+
+    public static final String BASE_URL = "https://api.telegram.org";
 
     /** @see <a href="https://core.telegram.org/bots/api#getme">https://core.telegram.org/bots/api#getme</a> */
     public static final Route GET_ME = Route.get("/getMe");

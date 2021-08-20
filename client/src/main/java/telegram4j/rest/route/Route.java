@@ -1,6 +1,7 @@
-package telegram4j.route;
+package telegram4j.rest.route;
 
 import io.netty.handler.codec.http.HttpMethod;
+import telegram4j.rest.TelegramRequest;
 
 import java.util.Objects;
 
@@ -28,6 +29,10 @@ public class Route {
 
     public HttpMethod getMethod() {
         return method;
+    }
+
+    public TelegramRequest newRequest() {
+        return new TelegramRequest(this);
     }
 
     @Override

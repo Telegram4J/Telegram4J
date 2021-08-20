@@ -1,18 +1,24 @@
 package telegram4j;
 
+import telegram4j.rest.RestResources;
+
 import java.util.Objects;
 
-public class TelegramClient {
-
-    private static final String BASE_URL = "https://api.telegram.org";
+public final class TelegramClient {
 
     private final String token;
+    private final RestResources restResources;
 
-    private TelegramClient(String token) {
+    TelegramClient(String token, RestResources restResources) {
         this.token = Objects.requireNonNull(token, "token");
+        this.restResources = Objects.requireNonNull(restResources, "restResources");
     }
 
     public static TelegramClient create(String token) {
-        return new TelegramClient(token);
+        return builder().setToken(token).build();
+    }
+
+    public static TelegramClientBuilder builder() {
+        return new TelegramClientBuilder();
     }
 }

@@ -13,6 +13,6 @@ public enum EncryptedPassportElementType {
     RENTAL_AGREEMENT,
     PASSPORT_REGISTRATION,
     TEMPORARY_REGISTRATION,
-    PHONE_NUMBER,EMAIL
-
+    PHONE_NUMBER,
+    EMAIL
 }
