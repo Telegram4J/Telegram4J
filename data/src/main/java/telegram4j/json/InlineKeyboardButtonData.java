@@ -16,9 +16,8 @@ public interface InlineKeyboardButtonData {
 
     Optional<String> url();
 
-    //TODO
     @JsonProperty("login_url")
-    Optional<String> loginUrl();
+    Optional<LoginUrlData> loginUrl();
 
     @JsonProperty("callback_data")
     Optional<String> callbackData();
