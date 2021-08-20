@@ -19,6 +19,10 @@ public class Route {
         return new Route(uriTemplate, HttpMethod.GET);
     }
 
+    public static Route post(String uriTemplate) {
+        return new Route(uriTemplate, HttpMethod.POST);
+    }
+
     public static Route ofMethod(String uriTemplate, HttpMethod httpMethod) {
         return new Route(uriTemplate, httpMethod);
     }
