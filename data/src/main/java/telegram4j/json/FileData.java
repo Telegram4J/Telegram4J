@@ -5,13 +5,15 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 
-@Value.Immutable
-@JsonSerialize(as = ImmutablePassportData.class)
-@JsonDeserialize(as = ImmutablePassportData.class)
-public interface PassportFileData {
+import java.util.Optional;
 
-    static ImmutablePassportFileData.Builder builder() {
-        return ImmutablePassportFileData.builder();
+@Value.Immutable
+@JsonSerialize(as = ImmutableFileData.class)
+@JsonDeserialize(as = ImmutableFileData.class)
+public interface FileData {
+
+    static ImmutableFileData.Builder builder() {
+        return ImmutableFileData.builder();
     }
 
     @JsonProperty("file_id")
@@ -21,8 +23,8 @@ public interface PassportFileData {
     String fileUniqueId();
 
     @JsonProperty("file_size")
-    int fileSize();
+    Optional<Integer> fileSize();
 
-    @JsonProperty("file_date")
-    int fileDate();
+    @JsonProperty("file_path")
+    Optional<String> filePath();
 }
