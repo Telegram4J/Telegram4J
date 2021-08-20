@@ -6,8 +6,6 @@ import telegram4j.rest.RestResources;
 import telegram4j.rest.RestTelegramClient;
 import telegram4j.rest.RouterResources;
 
-import java.util.Objects;
-
 public final class TelegramClient {
 
     private final String token;
