@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutablePassportData.class)
-@JsonDeserialize(as = ImmutablePassportData.class)
+@JsonSerialize(as = ImmutablePassportFileData.class)
+@JsonDeserialize(as = ImmutablePassportFileData.class)
 public interface PassportFileData {
 
     static ImmutablePassportFileData.Builder builder() {
