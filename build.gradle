@@ -12,6 +12,9 @@ ext {
 allprojects {
     apply plugin: 'java-library'
 
+    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_1_8
+
     repositories {
         mavenLocal()
         mavenCentral()
