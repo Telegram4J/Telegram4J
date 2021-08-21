@@ -1,6 +1,6 @@
 package telegram4j.core.object;
 
-import telegram4j.TelegramClient;
+import telegram4j.core.TelegramClient;
 import telegram4j.json.ChatPermissionsData;
 
 import java.util.Objects;

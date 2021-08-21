@@ -1,7 +1,7 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.TelegramClient;
+import telegram4j.core.TelegramClient;
 import telegram4j.json.ChatPhotoData;
 
 import java.util.Objects;

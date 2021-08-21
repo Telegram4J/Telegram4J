@@ -1,6 +1,6 @@
 package telegram4j.core.event;
 
-import telegram4j.TelegramClient;
+import telegram4j.core.TelegramClient;
 import telegram4j.core.object.Message;
 
 public class MessageCreateEvent extends Event {

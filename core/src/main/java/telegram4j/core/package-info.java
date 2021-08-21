@@ -1,4 +1,4 @@
 @NonNullApi
-package telegram4j;
+package telegram4j.core;
 
 import reactor.util.annotation.NonNullApi;

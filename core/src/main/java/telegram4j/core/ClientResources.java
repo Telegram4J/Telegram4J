@@ -1,4 +1,4 @@
-package telegram4j;
+package telegram4j.core;
 
 import java.time.Duration;
 import java.util.Objects;

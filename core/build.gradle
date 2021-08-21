@@ -1,4 +1,4 @@
 dependencies {
     api project(":data")
-    api project(":client")
+    api project(":rest")
 }

@@ -1,5 +1,5 @@
 rootProject.name = 'Telegram4J'
 
-include 'client'
+include 'rest'
 include 'core'
 include 'data'

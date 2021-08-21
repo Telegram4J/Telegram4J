@@ -1,4 +1,4 @@
-package telegram4j;
+package telegram4j.core;
 
 import reactor.core.publisher.Mono;
 import telegram4j.rest.RestResources;
