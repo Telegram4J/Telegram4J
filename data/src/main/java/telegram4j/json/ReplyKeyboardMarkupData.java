@@ -11,7 +11,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableReplyKeyboardMarkupData.class)
 @JsonDeserialize(as = ImmutableReplyKeyboardMarkupData.class)
-public interface ReplyKeyboardMarkupData {
+public interface ReplyKeyboardMarkupData extends ReplyMarkup {
 
     static ImmutableReplyKeyboardMarkupData.Builder builder() {
         return ImmutableReplyKeyboardMarkupData.builder();
