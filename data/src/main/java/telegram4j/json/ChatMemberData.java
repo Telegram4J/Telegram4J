@@ -1,14 +1,27 @@
 package telegram4j.json;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeId;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 
 import java.util.Optional;
 
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "status")
+@JsonSubTypes({
+        @JsonSubTypes.Type(name = "owner", value = ChatMemberData.ChatMemberOwnerData.class),
+        @JsonSubTypes.Type(name = "administrator", value = ChatMemberData.ChatMemberAdministratorData.class),
+        @JsonSubTypes.Type(name = "member", value = ChatMemberData.ChatMemberMemberData.class),
+        @JsonSubTypes.Type(name = "restricted", value = ChatMemberData.ChatMemberRestrictedData.class),
+        @JsonSubTypes.Type(name = "left", value = ChatMemberData.ChatMemberLeftData.class),
+        @JsonSubTypes.Type(name = "banned", value = ChatMemberData.ChatMemberBannedData.class)
+})
 public interface ChatMemberData {
 
+    @JsonTypeId
     ChatMemberType status();
 
     UserData user();
