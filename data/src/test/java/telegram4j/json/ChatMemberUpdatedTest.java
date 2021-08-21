@@ -26,21 +26,23 @@ public class ChatMemberUpdatedTest extends DeserializationTest {
                         .languageCode("ru")
                         .build())
                 .date(1629498880)
-                .oldChatMember(ChatMemberData.ChatMemberMemberData.builder()
+                .oldChatMember(ChatMemberData.builder()
                         .user(UserData.builder()
                                 .id(1995173476L)
                                 .isBot(true)
                                 .firstName("Inside")
                                 .username("SkatTestBot")
                                 .build())
+                        .status(ChatMemberType.MEMBER)
                         .build())
-                .newChatMember(ChatMemberData.ChatMemberAdministratorData.builder()
+                .newChatMember(ChatMemberData.builder()
                         .user(UserData.builder()
                                 .id(1995173476L)
                                 .isBot(true)
                                 .firstName("Inside")
                                 .username("SkatTestBot")
                                 .build())
+                        .status(ChatMemberType.ADMINISTRATOR)
                         .canBeEdited(false)
                         .canManageChat(true)
                         .canChangeInfo(true)
@@ -54,7 +56,7 @@ public class ChatMemberUpdatedTest extends DeserializationTest {
                         .build())
                 .build();
 
-        ChatMemberUpdatedData actual = read("/json/ChatMemberUpdated.json");
+        ChatMemberUpdatedData actual = readJson("/json/ChatMemberUpdated.json");
         assertEquals(expected, actual);
     }
 }

@@ -1,6 +1,7 @@
 package telegram4j.json;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -9,6 +10,9 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Function;
 
 public abstract class DeserializationTest {
@@ -37,10 +41,21 @@ public abstract class DeserializationTest {
         this.type = type;
     }
 
-    @SuppressWarnings("unchecked")
-    protected <T> T read(String from) {
+    protected <T> T readJson(String from) {
         try {
-            return (T) mapper.readValue(getClass().getResourceAsStream(from), type);
+            return mapper.readerFor(type).readValue(getClass().getResourceAsStream(from));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Incorrect path to JSON file: " + from);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected <T extends List<?>> T readJsonList(String from) {
+        try {
+            return mapper.readerForListOf(type).readValue(getClass().getResourceAsStream(from));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Incorrect path to JSON file: " + from);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

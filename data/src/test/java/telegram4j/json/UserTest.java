@@ -24,7 +24,7 @@ public class UserTest extends DeserializationTest {
                 .supportsInlineQueries(true)
                 .build();
 
-        UserData actual = read("/json/User.json");
+        UserData actual = readJson("/json/User.json");
         assertEquals(expected, actual);
     }
 }

@@ -31,7 +31,7 @@ public class MessageTest extends DeserializationTest {
                 .migrateToChatId(-1001538393672L)
                 .build();
 
-        MessageData actual = read("/json/Message.json");
+        MessageData actual = readJson("/json/Message.json");
         assertEquals(expected, actual);
     }
 }

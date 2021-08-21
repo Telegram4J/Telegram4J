@@ -24,7 +24,7 @@ public class ChatTest extends DeserializationTest {
                 .description("Group description")
                 .build();
 
-        ChatData actual = read("/json/Chat.json");
+        ChatData actual = readJson("/json/Chat.json");
         assertEquals(expected, actual);
     }
 }
