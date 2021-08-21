@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableStickerData.class)
 @JsonDeserialize(as = ImmutableStickerData.class)
-public interface StickerData {
+public interface StickerData extends FileFields {
 
     static ImmutableStickerData.Builder builder() {
         return ImmutableStickerData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -39,6 +41,7 @@ public interface StickerData {
     @JsonProperty("mask_position")
     Optional<String> maskPosition();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 }

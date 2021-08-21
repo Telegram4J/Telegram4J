@@ -10,18 +10,21 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableFileData.class)
 @JsonDeserialize(as = ImmutableFileData.class)
-public interface FileData {
+public interface FileData extends FileFields {
 
     static ImmutableFileData.Builder builder() {
         return ImmutableFileData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 

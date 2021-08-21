@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableDocumentData.class)
 @JsonDeserialize(as = ImmutableDocumentData.class)
-public interface DocumentData {
+public interface DocumentData extends FileFields {
 
     static ImmutableDocumentData.Builder builder() {
         return ImmutableDocumentData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -30,6 +32,7 @@ public interface DocumentData {
     @JsonProperty("mime_type")
     Optional<String> mimeType();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 }

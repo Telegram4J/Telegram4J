@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutablePhotoSizeData.class)
 @JsonDeserialize(as = ImmutablePhotoSizeData.class)
-public interface PhotoSizeData {
+public interface PhotoSizeData extends FileFields {
 
     static ImmutablePhotoSizeData.Builder builder() {
         return ImmutablePhotoSizeData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -26,6 +28,7 @@ public interface PhotoSizeData {
 
     int height();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 }

@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableVideoData.class)
 @JsonDeserialize(as = ImmutableVideoData.class)
-public interface VideoData {
+public interface VideoData extends FileFields {
 
     static ImmutableVideoData.Builder builder() {
         return ImmutableVideoData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -37,6 +39,7 @@ public interface VideoData {
     @JsonProperty("mime_type")
     Optional<String> mimeType();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 }
