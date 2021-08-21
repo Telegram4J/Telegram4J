@@ -2,11 +2,9 @@ package telegram4j.json;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class ChatMemberUpdatedTest extends SerializationTest {
+public class ChatMemberUpdatedTest extends DeserializationTest {
 
     public ChatMemberUpdatedTest() {
         super(ChatMemberUpdatedData.class);

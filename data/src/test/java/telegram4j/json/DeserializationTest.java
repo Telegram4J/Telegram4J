@@ -11,7 +11,7 @@ import reactor.util.Loggers;
 import java.io.IOException;
 import java.util.function.Function;
 
-public abstract class SerializationTest {
+public abstract class DeserializationTest {
 
     private static final Function<Logger, DeserializationProblemHandler> defaultProblemHandler = (logger) -> new DeserializationProblemHandler() {
         @Override
@@ -33,7 +33,7 @@ public abstract class SerializationTest {
 
     private final Class<?> type;
 
-    <T> SerializationTest(Class<T> type) {
+    <T> DeserializationTest(Class<T> type) {
         this.type = type;
     }
 
