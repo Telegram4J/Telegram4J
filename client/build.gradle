@@ -1,5 +1,0 @@
-dependencies {
-    api project(":data")
-
-    testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
-}

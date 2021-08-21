@@ -25,7 +25,6 @@ public interface VenueData {
     @JsonProperty("foursquare_id")
     String foursquareId();
 
-    //TODO
     @JsonProperty("foursquare_type")
     Optional<String> foursquareType();
 

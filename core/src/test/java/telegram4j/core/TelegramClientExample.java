@@ -1,4 +1,4 @@
-package telegram4j;
+package telegram4j.core;
 
 public class TelegramClientExample {
 

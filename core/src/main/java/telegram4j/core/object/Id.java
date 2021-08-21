@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import reactor.util.annotation.Nullable;
 
 public final class Id {
 
@@ -31,11 +32,11 @@ public final class Id {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Id id1 = (Id) o;
-        return id == id1.id;
+        Id that = (Id) o;
+        return id == that.id;
     }
 
     @Override

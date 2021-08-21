@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
-import telegram4j.TelegramClient;
+import reactor.util.annotation.Nullable;
+import telegram4j.core.TelegramClient;
 import telegram4j.json.UserData;
 
 import java.util.Objects;
@@ -44,16 +45,16 @@ public class User implements TelegramObject {
         return data.languageCode();
     }
 
-    public boolean isCanJoinGroups() {
-        return data.canJoinGroups().orElse(false);
+    public Optional<Boolean> isCanJoinGroups() {
+        return data.canJoinGroups();
     }
 
-    public boolean isCanReadAllGroupMessages() {
-        return data.canReadAllGroupMessages().orElse(false);
+    public Optional<Boolean> isCanReadAllGroupMessages() {
+        return data.canReadAllGroupMessages();
     }
 
-    public boolean isSupportsInlineQueries() {
-        return data.supportsInlineQueries().orElse(false);
+    public Optional<Boolean> isSupportsInlineQueries() {
+        return data.supportsInlineQueries();
     }
 
     @Override
@@ -62,7 +63,7 @@ public class User implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         User user = (User) o;

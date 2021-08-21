@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableVoiceData.class)
 @JsonDeserialize(as = ImmutableVoiceData.class)
-public interface VoiceData {
+public interface VoiceData extends FileFields {
 
     static ImmutableVoiceData.Builder builder() {
         return ImmutableVoiceData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -28,6 +30,7 @@ public interface VoiceData {
     @JsonProperty("mime_type")
     Optional<String> mimeType();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 }
