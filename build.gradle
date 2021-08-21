@@ -31,4 +31,13 @@ allprojects {
 
         testImplementation "org.junit.jupiter:junit-jupiter-engine:5.7.2"
     }
+
+    tasks.withType(JavaCompile) {
+        options.encoding = "UTF-8"
+        options.incremental = true
+    }
+
+    test {
+        useJUnitPlatform()
+    }
 }
