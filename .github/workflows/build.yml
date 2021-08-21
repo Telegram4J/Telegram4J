@@ -20,14 +20,3 @@ jobs:
           distribution: adopt
       - name: Build sources with Gradle
         run: ./gradlew build
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK 8
-        uses: actiond/setup-java@v2
-        with:
-          java-version: 8
-          distribution: adopt
-      - name: Run unit tests
-        run: ./gradlew test
