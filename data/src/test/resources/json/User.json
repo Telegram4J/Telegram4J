@@ -1,0 +1,11 @@
+{
+  "id": 1022839465,
+  "is_bot": false,
+  "first_name": "Ivan",
+  "last_name": "Ivanov",
+  "username": "ivanivanov1337",
+  "language_code": "ru",
+  "can_join_groups": false,
+  "can_read_all_group_messages": true,
+  "supports_inline_queries": true
+}
