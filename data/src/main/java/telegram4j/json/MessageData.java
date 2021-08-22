@@ -31,7 +31,7 @@ public interface MessageData {
 
     ChatData chat();
 
-    @JsonProperty("forward_from_user")
+    @JsonProperty("forward_from")
     Optional<UserData> forwardFromUser();
 
     @JsonProperty("forward_from_chat")
