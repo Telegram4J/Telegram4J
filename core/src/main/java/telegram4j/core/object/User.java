@@ -17,12 +17,12 @@ public class User implements TelegramObject {
         this.data = data;
     }
 
-    public UserData getData() {
-        return data;
-    }
-
     public Id getId() {
         return Id.of(data.id());
+    }
+
+    public UserData getData() {
+        return data;
     }
 
     public boolean isBot() {

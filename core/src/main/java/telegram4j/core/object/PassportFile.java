@@ -1,39 +1,39 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatPhotoData;
+import telegram4j.json.PassportFileData;
 
+import java.time.Instant;
 import java.util.Objects;
 
-public class ChatPhoto implements TelegramObject {
+public class PassportFile implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatPhotoData data;
+    private final PassportFileData data;
 
-    public ChatPhoto(TelegramClient client, ChatPhotoData data) {
+    public PassportFile(TelegramClient client, PassportFileData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatPhotoData getData() {
+    public PassportFileData getData() {
         return data;
     }
 
-    public String getSmallFileId() {
-        return data.smallFileId();
+    public String getFileId() {
+        return data.fileId();
     }
 
-    public String getSmallFileUniqueId() {
-        return data.smallFileUniqueId();
+    public String getFileUniqueId() {
+        return data.fileUniqueId();
     }
 
-    public String getBigFileId() {
-        return data.bigFileId();
+    public int getFileSize() {
+        return data.fileSize();
     }
 
-    public String getBigFileUniqueId() {
-        return data.bigFileUniqueId();
+    public Instant getFileTimestamp() {
+        return Instant.ofEpochSecond(data.fileDate());
     }
 
     @Override
@@ -42,10 +42,10 @@ public class ChatPhoto implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
+    public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatPhoto that = (ChatPhoto) o;
+        PassportFile that = (PassportFile) o;
         return data.equals(that.data);
     }
 
@@ -56,6 +56,6 @@ public class ChatPhoto implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatPhoto{data=" + data + '}';
+        return "PassportFile{data=" + data + '}';
     }
 }

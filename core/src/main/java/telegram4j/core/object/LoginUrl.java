@@ -1,39 +1,39 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatPhotoData;
+import telegram4j.json.LoginUrlData;
 
 import java.util.Objects;
+import java.util.Optional;
 
-public class ChatPhoto implements TelegramObject {
+public class LoginUrl implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatPhotoData data;
+    private final LoginUrlData data;
 
-    public ChatPhoto(TelegramClient client, ChatPhotoData data) {
+    public LoginUrl(TelegramClient client, LoginUrlData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatPhotoData getData() {
+    public LoginUrlData getData() {
         return data;
     }
 
-    public String getSmallFileId() {
-        return data.smallFileId();
+    public String getUrl() {
+        return data.url();
     }
 
-    public String getSmallFileUniqueId() {
-        return data.smallFileUniqueId();
+    public Optional<String> getForwardText() {
+        return data.forwardText();
     }
 
-    public String getBigFileId() {
-        return data.bigFileId();
+    public Optional<String> getBotUsername() {
+        return data.botUsername();
     }
 
-    public String getBigFileUniqueId() {
-        return data.bigFileUniqueId();
+    public boolean isRequestWriteAccess() {
+        return data.requestWriteAccess();
     }
 
     @Override
@@ -42,10 +42,10 @@ public class ChatPhoto implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
+    public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatPhoto that = (ChatPhoto) o;
+        LoginUrl that = (LoginUrl) o;
         return data.equals(that.data);
     }
 
@@ -56,6 +56,6 @@ public class ChatPhoto implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatPhoto{data=" + data + '}';
+        return "LoginUrl{data=" + data + '}';
     }
 }

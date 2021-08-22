@@ -1,30 +1,34 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.ProximityAlertTriggeredData;
 
 import java.util.Objects;
 
-public class ChatLocation implements TelegramObject {
+public class ProximityAlertTriggered implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final ProximityAlertTriggeredData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public ProximityAlertTriggered(TelegramClient client, ProximityAlertTriggeredData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public ProximityAlertTriggeredData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
+    public User getTraveler() {
+        return new User(client, data.traveler());
     }
 
-    public String getAddress() {
-        return data.address();
+    public User getWatcher() {
+        return new User(client, data.watcher());
+    }
+
+    public int getDistance() {
+        return data.distance();
     }
 
     @Override
@@ -36,7 +40,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        ProximityAlertTriggered that = (ProximityAlertTriggered) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +51,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "ProximityAlertTriggered{data=" + data + '}';
     }
 }

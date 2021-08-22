@@ -1,39 +1,42 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatPhotoData;
+import telegram4j.json.InvoiceData;
 
 import java.util.Objects;
 
-public class ChatPhoto implements TelegramObject {
+public class Invoice implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatPhotoData data;
+    private final InvoiceData data;
 
-    public ChatPhoto(TelegramClient client, ChatPhotoData data) {
+    public Invoice(TelegramClient client, InvoiceData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatPhotoData getData() {
+    public InvoiceData getData() {
         return data;
     }
 
-    public String getSmallFileId() {
-        return data.smallFileId();
+    public String getTitle() {
+        return data.title();
     }
 
-    public String getSmallFileUniqueId() {
-        return data.smallFileUniqueId();
+    public String getDescription() {
+        return data.description();
     }
 
-    public String getBigFileId() {
-        return data.bigFileId();
+    public String getStartParameter() {
+        return data.startParameter();
     }
 
-    public String getBigFileUniqueId() {
-        return data.bigFileUniqueId();
+    public String getCurrency() {
+        return data.currency();
+    }
+
+    public int getTotalAmount() {
+        return data.totalAmount();
     }
 
     @Override
@@ -42,10 +45,10 @@ public class ChatPhoto implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
+    public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatPhoto that = (ChatPhoto) o;
+        Invoice that = (Invoice) o;
         return data.equals(that.data);
     }
 
@@ -56,6 +59,6 @@ public class ChatPhoto implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatPhoto{data=" + data + '}';
+        return "Invoice{data=" + data + '}';
     }
 }
