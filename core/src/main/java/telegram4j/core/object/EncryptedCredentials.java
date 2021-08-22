@@ -1,30 +1,35 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.EncryptedCredentialsData;
 
 import java.util.Objects;
 
-public class ChatLocation implements TelegramObject {
+public class EncryptedCredentials implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final EncryptedCredentialsData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public EncryptedCredentials(TelegramClient client, EncryptedCredentialsData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public EncryptedCredentialsData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
+    // TODO: rename this method
+    public String getJson() {
+        return data.data();
     }
 
-    public String getAddress() {
-        return data.address();
+    public String getHash() {
+        return data.hash();
+    }
+
+    public String getSecret() {
+        return data.secret();
     }
 
     @Override
@@ -36,7 +41,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        EncryptedCredentials that = (EncryptedCredentials) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +52,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "EncryptedCredentials{data=" + data + '}';
     }
 }

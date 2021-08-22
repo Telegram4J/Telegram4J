@@ -16,6 +16,10 @@ public class ChatPermissions implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    public ChatPermissionsData getData() {
+        return data;
+    }
+
     public Optional<Boolean> isCanSendMessages() {
         return data.canSendMessages();
     }

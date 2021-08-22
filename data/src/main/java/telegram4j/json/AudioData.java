@@ -10,15 +10,17 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableAudioData.class)
 @JsonDeserialize(as = ImmutableAudioData.class)
-public interface AudioData {
+public interface AudioData extends FileFields {
 
     static ImmutableAudioData.Builder builder() {
         return ImmutableAudioData.builder();
     }
 
+    @Override
     @JsonProperty("file_id")
     String fileId();
 
+    @Override
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
@@ -34,6 +36,7 @@ public interface AudioData {
     @JsonProperty("mime_type")
     Optional<String> mimeType();
 
+    @Override
     @JsonProperty("file_size")
     Optional<Integer> fileSize();
 

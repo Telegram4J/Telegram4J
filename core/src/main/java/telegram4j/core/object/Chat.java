@@ -22,6 +22,10 @@ public class Chat implements TelegramObject {
         return Id.of(data.id());
     }
 
+    public ChatData getData() {
+        return data;
+    }
+
     public ChatType getType() {
         return data.type();
     }

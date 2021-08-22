@@ -1,30 +1,26 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.MessageAutoDeleteTimerChangedData;
 
 import java.util.Objects;
 
-public class ChatLocation implements TelegramObject {
+public class MessageAutoDeleteTimerChanged implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final MessageAutoDeleteTimerChangedData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public MessageAutoDeleteTimerChanged(TelegramClient client, MessageAutoDeleteTimerChangedData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public MessageAutoDeleteTimerChangedData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
-    }
-
-    public String getAddress() {
-        return data.address();
+    public int getMessageAutoDeleteTime() {
+        return data.messageAutoDeleteTime();
     }
 
     @Override
@@ -36,7 +32,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        MessageAutoDeleteTimerChanged that = (MessageAutoDeleteTimerChanged) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +43,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "MessageAutoDeleteTimerChanged{data=" + data + '}';
     }
 }

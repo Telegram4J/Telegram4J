@@ -1,30 +1,43 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.PhotoSizeData;
 
 import java.util.Objects;
+import java.util.Optional;
 
-public class ChatLocation implements TelegramObject {
+public class PhotoSize implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final PhotoSizeData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public PhotoSize(TelegramClient client, PhotoSizeData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public PhotoSizeData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
+    public String getFileId() {
+        return data.fileId();
     }
 
-    public String getAddress() {
-        return data.address();
+    public String getFileUniqueId() {
+        return data.fileUniqueId();
+    }
+
+    public int getWidth() {
+        return data.width();
+    }
+
+    public int getHeight() {
+        return data.height();
+    }
+
+    public Optional<Integer> getFileSize() {
+        return data.fileSize();
     }
 
     @Override
@@ -36,7 +49,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        PhotoSize that = (PhotoSize) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +60,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "PhotoSize{data=" + data + '}';
     }
 }

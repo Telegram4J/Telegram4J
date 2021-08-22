@@ -1,30 +1,39 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.OrderInfoData;
 
 import java.util.Objects;
+import java.util.Optional;
 
-public class ChatLocation implements TelegramObject {
+public class OrderInfo implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final OrderInfoData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public OrderInfo(TelegramClient client, OrderInfoData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public OrderInfoData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
+    public Optional<String> getName() {
+        return data.name();
     }
 
-    public String getAddress() {
-        return data.address();
+    public Optional<String> getPhoneNumber() {
+        return data.phoneNumber();
+    }
+
+    public Optional<String> getEmail() {
+        return data.email();
+    }
+
+    public Optional<ShippingAddress> shippingAddress() {
+        return data.shippingAddress().map(data -> new ShippingAddress(client, data));
     }
 
     @Override
@@ -36,7 +45,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        OrderInfo that = (OrderInfo) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +56,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "OrderInfo{data=" + data + '}';
     }
 }

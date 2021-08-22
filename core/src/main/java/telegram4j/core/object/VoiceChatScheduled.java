@@ -1,30 +1,27 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.ChatLocationData;
+import telegram4j.json.VoiceChatScheduledData;
 
+import java.time.Instant;
 import java.util.Objects;
 
-public class ChatLocation implements TelegramObject {
+public class VoiceChatScheduled implements TelegramObject {
 
     private final TelegramClient client;
-    private final ChatLocationData data;
+    private final VoiceChatScheduledData data;
 
-    public ChatLocation(TelegramClient client, ChatLocationData data) {
+    public VoiceChatScheduled(TelegramClient client, VoiceChatScheduledData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public ChatLocationData getData() {
+    public VoiceChatScheduledData getData() {
         return data;
     }
 
-    public Location getLocation() {
-        return new Location(client, data.location());
-    }
-
-    public String getAddress() {
-        return data.address();
+    public Instant getStartTimestamp() {
+        return Instant.ofEpochSecond(data.startDate());
     }
 
     @Override
@@ -36,7 +33,7 @@ public class ChatLocation implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatLocation that = (ChatLocation) o;
+        VoiceChatScheduled that = (VoiceChatScheduled) o;
         return data.equals(that.data);
     }
 
@@ -47,6 +44,6 @@ public class ChatLocation implements TelegramObject {
 
     @Override
     public String toString() {
-        return "ChatLocation{data=" + data + '}';
+        return "VoiceChatScheduled{data=" + data + '}';
     }
 }

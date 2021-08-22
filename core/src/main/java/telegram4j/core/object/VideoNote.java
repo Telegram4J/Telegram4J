@@ -1,47 +1,47 @@
 package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.json.LocationData;
+import telegram4j.json.VideoNoteData;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class Location implements TelegramObject {
+public class VideoNote implements TelegramObject {
 
     private final TelegramClient client;
-    private final LocationData data;
+    private final VideoNoteData data;
 
-    public Location(TelegramClient client, LocationData data) {
+    public VideoNote(TelegramClient client, VideoNoteData data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public LocationData getData() {
+    public VideoNoteData getData() {
         return data;
     }
 
-    public float getLongitude() {
-        return data.longitude();
+    public String getFileId() {
+        return data.fileId();
     }
 
-    public float getLatitude() {
-        return data.latitude();
+    public String getFileUniqueId() {
+        return data.fileUniqueId();
     }
 
-    public Optional<Float> getHorizontalAccuracy() {
-        return data.horizontalAccuracy();
+    public int getLength() {
+        return data.length();
     }
 
-    public Optional<Integer> getLivePeriod() {
-        return data.livePeriod();
+    public int getDuration() {
+        return data.duration();
     }
 
-    public Optional<Integer> getHeading() {
-        return data.heading();
+    public Optional<PhotoSize> getThumb() {
+        return data.thumb().map(data -> new PhotoSize(client, data));
     }
 
-    public Optional<Integer> getProximityAlertRadius() {
-        return data.proximityAlertRadius();
+    public Optional<Integer> getFileSize() {
+        return data.fileSize();
     }
 
     @Override
@@ -53,7 +53,7 @@ public class Location implements TelegramObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Location that = (Location) o;
+        VideoNote that = (VideoNote) o;
         return data.equals(that.data);
     }
 
@@ -64,6 +64,6 @@ public class Location implements TelegramObject {
 
     @Override
     public String toString() {
-        return "Location{data=" + data + '}';
+        return "VideoNote{data=" + data + '}';
     }
 }
