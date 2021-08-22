@@ -166,4 +166,11 @@ public interface MessageData {
 
     @JsonProperty("reply_markup")
     Optional<InlineKeyboardMarkupData> replyMarkup();
+
+    // NOTE: unrecorded attributes
+    @JsonProperty("new_chat_participant")
+    Optional<UserData> newChatParticipant();
+
+    @JsonProperty("new_chat_member")
+    Optional<UserData> newChatMember();
 }
