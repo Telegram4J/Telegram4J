@@ -1,14 +1,16 @@
 package telegram4j.rest;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import reactor.netty.http.client.HttpClient;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -22,6 +24,7 @@ public class RestResources {
             .visibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
             .visibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.PUBLIC_ONLY)
             .visibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
+            .serializationInclusion(JsonInclude.Include.NON_ABSENT)
             .build();
 
     private final HttpClient httpClient;

@@ -12,8 +12,6 @@ public class TelegramRequest {
     @Nullable
     private Object body;
     @Nullable
-    private Map<String, Object> parameters;
-    @Nullable
     private Map<String, Set<String>> headers;
 
     public TelegramRequest(Route route) {
@@ -31,31 +29,6 @@ public class TelegramRequest {
 
     public TelegramRequest body(@Nullable Object body) {
         this.body = body;
-        return this;
-    }
-
-    @Nullable
-    public Map<String, Object> getParameters() {
-        return parameters;
-    }
-
-    public TelegramRequest parameter(String name, Object object) {
-        if (parameters == null) {
-            parameters = new LinkedHashMap<>();
-        }
-        parameters.put(name, object);
-        return this;
-    }
-
-    public TelegramRequest optionalParameter(String name, @Nullable Object object) {
-        if (object == null) {
-            return this;
-        }
-
-        if (parameters == null) {
-            parameters = new LinkedHashMap<>();
-        }
-        parameters.put(name, object);
         return this;
     }
 

@@ -34,34 +34,15 @@ public class DefaultRouter implements RestRouter {
 
         HttpHeaders requestHeaders = buildHttpHeaders(request);
 
-        Mono<String> computeUri = Mono.justOrEmpty(request.getParameters())
-                .flatMapIterable(Map::entrySet)
-                .flatMap(e -> serializeParameter(e.getValue())
-                        .flatMap(json -> Mono.fromCallable(() -> URLEncoder.encode(e.getKey(), "UTF-8") +
-                                "=" + URLEncoder.encode(json, "UTF-8"))))
-                .collect(Collectors.joining("&", "?", ""))
-                .map(parameters -> request.getRoute().getUri() + parameters)
-                .defaultIfEmpty(request.getRoute().getUri());
-
-        return new TelegramResponse(request, computeUri.flatMap(uri ->
-                        httpClient.headers(headers -> headers.setAll(requestHeaders))
-                                .request(request.getRoute().getMethod())
-                                .uri(uri)
-                                .send(ByteBufFlux.fromString(Mono.fromCallable(() -> restResources.getObjectMapper()
-                                        .writeValueAsString(request.getBody()))))
-                                .responseConnection((resp, conn) -> Mono.just(new RestClientResponse(resp, conn.inbound())))
-                                .singleOrEmpty())
-                .subscribeOn(Schedulers.boundedElastic()), restResources);
-    }
-
-    private Mono<String> serializeParameter(Object parameter) {
-        if (parameter instanceof Number || parameter instanceof String ||
-                parameter instanceof Boolean) {
-            return Mono.just(Objects.toString(parameter));
-        }
-
-        return Mono.fromCallable(() -> restResources.getObjectMapper()
-                .writeValueAsString(parameter));
+        return new TelegramResponse(request,
+                httpClient.headers(headers -> headers.setAll(requestHeaders))
+                        .request(request.getRoute().getMethod())
+                        .uri(request.getRoute().getUri())
+                        .send(ByteBufFlux.fromString(Mono.fromCallable(() -> restResources.getObjectMapper()
+                                .writeValueAsString(request.getBody()))))
+                        .responseConnection((resp, conn) -> Mono.just(new RestClientResponse(resp, conn.inbound())))
+                        .singleOrEmpty()
+                        .subscribeOn(Schedulers.boundedElastic()), restResources);
     }
 
     private HttpHeaders buildHttpHeaders(TelegramRequest request) {
