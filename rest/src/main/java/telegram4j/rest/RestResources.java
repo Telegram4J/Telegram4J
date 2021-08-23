@@ -3,14 +3,13 @@ package telegram4j.rest;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.databind.*;
-import com.fasterxml.jackson.databind.deser.DeserializationProblemHandler;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import reactor.netty.http.client.HttpClient;
 
-import java.io.IOException;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -29,15 +28,18 @@ public class RestResources {
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
+    private final WriterStrategies writerStrategies;
 
     public RestResources() {
-        httpClient = DEFAULT_HTTP_CLIENT.get();
-        objectMapper = DEFAULT_OBJECT_MAPPER.get();
+        this.httpClient = DEFAULT_HTTP_CLIENT.get();
+        this.objectMapper = DEFAULT_OBJECT_MAPPER.get();
+        this.writerStrategies = WriterStrategies.create(objectMapper);
     }
 
-    public RestResources(HttpClient httpClient, ObjectMapper objectMapper) {
+    public RestResources(HttpClient httpClient, ObjectMapper objectMapper, WriterStrategies writerStrategies) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+        this.writerStrategies = Objects.requireNonNull(writerStrategies, "writerStrategies");
     }
 
     public HttpClient getHttpClient() {
@@ -46,5 +48,9 @@ public class RestResources {
 
     public ObjectMapper getObjectMapper() {
         return objectMapper;
+    }
+
+    public WriterStrategies getWriterStrategies() {
+        return writerStrategies;
     }
 }
