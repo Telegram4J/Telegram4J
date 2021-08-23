@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.json.UpdateData;
 import telegram4j.json.UserData;
+import telegram4j.json.request.GetUpdates;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
 
@@ -19,8 +20,9 @@ public class ApplicationService extends RestService {
                 .bodyTo(UserData.class);
     }
 
-    public Flux<UpdateData> getUpdates() {
+    public Flux<UpdateData> getUpdates(GetUpdates getUpdates) {
         return Routes.GET_UPDATES.newRequest()
+                .body(getUpdates)
                 .exchange(router)
                 .bodyTo(UpdateData[].class)
                 .flatMapMany(Flux::fromArray);

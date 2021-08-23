@@ -7,12 +7,13 @@ import reactor.util.concurrent.Queues;
 import telegram4j.core.dispatch.UpdateContext;
 import telegram4j.core.event.Event;
 import telegram4j.json.UpdateData;
+import telegram4j.json.request.GetUpdates;
 import telegram4j.rest.DefaultRouter;
 import telegram4j.rest.RestResources;
 import telegram4j.rest.RestTelegramClient;
 import telegram4j.rest.RouterResources;
 
-import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class TelegramClient {
@@ -23,6 +24,7 @@ public final class TelegramClient {
     private final ClientResources clientResources;
 
     private final AtomicInteger lastUpdateId = new AtomicInteger();
+    private final AtomicBoolean terminate = new AtomicBoolean(true);
     private final Sinks.Many<UpdateData> updates;
 
     TelegramClient(String token, RestResources restResources, ClientResources clientResources) {
@@ -67,12 +69,23 @@ public final class TelegramClient {
         return Mono.defer(() -> {
 
             Mono<Void> readUpdates = Flux.interval(clientResources.getUpdateInterval())
-                    .flatMap(l -> getRestClient().getApplicationService().getUpdates()
-                            .filter(data -> data.updateId() > lastUpdateId.get())
-                            .sort(Comparator.comparingInt(UpdateData::updateId))
-                            .doOnNext(data -> lastUpdateId.set(data.updateId()))
+                    .flatMap(l -> getRestClient().getApplicationService()
+                            .getUpdates(GetUpdates.builders()
+                                    .offset(terminate.get() ? lastUpdateId.get() + 1 : lastUpdateId.get())
+                                    .build())
                             .checkpoint("Read updates from API")
-                            .doOnNext(updates::tryEmitNext))
+                            .filter(data -> !terminate.get())
+                            .filter(data -> data.updateId() > lastUpdateId.get())
+                            .collectList()
+                            .doOnNext(list -> lastUpdateId.set(list.stream()
+                                    .mapToInt(UpdateData::updateId)
+                                    .max().orElseGet(lastUpdateId::get)))
+                            .doOnNext(list -> list.forEach(updates::tryEmitNext))
+                            .doFirst(() -> {
+                                synchronized (terminate) {
+                                    terminate.set(!terminate.get());
+                                }
+                            }))
                     .then();
 
             Mono<Void> mapEvents = updates.asFlux()

@@ -2,6 +2,7 @@ package telegram4j.rest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufMono;
 
 public class TelegramResponse {
@@ -27,6 +28,7 @@ public class TelegramResponse {
 
             return Mono.just(res);
         })
+        .subscribeOn(Schedulers.boundedElastic())
         .flatMap(resp -> {
             ByteBufMono body = resp.getBody();
             return body.asByteArray()

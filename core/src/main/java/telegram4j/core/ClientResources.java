@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 
 public class ClientResources {
 
-    public static final Duration DEFAULT_UPDATE_INTERVAL = Duration.ofMillis(30);
+    public static final Duration DEFAULT_UPDATE_INTERVAL = Duration.ofMillis(300);
 
     public static final Supplier<DispatchMapper> DEFAULT_DISPATCH_MAPPER = DefaultDispatchMapper::new;
 
