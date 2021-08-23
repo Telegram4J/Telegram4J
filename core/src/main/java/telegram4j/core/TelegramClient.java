@@ -3,6 +3,8 @@ package telegram4j.core;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.util.Logger;
+import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.core.dispatch.UpdateContext;
 import telegram4j.core.event.Event;
@@ -17,6 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class TelegramClient {
+    private static final Logger log = Loggers.getLogger(TelegramClient.class)
 
     private final String token;
     private final RestResources restResources;
@@ -95,7 +98,8 @@ public final class TelegramClient {
                     .doOnNext(clientResources.getEventDispatcher()::publish)
                     .then();
 
-            return Mono.when(readUpdates, mapEvents);
+            return Mono.when(readUpdates, mapEvents)
+                    .doFirst(() -> log.info("Started updates listening."));
         });
     }
 }
