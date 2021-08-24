@@ -1,5 +1,7 @@
 package telegram4j.json;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum BotCommandScopeType {
     DEFAULT,
     ALL_PRIVATE_CHATS,
@@ -7,5 +9,11 @@ public enum BotCommandScopeType {
     ALL_CHAT_ADMINISTRATORS,
     CHAT,
     CHAT_ADMINISTRATORS,
-    CHAT_MEMBER
+    CHAT_MEMBER;
+
+    @JsonValue
+    @Override
+    public String toString() {
+        return super.toString().toLowerCase();
+    }
 }
