@@ -29,7 +29,7 @@ public class PassportFile implements TelegramObject {
     }
 
     public int getFileSize() {
-        return data.fileSize();
+        return data.fileSize().orElseThrow(IllegalStateException::new); // always present
     }
 
     public Instant getFileTimestamp() {

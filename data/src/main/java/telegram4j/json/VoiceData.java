@@ -10,7 +10,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableVoiceData.class)
 @JsonDeserialize(as = ImmutableVoiceData.class)
-public interface VoiceData extends FileFields {
+public interface VoiceData extends FileFields, MediaFileFields {
 
     static ImmutableVoiceData.Builder builder() {
         return ImmutableVoiceData.builder();
@@ -25,6 +25,7 @@ public interface VoiceData extends FileFields {
     String fileUniqueId();
 
     // in seconds
+    @Override
     int duration();
 
     @JsonProperty("mime_type")

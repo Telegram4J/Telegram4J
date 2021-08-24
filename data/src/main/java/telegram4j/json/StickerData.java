@@ -10,7 +10,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableStickerData.class)
 @JsonDeserialize(as = ImmutableStickerData.class)
-public interface StickerData extends FileFields {
+public interface StickerData extends FileFields, SizedMediaFile {
 
     static ImmutableStickerData.Builder builder() {
         return ImmutableStickerData.builder();
@@ -24,8 +24,10 @@ public interface StickerData extends FileFields {
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
+    @Override
     int width();
 
+    @Override
     int height();
 
     @JsonProperty("is_animated")
