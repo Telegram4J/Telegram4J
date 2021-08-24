@@ -19,8 +19,8 @@ public interface BotCommandScopeData {
     BotCommandScopeType type();
 
     @JsonProperty("chat_id")
-    Optional<String> chatId();
+    Optional<Long> chatId();
 
     @JsonProperty("user_id")
-    Optional<String> userId();
+    Optional<Long> userId();
 }
