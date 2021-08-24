@@ -13,10 +13,10 @@ import telegram4j.rest.route.Routes;
 public class TelegramClientExample {
 
     public static void main(String[] args) {
-        TelegramClient telegramClient = TelegramClient.create(System.getenv("T4J_TOKEN"));
+        TelegramClient client = TelegramClient.create(System.getenv("T4J_TOKEN"));
 
-        Routes.SET_MY_COMMANDS.newRequest()
-                .body(SetMyCommands.builder()
+        client.getRestClient().getCommandService()
+                .setMyCommands(SetMyCommands.builder()
                         .addCommand(BotCommandData.builder()
                                 .command("shrug")
                                 .description("¯\\_(ツ)_/¯")
@@ -25,32 +25,29 @@ public class TelegramClientExample {
                                 .type(BotCommandScopeType.ALL_GROUP_CHATS)
                                 .build())
                         .build())
-                .exchange(telegramClient.getRestClient().getApplicationService().getRouter())
-                .bodyTo(Boolean.class)
                 .block();
 
-        telegramClient.on(MessageCreateEvent.class)
+        client.on(MessageCreateEvent.class)
                 .filter(event -> event.getMessage().getEntities()
                         .map(list -> list.stream().anyMatch(entity -> entity.getType() == MessageEntityType.BOT_COMMAND))
                         .map(bool -> bool && event.getMessage().getText()
                                 .map("/shrug"::contains)
                                 .orElse(false))
                         .orElse(false))
-                .log()
-                .flatMap(event -> telegramClient.getRestClient().getChatService()
+                .flatMap(event -> client.getRestClient().getChatService()
                         .sendMessage(MessageCreate.builder()
                                 .text("¯\\_(ツ)_/¯")
                                 .chatId(event.getMessage().getChat().getId().asLong())
                                 .build()))
                 .subscribe();
 
-        telegramClient.on(MessageCreateEvent.class)
+        client.on(MessageCreateEvent.class)
                 .filter(event -> event.getMessage().getText()
                         .map(s -> s.equals("амогус"))
                         .orElse(false))
                 .flatMap(event -> {
                     long time = System.currentTimeMillis();
-                    return telegramClient.getRestClient().getChatService()
+                    return client.getRestClient().getChatService()
                             .sendMessage(MessageCreate.builder()
                                     .chatId(event.getMessage().getChat().getId().asLong())
                                     .text("amogus")
@@ -60,6 +57,6 @@ public class TelegramClientExample {
                 })
                 .subscribe();
 
-        telegramClient.login().block();
+        client.login().block();
     }
 }
