@@ -4,7 +4,7 @@ import reactor.netty.ByteBufMono;
 import reactor.netty.NettyInbound;
 import reactor.netty.http.client.HttpClientResponse;
 
-class RestClientResponse {
+public class RestClientResponse {
 
     private final HttpClientResponse httpResponse;
     private final NettyInbound inbound;

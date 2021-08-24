@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -10,18 +11,16 @@ import telegram4j.core.dispatch.UpdateContext;
 import telegram4j.core.event.Event;
 import telegram4j.json.UpdateData;
 import telegram4j.json.request.GetUpdates;
-import telegram4j.rest.DefaultRouter;
-import telegram4j.rest.RestResources;
-import telegram4j.rest.RestTelegramClient;
-import telegram4j.rest.RouterResources;
+import telegram4j.rest.*;
+import telegram4j.rest.route.Route;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class TelegramClient {
-    private static final Logger log = Loggers.getLogger(TelegramClient.class)
+    private static final Logger log = Loggers.getLogger(TelegramClient.class);
 
-    private final String token;
     private final RestResources restResources;
     private final RestTelegramClient restClient;
     private final ClientResources clientResources;
@@ -31,7 +30,6 @@ public final class TelegramClient {
     private final Sinks.Many<UpdateData> updates;
 
     TelegramClient(String token, RestResources restResources, ClientResources clientResources) {
-        this.token = token;
         this.restResources = restResources;
         this.restClient = new RestTelegramClient(new DefaultRouter(
                 new RouterResources(token, restResources)));

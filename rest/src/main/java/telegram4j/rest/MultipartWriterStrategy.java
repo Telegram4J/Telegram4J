@@ -6,7 +6,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
-import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple2;
 
 import java.io.InputStream;
@@ -22,17 +21,12 @@ public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<
     }
 
     @Override
-    public boolean canWrite(@Nullable Class<?> type, HttpHeaders headers) {
-        return headers.get(HttpHeaderNames.CONTENT_TYPE).equals("multipart/data-form") &&
-                type != null && mapper.canSerialize(type);
+    public boolean canWrite(Class<?> type, HttpHeaders headers) {
+        return headers.get(HttpHeaderNames.CONTENT_TYPE, "").equals("multipart/data-form");
     }
 
     @Override
-    public Mono<HttpClient.ResponseReceiver<?>> write(HttpClient.RequestSender sender, @Nullable MultipartRequest<?> body) {
-        if (body == null) {
-            return Mono.error(new IllegalArgumentException("Missing body"));
-        }
-
+    public Mono<HttpClient.ResponseReceiver<?>> write(HttpClient.RequestSender sender, MultipartRequest<?> body) {
         return Mono.fromSupplier(() -> sender.sendForm((request, form) -> {
             form.multipart(true);
             if (body.getJson() != null) {

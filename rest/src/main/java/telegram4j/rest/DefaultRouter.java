@@ -42,8 +42,12 @@ public class DefaultRouter implements RestRouter {
                             .uri(request.getRoute().getUri());
 
                     Object body = request.getBody();
+                    if (body == null) {
+                        return Mono.just(sender.send(Mono.empty()));
+                    }
+
                     return Flux.fromIterable(restResources.getWriterStrategies().getWriters())
-                            .filter(strategy -> strategy.canWrite(body != null ? body.getClass() : null, requestHeaders))
+                            .filter(strategy -> strategy.canWrite(body.getClass(), requestHeaders))
                             .next()
                             .switchIfEmpty(Mono.error(() -> new IllegalStateException("No write strategies for body: " + body)))
                             .map(DefaultRouter::cast)
