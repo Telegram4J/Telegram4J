@@ -29,7 +29,7 @@ allprojects {
         api "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
         api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jackson_version"
 
-        testImplementation "org.junit.jupiter:junit-jupiter-engine:5.7.2"
+        testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
     }
 
     tasks.withType(JavaCompile) {
