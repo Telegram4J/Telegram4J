@@ -1,5 +1,7 @@
 package telegram4j.json;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 public enum MessageEntityType {
 
     MENTION,
@@ -16,5 +18,11 @@ public enum MessageEntityType {
     CODE,
     PRE,
     TEXT_LINK,
-    TEXT_MENTION
+    TEXT_MENTION;
+
+    @JsonValue
+    @Override
+    public String toString() {
+        return super.toString().toLowerCase();
+    }
 }
