@@ -11,8 +11,8 @@ public class ClientException extends RuntimeException {
 
     public ClientException(TelegramRequest request, RestClientResponse response, ErrorResponse errorResponse) {
         super(request.getRoute().getMethod() + " " + request.getRoute().getUri() +
-                " returned " + errorResponse.getErrorCode() + " with description: " +
-                errorResponse.getDescription());
+                " returned " + errorResponse.getErrorCode() + errorResponse.getDescription()
+                .map(s -> " with description: " + s).orElse(""));
         this.request = Objects.requireNonNull(request, "request");
         this.response = Objects.requireNonNull(response, "response");
     }
