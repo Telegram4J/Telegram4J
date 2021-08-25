@@ -2,6 +2,8 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
+import telegram4j.core.object.chat.Chat;
+import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
 
 import java.time.Instant;
@@ -33,7 +35,7 @@ public class Message implements TelegramObject {
     }
 
     public Chat getChat() {
-        return new Chat(client, data.chat());
+        return EntityUtil.getChat(client, data.chat());
     }
 
     public Instant getTimestamp() {
@@ -45,7 +47,7 @@ public class Message implements TelegramObject {
     }
 
     public Optional<Chat> getForwardFromChat() {
-        return data.forwardFromChat().map(data -> new Chat(client, data));
+        return data.forwardFromChat().map(data -> EntityUtil.getChat(client, data));
     }
 
     public Optional<Id> getForwardFromMessageId() {
