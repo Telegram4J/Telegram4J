@@ -31,7 +31,7 @@ public class TelegramClientExample {
                 .filter(event -> event.getMessage().getEntities()
                         .map(list -> list.stream().anyMatch(entity -> entity.getType() == MessageEntityType.BOT_COMMAND))
                         .map(bool -> bool && event.getMessage().getText()
-                                .map("/shrug"::contains)
+                                .map(s -> s.contains("/shrug"))
                                 .orElse(false))
                         .orElse(false))
                 .flatMap(event -> client.getRestClient().getChatService()
