@@ -16,7 +16,7 @@ public interface ChatMemberData {
         return ImmutableChatMemberData.builder();
     }
 
-    ChatMemberType status();
+    ChatMemberStatus status();
 
     UserData user();
 
@@ -61,6 +61,9 @@ public interface ChatMemberData {
 
     @JsonProperty("is_member")
     Optional<Boolean> isMember();
+
+    @JsonProperty("can_send_messages")
+    Optional<Boolean> canSendMessages();
 
     @JsonProperty("can_send_media_messages")
     Optional<Boolean> canSendMediaMessages();

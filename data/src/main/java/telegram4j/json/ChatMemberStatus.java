@@ -2,13 +2,13 @@ package telegram4j.json;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 
-public enum ChatMemberType {
-    OWNER,
+public enum ChatMemberStatus {
+    CREATOR,
     ADMINISTRATOR,
     MEMBER,
     RESTRICTED,
     LEFT,
-    BANNED;
+    KICKED;
 
     @JsonValue
     @Override
