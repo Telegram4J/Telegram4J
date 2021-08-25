@@ -5,12 +5,13 @@ import telegram4j.json.ChatData;
 
 import java.util.Optional;
 
-public final class PrivateChat extends BaseChat {
+public final class PrivateChat extends BaseChat implements NamedChat {
 
     public PrivateChat(TelegramClient client, ChatData data) {
         super(client, data);
     }
 
+    @Override
     public Optional<String> getUsername() {
         return getData().username();
     }

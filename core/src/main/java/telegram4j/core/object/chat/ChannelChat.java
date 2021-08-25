@@ -6,7 +6,7 @@ import telegram4j.json.ChatData;
 
 import java.util.Optional;
 
-public final class ChannelChat extends BaseChat implements GrouporizableChat {
+public final class ChannelChat extends BaseChat implements LinkedChat {
 
     public ChannelChat(TelegramClient client, ChatData data) {
         super(client, data);
@@ -27,6 +27,7 @@ public final class ChannelChat extends BaseChat implements GrouporizableChat {
         return getData().inviteLink();
     }
 
+    @Override
     public Optional<Id> getLinkedChatId() {
         return getData().linkedChatId().map(Id::of);
     }

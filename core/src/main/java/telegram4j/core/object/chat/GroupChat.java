@@ -6,7 +6,7 @@ import telegram4j.json.ChatData;
 
 import java.util.Optional;
 
-public final class GroupChat extends BaseChat implements GrouporizableChat {
+public class GroupChat extends BaseChat implements GrouporizableChat {
 
     public GroupChat(TelegramClient client, ChatData data) {
         super(client, data);

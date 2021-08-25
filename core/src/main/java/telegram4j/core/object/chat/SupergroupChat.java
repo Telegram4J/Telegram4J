@@ -8,7 +8,7 @@ import telegram4j.json.ChatData;
 
 import java.util.Optional;
 
-public final class SupergroupChat extends BaseChat implements GrouporizableChat {
+public final class SupergroupChat extends GroupChat implements LinkedChat, NamedChat {
 
     public SupergroupChat(TelegramClient client, ChatData data) {
         super(client, data);
@@ -19,6 +19,7 @@ public final class SupergroupChat extends BaseChat implements GrouporizableChat 
         return getData().title();
     }
 
+    @Override
     public Optional<String> getUsername() {
         return getData().username();
     }
@@ -33,6 +34,7 @@ public final class SupergroupChat extends BaseChat implements GrouporizableChat 
         return getData().inviteLink();
     }
 
+    @Override
     public Optional<ChatPermissions> getPermissions() {
         return getData().permissions().map(data -> new ChatPermissions(getClient(), data));
     }
@@ -49,6 +51,7 @@ public final class SupergroupChat extends BaseChat implements GrouporizableChat 
         return getData().canSetStickerSet();
     }
 
+    @Override
     public Optional<Id> getLinkedChatId() {
         return getData().linkedChatId().map(Id::of);
     }
