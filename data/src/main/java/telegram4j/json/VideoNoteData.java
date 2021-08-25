@@ -10,7 +10,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableVideoNoteData.class)
 @JsonDeserialize(as = ImmutableVideoNoteData.class)
-public interface VideoNoteData extends FileFields {
+public interface VideoNoteData extends FileFields, MediaFileFields {
 
     static ImmutableVideoNoteData.Builder builder() {
         return ImmutableVideoNoteData.builder();
@@ -26,7 +26,7 @@ public interface VideoNoteData extends FileFields {
 
     int length();
 
-    // in seconds
+    @Override
     int duration();
 
     Optional<PhotoSizeData> thumb();

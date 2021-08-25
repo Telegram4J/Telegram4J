@@ -13,9 +13,16 @@ import reactor.netty.http.client.HttpClient;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+/** Resources used across REST module. */
 public class RestResources {
 
+    /** The {@link Supplier} which creates a default {@link HttpClient}s. */
     public static final Supplier<HttpClient> DEFAULT_HTTP_CLIENT = () -> HttpClient.create().compress(true);
+
+    /**
+     * The {@link Supplier} which creates a {@link ObjectMapper} instances
+     * with required for serialization/deserialization options.
+     */
     public static final Supplier<ObjectMapper> DEFAULT_OBJECT_MAPPER = () -> JsonMapper.builder()
             .addModules(new Jdk8Module())
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
@@ -26,10 +33,14 @@ public class RestResources {
             .serializationInclusion(JsonInclude.Include.NON_ABSENT)
             .build();
 
+    /** Netty http client used in REST API. */
     private final HttpClient httpClient;
+
+    /** Jackson mapper for json serializing/deserializing. */
     private final ObjectMapper objectMapper;
     private final WriterStrategies writerStrategies;
 
+    /** Constructs a {@link RestResources} with default settings. */
     public RestResources() {
         this.httpClient = DEFAULT_HTTP_CLIENT.get();
         this.objectMapper = DEFAULT_OBJECT_MAPPER.get();
@@ -42,10 +53,12 @@ public class RestResources {
         this.writerStrategies = Objects.requireNonNull(writerStrategies, "writerStrategies");
     }
 
+    /** @return The {@link HttpClient} for HTTP requests. */
     public HttpClient getHttpClient() {
         return httpClient;
     }
 
+    /** @return The {@link ObjectMapper} mapper for json serializing/deserializing. */
     public ObjectMapper getObjectMapper() {
         return objectMapper;
     }
