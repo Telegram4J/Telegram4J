@@ -184,20 +184,20 @@ public class Message implements TelegramObject {
                 .collect(Collectors.toList()));
     }
 
-    public Optional<Boolean> isDeleteChatPhoto() {
-        return data.deleteChatPhoto();
+    public boolean isDeleteChatPhoto() {
+        return data.deleteChatPhoto().orElse(false);
     }
 
-    public Optional<Boolean> isGroupChatCreated() {
-        return data.groupChatCreated();
+    public boolean isGroupChatCreated() {
+        return data.groupChatCreated().orElse(false);
     }
 
-    public Optional<Boolean> isSupergroupChatCreated() {
-        return data.supergroupChatCreated();
+    public boolean isSupergroupChatCreated() {
+        return data.supergroupChatCreated().orElse(false);
     }
 
-    public Optional<Boolean> isChannelChatCreated() {
-        return data.channelChatCreated();
+    public boolean isChannelChatCreated() {
+        return data.channelChatCreated().orElse(false);
     }
 
     // TODO: maybe unwrap this?
