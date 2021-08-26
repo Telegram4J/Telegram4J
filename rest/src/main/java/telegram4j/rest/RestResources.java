@@ -9,7 +9,10 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import reactor.netty.http.client.HttpClient;
+import telegram4j.rest.response.ResponseTransformer;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
@@ -39,18 +42,23 @@ public class RestResources {
     /** Jackson mapper for json serializing/deserializing. */
     private final ObjectMapper objectMapper;
     private final WriterStrategies writerStrategies;
+    private final List<ResponseTransformer> responseTransformers;
 
     /** Constructs a {@link RestResources} with default settings. */
     public RestResources() {
         this.httpClient = DEFAULT_HTTP_CLIENT.get();
         this.objectMapper = DEFAULT_OBJECT_MAPPER.get();
         this.writerStrategies = WriterStrategies.create(objectMapper);
+        this.responseTransformers = Collections.emptyList();
     }
 
-    public RestResources(HttpClient httpClient, ObjectMapper objectMapper, WriterStrategies writerStrategies) {
+    public RestResources(HttpClient httpClient, ObjectMapper objectMapper,
+                         WriterStrategies writerStrategies,
+                         List<ResponseTransformer> responseTransformers) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.writerStrategies = Objects.requireNonNull(writerStrategies, "writerStrategies");
+        this.responseTransformers = Collections.unmodifiableList(responseTransformers);
     }
 
     /** @return The {@link HttpClient} for HTTP requests. */
@@ -65,5 +73,9 @@ public class RestResources {
 
     public WriterStrategies getWriterStrategies() {
         return writerStrategies;
+    }
+
+    public List<ResponseTransformer> getResponseTransformers() {
+        return responseTransformers;
     }
 }

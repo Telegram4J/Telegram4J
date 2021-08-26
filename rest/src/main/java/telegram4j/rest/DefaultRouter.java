@@ -56,7 +56,9 @@ public class DefaultRouter implements RestRouter {
                 .flatMap(receiver -> receiver.responseConnection((resp, conn) -> Mono.just(
                                 new RestClientResponse(resp, conn.inbound())))
                         .singleOrEmpty())
-                .subscribeOn(Schedulers.boundedElastic()), restResources);
+                .subscribeOn(Schedulers.boundedElastic())
+                .checkpoint("Request to " + request.getRoute().getMethod() +
+                        " " + request.getRoute().getMethod()), restResources);
     }
 
     private HttpHeaders buildHttpHeaders(TelegramRequest request) {

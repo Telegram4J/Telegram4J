@@ -5,6 +5,8 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufMono;
 
+import java.util.function.Function;
+
 public class TelegramResponse {
 
     private final TelegramRequest request;
@@ -29,6 +31,11 @@ public class TelegramResponse {
             return Mono.just(res);
         })
         .subscribeOn(Schedulers.boundedElastic())
+        .transform(restResources.getResponseTransformers().stream()
+                .map(transformer -> transformer.transform(request)
+                        .andThen(after -> after.checkpoint("Apply " + transformer +
+                                request.getRoute().getMethod() + " " + request.getRoute().getMethod())))
+                .reduce(Function.identity(), Function::andThen))
         .flatMap(resp -> {
             ByteBufMono body = resp.getBody();
             return body.asByteArray()
