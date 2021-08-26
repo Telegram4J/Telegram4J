@@ -11,6 +11,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import reactor.netty.http.client.HttpClient;
 import telegram4j.rest.response.ResponseTransformer;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -61,6 +62,10 @@ public class RestResources {
         this.responseTransformers = Collections.unmodifiableList(responseTransformers);
     }
 
+    public static Builder builder() {
+        return new Builder();
+    }
+
     /** @return The {@link HttpClient} for HTTP requests. */
     public HttpClient getHttpClient() {
         return httpClient;
@@ -77,5 +82,55 @@ public class RestResources {
 
     public List<ResponseTransformer> getResponseTransformers() {
         return responseTransformers;
+    }
+
+    public static class Builder {
+
+        private HttpClient httpClient;
+        private ObjectMapper objectMapper;
+        private WriterStrategies writerStrategies;
+        private List<ResponseTransformer> responseTransformers;
+
+        private Builder() {}
+
+        public Builder setHttpClient(HttpClient httpClient) {
+            this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+            return this;
+        }
+
+        public Builder setObjectMapper(ObjectMapper objectMapper) {
+            this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
+            return this;
+        }
+
+        public Builder setWriterStrategies(WriterStrategies writerStrategies) {
+            this.writerStrategies = Objects.requireNonNull(writerStrategies, "writerStrategies");
+            return this;
+        }
+
+        public Builder addResponseTransformers(ResponseTransformer... responseTransformers) {
+            if (this.responseTransformers == null) {
+                this.responseTransformers = new ArrayList<>();
+            }
+            Collections.addAll(this.responseTransformers, responseTransformers);
+            return this;
+        }
+
+        public RestResources build() {
+            if (httpClient == null) {
+                httpClient = DEFAULT_HTTP_CLIENT.get();
+            }
+            if (objectMapper == null) {
+                objectMapper = DEFAULT_OBJECT_MAPPER.get();
+            }
+            if (writerStrategies == null) {
+                writerStrategies = WriterStrategies.create(objectMapper);
+            }
+            if (responseTransformers == null) {
+                responseTransformers = Collections.emptyList();
+            }
+
+            return new RestResources(httpClient, objectMapper, writerStrategies, responseTransformers);
+        }
     }
 }
