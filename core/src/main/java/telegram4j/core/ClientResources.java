@@ -20,7 +20,7 @@ public class ClientResources {
     public static final Supplier<DispatchMapper> DEFAULT_DISPATCH_MAPPER = DefaultDispatchMapper::new;
 
     /** The {@link Supplier} which creates a {@link DefaultEventDispatcher} instances with default settings. */
-    public static final Supplier<EventDispatcher> DEFAULT_EVENT_DISPATCHER = () -> DefaultEventDispatcher.builder().build();
+    public static final Supplier<EventDispatcher> DEFAULT_EVENT_DISPATCHER = DefaultEventDispatcher::create;
 
     /** Update check interval. */
     private final Duration updateInterval;

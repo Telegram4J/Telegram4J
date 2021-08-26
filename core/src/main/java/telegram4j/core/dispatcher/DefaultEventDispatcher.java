@@ -22,6 +22,10 @@ public class DefaultEventDispatcher implements EventDispatcher {
         this.eventScheduler = Objects.requireNonNull(eventScheduler, "eventScheduler");
     }
 
+    public static EventDispatcher create() {
+        return builder().build();
+    }
+
     public static Builder builder() {
         return new Builder();
     }
