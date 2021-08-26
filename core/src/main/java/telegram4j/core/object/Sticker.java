@@ -6,7 +6,7 @@ import telegram4j.json.StickerData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Sticker implements TelegramObject {
+public class Sticker implements Attachment {
 
     private final TelegramClient client;
     private final StickerData data;
@@ -20,10 +20,12 @@ public class Sticker implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

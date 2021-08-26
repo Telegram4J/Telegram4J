@@ -6,7 +6,7 @@ import telegram4j.json.VideoData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Video implements TelegramObject {
+public class Video implements Attachment {
 
     private final TelegramClient client;
     private final VideoData data;
@@ -20,10 +20,12 @@ public class Video implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

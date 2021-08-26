@@ -6,7 +6,7 @@ import telegram4j.json.PhotoSizeData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class PhotoSize implements TelegramObject {
+public class PhotoSize implements Attachment {
 
     private final TelegramClient client;
     private final PhotoSizeData data;
@@ -20,10 +20,12 @@ public class PhotoSize implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

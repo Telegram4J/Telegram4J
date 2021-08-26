@@ -6,7 +6,7 @@ import telegram4j.json.PassportFileData;
 import java.time.Instant;
 import java.util.Objects;
 
-public class PassportFile implements TelegramObject {
+public class PassportFile implements Attachment {
 
     private final TelegramClient client;
     private final PassportFileData data;
@@ -20,10 +20,12 @@ public class PassportFile implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

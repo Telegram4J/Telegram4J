@@ -6,7 +6,7 @@ import telegram4j.json.AnimationData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Animation implements TelegramObject {
+public class Animation implements Attachment {
 
     private final TelegramClient client;
     private final AnimationData data;
@@ -20,10 +20,12 @@ public class Animation implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

@@ -6,7 +6,7 @@ import telegram4j.json.VideoNoteData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class VideoNote implements TelegramObject {
+public class VideoNote implements Attachment {
 
     private final TelegramClient client;
     private final VideoNoteData data;
@@ -20,10 +20,12 @@ public class VideoNote implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

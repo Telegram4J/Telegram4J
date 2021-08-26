@@ -7,7 +7,7 @@ import telegram4j.json.AudioData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Audio implements TelegramObject {
+public class Audio implements Attachment {
 
     private final TelegramClient client;
     private final AudioData data;
@@ -21,10 +21,12 @@ public class Audio implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }

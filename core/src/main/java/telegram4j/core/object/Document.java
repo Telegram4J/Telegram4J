@@ -6,7 +6,7 @@ import telegram4j.json.DocumentData;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Document implements TelegramObject {
+public class Document implements Attachment {
 
     private final TelegramClient client;
     private final DocumentData data;
@@ -20,10 +20,12 @@ public class Document implements TelegramObject {
         return data;
     }
 
+    @Override
     public String getFileId() {
         return data.fileId();
     }
 
+    @Override
     public String getFileUniqueId() {
         return data.fileUniqueId();
     }
