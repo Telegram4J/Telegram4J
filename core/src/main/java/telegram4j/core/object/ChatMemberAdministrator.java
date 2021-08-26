@@ -5,7 +5,7 @@ import telegram4j.json.ChatMemberData;
 
 import java.util.Optional;
 
-public class ChatMemberAdministrator extends ChatMember {
+public final class ChatMemberAdministrator extends ChatMember {
 
     public ChatMemberAdministrator(TelegramClient client, ChatMemberData data) {
         super(client, data);

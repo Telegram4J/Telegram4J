@@ -5,7 +5,7 @@ import telegram4j.json.ChatMemberData;
 
 import java.time.Instant;
 
-public class ChatMemberBanned extends ChatMember {
+public final class ChatMemberBanned extends ChatMember {
 
     public ChatMemberBanned(TelegramClient client, ChatMemberData data) {
         super(client, data);
