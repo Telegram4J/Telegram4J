@@ -1,3 +1,6 @@
+/**
+ * Available Telegram object types.
+ */
 @NonNullApi
 package telegram4j.core.object;
 

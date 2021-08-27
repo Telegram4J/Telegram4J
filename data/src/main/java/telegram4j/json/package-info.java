@@ -1,3 +1,6 @@
+/**
+ * Telegram types created as immutable Jackson objects.
+ */
 @Value.Style(
         depluralize = true,
         jdkOnly = true,
