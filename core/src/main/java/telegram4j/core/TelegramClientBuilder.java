@@ -6,11 +6,11 @@ import java.util.Objects;
 
 public class TelegramClientBuilder {
 
-    /**Bot secret key, issued by a BotFather(Telegram bot for create bot's accounts) when creating new bot*/
+    /** Bot secret key, issued by a BotFather(Telegram bot for create bot's accounts) when creating new bot */
     private String token;
-    /**Access to rest content*/
+    /** Access to rest content */
     private RestResources restResources;
-    /**Access to events and updates handling*/
+    /** Access to events and updates handling */
     private ClientResources clientResources;
 
     TelegramClientBuilder() {}
