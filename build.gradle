@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'maven-publish'
 }
 
 ext {
@@ -11,6 +12,11 @@ ext {
 
 allprojects {
     apply plugin: 'java-library'
+    apply plugin: 'maven-publish'
+
+    group = 'com.telegram4j'
+    description = 'Java library for the Telegram API'
+    version = '0.1.0'
 
     targetCompatibility = JavaVersion.VERSION_1_8
     sourceCompatibility = JavaVersion.VERSION_1_8
@@ -37,7 +43,52 @@ allprojects {
         options.incremental = true
     }
 
+    tasks.withType(Javadoc) {
+        if (JavaVersion.current().isJava9Compatible()) {
+            options.addBooleanOption('html5', true)
+        }
+    }
+
     test {
         useJUnitPlatform()
+    }
+
+    java {
+        withJavadocJar()
+        withSourcesJar()
+    }
+}
+
+subprojects {
+    archivesBaseName = "telegram4j-$project.name"
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                artifactId archivesBaseName
+
+                versionMapping {
+                    usage('java-api') {
+                        fromResolutionOf('runtimeClasspath')
+                    }
+                    usage('java-runtime') {
+                        fromResolutionResult()
+                    }
+                }
+
+                pom {
+                    name = 'Telegram4J'
+                    description = 'A java REST wrapper for the Telegram Bot API'
+                    url = 'https://github.com/Telegram4J/Telegram4J'
+
+                    scm {
+                        url = 'https://github.com/Telegram4J/Telegram4J'
+                        connection = 'scm:git:git://github.com/Telegram4J/Telegram4J.git'
+                        developerConnection = 'scm:git:ssh://git@github.com:Telegram4J/Telegram4J.git'
+                    }
+                }
+            }
+        }
     }
 }
