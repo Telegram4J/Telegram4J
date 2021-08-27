@@ -8,11 +8,11 @@ import telegram4j.rest.RestResources;
  * Base class for access to library functions
  */
 public final class TelegramClient {
-    /**Bot secret key, issued by a BotFather(Telegram bot for create bot's accounts) when creating new bot*/
-    private final String token;
-    /**Access to rest content*/
+    /** Bot secret key, issued by a BotFather (Telegram bot for create bot's accounts) when creating new bot*/
+    private final String token; 
+    /** Access to rest content */
     private final RestResources restResources;
-    /**Access to events and updates handling*/
+    /** Access to events and updates handling */
     private final ClientResources clientResources;
 
     /**
