@@ -15,7 +15,7 @@ public class ChatMemberUpdatedTest extends DeserializationTest {
         ChatMemberUpdatedData expected = ChatMemberUpdatedData.builder()
                 .chat(ChatData.builder()
                         .id(-1001538393672L)
-                        .title("MindustrInside")
+                        .title("MindustryInside")
                         .type(ChatType.SUPERGROUP)
                         .build())
                 .fromUser(UserData.builder()

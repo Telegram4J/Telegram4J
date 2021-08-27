@@ -24,7 +24,6 @@ public interface VoiceData extends FileFields, MediaFileFields {
     @JsonProperty("file_unique_id")
     String fileUniqueId();
 
-    // in seconds
     @Override
     int duration();
 

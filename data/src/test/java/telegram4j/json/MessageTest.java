@@ -23,7 +23,7 @@ public class MessageTest extends DeserializationTest {
                         .build())
                 .chat(ChatData.builder()
                         .id(-567859824)
-                        .title("MindustrInside")
+                        .title("MindustryInside")
                         .type(ChatType.GROUP)
                         .allMembersAreAdministrators(false)
                         .build())

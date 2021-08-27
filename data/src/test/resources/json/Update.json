@@ -4,7 +4,7 @@
     "my_chat_member": {
       "chat": {
         "id": -1001538393672,
-        "title": "MindustrInside",
+        "title": "MindustryInside",
         "type": "supergroup"
       },
       "from": {
@@ -48,7 +48,7 @@
       },
       "chat": {
         "id": -567859824,
-        "title": "MindustrInside",
+        "title": "MindustryInside",
         "type": "group",
         "all_members_are_administrators": false
       },
@@ -68,12 +68,12 @@
       },
       "sender_chat": {
         "id": -1001538393672,
-        "title": "MindustrInside",
+        "title": "MindustryInside",
         "type": "supergroup"
       },
       "chat": {
         "id": -1001538393672,
-        "title": "MindustrInside",
+        "title": "MindustryInside",
         "type": "supergroup"
       },
       "date": 1629498851,
@@ -85,7 +85,7 @@
     "my_chat_member": {
       "chat": {
         "id": -1001538393672,
-        "title": "MindustrInside",
+        "title": "MindustryInside",
         "type": "supergroup"
       },
       "from": {
