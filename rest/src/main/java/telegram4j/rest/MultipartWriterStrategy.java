@@ -31,7 +31,7 @@ public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<
             form.multipart(true);
             if (body.getJson() != null) {
                 // Telegram doesn't allow to simply write one part as
-                // json and send a request, it requires that all json attributes/fields are parts
+                // json and then send a request. It requires that all json attributes/fields are parts
                 JsonNode node = mapper.convertValue(body.getJson(), JsonNode.class);
 
                 Iterator<Map.Entry<String, JsonNode>> it = node.fields();
