@@ -1,6 +1,3 @@
-/**
- * Telegram types created as immutable Jackson objects.
- */
 @Value.Style(
         depluralize = true,
         jdkOnly = true,
@@ -8,7 +5,7 @@
         defaultAsDefault = true
 )
 @NonNullApi
-package telegram4j.json;
+package telegram4j.json.request;
 
 import org.immutables.value.Value;
 import reactor.util.annotation.NonNullApi;

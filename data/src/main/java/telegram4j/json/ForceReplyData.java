@@ -10,7 +10,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableForceReplyData.class)
 @JsonDeserialize(as = ImmutableForceReplyData.class)
-public interface ForceReplyData {
+public interface ForceReplyData extends ReplyMarkup {
 
     static ImmutableForceReplyData.Builder builder() {
         return ImmutableForceReplyData.builder();

@@ -10,7 +10,7 @@ import java.util.List;
 @Value.Immutable
 @JsonSerialize(as = ImmutableInlineKeyboardMarkupData.class)
 @JsonDeserialize(as = ImmutableInlineKeyboardMarkupData.class)
-public interface InlineKeyboardMarkupData {
+public interface InlineKeyboardMarkupData extends ReplyMarkup {
 
     static ImmutableInlineKeyboardMarkupData.Builder builder() {
         return ImmutableInlineKeyboardMarkupData.builder();

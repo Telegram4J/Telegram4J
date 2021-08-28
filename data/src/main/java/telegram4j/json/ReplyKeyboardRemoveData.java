@@ -10,7 +10,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableReplyKeyboardRemoveData.class)
 @JsonDeserialize(as = ImmutableReplyKeyboardRemoveData.class)
-public interface ReplyKeyboardRemoveData {
+public interface ReplyKeyboardRemoveData extends ReplyMarkup {
 
     static ImmutableReplyKeyboardRemoveData.Builder builder() {
         return ImmutableReplyKeyboardRemoveData.builder();

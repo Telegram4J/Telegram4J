@@ -4,7 +4,6 @@ import telegram4j.core.dispatch.DefaultDispatchMapper;
 import telegram4j.core.dispatch.DispatchMapper;
 import telegram4j.core.dispatcher.DefaultEventDispatcher;
 import telegram4j.core.dispatcher.EventDispatcher;
-import telegram4j.core.event.Event;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -14,7 +13,7 @@ import java.util.function.Supplier;
 public class ClientResources {
 
     /** Optimized update check interval. */
-    public static final Duration DEFAULT_UPDATE_INTERVAL = Duration.ofMillis(30);
+    public static final Duration DEFAULT_UPDATE_INTERVAL = Duration.ofMillis(300);
 
     /** The {@link Supplier} which creates a {@link DefaultDispatchMapper} instances. */
     public static final Supplier<DispatchMapper> DEFAULT_DISPATCH_MAPPER = DefaultDispatchMapper::new;

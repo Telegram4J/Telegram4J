@@ -12,43 +12,43 @@ import java.util.Objects;
  */
 public class Route {
 
-    private final String uriTemplate;
+    private final String uri;
     private final HttpMethod method;
 
-    private Route(String uriTemplate, HttpMethod method) {
-        this.uriTemplate = uriTemplate;
-        this.method = method;
+    private Route(String uri, HttpMethod method) {
+        this.uri = Objects.requireNonNull(uri, "uri");
+        this.method = Objects.requireNonNull(method, "method");
     }
 
     /**
      * Creates a new {@link Route} with {@link HttpMethod#GET} method.
      *
-     * @param uriTemplate the URI string.
+     * @param uri the URI string.
      * @return a new {@link Route}.
      */
-    public static Route get(String uriTemplate) {
-        return new Route(uriTemplate, HttpMethod.GET);
+    public static Route get(String uri) {
+        return new Route(uri, HttpMethod.GET);
     }
 
     /**
      * Creates a new {@link Route} with {@link HttpMethod#POST} method.
      *
-     * @param uriTemplate the URI string.
+     * @param uri the URI string.
      * @return a new {@link Route}.
      */
-    public static Route post(String uriTemplate) {
-        return new Route(uriTemplate, HttpMethod.POST);
+    public static Route post(String uri) {
+        return new Route(uri, HttpMethod.POST);
     }
 
     /**
      * Creates a new {@link Route} with custom {@link HttpMethod}.
      *
-     * @param uriTemplate the URI string.
+     * @param uri the URI string.
      * @param httpMethod the http method.
      * @return a new {@link Route}.
      */
-    public static Route ofMethod(String uriTemplate, HttpMethod httpMethod) {
-        return new Route(uriTemplate, httpMethod);
+    public static Route ofMethod(String uri, HttpMethod httpMethod) {
+        return new Route(uri, httpMethod);
     }
 
     /**
@@ -56,8 +56,8 @@ public class Route {
      *
      * @return a URI string.
      */
-    public String getUriTemplate() {
-        return uriTemplate;
+    public String getUri() {
+        return uri;
     }
 
     /**
@@ -87,18 +87,18 @@ public class Route {
             return false;
         }
         Route route = (Route) o;
-        return uriTemplate.equals(route.uriTemplate) && method.equals(route.method);
+        return uri.equals(route.uri) && method.equals(route.method);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(uriTemplate, method);
+        return Objects.hash(uri, method);
     }
 
     @Override
     public String toString() {
         return "Route{" +
-                "uriTemplate='" + uriTemplate + '\'' +
+                "uri='" + uri + '\'' +
                 ", method=" + method +
                 '}';
     }

@@ -13,6 +13,15 @@ public final class Routes {
     /** @see <a href="https://core.telegram.org/bots/api#getupdates">https://core.telegram.org/bots/api#getupdates</a> */
     public static final Route GET_UPDATES = Route.get("/getUpdates");
 
+    /** @see <a href="https://core.telegram.org/bots/api#setwebhook">https://core.telegram.org/bots/api#setwebhook</a> */
+    public static final Route SET_WEBHOOK = Route.post("/setWebhook");
+
+    /** @see <a href="https://core.telegram.org/bots/api#deletewebhook">https://core.telegram.org/bots/api#deletewebhook</a> */
+    public static final Route DELETE_WEBHOOK = Route.post("/deleteWebhook");
+
+    /** @see <a href="https://core.telegram.org/bots/api#getwebhookinfo">https://core.telegram.org/bots/api#getwebhookinfo</a> */
+    public static final Route GET_WEBHOOK_INFO = Route.get("/getWebhookInfo");
+
     /** @see <a href="https://core.telegram.org/bots/api#getme">https://core.telegram.org/bots/api#getme</a> */
     public static final Route GET_ME = Route.get("/getMe");
 
