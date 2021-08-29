@@ -27,6 +27,7 @@ public final class TelegramClient {
 
     private final AtomicInteger lastUpdateId = new AtomicInteger(-1);
     private final AtomicBoolean terminate = new AtomicBoolean(true);
+    private final AtomicBoolean request = new AtomicBoolean();
     private final Sinks.Many<UpdateData> updates;
 
     TelegramClient(String token, RestResources restResources, ClientResources clientResources) {
@@ -70,23 +71,35 @@ public final class TelegramClient {
         return Mono.defer(() -> {
 
             Mono<Void> readUpdates = Flux.interval(clientResources.getUpdateInterval())
-                    .flatMap(l -> getRestClient().getApplicationService()
-                            .getUpdates(GetUpdates.builders()
-                                    .offset(terminate.get() ? lastUpdateId.get() + 1 : lastUpdateId.get())
-                                    .build())
-                            .checkpoint("Read updates from API")
-                            .filter(data -> !terminate.get())
-                            .filter(data -> data.updateId() > lastUpdateId.get())
-                            .collectList()
-                            .doOnNext(list -> lastUpdateId.set(list.stream()
-                                    .mapToInt(UpdateData::updateId)
-                                    .max().orElseGet(lastUpdateId::get)))
-                            .doOnNext(list -> list.forEach(updates::tryEmitNext))
-                            .doFirst(() -> {
-                                synchronized (terminate) {
-                                    terminate.set(!terminate.get());
-                                }
-                            }))
+                    .flatMap(l -> {
+                        if (request.get()) {
+                            return Mono.empty();
+                        }
+
+                        request.set(true);
+                        return Mono.fromSupplier(terminate::get)
+                                .filter(bool -> !bool)
+                                .switchIfEmpty(getRestClient().getApplicationService()
+                                        .getUpdates(GetUpdates.builders()
+                                                .offset(lastUpdateId.get() + 1)
+                                                .build())
+                                        .checkpoint("Terminate API updates")
+                                        .doFirst(() -> terminate.set(false))
+                                        .then(Mono.empty()))
+                                .flatMapMany(bool -> getRestClient().getApplicationService()
+                                        .getUpdates(GetUpdates.builders()
+                                                .offset(lastUpdateId.get())
+                                                .build()))
+                                .checkpoint("Read updates from API")
+                                .filter(data -> data.updateId() > lastUpdateId.get())
+                                .collectList()
+                                .doOnNext(list -> lastUpdateId.set(list.stream()
+                                        .mapToInt(UpdateData::updateId)
+                                        .max().orElseGet(lastUpdateId::get)))
+                                .doOnNext(list -> list.forEach(updates::tryEmitNext))
+                                .doOnNext(list -> terminate.set(!list.isEmpty()))
+                                .then(Mono.fromRunnable(() -> request.set(false)));
+                    })
                     .then();
 
             DispatchStoreLayout dispatchStoreLayout = new DispatchStoreLayout(this);
