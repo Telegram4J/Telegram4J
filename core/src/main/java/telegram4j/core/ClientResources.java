@@ -1,12 +1,14 @@
 package telegram4j.core;
 
+import org.immutables.builder.Builder;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.dispatch.DefaultDispatchMapper;
 import telegram4j.core.dispatch.DispatchMapper;
 import telegram4j.core.dispatcher.DefaultEventDispatcher;
 import telegram4j.core.dispatcher.EventDispatcher;
+import telegram4j.core.event.Event;
 
 import java.time.Duration;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 /** A {@link TelegramClient}'s resources used in updates handling and events mapping. */
@@ -35,10 +37,16 @@ public class ClientResources {
         this.eventDispatcher = DEFAULT_EVENT_DISPATCHER.get();
     }
 
-    public ClientResources(Duration updateInterval, DispatchMapper dispatchMapper, EventDispatcher eventDispatcher) {
-        this.updateInterval = Objects.requireNonNull(updateInterval, "updateInterval");
-        this.dispatchMapper = Objects.requireNonNull(dispatchMapper, "dispatchMapper");
-        this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
+    @Builder.Constructor
+    ClientResources(@Nullable Duration updateInterval, @Nullable DispatchMapper dispatchMapper,
+                           @Nullable EventDispatcher eventDispatcher) {
+        this.updateInterval = updateInterval != null ? updateInterval : DEFAULT_UPDATE_INTERVAL;
+        this.dispatchMapper = dispatchMapper != null ? dispatchMapper : DEFAULT_DISPATCH_MAPPER.get();
+        this.eventDispatcher = eventDispatcher != null ? eventDispatcher : DEFAULT_EVENT_DISPATCHER.get();
+    }
+
+    public static ClientResourcesBuilder builder() {
+        return new ClientResourcesBuilder();
     }
 
     /**

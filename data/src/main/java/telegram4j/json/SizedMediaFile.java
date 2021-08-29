@@ -1,6 +1,6 @@
 package telegram4j.json;
 
-public interface SizedMediaFile {
+public interface SizedMediaFile extends FileFields {
 
     int width();
 

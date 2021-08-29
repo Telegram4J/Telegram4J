@@ -30,7 +30,6 @@ public interface AnimationData extends FileFields, MediaFileFields, SizedMediaFi
     @Override
     int height();
 
-    // in seconds
     @Override
     int duration();
 
