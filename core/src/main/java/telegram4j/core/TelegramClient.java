@@ -1,20 +1,20 @@
 package telegram4j.core;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
-import telegram4j.core.dispatch.UpdateContext;
+import telegram4j.core.dispatch.DispatchStoreLayout;
 import telegram4j.core.event.Event;
 import telegram4j.json.UpdateData;
 import telegram4j.json.request.GetUpdates;
-import telegram4j.rest.*;
-import telegram4j.rest.route.Route;
+import telegram4j.rest.DefaultRouter;
+import telegram4j.rest.RestResources;
+import telegram4j.rest.RestTelegramClient;
+import telegram4j.rest.RouterResources;
 
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,7 +25,7 @@ public final class TelegramClient {
     private final RestTelegramClient restClient;
     private final ClientResources clientResources;
 
-    private final AtomicInteger lastUpdateId = new AtomicInteger();
+    private final AtomicInteger lastUpdateId = new AtomicInteger(-1);
     private final AtomicBoolean terminate = new AtomicBoolean(true);
     private final Sinks.Many<UpdateData> updates;
 
@@ -89,9 +89,12 @@ public final class TelegramClient {
                             }))
                     .then();
 
+            DispatchStoreLayout dispatchStoreLayout = new DispatchStoreLayout(this);
+
             Mono<Void> mapEvents = updates.asFlux()
-                    .flatMap(data -> clientResources.getDispatchMapper().<Event>handle(
-                            new UpdateContext(data, this)))
+                    .flatMap(dispatchStoreLayout::store)
+                    .checkpoint("Save updates to store")
+                    .<Event>flatMap(clientResources.getDispatchMapper()::handle)
                     .checkpoint("Map updates to events")
                     .doOnNext(clientResources.getEventDispatcher()::publish)
                     .then();

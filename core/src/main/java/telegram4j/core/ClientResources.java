@@ -7,6 +7,8 @@ import telegram4j.core.dispatch.DispatchMapper;
 import telegram4j.core.dispatcher.DefaultEventDispatcher;
 import telegram4j.core.dispatcher.EventDispatcher;
 import telegram4j.core.event.Event;
+import telegram4j.core.store.Store;
+import telegram4j.core.store.impl.LocalStoreLayout;
 
 import java.time.Duration;
 import java.util.function.Supplier;
@@ -23,26 +25,32 @@ public class ClientResources {
     /** The {@link Supplier} which creates a {@link DefaultEventDispatcher} instances with default settings. */
     public static final Supplier<EventDispatcher> DEFAULT_EVENT_DISPATCHER = DefaultEventDispatcher::create;
 
+    public static final Supplier<Store> DEFAULT_STORE = () -> Store.fromLayout(new LocalStoreLayout());
+
     /** Update check interval. */
     private final Duration updateInterval;
     /** Update event mapper. */
     private final DispatchMapper dispatchMapper;
     /** Event distributor. */
     private final EventDispatcher eventDispatcher;
+    /** Objects store used across Telegram4J. */
+    private final Store store;
 
     /** Constructs a {@link ClientResources} with default settings. */
     public ClientResources() {
         this.updateInterval = DEFAULT_UPDATE_INTERVAL;
         this.dispatchMapper = DEFAULT_DISPATCH_MAPPER.get();
         this.eventDispatcher = DEFAULT_EVENT_DISPATCHER.get();
+        this.store = DEFAULT_STORE.get();
     }
 
     @Builder.Constructor
     ClientResources(@Nullable Duration updateInterval, @Nullable DispatchMapper dispatchMapper,
-                           @Nullable EventDispatcher eventDispatcher) {
+                    @Nullable EventDispatcher eventDispatcher, @Nullable Store store) {
         this.updateInterval = updateInterval != null ? updateInterval : DEFAULT_UPDATE_INTERVAL;
         this.dispatchMapper = dispatchMapper != null ? dispatchMapper : DEFAULT_DISPATCH_MAPPER.get();
         this.eventDispatcher = eventDispatcher != null ? eventDispatcher : DEFAULT_EVENT_DISPATCHER.get();
+        this.store = store != null ? store : DEFAULT_STORE.get();
     }
 
     public static ClientResourcesBuilder builder() {
@@ -77,5 +85,14 @@ public class ClientResources {
      */
     public EventDispatcher getEventDispatcher() {
         return eventDispatcher;
+    }
+
+    /**
+     * Gets an object {@link Store store} used to save entities after receiving updates
+     *
+     * @return an object store.
+     */
+    public Store getStore() {
+        return store;
     }
 }

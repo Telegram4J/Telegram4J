@@ -5,5 +5,5 @@ import telegram4j.core.event.Event;
 
 public interface DispatchMapper {
 
-    <E extends Event> Mono<E> handle(UpdateContext update);
+    <E extends Event, O> Mono<E> handle(UpdateContext<O> update);
 }

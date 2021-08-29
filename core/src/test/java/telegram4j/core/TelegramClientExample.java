@@ -8,7 +8,6 @@ import telegram4j.json.BotCommandScopeType;
 import telegram4j.json.MessageEntityType;
 import telegram4j.json.request.MessageCreate;
 import telegram4j.json.request.SetMyCommands;
-import telegram4j.rest.route.Routes;
 
 public class TelegramClientExample {
 
@@ -43,7 +42,7 @@ public class TelegramClientExample {
 
         client.on(MessageCreateEvent.class)
                 .filter(event -> event.getMessage().getText()
-                        .map(s -> s.equals("амогус"))
+                        .map("амогус"::equals)
                         .orElse(false))
                 .flatMap(event -> {
                     long time = System.currentTimeMillis();
