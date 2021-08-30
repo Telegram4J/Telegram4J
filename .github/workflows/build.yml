@@ -19,4 +19,4 @@ jobs:
           java-version: 8
           distribution: adopt
       - name: Build sources with Gradle
-        run: ./gradlew build
+        run: ./gradlew jar
