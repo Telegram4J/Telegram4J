@@ -68,7 +68,8 @@ public class Poll implements TelegramObject {
 
     public Optional<List<MessageEntity>> getExplanationEntities() {
         return data.explanationEntities().map(list -> list.stream()
-                .map(data -> new MessageEntity(client, data))
+                .map(data -> new MessageEntity(client, data,
+                        getExplanation().orElseThrow(IllegalStateException::new)))
                 .collect(Collectors.toList()));
     }
 

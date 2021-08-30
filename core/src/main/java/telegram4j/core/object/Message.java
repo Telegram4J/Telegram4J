@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.chat.Chat;
@@ -22,8 +23,17 @@ public class Message implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    public Mono<Boolean> delete() {
+        return client.getRestClient().getChatService()
+                .deleteMessage(getChatId().asLong(), getId().asLong());
+    }
+
     public Id getId() {
         return Id.of(data.messageId());
+    }
+
+    public Id getChatId() {
+        return Id.of(data.chat().id());
     }
 
     public MessageData getData() {
@@ -92,7 +102,8 @@ public class Message implements TelegramObject {
 
     public Optional<List<MessageEntity>> getEntities() {
         return data.entities().map(list -> list.stream()
-                .map(data -> new MessageEntity(client, data))
+                .map(data -> new MessageEntity(client, data,
+                        getText().orElseThrow(IllegalStateException::new)))
                 .collect(Collectors.toList()));
     }
 
@@ -136,7 +147,8 @@ public class Message implements TelegramObject {
 
     public Optional<List<MessageEntity>> getCaptionEntities() {
         return data.captionEntities().map(list -> list.stream()
-                .map(data -> new MessageEntity(client, data))
+                .map(data -> new MessageEntity(client, data,
+                        getCaption().orElseThrow(IllegalStateException::new)))
                 .collect(Collectors.toList()));
     }
 

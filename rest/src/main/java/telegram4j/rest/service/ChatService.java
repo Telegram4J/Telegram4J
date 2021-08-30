@@ -4,10 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.json.ChatData;
 import telegram4j.json.MessageData;
 import telegram4j.json.MessageIdData;
-import telegram4j.json.request.GetChat;
-import telegram4j.json.request.MessageCopy;
-import telegram4j.json.request.MessageCreate;
-import telegram4j.json.request.MessageForward;
+import telegram4j.json.request.*;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
 
@@ -45,5 +42,15 @@ public class ChatService extends RestService {
                         .build())
                 .exchange(router)
                 .bodyTo(ChatData.class);
+    }
+
+    public Mono<Boolean> deleteMessage(long chatId, long messageId) {
+        return Routes.DELETE_MESSAGE.newRequest()
+                .body(DeleteMessage.builder()
+                        .chatId(chatId)
+                        .messageId(messageId)
+                        .build())
+                .exchange(router)
+                .bodyTo(Boolean.class);
     }
 }
