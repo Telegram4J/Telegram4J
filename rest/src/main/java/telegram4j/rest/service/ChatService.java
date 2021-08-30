@@ -1,9 +1,11 @@
 package telegram4j.rest.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
 import telegram4j.json.ChatData;
 import telegram4j.json.MessageData;
 import telegram4j.json.MessageIdData;
+import telegram4j.json.PollData;
 import telegram4j.json.request.*;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
@@ -52,5 +54,40 @@ public class ChatService extends RestService {
                         .build())
                 .exchange(router)
                 .bodyTo(Boolean.class);
+    }
+
+    public Mono<JsonNode> editMessageText(MessageEditText messageEditText) {
+        return Routes.EDIT_MESSAGE_TEXT.newRequest()
+                .body(messageEditText)
+                .exchange(router)
+                .bodyTo(JsonNode.class);
+    }
+
+    public Mono<JsonNode> editMessageCaption(MessageEditCaption messageEditCaption) {
+        return Routes.EDIT_MESSAGE_CAPTION.newRequest()
+                .body(messageEditCaption)
+                .exchange(router)
+                .bodyTo(JsonNode.class);
+    }
+
+    public Mono<JsonNode> editMessageMedia(MessageEditMedia messageEditMedia) {
+        return Routes.EDIT_MESSAGE_MEDIA.newRequest()
+                .body(messageEditMedia)
+                .exchange(router)
+                .bodyTo(JsonNode.class);
+    }
+
+    public Mono<JsonNode> editMessageReplyMarkup(MessageEditReplyMarkup messageEditReplyMarkup) {
+        return Routes.EDIT_MESSAGE_REPLY_MARKUP.newRequest()
+                .body(messageEditReplyMarkup)
+                .exchange(router)
+                .bodyTo(JsonNode.class);
+    }
+
+    public Mono<PollData> stopPoll(StopPoll stopPoll) {
+        return Routes.STOP_POLL.newRequest()
+                .body(stopPoll)
+                .exchange(router)
+                .bodyTo(PollData.class);
     }
 }
