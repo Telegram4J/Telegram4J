@@ -7,10 +7,11 @@ import io.netty.handler.codec.http.HttpHeaders;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 import reactor.util.function.Tuple2;
+import telegram4j.json.InputFile;
 
-import java.io.InputStream;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<?>> {
 
@@ -41,8 +42,14 @@ public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<
                 }
             }
 
-            for (Tuple2<String, InputStream> file : body.getFiles()) {
-                form.file(file.getT1(), file.getT2(), "application/octet-stream");
+            for (Tuple2<String, InputFile> file : body.getFiles()) {
+                if (file.getT2().getContent() != null) {
+                    form.file(file.getT1(), file.getT2().getContent(), "application/octet-stream");
+                } else {
+                    String url = file.getT2().getUrl();
+                    Objects.requireNonNull(url, "url");
+                    form.attr(file.getT1(), url);
+                }
             }
         }));
     }

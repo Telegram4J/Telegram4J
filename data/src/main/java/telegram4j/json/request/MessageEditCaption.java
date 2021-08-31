@@ -11,7 +11,7 @@ import telegram4j.json.ParseMode;
 import java.util.List;
 import java.util.Optional;
 
-@Value.Immutable
+@Value.Immutable(singleton = true)
 @JsonSerialize(as = ImmutableMessageEditCaption.class)
 @JsonDeserialize(as = ImmutableMessageEditCaption.class)
 public interface MessageEditCaption {
@@ -29,7 +29,7 @@ public interface MessageEditCaption {
     @JsonProperty("inline_message_id")
     Optional<String> inlineMessageId();
 
-    String caption();
+    Optional<String> caption();
 
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();

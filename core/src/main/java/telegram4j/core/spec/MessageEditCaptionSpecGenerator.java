@@ -5,14 +5,15 @@ import telegram4j.core.object.Id;
 import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.json.ParseMode;
+import telegram4j.json.request.MessageEditCaption;
 import telegram4j.json.request.MessageEditText;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Value.Immutable
-interface MessageEditCaptionSpecGenerator extends Spec<MessageEditText> {
+@Value.Immutable(singleton = true)
+interface MessageEditCaptionSpecGenerator extends Spec<MessageEditCaption> {
 
     Optional<Id> chatId();
 
@@ -20,28 +21,25 @@ interface MessageEditCaptionSpecGenerator extends Spec<MessageEditText> {
 
     Optional<String> inlineMessageId();
 
-    String text();
+    Optional<String> caption();
 
     Optional<ParseMode> parseMode();
 
-    Optional<List<MessageEntity>> entities();
-
-    Optional<Boolean> disableWebPagePreview();
+    Optional<List<MessageEntity>> captionEntities();
 
     Optional<InlineKeyboardMarkup> replyMarkup();
 
     @Override
-    default MessageEditText asRequest() {
-        return MessageEditText.builder()
+    default MessageEditCaption asRequest() {
+        return MessageEditCaption.builder()
                 .chatId(chatId().map(Id::asLong))
                 .messageId(messageId().map(Id::asLong))
                 .inlineMessageId(inlineMessageId())
-                .text(text())
+                .caption(caption())
                 .parseMode(parseMode())
-                .entities(entities().map(list -> list.stream()
+                .captionEntities(captionEntities().map(list -> list.stream()
                         .map(MessageEntity::getData)
                         .collect(Collectors.toList())))
-                .disableWebPagePreview(disableWebPagePreview())
                 .replyMarkup(replyMarkup().map(InlineKeyboardMarkup::getData))
                 .build();
     }
