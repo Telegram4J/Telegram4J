@@ -8,8 +8,12 @@ import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.core.dispatch.DispatchStoreLayout;
 import telegram4j.core.event.Event;
+import telegram4j.core.object.Message;
+import telegram4j.core.object.Poll;
+import telegram4j.core.spec.*;
+import telegram4j.json.MessageData;
 import telegram4j.json.UpdateData;
-import telegram4j.json.request.GetUpdates;
+import telegram4j.json.request.*;
 import telegram4j.rest.DefaultRouter;
 import telegram4j.rest.RestResources;
 import telegram4j.rest.RestTelegramClient;
@@ -65,6 +69,48 @@ public final class TelegramClient {
 
     public <E extends Event> Flux<E> on(Class<E> type) {
         return clientResources.getEventDispatcher().on(type);
+    }
+
+
+    public Mono<Message> editMessageText(MessageEditTextSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageText(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageCaption(MessageEditCaptionSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageCaption(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageMedia(MessageEditMediaSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageMedia(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageReplyMarkup(MessageEditReplyMarkupSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageReplyMarkup(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Poll> stopPoll(StopPollSpec spec) {
+        return getRestClient().getChatService().stopPoll(spec.asRequest())
+                .map(data -> new Poll(this, data));
     }
 
     public Mono<Void> login() {

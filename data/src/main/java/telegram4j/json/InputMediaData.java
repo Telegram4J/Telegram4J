@@ -29,8 +29,6 @@ public interface InputMediaData {
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
-    Optional<String> thumb();
-
     Optional<Integer> width();
 
     Optional<Integer> height();

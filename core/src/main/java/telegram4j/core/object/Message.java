@@ -6,10 +6,6 @@ import telegram4j.core.TelegramClient;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
-import telegram4j.json.request.MessageEditCaption;
-import telegram4j.json.request.MessageEditMedia;
-import telegram4j.json.request.MessageEditReplyMarkup;
-import telegram4j.json.request.MessageEditText;
 
 import java.time.Instant;
 import java.util.List;
@@ -30,42 +26,6 @@ public class Message implements TelegramObject {
     public Mono<Boolean> delete() {
         return client.getRestClient().getChatService()
                 .deleteMessage(getChatId().asLong(), getId().asLong());
-    }
-
-    public Mono<Message> editMessageText(MessageEditText spec) {
-        return client.getRestClient().getChatService()
-                .editMessageText(spec)
-                .filter(node -> !node.isBoolean())
-                .map(node -> client.getRestResources().getObjectMapper()
-                        .convertValue(node, MessageData.class))
-                .map(data -> new Message(client, data));
-    }
-
-    public Mono<Message> editMessageCaption(MessageEditCaption spec) {
-        return client.getRestClient().getChatService()
-                .editMessageCaption(spec)
-                .filter(node -> !node.isBoolean())
-                .map(node -> client.getRestResources().getObjectMapper()
-                        .convertValue(node, MessageData.class))
-                .map(data -> new Message(client, data));
-    }
-
-    public Mono<Message> editMessageMedia(MessageEditMedia spec) {
-        return client.getRestClient().getChatService()
-                .editMessageMedia(spec)
-                .filter(node -> !node.isBoolean())
-                .map(node -> client.getRestResources().getObjectMapper()
-                        .convertValue(node, MessageData.class))
-                .map(data -> new Message(client, data));
-    }
-
-    public Mono<Message> editMessageReplyMarkup(MessageEditReplyMarkup spec) {
-        return client.getRestClient().getChatService()
-                .editMessageReplyMarkup(spec)
-                .filter(node -> !node.isBoolean())
-                .map(node -> client.getRestResources().getObjectMapper()
-                        .convertValue(node, MessageData.class))
-                .map(data -> new Message(client, data));
     }
 
     public Id getId() {
