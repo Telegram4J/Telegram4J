@@ -2,9 +2,12 @@ package telegram4j.rest;
 
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 import telegram4j.json.InputFile;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -25,6 +28,18 @@ public class MultipartRequest<J> {
 
     public static <B> MultipartRequest<B> ofBodyAndFiles(@Nullable B body, List<Tuple2<String, InputFile>> files) {
         return new MultipartRequest<>(body, files);
+    }
+
+    public MultipartRequest<J> addFile(String name, InputFile file) {
+        List<Tuple2<String, InputFile>> added = new ArrayList<>(files);
+        added.add(Tuples.of(name, file));
+        return new MultipartRequest<>(json, added);
+    }
+
+    public MultipartRequest<J> addFiles(Collection<? extends Tuple2<String, InputFile>> files) {
+        List<Tuple2<String, InputFile>> added = new ArrayList<>(this.files);
+        added.addAll(files);
+        return new MultipartRequest<>(json, added);
     }
 
     @Nullable
