@@ -1,4 +1,4 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chatmember;
 
 import telegram4j.core.TelegramClient;
 import telegram4j.json.ChatMemberData;
@@ -12,39 +12,39 @@ public final class ChatMemberAdministrator extends ChatMember {
     }
 
     public boolean isCanBeEdited() {
-        return getData().canBeEdited().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canBeEdited().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isAnonymous() {
-        return getData().isAnonymous().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().isAnonymous().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanManageChat() {
-        return getData().canManageChat().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canManageChat().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanDeleteMessages() {
-        return getData().canDeleteMessages().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canDeleteMessages().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanManageVoiceChats() {
-        return getData().canManageVoiceChats().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canManageVoiceChats().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanRestrictMembers() {
-        return getData().canRestrictMembers().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canRestrictMembers().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanPromoteMembers() {
-        return getData().canPromoteMembers().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canPromoteMembers().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanChangeInfo() {
-        return getData().canChangeInfo().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canChangeInfo().orElseThrow(IllegalStateException::new);
     }
 
     public boolean isCanInviteUsers() {
-        return getData().canInviteUsers().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().canInviteUsers().orElseThrow(IllegalStateException::new);
     }
 
     public Optional<Boolean> isCanPostMessages() {

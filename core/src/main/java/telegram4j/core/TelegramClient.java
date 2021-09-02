@@ -71,7 +71,6 @@ public final class TelegramClient {
         return clientResources.getEventDispatcher().on(type);
     }
 
-
     public Mono<Message> editMessageText(MessageEditTextSpec spec) {
         return getRestClient().getChatService()
                 .editMessageText(spec.asRequest())

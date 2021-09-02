@@ -1,6 +1,8 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chatmember;
 
 import telegram4j.core.TelegramClient;
+import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.User;
 import telegram4j.json.ChatMemberData;
 import telegram4j.json.ChatMemberStatus;
 

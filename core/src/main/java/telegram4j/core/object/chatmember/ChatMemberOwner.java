@@ -1,4 +1,4 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chatmember;
 
 import telegram4j.core.TelegramClient;
 import telegram4j.json.ChatMemberData;
@@ -12,7 +12,7 @@ public final class ChatMemberOwner extends ChatMember {
     }
 
     public boolean isAnonymous() {
-        return getData().isAnonymous().orElseThrow(IllegalStateException::new); // must be always present
+        return getData().isAnonymous().orElseThrow(IllegalStateException::new);
     }
 
     public Optional<String> getCustomTitle() {
