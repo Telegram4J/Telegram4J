@@ -4,8 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
 import telegram4j.json.ChatData;
 import telegram4j.json.MessageData;
-import telegram4j.json.MessageIdData;
 import telegram4j.json.PollData;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 import telegram4j.json.request.*;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
@@ -30,14 +31,14 @@ public class ChatService extends RestService {
                 .bodyTo(MessageData.class);
     }
 
-    public Mono<MessageIdData> copyMessage(MessageCopy messageCopy) {
+    public Mono<Id> copyMessage(MessageCopy messageCopy) {
         return Routes.COPY_MESSAGE.newRequest()
                 .body(messageCopy)
                 .exchange(router)
-                .bodyTo(MessageIdData.class);
+                .bodyTo(Id.class);
     }
 
-    public Mono<ChatData> getChat(long chatId) {
+    public Mono<ChatData> getChat(ChatId chatId) {
         return Routes.GET_CHAT.newRequest()
                 .body(GetChat.builder()
                         .chatId(chatId)

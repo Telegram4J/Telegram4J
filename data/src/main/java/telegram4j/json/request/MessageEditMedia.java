@@ -8,6 +8,8 @@ import telegram4j.json.InlineKeyboardMarkupData;
 import telegram4j.json.InputMediaData;
 import telegram4j.json.MessageEntityData;
 import telegram4j.json.ParseMode;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,10 +24,10 @@ public interface MessageEditMedia {
     }
 
     @JsonProperty("chat_id")
-    Optional<Long> chatId();
+    Optional<ChatId> chatId();
 
     @JsonProperty("message_id")
-    Optional<Long> messageId();
+    Optional<Id> messageId();
 
     @JsonProperty("inline_message_id")
     Optional<String> inlineMessageId();

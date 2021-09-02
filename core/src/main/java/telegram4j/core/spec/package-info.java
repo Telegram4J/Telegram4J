@@ -10,6 +10,8 @@
         depluralize = true,
         defaultAsDefault = true
 )
+@MetaEncodingEnabled
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
+import telegram4j.json.encoding.MetaEncodingEnabled;

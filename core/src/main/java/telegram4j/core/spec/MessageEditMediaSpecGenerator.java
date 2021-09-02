@@ -1,7 +1,8 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.json.InputMediaData;
 import telegram4j.json.request.MessageEditMedia;
@@ -11,7 +12,7 @@ import java.util.Optional;
 @Value.Immutable
 interface MessageEditMediaSpecGenerator extends Spec<MessageEditMedia> {
 
-    Optional<Id> chatId();
+    Optional<ChatId> chatId();
 
     Optional<Id> messageId();
 
@@ -24,8 +25,8 @@ interface MessageEditMediaSpecGenerator extends Spec<MessageEditMedia> {
     @Override
     default MessageEditMedia asRequest() {
         return MessageEditMedia.builder()
-                .chatId(chatId().map(Id::asLong))
-                .messageId(messageId().map(Id::asLong))
+                .chatId(chatId())
+                .messageId(messageId())
                 .inlineMessageId(inlineMessageId())
                 .media(media())
                 .replyMarkup(replyMarkup().map(InlineKeyboardMarkup::getData))

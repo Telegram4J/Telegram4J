@@ -3,7 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.ChatPhoto;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.Id;
 import telegram4j.core.object.Message;
 import telegram4j.json.ChatData;
 import telegram4j.json.ChatType;
@@ -23,7 +23,7 @@ class BaseChat implements Chat {
 
     @Override
     public Id getId() {
-        return Id.of(data.id());
+        return data.id();
     }
 
     @Override

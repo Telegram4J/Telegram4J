@@ -7,6 +7,8 @@ import org.immutables.value.Value;
 import telegram4j.json.MessageEntityData;
 import telegram4j.json.ParseMode;
 import telegram4j.json.ReplyMarkup;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,13 +23,13 @@ public interface MessageCopy {
     }
 
     @JsonProperty("chat_id")
-    long chatId();
+    ChatId chatId();
 
     @JsonProperty("from_chat_id")
-    long fromChatId();
+    ChatId fromChatId();
 
     @JsonProperty("message_id")
-    long messageId();
+    Id messageId();
 
     String caption();
 
@@ -41,7 +43,7 @@ public interface MessageCopy {
     Optional<Boolean> disableNotification();
 
     @JsonProperty("reply_to_message_id")
-    Optional<Long> replyToMessageId();
+    Optional<Id> replyToMessageId();
 
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();

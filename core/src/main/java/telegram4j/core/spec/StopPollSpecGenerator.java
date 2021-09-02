@@ -1,7 +1,8 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.json.request.StopPoll;
 
@@ -10,7 +11,7 @@ import java.util.Optional;
 @Value.Immutable
 interface StopPollSpecGenerator extends Spec<StopPoll> {
 
-    Id chatId();
+    ChatId chatId();
 
     Id messageId();
 
@@ -19,8 +20,8 @@ interface StopPollSpecGenerator extends Spec<StopPoll> {
     @Override
     default StopPoll asRequest() {
         return StopPoll.builder()
-                .chatId(chatId().asLong())
-                .messageId(messageId().asLong())
+                .chatId(chatId())
+                .messageId(messageId())
                 .replyMarkup(replyMarkup().map(InlineKeyboardMarkup::getData))
                 .build();
     }

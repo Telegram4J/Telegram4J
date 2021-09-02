@@ -1,4 +1,4 @@
-package telegram4j.core.object;
+package telegram4j.json.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

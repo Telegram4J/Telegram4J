@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.api.Id;
 
 import java.util.Optional;
 
@@ -17,7 +18,7 @@ public interface GetUserProfilePhotos {
     }
 
     @JsonProperty("user_id")
-    long userId();
+    Id userId();
 
     Optional<Integer> offset();
 

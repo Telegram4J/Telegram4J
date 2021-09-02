@@ -13,13 +13,12 @@ import java.util.concurrent.ConcurrentMap;
 
 public class LocalStoreLayout implements StoreLayout {
     private final ConcurrentMap<Long128, MessageData> messages = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, UserData> users = new ConcurrentHashMap<>();
 
     @Override
     public Mono<Void> onMessageCreate(MessageData dispatch) {
         return Mono.fromRunnable(() -> {
             ImmutableMessageData message = ImmutableMessageData.copyOf(dispatch);
-            Long128 id = Long128.of(message.chat().id(), message.messageId());
+            Long128 id = Long128.of(message.chat().id().asLong(), message.messageId().asLong());
             messages.put(id, message);
         });
     }
@@ -28,7 +27,7 @@ public class LocalStoreLayout implements StoreLayout {
     public Mono<MessageData> onMessageUpdate(MessageData dispatch) {
         return Mono.fromSupplier(() -> {
             ImmutableMessageData edited = ImmutableMessageData.copyOf(dispatch);
-            Long128 id = Long128.of(edited.chat().id(), edited.messageId());
+            Long128 id = Long128.of(edited.chat().id().asLong(), edited.messageId().asLong());
             MessageData old = messages.get(id);
             messages.computeIfPresent(id, (key, data) -> edited);
             return old;
@@ -36,28 +35,8 @@ public class LocalStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<MessageData> onMessageDelete(MessageData dispatch) {
-        return Mono.fromSupplier(() -> messages.remove(Long128.of(dispatch.chat().id(), dispatch.messageId())));
-    }
-
-    @Override
-    public Mono<UserData> onUserUpdate(UserData dispatch) {
-        return Mono.fromSupplier(() -> {
-            ImmutableUserData edited = ImmutableUserData.copyOf(dispatch);
-            UserData old = users.get(edited.id());
-            users.computeIfPresent(edited.id(), (key, data) -> edited);
-            return old;
-        });
-    }
-
-    @Override
     public Mono<MessageData> getMessageById(long chatId, long messageId) {
         return Mono.fromSupplier(() -> messages.get(Long128.of(chatId, messageId)));
-    }
-
-    @Override
-    public Mono<UserData> getUserById(long userId) {
-        return Mono.fromSupplier(() -> users.get(userId));
     }
 
     static final class Long128 {

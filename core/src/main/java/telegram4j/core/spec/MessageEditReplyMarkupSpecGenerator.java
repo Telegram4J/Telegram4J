@@ -1,7 +1,8 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.json.request.MessageEditReplyMarkup;
 
@@ -10,7 +11,7 @@ import java.util.Optional;
 @Value.Immutable(singleton = true)
 interface MessageEditReplyMarkupSpecGenerator extends Spec<MessageEditReplyMarkup> {
 
-    Optional<Id> chatId();
+    Optional<ChatId> chatId();
 
     Optional<Id> messageId();
 
@@ -21,8 +22,8 @@ interface MessageEditReplyMarkupSpecGenerator extends Spec<MessageEditReplyMarku
     @Override
     default MessageEditReplyMarkup asRequest() {
         return MessageEditReplyMarkup.builder()
-                .chatId(chatId().map(Id::asLong))
-                .messageId(messageId().map(Id::asLong))
+                .chatId(chatId())
+                .messageId(messageId())
                 .inlineMessageId(inlineMessageId())
                 .replyMarkup(replyMarkup().map(InlineKeyboardMarkup::getData))
                 .build();

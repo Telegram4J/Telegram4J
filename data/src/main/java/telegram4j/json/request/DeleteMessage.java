@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 
 @Value.Immutable
 @JsonSerialize(as = ImmutableDeleteMessage.class)
@@ -15,8 +17,8 @@ public interface DeleteMessage {
     }
 
     @JsonProperty("chat_id")
-    long chatId();
+    ChatId chatId();
 
     @JsonProperty("message_id")
-    long messageId();
+    Id messageId();
 }

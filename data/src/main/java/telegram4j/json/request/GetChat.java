@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.api.ChatId;
 
 @Value.Immutable
 @JsonSerialize(as = ImmutableGetChat.class)
@@ -15,5 +16,5 @@ public interface GetChat {
     }
 
     @JsonProperty("chat_id")
-    long chatId();
+    ChatId chatId();
 }

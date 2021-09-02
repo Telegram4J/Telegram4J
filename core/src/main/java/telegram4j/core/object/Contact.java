@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import telegram4j.core.TelegramClient;
 import telegram4j.json.ContactData;
+import telegram4j.json.api.Id;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +34,7 @@ public class Contact implements TelegramObject {
     }
 
     public Optional<Id> getUserId() {
-        return data.userId().map(Id::of);
+        return data.userId();
     }
 
     public Optional<String> getVcard() {

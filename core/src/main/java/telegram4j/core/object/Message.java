@@ -6,6 +6,7 @@ import telegram4j.core.TelegramClient;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
+import telegram4j.json.api.Id;
 
 import java.time.Instant;
 import java.util.List;
@@ -29,11 +30,11 @@ public class Message implements TelegramObject {
     }
 
     public Id getId() {
-        return Id.of(data.messageId());
+        return data.messageId();
     }
 
     public Id getChatId() {
-        return Id.of(data.chat().id());
+        return data.chat().id();
     }
 
     public MessageData getData() {
@@ -61,7 +62,7 @@ public class Message implements TelegramObject {
     }
 
     public Optional<Id> getForwardFromMessageId() {
-        return data.forwardFromMessageId().map(Id::of);
+        return data.forwardFromMessageId();
     }
 
     public Optional<String> getForwardSignature() {
@@ -218,11 +219,11 @@ public class Message implements TelegramObject {
     }
 
     public Optional<Id> getMigrateToChatId() {
-        return data.migrateToChatId().map(Id::of);
+        return data.migrateToChatId();
     }
 
     public Optional<Id> getMigrateFromChatId() {
-        return data.migrateFromChatId().map(Id::of);
+        return data.migrateFromChatId();
     }
 
     public Optional<Message> getPinnedMessage() {
