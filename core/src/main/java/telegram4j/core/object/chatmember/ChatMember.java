@@ -38,7 +38,7 @@ public class ChatMember implements TelegramObject {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof ChatMember)) return false;
         ChatMember that = (ChatMember) o;
         return data.equals(that.data);
     }

@@ -1,12 +1,11 @@
 package telegram4j.core.object.chat;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.ChatPhoto;
-import telegram4j.json.api.Id;
 import telegram4j.core.object.Message;
 import telegram4j.json.ChatData;
 import telegram4j.json.ChatType;
+import telegram4j.json.api.Id;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -57,9 +56,9 @@ class BaseChat implements Chat {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
+    public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof BaseChat)) return false;
         BaseChat that = (BaseChat) o;
         return getId().equals(that.getId());
     }
