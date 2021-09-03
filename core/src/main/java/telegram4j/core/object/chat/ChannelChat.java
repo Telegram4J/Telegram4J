@@ -29,7 +29,7 @@ public final class ChannelChat extends BaseChat implements LinkedChat {
 
     @Override
     public Optional<Id> getLinkedChatId() {
-        return getData().linkedChatId().map(Id::of);
+        return getData().linkedChatId();
     }
 
     @Override

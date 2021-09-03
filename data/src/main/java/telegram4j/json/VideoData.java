@@ -30,7 +30,6 @@ public interface VideoData extends FileFields, MediaFileFields, SizedMediaFile {
     @Override
     int height();
 
-    // in seconds
     @Override
     int duration();
 

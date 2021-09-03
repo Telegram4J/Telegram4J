@@ -53,7 +53,7 @@ public final class SupergroupChat extends GroupChat implements LinkedChat, Named
 
     @Override
     public Optional<Id> getLinkedChatId() {
-        return getData().linkedChatId().map(Id::of);
+        return getData().linkedChatId();
     }
 
     public Optional<ChatLocation> getLocation() {

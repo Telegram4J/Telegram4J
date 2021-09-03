@@ -62,7 +62,7 @@ public interface ChatData {
     Optional<Boolean> canSetStickerSet();
 
     @JsonProperty("linked_chat_id")
-    Optional<Long> linkedChatId();
+    Optional<Id> linkedChatId();
 
     Optional<ChatLocationData> location();
 }
