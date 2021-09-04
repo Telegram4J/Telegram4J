@@ -23,7 +23,7 @@ public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<
 
     @Override
     public boolean canWrite(Class<?> type, HttpHeaders headers) {
-        return headers.get(HttpHeaderNames.CONTENT_TYPE, "").equals("multipart/data-form");
+        return headers.get(HttpHeaderNames.CONTENT_TYPE, "").equals("multipart/form-data");
     }
 
     @Override
