@@ -24,7 +24,7 @@ public interface InputMediaData {
     Optional<String> caption();
 
     @JsonProperty("parse_mode")
-    Optional<String> parseMode();
+    Optional<ParseMode> parseMode();
 
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();

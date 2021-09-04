@@ -43,12 +43,25 @@ public class MultipartWriterStrategy implements WriterStrategy<MultipartRequest<
             }
 
             for (Tuple2<String, InputFile> file : body.getFiles()) {
-                if (file.getT2().getContent() != null) {
-                    form.file(file.getT1(), file.getT2().getContent(), "application/octet-stream");
+                String name = file.getT1();
+                InputFile data = file.getT2();
+                if (data.getContent() != null) {
+                    // 'thumb' and 'media' fields allow reference to 'attach://<file_attach_name>'
+                    String filename0 = data.getFilename();
+                    String filename = filename0;
+                    if (name.equals("thumb") || name.equals("media")) {
+                        filename = "attach://" + filename0;
+                    }
+
+                    if (name.equals("media")) {
+                        name = filename0;
+                    }
+
+                    form.file(name, filename, data.getContent(), null);
                 } else {
-                    String url = file.getT2().getUrl();
+                    String url = data.getUrl();
                     Objects.requireNonNull(url, "url");
-                    form.attr(file.getT1(), url);
+                    form.attr(name, url);
                 }
             }
         }));

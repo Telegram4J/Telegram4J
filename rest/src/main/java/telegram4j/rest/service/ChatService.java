@@ -1,6 +1,7 @@
 package telegram4j.rest.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.json.ChatData;
 import telegram4j.json.MessageData;
@@ -8,6 +9,7 @@ import telegram4j.json.PollData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 import telegram4j.json.request.*;
+import telegram4j.rest.MultipartRequest;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
 
@@ -71,8 +73,9 @@ public class ChatService extends RestService {
                 .bodyTo(JsonNode.class);
     }
 
-    public Mono<JsonNode> editMessageMedia(MessageEditMedia messageEditMedia) {
+    public Mono<JsonNode> editMessageMedia(MultipartRequest<MessageEditMedia> messageEditMedia) {
         return Routes.EDIT_MESSAGE_MEDIA.newRequest()
+                .header("content-type", "multipart/form-data")
                 .body(messageEditMedia)
                 .exchange(router)
                 .bodyTo(JsonNode.class);
@@ -90,5 +93,22 @@ public class ChatService extends RestService {
                 .body(stopPoll)
                 .exchange(router)
                 .bodyTo(PollData.class);
+    }
+
+    public Mono<MessageData> sendDocument(MultipartRequest<SendDocument> request) {
+        return Routes.SEND_DOCUMENT.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
+    public Flux<MessageData> sendMediaGroup(MultipartRequest<SendMediaGroup> request) {
+        return Routes.SEND_MEDIA_GROUP.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData[].class)
+                .flatMapMany(Flux::fromArray);
     }
 }

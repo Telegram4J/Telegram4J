@@ -15,9 +15,9 @@ public class MultipartRequest<J> {
 
     @Nullable
     private final J json;
-    private final List<Tuple2<String, InputFile>> files;
+    private final Collection<Tuple2<String, InputFile>> files;
 
-    private MultipartRequest(@Nullable J json, List<Tuple2<String, InputFile>> files) {
+    private MultipartRequest(@Nullable J json, Collection<Tuple2<String, InputFile>> files) {
         this.json = json;
         this.files = files;
     }
@@ -26,7 +26,7 @@ public class MultipartRequest<J> {
         return new MultipartRequest<>(body, Collections.emptyList());
     }
 
-    public static <B> MultipartRequest<B> ofBodyAndFiles(@Nullable B body, List<Tuple2<String, InputFile>> files) {
+    public static <B> MultipartRequest<B> ofBodyAndFiles(@Nullable B body, Collection<Tuple2<String, InputFile>> files) {
         return new MultipartRequest<>(body, files);
     }
 
@@ -47,7 +47,7 @@ public class MultipartRequest<J> {
         return json;
     }
 
-    public List<Tuple2<String, InputFile>> getFiles() {
+    public Collection<Tuple2<String, InputFile>> getFiles() {
         return files;
     }
 }
