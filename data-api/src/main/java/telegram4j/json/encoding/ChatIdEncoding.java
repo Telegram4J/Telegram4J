@@ -2,24 +2,27 @@ package telegram4j.json.encoding;
 
 import org.immutables.encode.Encoding;
 import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 
 import java.util.Objects;
 
 @Encoding
 public class ChatIdEncoding {
-
-    @Encoding.Impl(virtual = true)
-    private ChatId id;
-
-    private final String value = id.asString();
+    @Encoding.Impl
+    private ChatId value = null;
 
     @Encoding.Expose
     ChatId get() {
-        return ChatId.of(value);
+        return value;
     }
 
     @Encoding.Copy
     public ChatId withLong(long value) {
+        return ChatId.of(value);
+    }
+
+    @Encoding.Copy
+    public ChatId withId(Id value) {
         return ChatId.of(value);
     }
 
@@ -54,6 +57,11 @@ public class ChatIdEncoding {
 
         @Encoding.Init
         public void setLongValue(long value) {
+            this.id = ChatId.of(value);
+        }
+
+        @Encoding.Init
+        public void setIdValue(Id value) {
             this.id = ChatId.of(value);
         }
 

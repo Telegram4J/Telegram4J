@@ -22,11 +22,11 @@ public final class Id {
         return new Id(Long.parseLong(id));
     }
 
+    @JsonValue
     public long asLong() {
         return id;
     }
 
-    @JsonValue
     public String asString() {
         return Long.toString(id);
     }
