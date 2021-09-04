@@ -184,7 +184,7 @@ public final class Routes {
     /** @see <a href="https://core.telegram.org/bots/api#editmessagecaption">https://core.telegram.org/bots/api#editmessagecaption</a> */
     public static final Route EDIT_MESSAGE_CAPTION = Route.post("/editMessageCaption");
 
-    /** @see <a href="https://core.telegram.org/bots/api#editMessageMedia">https://core.telegram.org/bots/api#editMessageMedia</a> */
+    /** @see <a href="https://core.telegram.org/bots/api#editmessagemedia">https://core.telegram.org/bots/api#editmessagemedia</a> */
     public static final Route EDIT_MESSAGE_MEDIA = Route.post("/editMessageMedia");
 
     /** @see <a href="https://core.telegram.org/bots/api#editmessagereplymarkup">https://core.telegram.org/bots/api#editmessagereplymarkup</a> */

@@ -26,6 +26,11 @@ public class OptionalIdEncoding {
     }
 
     @Encoding.Copy
+    public Optional<Id> withId(Id value) {
+        return Optional.of(value);
+    }
+
+    @Encoding.Copy
     public Optional<Id> withString(String value) {
         return Optional.of(Id.of(value));
     }
@@ -58,6 +63,11 @@ public class OptionalIdEncoding {
         @Encoding.Init
         public void setLongValue(long value) {
             this.optional = Optional.of(Id.of(value));
+        }
+
+        @Encoding.Init
+        public void setIdValue(Id value) {
+            this.optional = Optional.of(value);
         }
 
         @Encoding.Init
