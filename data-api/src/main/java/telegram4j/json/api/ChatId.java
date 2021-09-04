@@ -1,11 +1,13 @@
 package telegram4j.json.api;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import telegram4j.json.serialize.ChatIdSerializer;
 
 import java.util.Objects;
 import java.util.Optional;
 
+@JsonSerialize(using = ChatIdSerializer.class)
 public final class ChatId {
 
     private final String id;
@@ -26,7 +28,8 @@ public final class ChatId {
     @JsonCreator
     public static ChatId of(String id) {
         if (!id.startsWith("@")) {
-            throw new IllegalArgumentException("Incorrect chat id format for value: '" + id + "'");
+            Long.parseLong(id); // verify Id value
+            return new ChatId(id);
         }
         return new ChatId(id);
     }
@@ -39,7 +42,6 @@ public final class ChatId {
         return id.startsWith("@") ? Optional.empty() : Optional.of(Id.of(id));
     }
 
-    @JsonValue
     public String asString() {
         return id;
     }
