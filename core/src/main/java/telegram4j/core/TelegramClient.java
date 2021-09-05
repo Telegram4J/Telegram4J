@@ -112,6 +112,11 @@ public final class TelegramClient {
                 .map(data -> new Poll(this, data));
     }
 
+    public Mono<Message> sendMessage(MessageCreateSpec spec) {
+        return getRestClient().getChatService().sendMessage(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
     public Mono<Message> sendDocument(SendDocumentSpec spec) {
         return getRestClient().getChatService().sendDocument(spec.asRequest())
                 .map(data -> new Message(this, data));

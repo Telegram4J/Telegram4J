@@ -166,7 +166,7 @@ public interface MessageData {
     Optional<VoiceChatParticipantsInvitedData> voiceChatParticipantsInvited();
 
     @JsonProperty("reply_markup")
-    Optional<InlineKeyboardMarkupData> replyMarkup();
+    Optional<ReplyMarkupData> replyMarkup();
 
     // NOTE: unrecorded attributes
     @JsonProperty("new_chat_participant")

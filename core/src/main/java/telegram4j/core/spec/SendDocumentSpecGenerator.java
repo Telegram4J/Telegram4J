@@ -3,8 +3,9 @@ package telegram4j.core.spec;
 import org.immutables.value.Value;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
+import telegram4j.core.object.replymarkup.ReplyMarkup;
 import telegram4j.json.InputFile;
 import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
@@ -40,7 +41,7 @@ interface SendDocumentSpecGenerator extends Spec<MultipartRequest<SendDocument>>
 
     Optional<Boolean> allowSendingWithoutReply();
 
-    Optional<InlineKeyboardMarkup> replyMarkup();
+    Optional<ReplyMarkup> replyMarkup();
 
     @Override
     default MultipartRequest<SendDocument> asRequest() {
@@ -55,7 +56,7 @@ interface SendDocumentSpecGenerator extends Spec<MultipartRequest<SendDocument>>
                 .disableNotification(disableNotification())
                 .replyToMessageId(replyToMessageId())
                 .allowSendingWithoutReply(allowSendingWithoutReply())
-                .replyMarkup(replyMarkup().map(InlineKeyboardMarkup::getData))
+                .replyMarkup(replyMarkup().map(ReplyMarkup::getData))
                 .build();
 
         List<Tuple2<String, InputFile>> files = new ArrayList<>(1);

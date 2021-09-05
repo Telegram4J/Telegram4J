@@ -1,18 +1,15 @@
 package telegram4j.core.object;
 
-import telegram4j.core.TelegramClient;
 import telegram4j.json.LoginUrlData;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class LoginUrl implements TelegramObject {
+public class LoginUrl {
 
-    private final TelegramClient client;
     private final LoginUrlData data;
 
-    public LoginUrl(TelegramClient client, LoginUrlData data) {
-        this.client = Objects.requireNonNull(client, "client");
+    public LoginUrl(LoginUrlData data) {
         this.data = Objects.requireNonNull(data, "data");
     }
 
@@ -34,11 +31,6 @@ public class LoginUrl implements TelegramObject {
 
     public boolean isRequestWriteAccess() {
         return data.requestWriteAccess();
-    }
-
-    @Override
-    public TelegramClient getClient() {
-        return client;
     }
 
     @Override

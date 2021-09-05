@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
 import telegram4j.json.api.Id;
@@ -266,7 +267,7 @@ public class Message implements TelegramObject {
     }
 
     public Optional<InlineKeyboardMarkup> getReplyMarkup() {
-        return data.replyMarkup().map(data -> new InlineKeyboardMarkup(client, data));
+        return data.replyMarkup().map(InlineKeyboardMarkup::new);
     }
 
     public Optional<User> getNewChatParticipant() {

@@ -1,19 +1,21 @@
-package telegram4j.core.object;
+package telegram4j.core.object.replymarkup;
 
-import telegram4j.core.TelegramClient;
+import telegram4j.core.object.LoginUrl;
 import telegram4j.json.InlineKeyboardButtonData;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class InlineKeyboardButton implements TelegramObject {
+public final class InlineKeyboardButton {
 
-    private final TelegramClient client;
     private final InlineKeyboardButtonData data;
 
-    public InlineKeyboardButton(TelegramClient client, InlineKeyboardButtonData data) {
-        this.client = Objects.requireNonNull(client, "client");
+    public InlineKeyboardButton(InlineKeyboardButtonData data) {
         this.data = Objects.requireNonNull(data, "data");
+    }
+
+    public static InlineKeyboardButton fromData(InlineKeyboardButtonData data) {
+        return new InlineKeyboardButton(data);
     }
 
     public InlineKeyboardButtonData getData() {
@@ -29,7 +31,7 @@ public class InlineKeyboardButton implements TelegramObject {
     }
 
     public Optional<LoginUrl> getLoginUrl() {
-        return data.loginUrl().map(data -> new LoginUrl(client, data));
+        return data.loginUrl().map(LoginUrl::new);
     }
 
     // TODO: rename?
@@ -49,11 +51,6 @@ public class InlineKeyboardButton implements TelegramObject {
 
     public boolean isPay() {
         return data.pay();
-    }
-
-    @Override
-    public TelegramClient getClient() {
-        return client;
     }
 
     @Override

@@ -1,9 +1,9 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
+import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.core.object.InlineKeyboardMarkup;
 import telegram4j.json.request.MessageEditReplyMarkup;
 
 import java.util.Optional;

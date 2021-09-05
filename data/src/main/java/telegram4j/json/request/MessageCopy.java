@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
 import telegram4j.json.MessageEntityData;
 import telegram4j.json.ParseMode;
-import telegram4j.json.ReplyMarkup;
+import telegram4j.json.ReplyMarkupData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
@@ -49,5 +49,5 @@ public interface MessageCopy {
     Optional<Boolean> allowSendingWithoutReply();
 
     @JsonProperty("reply_markup")
-    Optional<ReplyMarkup> replyMarkup();
+    Optional<ReplyMarkupData> replyMarkup();
 }

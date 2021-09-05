@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
-import telegram4j.json.InlineKeyboardMarkupData;
+import telegram4j.json.ReplyMarkupData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
@@ -26,5 +26,5 @@ public interface StopPoll {
     Id messageId();
 
     @JsonProperty("reply_markup")
-    Optional<InlineKeyboardMarkupData> replyMarkup();
+    Optional<ReplyMarkupData> replyMarkup();
 }
