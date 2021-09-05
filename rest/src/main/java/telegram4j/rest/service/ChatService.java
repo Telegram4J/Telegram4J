@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.json.ChatData;
+import telegram4j.json.FileData;
 import telegram4j.json.MessageData;
 import telegram4j.json.PollData;
 import telegram4j.json.api.ChatId;
@@ -106,6 +107,14 @@ public class ChatService extends RestService {
                 .bodyTo(MessageData.class);
     }
 
+    public Mono<MessageData> sendPhoto(MultipartRequest<SendPhotoRequest> request) {
+        return Routes.SEND_PHOTO.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
     public Flux<MessageData> sendMediaGroup(MultipartRequest<SendMediaGroupRequest> request) {
         return Routes.SEND_MEDIA_GROUP.newRequest()
                 .header("content-type", "multipart/form-data")
@@ -113,5 +122,12 @@ public class ChatService extends RestService {
                 .exchange(router)
                 .bodyTo(MessageData[].class)
                 .flatMapMany(Flux::fromArray);
+    }
+
+    public Mono<FileData> getFile(String fileId) {
+        return Routes.GET_FILE.newRequest()
+                .body(Collections.singletonMap("file_id", fileId))
+                .exchange(router)
+                .bodyTo(FileData.class);
     }
 }

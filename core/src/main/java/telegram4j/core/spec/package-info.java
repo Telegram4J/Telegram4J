@@ -8,7 +8,7 @@
         deepImmutablesDetection = true,
         allMandatoryParameters = true,
         depluralize = true,
-        defaultAsDefault = true
+        instance = "create"
 )
 @NonNullApi
 @MetaEncodingEnabled

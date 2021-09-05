@@ -8,11 +8,13 @@ import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.core.dispatch.DispatchStoreLayout;
 import telegram4j.core.event.Event;
+import telegram4j.core.object.File;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.Poll;
 import telegram4j.core.spec.*;
 import telegram4j.json.MessageData;
 import telegram4j.json.UpdateData;
+import telegram4j.json.api.Id;
 import telegram4j.json.request.*;
 import telegram4j.rest.DefaultRouter;
 import telegram4j.rest.RestResources;
@@ -117,6 +119,20 @@ public final class TelegramClient {
                 .map(data -> new Message(this, data));
     }
 
+    public Mono<Message> forwardMessage(MessageForwardSpec spec) {
+        return getRestClient().getChatService().forwardMessage(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Id> copyMessage(MessageCopySpec spec) {
+        return getRestClient().getChatService().copyMessage(spec.asRequest());
+    }
+
+    public Mono<Message> sendPhoto(SendPhotoSpec spec) {
+        return getRestClient().getChatService().sendPhoto(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
     public Mono<Message> sendDocument(SendDocumentSpec spec) {
         return getRestClient().getChatService().sendDocument(spec.asRequest())
                 .map(data -> new Message(this, data));
@@ -125,6 +141,11 @@ public final class TelegramClient {
     public Flux<Message> sendMediaGroup(SendMediaGroupSpec spec) {
         return getRestClient().getChatService().sendMediaGroup(spec.asRequest())
                 .map(data -> new Message(this, data));
+    }
+
+    public Mono<File> getFile(String fileId) {
+        return getRestClient().getChatService().getFile(fileId)
+                .map(data -> new File(this, data));
     }
 
     public Mono<Void> login() {

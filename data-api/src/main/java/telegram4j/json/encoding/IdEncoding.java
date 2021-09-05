@@ -8,14 +8,12 @@ import java.util.Objects;
 @Encoding
 public class IdEncoding {
 
-    @Encoding.Impl(virtual = true)
-    private Id id;
-
-    private final long value = id.asLong();
+    @Encoding.Impl
+    private Id value = null;
 
     @Encoding.Expose
     Id get() {
-        return Id.of(value);
+        return value;
     }
 
     @Encoding.Copy
