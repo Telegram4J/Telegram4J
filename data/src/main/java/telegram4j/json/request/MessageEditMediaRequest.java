@@ -4,22 +4,20 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
-import telegram4j.json.MessageEntityData;
-import telegram4j.json.ParseMode;
+import telegram4j.json.InputMediaData;
 import telegram4j.json.ReplyMarkupData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
-import java.util.List;
 import java.util.Optional;
 
-@Value.Immutable(singleton = true)
-@JsonSerialize(as = ImmutableMessageEditCaption.class)
-@JsonDeserialize(as = ImmutableMessageEditCaption.class)
-public interface MessageEditCaption {
+@Value.Immutable
+@JsonSerialize(as = ImmutableMessageEditMediaRequest.class)
+@JsonDeserialize(as = ImmutableMessageEditMediaRequest.class)
+public interface MessageEditMediaRequest {
 
-    static ImmutableMessageEditCaption.Builder builder() {
-        return ImmutableMessageEditCaption.builder();
+    static ImmutableMessageEditMediaRequest.Builder builder() {
+        return ImmutableMessageEditMediaRequest.builder();
     }
 
     @JsonProperty("chat_id")
@@ -31,13 +29,7 @@ public interface MessageEditCaption {
     @JsonProperty("inline_message_id")
     Optional<String> inlineMessageId();
 
-    Optional<String> caption();
-
-    @JsonProperty("parse_mode")
-    Optional<ParseMode> parseMode();
-
-    @JsonProperty("caption_entities")
-    Optional<List<MessageEntityData>> captionEntities();
+    InputMediaData media();
 
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();

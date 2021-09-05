@@ -13,17 +13,23 @@ import telegram4j.json.api.Id;
 import java.util.List;
 import java.util.Optional;
 
-@Value.Immutable
-@JsonSerialize(as = ImmutableSendDocument.class)
-@JsonDeserialize(as = ImmutableSendDocument.class)
-public interface SendDocument {
+@Value.Immutable(singleton = true)
+@JsonSerialize(as = ImmutableMessageEditCaptionRequest.class)
+@JsonDeserialize(as = ImmutableMessageEditCaptionRequest.class)
+public interface MessageEditCaptionRequest {
 
-    static ImmutableSendDocument.Builder builder() {
-        return ImmutableSendDocument.builder();
+    static ImmutableMessageEditCaptionRequest.Builder builder() {
+        return ImmutableMessageEditCaptionRequest.builder();
     }
 
     @JsonProperty("chat_id")
-    ChatId chatId();
+    Optional<ChatId> chatId();
+
+    @JsonProperty("message_id")
+    Optional<Id> messageId();
+
+    @JsonProperty("inline_message_id")
+    Optional<String> inlineMessageId();
 
     Optional<String> caption();
 
@@ -32,18 +38,6 @@ public interface SendDocument {
 
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
-
-    @JsonProperty("disable_content_type_detection")
-    Optional<Boolean> disableContentTypeDetection();
-
-    @JsonProperty("disable_notification")
-    Optional<Boolean> disableNotification();
-
-    @JsonProperty("reply_to_message_id")
-    Optional<Id> replyToMessageId();
-
-    @JsonProperty("allow_sending_without_reply")
-    Optional<Boolean> allowSendingWithoutReply();
 
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();

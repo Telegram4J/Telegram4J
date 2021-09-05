@@ -4,16 +4,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.ReplyMarkupData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
-@Value.Immutable
-@JsonSerialize(as = ImmutableDeleteMessage.class)
-@JsonDeserialize(as = ImmutableDeleteMessage.class)
-public interface DeleteMessage {
+import java.util.Optional;
 
-    static ImmutableDeleteMessage.Builder builder() {
-        return ImmutableDeleteMessage.builder();
+@Value.Immutable
+@JsonSerialize(as = ImmutableStopPollRequest.class)
+@JsonDeserialize(as = ImmutableStopPollRequest.class)
+public interface StopPollRequest {
+
+    static ImmutableStopPollRequest.Builder builder() {
+        return ImmutableStopPollRequest.builder();
     }
 
     @JsonProperty("chat_id")
@@ -21,4 +24,7 @@ public interface DeleteMessage {
 
     @JsonProperty("message_id")
     Id messageId();
+
+    @JsonProperty("reply_markup")
+    Optional<ReplyMarkupData> replyMarkup();
 }

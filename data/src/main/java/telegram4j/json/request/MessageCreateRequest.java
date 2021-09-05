@@ -14,22 +14,16 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageEditText.class)
-@JsonDeserialize(as = ImmutableMessageEditText.class)
-public interface MessageEditText {
+@JsonSerialize(as = ImmutableMessageCreateRequest.class)
+@JsonDeserialize(as = ImmutableMessageCreateRequest.class)
+public interface MessageCreateRequest {
 
-    static ImmutableMessageEditText.Builder builder() {
-        return ImmutableMessageEditText.builder();
+    static ImmutableMessageCreateRequest.Builder builder() {
+        return ImmutableMessageCreateRequest.builder();
     }
 
     @JsonProperty("chat_id")
-    Optional<ChatId> chatId();
-
-    @JsonProperty("message_id")
-    Optional<Id> messageId();
-
-    @JsonProperty("inline_message_id")
-    Optional<String> inlineMessageId();
+    ChatId chatId();
 
     String text();
 
@@ -38,8 +32,17 @@ public interface MessageEditText {
 
     Optional<List<MessageEntityData>> entities();
 
-    @JsonProperty("disable_web_page_preview")
-    Optional<Boolean> disableWebPagePreview();
+    @JsonProperty("disable_web_preview")
+    Optional<Boolean> disableWebPreview();
+
+    @JsonProperty("disable_notification")
+    Optional<Boolean> disableNotification();
+
+    @JsonProperty("reply_to_message_id")
+    Optional<Id> replyToMessageId();
+
+    @JsonProperty("allow_sending_without_reply")
+    Optional<Boolean> allowSendingWithoutReply();
 
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();

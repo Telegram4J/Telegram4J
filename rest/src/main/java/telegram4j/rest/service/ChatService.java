@@ -13,89 +13,92 @@ import telegram4j.rest.MultipartRequest;
 import telegram4j.rest.RestRouter;
 import telegram4j.rest.route.Routes;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 public class ChatService extends RestService {
 
     public ChatService(RestRouter router) {
         super(router);
     }
 
-    public Mono<MessageData> sendMessage(MessageCreate messageCreate) {
+    public Mono<MessageData> sendMessage(MessageCreateRequest request) {
         return Routes.SEND_MESSAGE.newRequest()
-                .body(messageCreate)
+                .body(request)
                 .exchange(router)
                 .bodyTo(MessageData.class);
     }
 
-    public Mono<MessageData> forwardMessage(MessageForward messageForward) {
+    public Mono<MessageData> forwardMessage(MessageForwardRequest request) {
         return Routes.FORWARD_MESSAGE.newRequest()
-                .body(messageForward)
+                .body(request)
                 .exchange(router)
                 .bodyTo(MessageData.class);
     }
 
-    public Mono<Id> copyMessage(MessageCopy messageCopy) {
+    public Mono<Id> copyMessage(MessageCopyRequest request) {
         return Routes.COPY_MESSAGE.newRequest()
-                .body(messageCopy)
+                .body(request)
                 .exchange(router)
                 .bodyTo(Id.class);
     }
 
     public Mono<ChatData> getChat(ChatId chatId) {
         return Routes.GET_CHAT.newRequest()
-                .body(GetChat.builder()
-                        .chatId(chatId)
-                        .build())
+                .body(Collections.singletonMap("chat_id", chatId))
                 .exchange(router)
                 .bodyTo(ChatData.class);
     }
 
-    public Mono<Boolean> deleteMessage(long chatId, long messageId) {
+    public Mono<Boolean> deleteMessage(ChatId chatId, Id messageId) {
+        Map<String, Object> params = new HashMap<>(2);
+        params.put("chat_id", chatId);
+        params.put("message_id", messageId);
+
         return Routes.DELETE_MESSAGE.newRequest()
-                .body(DeleteMessage.builder()
-                        .chatId(chatId)
-                        .messageId(messageId)
-                        .build())
+                .body(params)
                 .exchange(router)
                 .bodyTo(Boolean.class);
     }
 
-    public Mono<JsonNode> editMessageText(MessageEditText messageEditText) {
+    public Mono<JsonNode> editMessageText(MessageEditTextRequest request) {
         return Routes.EDIT_MESSAGE_TEXT.newRequest()
-                .body(messageEditText)
+                .body(request)
                 .exchange(router)
                 .bodyTo(JsonNode.class);
     }
 
-    public Mono<JsonNode> editMessageCaption(MessageEditCaption messageEditCaption) {
+    public Mono<JsonNode> editMessageCaption(MessageEditCaptionRequest request) {
         return Routes.EDIT_MESSAGE_CAPTION.newRequest()
-                .body(messageEditCaption)
+                .body(request)
                 .exchange(router)
                 .bodyTo(JsonNode.class);
     }
 
-    public Mono<JsonNode> editMessageMedia(MultipartRequest<MessageEditMedia> messageEditMedia) {
+    public Mono<JsonNode> editMessageMedia(MultipartRequest<MessageEditMediaRequest> request) {
         return Routes.EDIT_MESSAGE_MEDIA.newRequest()
                 .header("content-type", "multipart/form-data")
-                .body(messageEditMedia)
+                .body(request)
                 .exchange(router)
                 .bodyTo(JsonNode.class);
     }
 
-    public Mono<JsonNode> editMessageReplyMarkup(MessageEditReplyMarkup messageEditReplyMarkup) {
+    public Mono<JsonNode> editMessageReplyMarkup(MessageEditReplyMarkupRequest request) {
         return Routes.EDIT_MESSAGE_REPLY_MARKUP.newRequest()
-                .body(messageEditReplyMarkup)
+                .body(request)
                 .exchange(router)
                 .bodyTo(JsonNode.class);
     }
 
-    public Mono<PollData> stopPoll(StopPoll stopPoll) {
+    public Mono<PollData> stopPoll(StopPollRequest stopPoll) {
         return Routes.STOP_POLL.newRequest()
                 .body(stopPoll)
                 .exchange(router)
                 .bodyTo(PollData.class);
     }
 
-    public Mono<MessageData> sendDocument(MultipartRequest<SendDocument> request) {
+    public Mono<MessageData> sendDocument(MultipartRequest<SendDocumentRequest> request) {
         return Routes.SEND_DOCUMENT.newRequest()
                 .header("content-type", "multipart/form-data")
                 .body(request)
@@ -103,7 +106,7 @@ public class ChatService extends RestService {
                 .bodyTo(MessageData.class);
     }
 
-    public Flux<MessageData> sendMediaGroup(MultipartRequest<SendMediaGroup> request) {
+    public Flux<MessageData> sendMediaGroup(MultipartRequest<SendMediaGroupRequest> request) {
         return Routes.SEND_MEDIA_GROUP.newRequest()
                 .header("content-type", "multipart/form-data")
                 .body(request)

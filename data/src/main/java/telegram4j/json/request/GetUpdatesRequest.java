@@ -9,12 +9,12 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable(singleton = true)
-@JsonSerialize(as = ImmutableGetUpdates.class)
-@JsonDeserialize(as = ImmutableGetUpdates.class)
-public interface GetUpdates {
+@JsonSerialize(as = ImmutableGetUpdatesRequest.class)
+@JsonDeserialize(as = ImmutableGetUpdatesRequest.class)
+public interface GetUpdatesRequest {
 
-    static ImmutableGetUpdates.Builder builders() {
-        return ImmutableGetUpdates.builder();
+    static ImmutableGetUpdatesRequest.Builder builders() {
+        return ImmutableGetUpdatesRequest.builder();
     }
 
     Optional<Integer> offset();

@@ -9,7 +9,7 @@ import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.json.InputFile;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.MessageEditMedia;
+import telegram4j.json.request.MessageEditMediaRequest;
 import telegram4j.rest.MultipartRequest;
 
 import java.util.Optional;
@@ -17,7 +17,7 @@ import java.util.Optional;
 import static telegram4j.core.spec.InternalSpecUtil.addAllOptional;
 
 @Value.Immutable
-interface MessageEditMediaSpecGenerator extends Spec<MultipartRequest<MessageEditMedia>> {
+interface MessageEditMediaSpecGenerator extends Spec<MultipartRequest<MessageEditMediaRequest>> {
 
     Optional<ChatId> chatId();
 
@@ -32,8 +32,8 @@ interface MessageEditMediaSpecGenerator extends Spec<MultipartRequest<MessageEdi
     Optional<InlineKeyboardMarkup> replyMarkup();
 
     @Override
-    default MultipartRequest<MessageEditMedia> asRequest() {
-        MessageEditMedia json = MessageEditMedia.builder()
+    default MultipartRequest<MessageEditMediaRequest> asRequest() {
+        MessageEditMediaRequest json = MessageEditMediaRequest.builder()
                 .chatId(chatId())
                 .messageId(messageId())
                 .inlineMessageId(inlineMessageId())

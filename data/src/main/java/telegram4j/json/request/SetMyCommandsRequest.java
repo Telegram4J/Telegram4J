@@ -4,18 +4,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.BotCommandData;
 import telegram4j.json.BotCommandScopeData;
 
+import java.util.List;
 import java.util.Optional;
 
-@Value.Immutable(singleton = true)
-@JsonSerialize(as = ImmutableDeleteMyCommands.class)
-@JsonDeserialize(as = ImmutableDeleteMyCommands.class)
-public interface DeleteMyCommands {
+@Value.Immutable
+@JsonSerialize(as = ImmutableSetMyCommandsRequest.class)
+@JsonDeserialize(as = ImmutableSetMyCommandsRequest.class)
+public interface SetMyCommandsRequest {
 
-    static ImmutableDeleteMyCommands.Builder builder() {
-        return ImmutableDeleteMyCommands.builder();
+    static ImmutableSetMyCommandsRequest.Builder builder() {
+        return ImmutableSetMyCommandsRequest.builder();
     }
+
+    List<BotCommandData> commands();
 
     Optional<BotCommandScopeData> scope();
 

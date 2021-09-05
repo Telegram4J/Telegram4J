@@ -4,13 +4,12 @@ import org.immutables.value.Value;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import telegram4j.core.object.MessageEntity;
-import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.core.object.replymarkup.ReplyMarkup;
 import telegram4j.json.InputFile;
 import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.SendDocument;
+import telegram4j.json.request.SendDocumentRequest;
 import telegram4j.rest.MultipartRequest;
 
 import java.util.ArrayList;
@@ -19,7 +18,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Value.Immutable
-interface SendDocumentSpecGenerator extends Spec<MultipartRequest<SendDocument>> {
+interface SendDocumentSpecGenerator extends Spec<MultipartRequest<SendDocumentRequest>> {
 
     ChatId chatId();
 
@@ -44,8 +43,8 @@ interface SendDocumentSpecGenerator extends Spec<MultipartRequest<SendDocument>>
     Optional<ReplyMarkup> replyMarkup();
 
     @Override
-    default MultipartRequest<SendDocument> asRequest() {
-        SendDocument json = SendDocument.builder()
+    default MultipartRequest<SendDocumentRequest> asRequest() {
+        SendDocumentRequest json = SendDocumentRequest.builder()
                 .chatId(chatId())
                 .caption(caption())
                 .parseMode(parseMode())

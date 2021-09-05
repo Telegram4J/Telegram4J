@@ -8,7 +8,7 @@ import telegram4j.core.object.inputmedia.UploadInputMedia;
 import telegram4j.json.InputFile;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.SendMediaGroup;
+import telegram4j.json.request.SendMediaGroupRequest;
 import telegram4j.rest.MultipartRequest;
 
 import java.util.List;
@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Value.Immutable
-interface SendMediaGroupSpecGenerator extends Spec<MultipartRequest<SendMediaGroup>> {
+interface SendMediaGroupSpecGenerator extends Spec<MultipartRequest<SendMediaGroupRequest>> {
 
     ChatId chatId();
 
@@ -32,8 +32,8 @@ interface SendMediaGroupSpecGenerator extends Spec<MultipartRequest<SendMediaGro
     Optional<Boolean> allowSendingWithoutReply();
 
     @Override
-    default MultipartRequest<SendMediaGroup> asRequest() {
-        SendMediaGroup json = SendMediaGroup.builder()
+    default MultipartRequest<SendMediaGroupRequest> asRequest() {
+        SendMediaGroupRequest json = SendMediaGroupRequest.builder()
                 .chatId(chatId())
                 .media(media().stream()
                         .map(InputMedia::getData)

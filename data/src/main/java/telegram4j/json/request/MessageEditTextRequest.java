@@ -4,20 +4,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
-import telegram4j.json.InputMediaData;
+import telegram4j.json.MessageEntityData;
+import telegram4j.json.ParseMode;
 import telegram4j.json.ReplyMarkupData;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
+import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageEditMedia.class)
-@JsonDeserialize(as = ImmutableMessageEditMedia.class)
-public interface MessageEditMedia {
+@JsonSerialize(as = ImmutableMessageEditTextRequest.class)
+@JsonDeserialize(as = ImmutableMessageEditTextRequest.class)
+public interface MessageEditTextRequest {
 
-    static ImmutableMessageEditMedia.Builder builder() {
-        return ImmutableMessageEditMedia.builder();
+    static ImmutableMessageEditTextRequest.Builder builder() {
+        return ImmutableMessageEditTextRequest.builder();
     }
 
     @JsonProperty("chat_id")
@@ -29,7 +31,15 @@ public interface MessageEditMedia {
     @JsonProperty("inline_message_id")
     Optional<String> inlineMessageId();
 
-    InputMediaData media();
+    String text();
+
+    @JsonProperty("parse_mode")
+    Optional<ParseMode> parseMode();
+
+    Optional<List<MessageEntityData>> entities();
+
+    @JsonProperty("disable_web_page_preview")
+    Optional<Boolean> disableWebPagePreview();
 
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();

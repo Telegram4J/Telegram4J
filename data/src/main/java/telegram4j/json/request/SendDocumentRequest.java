@@ -14,30 +14,27 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageCopy.class)
-@JsonDeserialize(as = ImmutableMessageCopy.class)
-public interface MessageCopy {
+@JsonSerialize(as = ImmutableSendDocumentRequest.class)
+@JsonDeserialize(as = ImmutableSendDocumentRequest.class)
+public interface SendDocumentRequest {
 
-    static ImmutableMessageCopy.Builder builder() {
-        return ImmutableMessageCopy.builder();
+    static ImmutableSendDocumentRequest.Builder builder() {
+        return ImmutableSendDocumentRequest.builder();
     }
 
     @JsonProperty("chat_id")
     ChatId chatId();
 
-    @JsonProperty("from_chat_id")
-    ChatId fromChatId();
-
-    @JsonProperty("message_id")
-    Id messageId();
-
-    String caption();
+    Optional<String> caption();
 
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
+
+    @JsonProperty("disable_content_type_detection")
+    Optional<Boolean> disableContentTypeDetection();
 
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();

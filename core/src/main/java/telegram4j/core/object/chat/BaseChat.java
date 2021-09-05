@@ -58,8 +58,8 @@ class BaseChat implements Chat {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof BaseChat)) return false;
-        BaseChat that = (BaseChat) o;
+        if (!(o instanceof Chat)) return false;
+        Chat that = (Chat) o;
         return getId().equals(that.getId());
     }
 

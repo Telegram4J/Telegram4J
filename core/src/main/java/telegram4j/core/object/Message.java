@@ -7,6 +7,7 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
+import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 
 import java.time.Instant;
@@ -27,7 +28,7 @@ public class Message implements TelegramObject {
 
     public Mono<Boolean> delete() {
         return client.getRestClient().getChatService()
-                .deleteMessage(getChatId().asLong(), getId().asLong());
+                .deleteMessage(ChatId.of(getChatId()), getId());
     }
 
     public Id getId() {

@@ -6,14 +6,14 @@ import telegram4j.core.object.replymarkup.ReplyMarkup;
 import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.MessageCreate;
+import telegram4j.json.request.MessageCreateRequest;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Value.Immutable
-interface MessageCreateSpecGenerator extends Spec<MessageCreate> {
+interface MessageCreateSpecGenerator extends Spec<MessageCreateRequest> {
 
     ChatId chatId();
 
@@ -34,8 +34,8 @@ interface MessageCreateSpecGenerator extends Spec<MessageCreate> {
     Optional<ReplyMarkup> replyMarkup();
 
     @Override
-    default MessageCreate asRequest() {
-        return MessageCreate.builder()
+    default MessageCreateRequest asRequest() {
+        return MessageCreateRequest.builder()
                 .chatId(chatId())
                 .text(text())
                 .parseMode(parseMode())

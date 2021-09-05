@@ -9,12 +9,12 @@ import telegram4j.json.api.Id;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableGetUserProfilePhotos.class)
-@JsonDeserialize(as = ImmutableGetUserProfilePhotos.class)
-public interface GetUserProfilePhotos {
+@JsonSerialize(as = ImmutableGetUserProfilePhotosRequest.class)
+@JsonDeserialize(as = ImmutableGetUserProfilePhotosRequest.class)
+public interface GetUserProfilePhotosRequest {
 
-    static ImmutableGetUserProfilePhotos.Builder builder() {
-        return ImmutableGetUserProfilePhotos.builder();
+    static ImmutableGetUserProfilePhotosRequest.Builder builder() {
+        return ImmutableGetUserProfilePhotosRequest.builder();
     }
 
     @JsonProperty("user_id")

@@ -34,7 +34,6 @@ public final class InlineKeyboardButton {
         return data.loginUrl().map(LoginUrl::new);
     }
 
-    // TODO: rename?
     public Optional<String> getCallbackData() {
         return data.callbackData();
     }

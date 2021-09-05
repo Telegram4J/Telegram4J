@@ -9,12 +9,12 @@ import telegram4j.json.BotCommandScopeData;
 import java.util.Optional;
 
 @Value.Immutable(singleton = true)
-@JsonSerialize(as = ImmutableGetMyCommands.class)
-@JsonDeserialize(as = ImmutableGetMyCommands.class)
-public interface GetMyCommands {
+@JsonSerialize(as = ImmutableDeleteMyCommandsRequest.class)
+@JsonDeserialize(as = ImmutableDeleteMyCommandsRequest.class)
+public interface DeleteMyCommandsRequest {
 
-    static ImmutableGetMyCommands.Builder builder() {
-        return ImmutableGetMyCommands.builder();
+    static ImmutableDeleteMyCommandsRequest.Builder builder() {
+        return ImmutableDeleteMyCommandsRequest.builder();
     }
 
     Optional<BotCommandScopeData> scope();

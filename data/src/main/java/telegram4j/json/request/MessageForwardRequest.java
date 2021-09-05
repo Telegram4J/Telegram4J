@@ -10,12 +10,12 @@ import telegram4j.json.api.Id;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageForward.class)
-@JsonDeserialize(as = ImmutableMessageForward.class)
-public interface MessageForward {
+@JsonSerialize(as = ImmutableMessageForwardRequest.class)
+@JsonDeserialize(as = ImmutableMessageForwardRequest.class)
+public interface MessageForwardRequest {
 
-    static ImmutableMessageForward.Builder builder() {
-        return ImmutableMessageForward.builder();
+    static ImmutableMessageForwardRequest.Builder builder() {
+        return ImmutableMessageForwardRequest.builder();
     }
 
     @JsonProperty("chat_id")

@@ -11,12 +11,12 @@ import telegram4j.json.api.Id;
 import java.util.Optional;
 
 @Value.Immutable(singleton = true)
-@JsonSerialize(as = ImmutableMessageEditReplyMarkup.class)
-@JsonDeserialize(as = ImmutableMessageEditReplyMarkup.class)
-public interface MessageEditReplyMarkup {
+@JsonSerialize(as = ImmutableMessageEditReplyMarkupRequest.class)
+@JsonDeserialize(as = ImmutableMessageEditReplyMarkupRequest.class)
+public interface MessageEditReplyMarkupRequest {
 
-    static ImmutableMessageEditReplyMarkup.Builder builder() {
-        return ImmutableMessageEditReplyMarkup.builder();
+    static ImmutableMessageEditReplyMarkupRequest.Builder builder() {
+        return ImmutableMessageEditReplyMarkupRequest.builder();
     }
 
     @JsonProperty("chat_id")
