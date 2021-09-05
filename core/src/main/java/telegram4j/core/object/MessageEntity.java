@@ -72,6 +72,9 @@ public class MessageEntity implements TelegramObject {
 
     @Override
     public String toString() {
-        return "MessageEntity{data=" + data + '}';
+        return "MessageEntity{" +
+                "data=" + data +
+                ", content='" + content + '\'' +
+                '}';
     }
 }
