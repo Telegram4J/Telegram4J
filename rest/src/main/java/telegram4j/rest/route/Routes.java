@@ -52,6 +52,9 @@ public final class Routes {
     /** @see <a href="https://core.telegram.org/bots/api#sendvideo">https://core.telegram.org/bots/api#sendvideo</a> */
     public static final Route SEND_VIDEO = Route.post("/sendVideo");
 
+    /** @see <a href="https://core.telegram.org/bots/api#sendvideonote">https://core.telegram.org/bots/api#sendvideonote</a> */
+    public static final Route SEND_VIDEO_NOTE = Route.post("/sendVideoNote");
+
     /** @see <a href="https://core.telegram.org/bots/api#sendanimation">https://core.telegram.org/bots/api#sendanimation</a> */
     public static final Route SEND_ANIMATION = Route.post("/sendAnimation");
 

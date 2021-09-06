@@ -107,6 +107,30 @@ public class ChatService extends RestService {
                 .bodyTo(MessageData.class);
     }
 
+    public Mono<MessageData> sendAudio(MultipartRequest<SendAudioRequest> request) {
+        return Routes.SEND_AUDIO.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
+    public Mono<MessageData> sendVideo(MultipartRequest<SendVideoRequest> request) {
+        return Routes.SEND_VIDEO.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
+    public Mono<MessageData> sendVideoNote(MultipartRequest<SendVideoNoteRequest> request) {
+        return Routes.SEND_VIDEO_NOTE.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
     public Mono<MessageData> sendPhoto(MultipartRequest<SendPhotoRequest> request) {
         return Routes.SEND_PHOTO.newRequest()
                 .header("content-type", "multipart/form-data")

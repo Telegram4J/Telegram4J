@@ -128,6 +128,21 @@ public final class TelegramClient {
         return getRestClient().getChatService().copyMessage(spec.asRequest());
     }
 
+    public Mono<Message> sendAudio(SendAudioSpec spec) {
+        return getRestClient().getChatService().sendAudio(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVideo(SendVideoSpec spec) {
+        return getRestClient().getChatService().sendVideo(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVideoNote(SendVideoNoteSpec spec) {
+        return getRestClient().getChatService().sendVideoNote(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
     public Mono<Message> sendPhoto(SendPhotoSpec spec) {
         return getRestClient().getChatService().sendPhoto(spec.asRequest())
                 .map(data -> new Message(this, data));
