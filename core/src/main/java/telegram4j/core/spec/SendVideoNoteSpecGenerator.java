@@ -3,20 +3,16 @@ package telegram4j.core.spec;
 import org.immutables.value.Value;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.replymarkup.ReplyMarkup;
 import telegram4j.json.InputFile;
-import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.SendAudioRequest;
 import telegram4j.json.request.SendVideoNoteRequest;
 import telegram4j.rest.MultipartRequest;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Value.Immutable
 interface SendVideoNoteSpecGenerator extends Spec<MultipartRequest<SendVideoNoteRequest>> {

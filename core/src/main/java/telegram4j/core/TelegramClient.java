@@ -153,8 +153,23 @@ public final class TelegramClient {
                 .map(data -> new Message(this, data));
     }
 
+    public Mono<Message> sendAnimation(SendAnimationSpec spec) {
+        return getRestClient().getChatService().sendAnimation(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
     public Flux<Message> sendMediaGroup(SendMediaGroupSpec spec) {
         return getRestClient().getChatService().sendMediaGroup(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendLocation(SendLocationSpec spec) {
+        return getRestClient().getChatService().sendLocation(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVoice(SendVoiceSpec spec) {
+        return getRestClient().getChatService().sendVoice(spec.asRequest())
                 .map(data -> new Message(this, data));
     }
 

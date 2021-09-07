@@ -9,26 +9,20 @@ import telegram4j.json.InputFile;
 import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.SendVideoRequest;
+import telegram4j.json.request.SendAnimationRequest;
+import telegram4j.json.request.SendVoiceRequest;
 import telegram4j.rest.MultipartRequest;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.lang.reflect.Array;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Value.Immutable
-interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>> {
+interface SendVoiceSpecGenerator extends Spec<MultipartRequest<SendVoiceRequest>> {
 
     ChatId chatId();
 
-    InputFile video();
-
-    Optional<Integer> duration();
-
-    Optional<Integer> width();
-
-    Optional<Integer> height();
+    InputFile voice();
 
     Optional<String> caption();
 
@@ -36,9 +30,7 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
 
     Optional<List<MessageEntity>> captionEntities();
 
-    Optional<InputFile> thumb();
-
-    Optional<Boolean> supportsStreaming();
+    Optional<Integer> duration();
 
     Optional<Boolean> disableNotification();
 
@@ -49,32 +41,23 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
     Optional<ReplyMarkup> replyMarkup();
 
     @Override
-    default MultipartRequest<SendVideoRequest> asRequest() {
-
-        SendVideoRequest json = SendVideoRequest.builder()
+    default MultipartRequest<SendVoiceRequest> asRequest() {
+        SendVoiceRequest json = SendVoiceRequest.builder()
                 .chatId(chatId())
                 .duration(duration())
-                .width(width())
-                .height(height())
                 .caption(caption())
                 .parseMode(parseMode())
                 .captionEntities(captionEntities().map(list -> list.stream()
                         .map(MessageEntity::getData)
                         .collect(Collectors.toList())))
-                .supportsStreaming(supportsStreaming())
                 .disableNotification(disableNotification())
                 .replyToMessageId(replyToMessageId())
                 .allowSendingWithoutReply(allowSendingWithoutReply())
                 .replyMarkup(replyMarkup().map(ReplyMarkup::getData))
                 .build();
 
-        List<Tuple2<String, InputFile>> files = new ArrayList<>(1);
-        if (thumb().isPresent()) {
-            InputFile thumb = thumb().orElseThrow(IllegalStateException::new);
-            files.add(Tuples.of("thumb", thumb));
-        }
+        List<Tuple2<String, InputFile>> files = Collections.singletonList(Tuples.of("voice", voice()));
 
-        files.add(Tuples.of("video", video()));
         return MultipartRequest.ofBodyAndFiles(json, files);
     }
 }

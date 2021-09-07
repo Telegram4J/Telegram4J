@@ -9,7 +9,7 @@ import telegram4j.json.InputFile;
 import telegram4j.json.ParseMode;
 import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
-import telegram4j.json.request.SendVideoRequest;
+import telegram4j.json.request.SendAnimationRequest;
 import telegram4j.rest.MultipartRequest;
 
 import java.util.ArrayList;
@@ -18,11 +18,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Value.Immutable
-interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>> {
+interface SendAnimationSpecGenerator extends Spec<MultipartRequest<SendAnimationRequest>> {
 
     ChatId chatId();
 
-    InputFile video();
+    InputFile animation();
 
     Optional<Integer> duration();
 
@@ -30,15 +30,13 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
 
     Optional<Integer> height();
 
+    Optional<InputFile> thumb();
+
     Optional<String> caption();
 
     Optional<ParseMode> parseMode();
 
     Optional<List<MessageEntity>> captionEntities();
-
-    Optional<InputFile> thumb();
-
-    Optional<Boolean> supportsStreaming();
 
     Optional<Boolean> disableNotification();
 
@@ -49,9 +47,8 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
     Optional<ReplyMarkup> replyMarkup();
 
     @Override
-    default MultipartRequest<SendVideoRequest> asRequest() {
-
-        SendVideoRequest json = SendVideoRequest.builder()
+    default MultipartRequest<SendAnimationRequest> asRequest() {
+        SendAnimationRequest json = SendAnimationRequest.builder()
                 .chatId(chatId())
                 .duration(duration())
                 .width(width())
@@ -61,7 +58,6 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
                 .captionEntities(captionEntities().map(list -> list.stream()
                         .map(MessageEntity::getData)
                         .collect(Collectors.toList())))
-                .supportsStreaming(supportsStreaming())
                 .disableNotification(disableNotification())
                 .replyToMessageId(replyToMessageId())
                 .allowSendingWithoutReply(allowSendingWithoutReply())
@@ -74,7 +70,8 @@ interface SendVideoSpecGenerator extends Spec<MultipartRequest<SendVideoRequest>
             files.add(Tuples.of("thumb", thumb));
         }
 
-        files.add(Tuples.of("video", video()));
+        files.add(Tuples.of("animation", animation()));
+
         return MultipartRequest.ofBodyAndFiles(json, files);
     }
 }

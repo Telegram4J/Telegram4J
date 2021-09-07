@@ -14,30 +14,30 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageCopyRequest.class)
-@JsonDeserialize(as = ImmutableMessageCopyRequest.class)
-public interface MessageCopyRequest {
+@JsonSerialize(as = ImmutableSendLocationRequest.class)
+@JsonDeserialize(as = ImmutableSendLocationRequest.class)
+public interface SendLocationRequest {
 
-    static ImmutableMessageCopyRequest.Builder builder() {
-        return ImmutableMessageCopyRequest.builder();
+    static ImmutableSendLocationRequest.Builder builder() {
+        return ImmutableSendLocationRequest.builder();
     }
 
-    @JsonProperty("chat_id")
     ChatId chatId();
 
-    @JsonProperty("from_chat_id")
-    ChatId fromChatId();
+    float latitude();
 
-    @JsonProperty("message_id")
-    Id messageId();
+    float longitude();
 
-    Optional<String> caption();
+    @JsonProperty("horizontal_accuracy")
+    Optional<Float> horizontalAccuracy();
 
-    @JsonProperty("parse_mode")
-    Optional<ParseMode> parseMode();
+    @JsonProperty("live_period")
+    Optional<Integer> livePeriod();
 
-    @JsonProperty("caption_entities")
-    Optional<List<MessageEntityData>> captionEntities();
+    Optional<Integer> heading();
+
+    @JsonProperty("proximity_alert_radius")
+    Optional<Integer> proximityAlertRadius();
 
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();

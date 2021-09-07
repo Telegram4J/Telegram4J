@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendAudioRequest.class)
 @JsonDeserialize(as = ImmutableSendAudioRequest.class)
-public interface SendAudioRequest {
+public interface SendAudioRequest extends BaseSendRequest {
 
     static ImmutableSendAudioRequest.Builder builder() {
         return ImmutableSendAudioRequest.builder();
@@ -24,11 +24,14 @@ public interface SendAudioRequest {
 
     ChatId chatId();
 
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
@@ -38,15 +41,19 @@ public interface SendAudioRequest {
 
     Optional<String> title();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

@@ -14,40 +14,46 @@ import java.util.List;
 import java.util.Optional;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableMessageCopyRequest.class)
-@JsonDeserialize(as = ImmutableMessageCopyRequest.class)
-public interface MessageCopyRequest {
+@JsonSerialize(as = ImmutableSendAnimationRequest.class)
+@JsonDeserialize(as = ImmutableSendAnimationRequest.class)
+public interface SendAnimationRequest extends BaseSendRequest {
 
-    static ImmutableMessageCopyRequest.Builder builder() {
-        return ImmutableMessageCopyRequest.builder();
+    static ImmutableSendAnimationRequest.Builder builder() {
+        return ImmutableSendAnimationRequest.builder();
     }
 
-    @JsonProperty("chat_id")
     ChatId chatId();
 
-    @JsonProperty("from_chat_id")
-    ChatId fromChatId();
+    Optional<Integer> duration();
 
-    @JsonProperty("message_id")
-    Id messageId();
+    Optional<Integer> width();
 
+    Optional<Integer> height();
+
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

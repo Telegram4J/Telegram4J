@@ -148,6 +148,29 @@ public class ChatService extends RestService {
                 .flatMapMany(Flux::fromArray);
     }
 
+    public Mono<MessageData> sendAnimation(MultipartRequest<SendAnimationRequest> request) {
+        return Routes.SEND_ANIMATION.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
+    public Mono<MessageData> sendLocation(SendLocationRequest request) {
+        return Routes.SEND_LOCATION.newRequest()
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
+    public Mono<MessageData> sendVoice(MultipartRequest<SendVoiceRequest> request) {
+        return Routes.SEND_VOICE.newRequest()
+                .header("content-type", "multipart/form-data")
+                .body(request)
+                .exchange(router)
+                .bodyTo(MessageData.class);
+    }
+
     public Mono<FileData> getFile(String fileId) {
         return Routes.GET_FILE.newRequest()
                 .body(Collections.singletonMap("file_id", fileId))

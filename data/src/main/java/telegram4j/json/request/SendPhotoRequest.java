@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendPhotoRequest.class)
 @JsonDeserialize(as = ImmutableSendPhotoRequest.class)
-public interface SendPhotoRequest {
+public interface SendPhotoRequest extends BaseSendRequest {
 
     static ImmutableSendPhotoRequest.Builder builder() {
         return ImmutableSendPhotoRequest.builder();
@@ -24,23 +24,30 @@ public interface SendPhotoRequest {
 
     ChatId chatId();
 
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

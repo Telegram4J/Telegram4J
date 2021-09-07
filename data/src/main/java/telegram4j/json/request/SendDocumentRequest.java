@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendDocumentRequest.class)
 @JsonDeserialize(as = ImmutableSendDocumentRequest.class)
-public interface SendDocumentRequest {
+public interface SendDocumentRequest extends BaseSendRequest {
 
     static ImmutableSendDocumentRequest.Builder builder() {
         return ImmutableSendDocumentRequest.builder();
@@ -25,26 +25,33 @@ public interface SendDocumentRequest {
     @JsonProperty("chat_id")
     ChatId chatId();
 
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
     @JsonProperty("disable_content_type_detection")
     Optional<Boolean> disableContentTypeDetection();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

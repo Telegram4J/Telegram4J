@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendVideoRequest.class)
 @JsonDeserialize(as = ImmutableSendVideoRequest.class)
-public interface SendVideoRequest {
+public interface SendVideoRequest extends BaseSendRequest {
 
     static ImmutableSendVideoRequest.Builder builder() {
         return ImmutableSendVideoRequest.builder();
@@ -30,26 +30,33 @@ public interface SendVideoRequest {
 
     Optional<Integer> height();
 
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
     @JsonProperty("supports_streaming")
     Optional<Boolean> supportsStreaming();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }
