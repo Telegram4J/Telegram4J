@@ -14,6 +14,7 @@ import telegram4j.core.object.Poll;
 import telegram4j.core.spec.*;
 import telegram4j.json.MessageData;
 import telegram4j.json.UpdateData;
+import telegram4j.json.api.ChatId;
 import telegram4j.json.api.Id;
 import telegram4j.json.request.*;
 import telegram4j.rest.DefaultRouter;
@@ -107,6 +108,10 @@ public final class TelegramClient {
                 .map(node -> getRestResources().getObjectMapper()
                         .convertValue(node, MessageData.class))
                 .map(data -> new Message(this, data));
+    }
+
+    public Mono<Boolean> deleteMessageById(ChatId chatId, Id messageId) {
+        return getRestClient().getChatService().deleteMessage(chatId, messageId);
     }
 
     public Mono<Poll> stopPoll(StopPollSpec spec) {
