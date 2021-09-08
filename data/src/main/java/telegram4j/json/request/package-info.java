@@ -1,3 +1,6 @@
+/**
+ * Telegram request created as immutable Jackson objects.
+ */
 @Value.Style(
         depluralize = true,
         jdkOnly = true,

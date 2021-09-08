@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableMessageCreateRequest.class)
 @JsonDeserialize(as = ImmutableMessageCreateRequest.class)
-public interface MessageCreateRequest {
+public interface MessageCreateRequest extends BaseSendRequest {
 
     static ImmutableMessageCreateRequest.Builder builder() {
         return ImmutableMessageCreateRequest.builder();
@@ -35,15 +35,19 @@ public interface MessageCreateRequest {
     @JsonProperty("disable_web_preview")
     Optional<Boolean> disableWebPreview();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

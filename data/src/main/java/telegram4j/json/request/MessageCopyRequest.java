@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableMessageCopyRequest.class)
 @JsonDeserialize(as = ImmutableMessageCopyRequest.class)
-public interface MessageCopyRequest {
+public interface MessageCopyRequest extends BaseSendRequest, CaptionFields {
 
     static ImmutableMessageCopyRequest.Builder builder() {
         return ImmutableMessageCopyRequest.builder();
@@ -31,23 +31,30 @@ public interface MessageCopyRequest {
     @JsonProperty("message_id")
     Id messageId();
 
+    @Override
     Optional<String> caption();
 
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable(singleton = true)
 @JsonSerialize(as = ImmutableMessageEditCaptionRequest.class)
 @JsonDeserialize(as = ImmutableMessageEditCaptionRequest.class)
-public interface MessageEditCaptionRequest {
+public interface MessageEditCaptionRequest extends CaptionFields {
 
     static ImmutableMessageEditCaptionRequest.Builder builder() {
         return ImmutableMessageEditCaptionRequest.builder();
@@ -31,11 +31,14 @@ public interface MessageEditCaptionRequest {
     @JsonProperty("inline_message_id")
     Optional<String> inlineMessageId();
 
-    Optional<String> caption();
-
+    @Override
     @JsonProperty("parse_mode")
     Optional<ParseMode> parseMode();
 
+    @Override
+    Optional<String> caption();
+
+    @Override
     @JsonProperty("caption_entities")
     Optional<List<MessageEntityData>> captionEntities();
 

@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendLocationRequest.class)
 @JsonDeserialize(as = ImmutableSendLocationRequest.class)
-public interface SendLocationRequest {
+public interface SendLocationRequest extends BaseSendRequest {
 
     static ImmutableSendLocationRequest.Builder builder() {
         return ImmutableSendLocationRequest.builder();
@@ -39,15 +39,19 @@ public interface SendLocationRequest {
     @JsonProperty("proximity_alert_radius")
     Optional<Integer> proximityAlertRadius();
 
+    @Override
     @JsonProperty("disable_notification")
     Optional<Boolean> disableNotification();
 
+    @Override
     @JsonProperty("reply_to_message_id")
     Optional<Id> replyToMessageId();
 
+    @Override
     @JsonProperty("allow_sending_without_reply")
     Optional<Boolean> allowSendingWithoutReply();
 
+    @Override
     @JsonProperty("reply_markup")
     Optional<ReplyMarkupData> replyMarkup();
 }

@@ -16,7 +16,7 @@ import java.util.Optional;
 @Value.Immutable
 @JsonSerialize(as = ImmutableSendPhotoRequest.class)
 @JsonDeserialize(as = ImmutableSendPhotoRequest.class)
-public interface SendPhotoRequest extends BaseSendRequest {
+public interface SendPhotoRequest extends BaseSendRequest, CaptionFields {
 
     static ImmutableSendPhotoRequest.Builder builder() {
         return ImmutableSendPhotoRequest.builder();
