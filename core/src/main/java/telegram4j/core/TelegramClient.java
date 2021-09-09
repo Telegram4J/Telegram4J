@@ -8,8 +8,15 @@ import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.core.dispatch.DispatchStoreLayout;
 import telegram4j.core.event.Event;
+import telegram4j.core.object.File;
+import telegram4j.core.object.Message;
+import telegram4j.core.object.Poll;
+import telegram4j.core.spec.*;
+import telegram4j.json.MessageData;
 import telegram4j.json.UpdateData;
-import telegram4j.json.request.GetUpdates;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
+import telegram4j.json.request.*;
 import telegram4j.rest.DefaultRouter;
 import telegram4j.rest.RestResources;
 import telegram4j.rest.RestTelegramClient;
@@ -27,6 +34,7 @@ public final class TelegramClient {
 
     private final AtomicInteger lastUpdateId = new AtomicInteger(-1);
     private final AtomicBoolean terminate = new AtomicBoolean(true);
+    private final AtomicBoolean request = new AtomicBoolean();
     private final Sinks.Many<UpdateData> updates;
 
     TelegramClient(String token, RestResources restResources, ClientResources clientResources) {
@@ -66,27 +74,148 @@ public final class TelegramClient {
         return clientResources.getEventDispatcher().on(type);
     }
 
+    public Mono<Message> editMessageText(MessageEditTextSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageText(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageCaption(MessageEditCaptionSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageCaption(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageMedia(MessageEditMediaSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageMedia(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> editMessageReplyMarkup(MessageEditReplyMarkupSpec spec) {
+        return getRestClient().getChatService()
+                .editMessageReplyMarkup(spec.asRequest())
+                .filter(node -> !node.isBoolean())
+                .map(node -> getRestResources().getObjectMapper()
+                        .convertValue(node, MessageData.class))
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Boolean> deleteMessageById(ChatId chatId, Id messageId) {
+        return getRestClient().getChatService().deleteMessage(chatId, messageId);
+    }
+
+    public Mono<Poll> stopPoll(StopPollSpec spec) {
+        return getRestClient().getChatService().stopPoll(spec.asRequest())
+                .map(data -> new Poll(this, data));
+    }
+
+    public Mono<Message> sendMessage(MessageCreateSpec spec) {
+        return getRestClient().getChatService().sendMessage(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> forwardMessage(MessageForwardSpec spec) {
+        return getRestClient().getChatService().forwardMessage(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Id> copyMessage(MessageCopySpec spec) {
+        return getRestClient().getChatService().copyMessage(spec.asRequest());
+    }
+
+    public Mono<Message> sendAudio(SendAudioSpec spec) {
+        return getRestClient().getChatService().sendAudio(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVideo(SendVideoSpec spec) {
+        return getRestClient().getChatService().sendVideo(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVideoNote(SendVideoNoteSpec spec) {
+        return getRestClient().getChatService().sendVideoNote(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendPhoto(SendPhotoSpec spec) {
+        return getRestClient().getChatService().sendPhoto(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendDocument(SendDocumentSpec spec) {
+        return getRestClient().getChatService().sendDocument(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendAnimation(SendAnimationSpec spec) {
+        return getRestClient().getChatService().sendAnimation(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Flux<Message> sendMediaGroup(SendMediaGroupSpec spec) {
+        return getRestClient().getChatService().sendMediaGroup(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendLocation(SendLocationSpec spec) {
+        return getRestClient().getChatService().sendLocation(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<Message> sendVoice(SendVoiceSpec spec) {
+        return getRestClient().getChatService().sendVoice(spec.asRequest())
+                .map(data -> new Message(this, data));
+    }
+
+    public Mono<File> getFile(String fileId) {
+        return getRestClient().getChatService().getFile(fileId)
+                .map(data -> new File(this, data));
+    }
+
     public Mono<Void> login() {
         return Mono.defer(() -> {
 
             Mono<Void> readUpdates = Flux.interval(clientResources.getUpdateInterval())
-                    .flatMap(l -> getRestClient().getApplicationService()
-                            .getUpdates(GetUpdates.builders()
-                                    .offset(terminate.get() ? lastUpdateId.get() + 1 : lastUpdateId.get())
-                                    .build())
-                            .checkpoint("Read updates from API")
-                            .filter(data -> !terminate.get())
-                            .filter(data -> data.updateId() > lastUpdateId.get())
-                            .collectList()
-                            .doOnNext(list -> lastUpdateId.set(list.stream()
-                                    .mapToInt(UpdateData::updateId)
-                                    .max().orElseGet(lastUpdateId::get)))
-                            .doOnNext(list -> list.forEach(updates::tryEmitNext))
-                            .doFirst(() -> {
-                                synchronized (terminate) {
-                                    terminate.set(!terminate.get());
-                                }
-                            }))
+                    .flatMap(l -> {
+                        if (request.get()) {
+                            return Mono.empty();
+                        }
+
+                        request.set(true);
+                        return Mono.fromSupplier(terminate::get)
+                                .filter(bool -> !bool)
+                                .switchIfEmpty(getRestClient().getApplicationService()
+                                        .getUpdates(GetUpdatesRequest.builders()
+                                                .offset(lastUpdateId.get() + 1)
+                                                .build())
+                                        .checkpoint("Terminate API updates")
+                                        .doFirst(() -> terminate.set(false))
+                                        .then(Mono.empty()))
+                                .flatMapMany(bool -> getRestClient().getApplicationService()
+                                        .getUpdates(GetUpdatesRequest.builders()
+                                                .offset(lastUpdateId.get())
+                                                .build()))
+                                .checkpoint("Read updates from API")
+                                .filter(data -> data.updateId() > lastUpdateId.get())
+                                .collectList()
+                                .doOnNext(list -> lastUpdateId.set(list.stream()
+                                        .mapToInt(UpdateData::updateId)
+                                        .max().orElseGet(lastUpdateId::get)))
+                                .doOnNext(list -> list.forEach(updates::tryEmitNext))
+                                .doOnNext(list -> terminate.set(!list.isEmpty()))
+                                .then(Mono.fromRunnable(() -> request.set(false)));
+                    })
                     .then();
 
             DispatchStoreLayout dispatchStoreLayout = new DispatchStoreLayout(this);

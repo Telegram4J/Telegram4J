@@ -2,12 +2,12 @@ package telegram4j.core;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.MessageCreateEvent;
+import telegram4j.core.spec.MessageCreateSpec;
 import telegram4j.json.BotCommandData;
 import telegram4j.json.BotCommandScopeData;
 import telegram4j.json.BotCommandScopeType;
 import telegram4j.json.MessageEntityType;
-import telegram4j.json.request.MessageCreate;
-import telegram4j.json.request.SetMyCommands;
+import telegram4j.json.request.SetMyCommandsRequest;
 
 public class TelegramClientExample {
 
@@ -15,7 +15,7 @@ public class TelegramClientExample {
         TelegramClient client = TelegramClient.create(System.getenv("T4J_TOKEN"));
 
         client.getRestClient().getCommandService()
-                .setMyCommands(SetMyCommands.builder()
+                .setMyCommands(SetMyCommandsRequest.builder()
                         .addCommand(BotCommandData.builder()
                                 .command("shrug")
                                 .description("¯\\_(ツ)_/¯")
@@ -33,11 +33,10 @@ public class TelegramClientExample {
                                 .map(s -> s.contains("/shrug"))
                                 .orElse(false))
                         .orElse(false))
-                .flatMap(event -> client.getRestClient().getChatService()
-                        .sendMessage(MessageCreate.builder()
-                                .text("¯\\_(ツ)_/¯")
-                                .chatId(event.getMessage().getChat().getId().asLong())
-                                .build()))
+                .flatMap(event -> client.sendMessage(MessageCreateSpec.builder()
+                        .text("¯\\_(ツ)_/¯")
+                        .chatId(event.getMessage().getChatId())
+                        .build()))
                 .subscribe();
 
         client.on(MessageCreateEvent.class)
@@ -46,8 +45,7 @@ public class TelegramClientExample {
                         .orElse(false))
                 .flatMap(event -> {
                     long time = System.currentTimeMillis();
-                    return client.getRestClient().getChatService()
-                            .sendMessage(MessageCreate.builder()
+                    return client.sendMessage(MessageCreateSpec.builder()
                                     .chatId(event.getMessage().getChat().getId().asLong())
                                     .text("amogus")
                                     .build())

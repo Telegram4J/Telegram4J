@@ -1,10 +1,14 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.replymarkup.InlineKeyboardMarkup;
 import telegram4j.core.util.EntityUtil;
 import telegram4j.json.*;
+import telegram4j.json.api.ChatId;
+import telegram4j.json.api.Id;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,8 +26,17 @@ public class Message implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    public Mono<Boolean> delete() {
+        return client.getRestClient().getChatService()
+                .deleteMessage(ChatId.of(getChatId()), getId());
+    }
+
     public Id getId() {
-        return Id.of(data.messageId());
+        return data.messageId();
+    }
+
+    public Id getChatId() {
+        return data.chat().id();
     }
 
     public MessageData getData() {
@@ -51,7 +64,7 @@ public class Message implements TelegramObject {
     }
 
     public Optional<Id> getForwardFromMessageId() {
-        return data.forwardFromMessageId().map(Id::of);
+        return data.forwardFromMessageId();
     }
 
     public Optional<String> getForwardSignature() {
@@ -92,7 +105,8 @@ public class Message implements TelegramObject {
 
     public Optional<List<MessageEntity>> getEntities() {
         return data.entities().map(list -> list.stream()
-                .map(data -> new MessageEntity(client, data))
+                .map(data -> new MessageEntity(client, data,
+                        getText().orElseThrow(IllegalStateException::new)))
                 .collect(Collectors.toList()));
     }
 
@@ -136,7 +150,8 @@ public class Message implements TelegramObject {
 
     public Optional<List<MessageEntity>> getCaptionEntities() {
         return data.captionEntities().map(list -> list.stream()
-                .map(data -> new MessageEntity(client, data))
+                .map(data -> new MessageEntity(client, data,
+                        getCaption().orElseThrow(IllegalStateException::new)))
                 .collect(Collectors.toList()));
     }
 
@@ -206,11 +221,11 @@ public class Message implements TelegramObject {
     }
 
     public Optional<Id> getMigrateToChatId() {
-        return data.migrateToChatId().map(Id::of);
+        return data.migrateToChatId();
     }
 
     public Optional<Id> getMigrateFromChatId() {
-        return data.migrateFromChatId().map(Id::of);
+        return data.migrateFromChatId();
     }
 
     public Optional<Message> getPinnedMessage() {
@@ -253,7 +268,7 @@ public class Message implements TelegramObject {
     }
 
     public Optional<InlineKeyboardMarkup> getReplyMarkup() {
-        return data.replyMarkup().map(data -> new InlineKeyboardMarkup(client, data));
+        return data.replyMarkup().map(InlineKeyboardMarkup::new);
     }
 
     public Optional<User> getNewChatParticipant() {

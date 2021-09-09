@@ -3,6 +3,7 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.UserData;
+import telegram4j.json.api.Id;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -18,7 +19,7 @@ public class User implements TelegramObject {
     }
 
     public Id getId() {
-        return Id.of(data.id());
+        return data.id();
     }
 
     public UserData getData() {

@@ -1,7 +1,7 @@
 package telegram4j.core.object.chat;
 
 import telegram4j.core.TelegramClient;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.Id;
 import telegram4j.json.ChatData;
 
 import java.util.Optional;
@@ -29,7 +29,7 @@ public final class ChannelChat extends BaseChat implements LinkedChat {
 
     @Override
     public Optional<Id> getLinkedChatId() {
-        return getData().linkedChatId().map(Id::of);
+        return getData().linkedChatId();
     }
 
     @Override

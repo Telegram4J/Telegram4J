@@ -1,6 +1,6 @@
 package telegram4j.core.object.chat;
 
-import telegram4j.core.object.Id;
+import telegram4j.json.api.Id;
 
 import java.util.Optional;
 

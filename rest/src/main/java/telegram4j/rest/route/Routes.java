@@ -52,6 +52,9 @@ public final class Routes {
     /** @see <a href="https://core.telegram.org/bots/api#sendvideo">https://core.telegram.org/bots/api#sendvideo</a> */
     public static final Route SEND_VIDEO = Route.post("/sendVideo");
 
+    /** @see <a href="https://core.telegram.org/bots/api#sendvideonote">https://core.telegram.org/bots/api#sendvideonote</a> */
+    public static final Route SEND_VIDEO_NOTE = Route.post("/sendVideoNote");
+
     /** @see <a href="https://core.telegram.org/bots/api#sendanimation">https://core.telegram.org/bots/api#sendanimation</a> */
     public static final Route SEND_ANIMATION = Route.post("/sendAnimation");
 
@@ -177,4 +180,22 @@ public final class Routes {
 
     /** @see <a href="https://core.telegram.org/bots/api#getmycommands">https://core.telegram.org/bots/api#getmycommands</a> */
     public static final Route GET_MY_COMMANDS = Route.get("/getMyCommands");
+
+    /** @see <a href="https://core.telegram.org/bots/api#editmessagetext">https://core.telegram.org/bots/api#editmessagetext</a> */
+    public static final Route EDIT_MESSAGE_TEXT = Route.post("/editMessageText");
+
+    /** @see <a href="https://core.telegram.org/bots/api#editmessagecaption">https://core.telegram.org/bots/api#editmessagecaption</a> */
+    public static final Route EDIT_MESSAGE_CAPTION = Route.post("/editMessageCaption");
+
+    /** @see <a href="https://core.telegram.org/bots/api#editmessagemedia">https://core.telegram.org/bots/api#editmessagemedia</a> */
+    public static final Route EDIT_MESSAGE_MEDIA = Route.post("/editMessageMedia");
+
+    /** @see <a href="https://core.telegram.org/bots/api#editmessagereplymarkup">https://core.telegram.org/bots/api#editmessagereplymarkup</a> */
+    public static final Route EDIT_MESSAGE_REPLY_MARKUP = Route.post("/editMessageReplyMarkup");
+
+    /** @see <a href="https://core.telegram.org/bots/api#stoppoll">https://core.telegram.org/bots/api#stoppoll</a> */
+    public static final Route STOP_POLL = Route.post("/stopPoll");
+
+    /** @see <a href="https://core.telegram.org/bots/api#deletemessage">https://core.telegram.org/bots/api#deletemessage</a> */
+    public static final Route DELETE_MESSAGE = Route.post("/deleteMessage");
 }

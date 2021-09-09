@@ -11,10 +11,13 @@ public class MessageEntity implements TelegramObject {
 
     private final TelegramClient client;
     private final MessageEntityData data;
+    private final String content;
 
-    public MessageEntity(TelegramClient client, MessageEntityData data) {
+    public MessageEntity(TelegramClient client, MessageEntityData data, String content) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        Objects.requireNonNull(content, "content");
+        this.content = content.substring(getOffset(), getOffset() + getLength());
     }
 
     public MessageEntityData getData() {
@@ -45,6 +48,10 @@ public class MessageEntity implements TelegramObject {
         return data.language();
     }
 
+    public String getContent() {
+        return content;
+    }
+
     @Override
     public TelegramClient getClient() {
         return client;
@@ -65,6 +72,9 @@ public class MessageEntity implements TelegramObject {
 
     @Override
     public String toString() {
-        return "MessageEntity{data=" + data + '}';
+        return "MessageEntity{" +
+                "data=" + data +
+                ", content='" + content + '\'' +
+                '}';
     }
 }

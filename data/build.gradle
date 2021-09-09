@@ -1,4 +1,11 @@
 dependencies {
+    api project(":data-api")
+
     compileOnly "org.immutables:value:$immutables_version"
+    compileOnly "org.immutables:encode:$immutables_version"
     annotationProcessor "org.immutables:value:$immutables_version"
+
+    if (JavaVersion.current().isJava8()) {
+        compileOnly "com.google.code.findbugs:annotations:$findbugs_version"
+    }
 }

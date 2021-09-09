@@ -3,7 +3,7 @@ package telegram4j.core.object.chat;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.ChatLocation;
 import telegram4j.core.object.ChatPermissions;
-import telegram4j.core.object.Id;
+import telegram4j.json.api.Id;
 import telegram4j.json.ChatData;
 
 import java.util.Optional;
@@ -53,7 +53,7 @@ public final class SupergroupChat extends GroupChat implements LinkedChat, Named
 
     @Override
     public Optional<Id> getLinkedChatId() {
-        return getData().linkedChatId().map(Id::of);
+        return getData().linkedChatId();
     }
 
     public Optional<ChatLocation> getLocation() {

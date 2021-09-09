@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
+import telegram4j.json.api.Id;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +19,7 @@ public interface MessageData {
     }
 
     @JsonProperty("message_id")
-    long messageId();
+    Id messageId();
 
     // NOTE: renamed due matches to generated #from method
     @JsonProperty("from")
@@ -38,7 +39,7 @@ public interface MessageData {
     Optional<ChatData> forwardFromChat();
 
     @JsonProperty("forward_from_message_id")
-    Optional<Long> forwardFromMessageId();
+    Optional<Id> forwardFromMessageId();
 
     @JsonProperty("forward_signature")
     Optional<String> forwardSignature();
@@ -130,10 +131,10 @@ public interface MessageData {
     Optional<MessageAutoDeleteTimerChangedData> messageAutoDeleteTimerChanged();
 
     @JsonProperty("migrate_to_chat_id")
-    Optional<Long> migrateToChatId();
+    Optional<Id> migrateToChatId();
 
     @JsonProperty("migrate_from_chat_id")
-    Optional<Long> migrateFromChatId();
+    Optional<Id> migrateFromChatId();
 
     @JsonProperty("pinned_message")
     Optional<MessageData> pinnedMessage();
@@ -165,7 +166,7 @@ public interface MessageData {
     Optional<VoiceChatParticipantsInvitedData> voiceChatParticipantsInvited();
 
     @JsonProperty("reply_markup")
-    Optional<InlineKeyboardMarkupData> replyMarkup();
+    Optional<ReplyMarkupData> replyMarkup();
 
     // NOTE: unrecorded attributes
     @JsonProperty("new_chat_participant")
