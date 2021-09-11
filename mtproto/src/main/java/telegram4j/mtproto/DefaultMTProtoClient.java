@@ -88,8 +88,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
-    public Sinks.Many<ByteBuf> receiver() {
-        return currentConnection.getReceiver();
+    public Flux<ByteBuf> receiver() {
+        return currentConnection.getReceiver().asFlux()
+                .map(buf -> mtProtoResources.getTransport()
+                        .decode(currentConnection.getConnection()
+                                .channel().alloc(), buf));
     }
 
     @Override

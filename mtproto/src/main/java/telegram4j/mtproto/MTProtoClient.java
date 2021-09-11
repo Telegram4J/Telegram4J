@@ -1,8 +1,8 @@
 package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 
 public interface MTProtoClient {
 
@@ -10,7 +10,7 @@ public interface MTProtoClient {
 
     Mono<Void> send(ByteBuf payload);
 
-    Sinks.Many<ByteBuf> receiver();
+    Flux<ByteBuf> receiver();
 
     Mono<Void> onDispose();
 }
