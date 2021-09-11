@@ -1,4 +1,4 @@
-package telegram4j.json.mtproto;
+package telegram4j.tl;
 
 import io.netty.buffer.ByteBuf;
 

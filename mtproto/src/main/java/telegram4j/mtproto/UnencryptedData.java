@@ -1,8 +1,8 @@
 package telegram4j.mtproto;
 
-import telegram4j.json.mtproto.TlObject;
+import telegram4j.tl.mtproto.TlObject;
 
-public class UnencryptedData<T extends TlObject<T>> {
+public class UnencryptedData<T extends TlObject> {
 
     private final long authKeyId;
     private final long messageId;
