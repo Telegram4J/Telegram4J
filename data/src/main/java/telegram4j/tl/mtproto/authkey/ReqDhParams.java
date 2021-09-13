@@ -1,7 +1,7 @@
 package telegram4j.tl.mtproto.authkey;
 
 import org.immutables.value.Value;
-import telegram4j.tl.mtproto.TlObject;
+import telegram4j.json.api.tl.TlObject;
 
 @Value.Immutable
 public interface ReqDhParams extends TlObject {
@@ -23,7 +23,7 @@ public interface ReqDhParams extends TlObject {
     PqInnerData encryptedData();
 
     @Override
-    default int getId() {
+    default int identifier() {
         return ID;
     }
 }

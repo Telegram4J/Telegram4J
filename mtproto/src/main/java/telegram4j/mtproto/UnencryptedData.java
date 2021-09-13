@@ -1,6 +1,6 @@
 package telegram4j.mtproto;
 
-import telegram4j.tl.mtproto.TlObject;
+import telegram4j.json.api.tl.TlObject;
 
 public class UnencryptedData<T extends TlObject> {
 

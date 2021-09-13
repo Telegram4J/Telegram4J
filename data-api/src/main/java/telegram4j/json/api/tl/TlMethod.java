@@ -1,4 +1,4 @@
-package telegram4j.tl.mtproto;
+package telegram4j.json.api.tl;
 
 public interface TlMethod extends TlObject {
 

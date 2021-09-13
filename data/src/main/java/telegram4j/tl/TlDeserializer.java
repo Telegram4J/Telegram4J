@@ -1,7 +1,7 @@
 package telegram4j.tl;
 
 import io.netty.buffer.ByteBuf;
-import telegram4j.tl.mtproto.TlObject;
+import telegram4j.json.api.tl.TlObject;
 import telegram4j.tl.mtproto.authkey.PqInnerData;
 import telegram4j.tl.mtproto.authkey.ReqDhParams;
 
