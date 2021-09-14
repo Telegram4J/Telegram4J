@@ -14,6 +14,9 @@ import com.sun.tools.javac.code.Symbol;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
+import reactor.util.annotation.Nullable;
+import telegram4j.json.api.tl.TlSerializable;
+import telegram4j.json.api.tl.TlTrue;
 import telegram4j.json.api.tl.TlObject;
 import telegram4j.tl.model.TlConstructor;
 import telegram4j.tl.model.TlParam;
@@ -115,7 +118,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 Set<TlConstructor> generalSuperclasses = schema.constructors().stream()
                         .peek(c -> counter.compute(normalizeName(c.type()), (s, i) -> i == null ? 0 : i + 1))
                         .filter(c -> normalizeName(c.type()).equalsIgnoreCase(normalizeName(c.predicate())) ||
-                                counter.getOrDefault(normalizeName(c.type()), 0) > 1)
+                                counter.getOrDefault(normalizeName(c.type()), 0) > 2)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
 
                 for (TlConstructor constructor : generalSuperclasses) {
@@ -127,7 +130,8 @@ public class SchemaGenerator extends AbstractProcessor {
                     TypeSpec.Builder superType = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC)
                             .addSuperinterface(TlObject.class)
-                            .addAnnotation(AnnotationSpec.builder(Value.Immutable.class).build());
+                            .addAnnotation(AnnotationSpec.builder(Value.Immutable.class).build())
+                            .addSuperinterface(TlSerializable.class);
 
                     // override #getId() method
                     superType.addField(FieldSpec.builder(TypeName.INT, "ID",
@@ -143,15 +147,19 @@ public class SchemaGenerator extends AbstractProcessor {
                             .build());
 
                     for (TlParam param : constructor.params()) {
-                        String paramType = normalizeName(param.type());
-                        if (ignoredTypes.contains(paramType.toLowerCase())) {
+                        if (param.type().equals("#")) {
                             continue;
                         }
 
-                        superType.addMethod(MethodSpec.methodBuilder(formatFieldName(param.name()))
+                        MethodSpec.Builder method = MethodSpec.methodBuilder(formatFieldName(param.name()))
                                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                .returns(mapType(param.type()))
-                                .build());
+                                .returns(mapType(param.type()));
+
+                        if (param.type().startsWith("flags.")) {
+                            method.addAnnotation(Nullable.class);
+                        }
+
+                        superType.addMethod(method.build());
                     }
 
                     JavaFile.builder(packageName, superType.build())
@@ -175,6 +183,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     try {
                         JavaFile.builder(packageName, TypeSpec.interfaceBuilder(name)
                                         .addModifiers(Modifier.PUBLIC)
+                                        .addSuperinterface(TlSerializable.class)
                                         .build())
                                 .indent(INDENT)
                                 .build()
@@ -238,6 +247,10 @@ public class SchemaGenerator extends AbstractProcessor {
                                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                                 .returns(mapType(param.type()));
 
+                        if (param.type().startsWith("flags.")) {
+                            attribute.addAnnotation(Nullable.class);
+                        }
+
                         builder.addMethod(attribute.build());
                     }
 
@@ -266,7 +279,25 @@ public class SchemaGenerator extends AbstractProcessor {
                         .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                         .addMethod(privateConstructor);
 
+                TypeVariableName serializableType = TypeVariableName.get("T", TlSerializable.class);
+
+                // special method for supertype objects
+                serializer.addMethod(MethodSpec.methodBuilder("serializeExact")
+                        .returns(ByteBuf.class)
+                        .addTypeVariable(serializableType)
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .addParameters(Arrays.asList(
+                                ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                                ParameterSpec.builder(serializableType, "payload").build()))
+                        .beginControlFlow("if (payload instanceof TlObject)")
+                        .addStatement("return serialize(allocator, (TlObject) payload)")
+                        .nextControlFlow("else")
+                        .addStatement("throw new IllegalArgumentException(\"Unrecorded TL Serializable supertype: \" + payload.getClass())")
+                        .endControlFlow()
+                        .build());
+
                 TypeVariableName generalType = TypeVariableName.get("T", TlObject.class);
+
                 MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
                         .returns(ByteBuf.class)
                         .addTypeVariable(generalType)
@@ -314,6 +345,9 @@ public class SchemaGenerator extends AbstractProcessor {
                         String method;
                         switch (paramType) {
                             case "true":
+                                method = "writeByte";
+                                wrapping = "payload.$L().asByte()";
+                                break;
                             case "bool":
                                 method = "writeBoolean";
                                 break;
@@ -329,6 +363,9 @@ public class SchemaGenerator extends AbstractProcessor {
                                 break;
                             case "long":
                                 method = "writeLongLE";
+                                break;
+                            case "double":
+                                method = "writeDoubleLE";
                                 break;
                             case "string":
                                 wrapping = "writeString(allocator, payload.$L())";
@@ -355,7 +392,8 @@ public class SchemaGenerator extends AbstractProcessor {
                                     }
                                     wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
                                 } else {
-                                    wrapping = "serialize(allocator, payload.$L())";
+                                    // TODO: use concrete method
+                                    wrapping = "serializeExact(allocator, payload.$L())";
                                 }
                                 method = "writeBytes";
                         }
@@ -453,7 +491,10 @@ public class SchemaGenerator extends AbstractProcessor {
         if (type.equalsIgnoreCase("int")) {
             return TypeName.INT;
         }
-        if (type.equalsIgnoreCase("bool") || type.equalsIgnoreCase("true")) {
+        if (type.equalsIgnoreCase("true")) {
+            return ClassName.get(TlTrue.class);
+        }
+        if (type.equalsIgnoreCase("bool")) {
             return TypeName.BOOLEAN;
         }
         if (type.equalsIgnoreCase("long")) {
@@ -471,7 +512,7 @@ public class SchemaGenerator extends AbstractProcessor {
         Matcher flag = FLAG_PATTERN.matcher(type);
         if (flag.matches()) {
             TypeName innerType = mapType(flag.group(2));
-            return ParameterizedTypeName.get(OPTIONAL_CLASS_NAME, innerType.box());
+            return innerType.box();
         }
 
         Matcher vector = VECTOR_PATTERN.matcher(type);

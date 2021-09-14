@@ -3,6 +3,7 @@ package telegram4j.tl;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
+import reactor.util.annotation.Nullable;
 import telegram4j.json.api.tl.TlObject;
 import telegram4j.tl.mtproto.TlSerializer;
 
@@ -82,29 +83,30 @@ public final class TlSerialUtil {
         return buf;
     }
 
-    public static ByteBuf serializeFlags(ByteBufAllocator allocator, Optional<?> value) {
-        return value.map(v -> {
-                    if (v instanceof Byte) {
-                        return allocator.buffer(Byte.BYTES).writeByte((int) v);
-                    } else if (v instanceof Boolean) {
-                        return allocator.buffer(1).writeBoolean((boolean) v);
-                    } else if (v instanceof Integer) {
-                        return allocator.buffer(Integer.BYTES).writeIntLE((int) v);
-                    } else if (v instanceof Long) {
-                        return allocator.buffer(Long.BYTES).writeLongLE((long) v);
-                    } else if (v instanceof Double) {
-                        return allocator.buffer(Double.BYTES).writeDoubleLE((long) v);
-                    } else {
-                        return TlSerializer.serialize(allocator, (TlObject) v);
-                    }
-                })
-                .orElse(EMPTY_BUFFER);
+    public static ByteBuf serializeFlags(ByteBufAllocator allocator, @Nullable Object value) {
+        if (value == null) {
+            return EMPTY_BUFFER;
+        }
+
+        if (value instanceof Byte) {
+            return allocator.buffer(Byte.BYTES).writeByte((int) value);
+        } else if (value instanceof Boolean) {
+            return allocator.buffer(1).writeBoolean((boolean) value);
+        } else if (value instanceof Integer) {
+            return allocator.buffer(Integer.BYTES).writeIntLE((int) value);
+        } else if (value instanceof Long) {
+            return allocator.buffer(Long.BYTES).writeLongLE((long) value);
+        } else if (value instanceof Double) {
+            return allocator.buffer(Double.BYTES).writeDoubleLE((long) value);
+        } else {
+            return TlSerializer.serialize(allocator, (TlObject) value);
+        }
     }
 
-    public static int calculateFlags(Optional<?>... optionals) {
+    public static int calculateFlags(Object... optionals) {
         int flags = 0;
-        for (Optional<?> optional : optionals) {
-            flags |= optional.isPresent() ? 1 : 0;
+        for (Object optional : optionals) {
+            flags |= optional != null ? 1 : 0;
         }
         return flags;
     }
