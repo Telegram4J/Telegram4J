@@ -5,11 +5,12 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.json.api.tl.TlObject;
+import telegram4j.json.api.tl.TlSerializable;
+import telegram4j.json.api.tl.TlTrue;
 import telegram4j.tl.mtproto.TlSerializer;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Optional;
 
 public final class TlSerialUtil {
 
@@ -63,7 +64,7 @@ public final class TlSerialUtil {
     }
 
 
-    public static ByteBuf serializeByteVector(ByteBufAllocator allocator, List<byte[]> vector) {
+    public static ByteBuf serializeBytesVector(ByteBufAllocator allocator, List<byte[]> vector) {
         ByteBuf buf = allocator.buffer();
         buf.writeIntLE(VECTOR_ID);
         buf.writeIntLE(vector.size());
@@ -87,7 +88,10 @@ public final class TlSerialUtil {
         if (value == null) {
             return EMPTY_BUFFER;
         }
+        return serializeUnknown(allocator, value);
+    }
 
+    public static ByteBuf serializeUnknown(ByteBufAllocator allocator, Object value) {
         if (value instanceof Byte) {
             return allocator.buffer(Byte.BYTES).writeByte((int) value);
         } else if (value instanceof Boolean) {
@@ -98,8 +102,25 @@ public final class TlSerialUtil {
             return allocator.buffer(Long.BYTES).writeLongLE((long) value);
         } else if (value instanceof Double) {
             return allocator.buffer(Double.BYTES).writeDoubleLE((long) value);
+        } else if (value instanceof TlTrue) {
+            return allocator.buffer(1).writeByte(1);
+        } else if (value instanceof byte[]) {
+            byte[] value0 = (byte[]) value;
+            return allocator.buffer(value0.length).writeBytes(value0);
+        } else if (value instanceof List) {
+            List<?> value0 = (List<?>) value;
+            ByteBuf buf = allocator.buffer();
+            buf.writeIntLE(VECTOR_ID);
+            buf.writeIntLE(value0.size());
+            for (Object o : value0) {
+                buf.writeBytes(serializeUnknown(allocator, o));
+            }
+            return buf;
+        } else if (value instanceof TlSerializable) {
+            TlSerializable value0 = (TlSerializable) value;
+            return TlSerializer.serializeExact(allocator, value0);
         } else {
-            return TlSerializer.serialize(allocator, (TlObject) value);
+            throw new IllegalArgumentException("Incorrect TL serializable type: " + value + " (" + value.getClass() + ")");
         }
     }
 

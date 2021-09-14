@@ -130,7 +130,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     TypeSpec.Builder superType = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC)
                             .addSuperinterface(TlObject.class)
-                            .addAnnotation(AnnotationSpec.builder(Value.Immutable.class).build())
                             .addSuperinterface(TlSerializable.class);
 
                     // override #getId() method
@@ -373,10 +372,10 @@ public class SchemaGenerator extends AbstractProcessor {
                                 method = "writeBytes";
                                 break;
                             default:
-                                Matcher vector;
+                                Matcher vector = VECTOR_PATTERN.matcher(paramType);
                                 if (paramType.startsWith("flags.")) {
                                     wrapping = "serializeFlags(allocator, payload.$L())";
-                                } else if ((vector = VECTOR_PATTERN.matcher(paramType)).matches()) {;
+                                } else if (vector.matches()) {
                                     String innerType = vector.group(1);
                                     String specific = "";
                                     switch (innerType.toLowerCase()) {
@@ -416,9 +415,9 @@ public class SchemaGenerator extends AbstractProcessor {
                 try {
                     JavaFile.builder(packageName, serializer.build())
                             .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                    "calculateFlags", "serializeByteVector", "serializeFlags",
-                                    "serializeIntVector", "serializeLongVector", "serializeVector",
-                                    "writeString")
+                                    "calculateFlags", "serializeBytesVector",
+                                    "serializeFlags", "serializeIntVector", "serializeLongVector",
+                                    "serializeVector", "writeString")
                             .indent(INDENT)
                             .build()
                             .writeTo(filer);
