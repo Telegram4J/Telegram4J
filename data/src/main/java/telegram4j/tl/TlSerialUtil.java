@@ -63,6 +63,15 @@ public final class TlSerialUtil {
         return buf;
     }
 
+    public static ByteBuf serializeStringVector(ByteBufAllocator allocator, List<String> vector) {
+        ByteBuf buf = allocator.buffer();
+        buf.writeIntLE(VECTOR_ID);
+        buf.writeIntLE(vector.size());
+        for (String o : vector) {
+            buf.writeBytes(writeString(allocator, o));
+        }
+        return buf;
+    }
 
     public static ByteBuf serializeBytesVector(ByteBufAllocator allocator, List<byte[]> vector) {
         ByteBuf buf = allocator.buffer();
@@ -74,12 +83,12 @@ public final class TlSerialUtil {
         return buf;
     }
 
-    public static ByteBuf serializeVector(ByteBufAllocator allocator, List<? extends TlObject> vector) {
+    public static ByteBuf serializeVector(ByteBufAllocator allocator, List<? extends TlSerializable> vector) {
         ByteBuf buf = allocator.buffer();
         buf.writeIntLE(VECTOR_ID);
         buf.writeIntLE(vector.size());
-        for (TlObject tlObject : vector) {
-            buf.writeBytes(TlSerializer.serialize(allocator, tlObject));
+        for (TlSerializable o : vector) {
+            buf.writeBytes(TlSerializer.serializeExact(allocator, o));
         }
         return buf;
     }

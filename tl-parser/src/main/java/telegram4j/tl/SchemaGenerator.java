@@ -15,9 +15,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
 import reactor.util.annotation.Nullable;
+import telegram4j.json.api.tl.TlObject;
 import telegram4j.json.api.tl.TlSerializable;
 import telegram4j.json.api.tl.TlTrue;
-import telegram4j.json.api.tl.TlObject;
 import telegram4j.tl.model.TlConstructor;
 import telegram4j.tl.model.TlParam;
 import telegram4j.tl.model.TlSchema;
@@ -32,9 +32,13 @@ import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
 import java.io.InputStream;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @SupportedAnnotationTypes("telegram4j.tl.GenerateSchema")
 public class SchemaGenerator extends AbstractProcessor {
@@ -47,7 +51,6 @@ public class SchemaGenerator extends AbstractProcessor {
             "string", "flags", "vector", "#"));
 
     private static final ClassName LIST_CLASS_NAME = ClassName.get(List.class);
-    private static final ClassName OPTIONAL_CLASS_NAME = ClassName.get(Optional.class);
 
     private static final String UTIL_PACKAGE = "telegram4j.tl";
     private static final String API_SCHEMA = "api.json";
@@ -66,6 +69,7 @@ public class SchemaGenerator extends AbstractProcessor {
     private int progress = 0x7;
 
     private TlSchema schema;
+    private Map<String, List<TlConstructor>> typeTree = new HashMap<>();
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -93,6 +97,10 @@ public class SchemaGenerator extends AbstractProcessor {
         } catch (Throwable t) {
             throw new RuntimeException(t);
         }
+
+        typeTree = schema.constructors().stream()
+                .filter(c -> !ignoredTypes.contains(normalizeName(c.type()).toLowerCase()))
+                .collect(Collectors.groupingBy(c -> normalizeName(c.type())));
     }
 
     @Override
@@ -114,81 +122,60 @@ public class SchemaGenerator extends AbstractProcessor {
 
             // generate super types
             if ((progress & STAGE_GENERAL_SUPERCLASSES) != 0) {
-                Map<String, Integer> counter = new HashMap<>();
-                Set<TlConstructor> generalSuperclasses = schema.constructors().stream()
-                        .peek(c -> counter.compute(normalizeName(c.type()), (s, i) -> i == null ? 0 : i + 1))
-                        .filter(c -> normalizeName(c.type()).equalsIgnoreCase(normalizeName(c.predicate())) ||
-                                counter.getOrDefault(normalizeName(c.type()), 0) > 2)
-                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                Map<String, Set<TlParam>> sharedParams = typeTree.entrySet().stream()
+                        .filter(e -> e.getValue().size() > 1)
+                        .collect(Collectors.groupingBy(Map.Entry::getKey,
+                                flatMapping(e -> e.getValue().stream()
+                                        .flatMap(c -> c.params().stream())
+                                        .filter(p -> e.getValue().stream()
+                                                .allMatch(c -> c.params().contains(p))),
+                                        Collectors.toCollection(LinkedHashSet::new))));
 
-                for (TlConstructor constructor : generalSuperclasses) {
-                    String name = normalizeName(constructor.type());
+                for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
+                    String name = e.getKey();
+                    Set<TlParam> params = e.getValue();
                     if (computed.containsKey(name) || ignoredTypes.contains(name.toLowerCase())) {
                         continue;
                     }
 
                     TypeSpec.Builder superType = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC)
-                            .addSuperinterface(TlObject.class)
                             .addSuperinterface(TlSerializable.class);
 
-                    // override #getId() method
-                    superType.addField(FieldSpec.builder(TypeName.INT, "ID",
-                                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .initializer("0x" + Integer.toHexString(constructor.id()))
-                            .build());
-
-                    superType.addMethod(MethodSpec.methodBuilder("identifier")
-                            .addAnnotation(Override.class)
-                            .returns(TypeName.INT)
-                            .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                            .addCode("return ID;")
-                            .build());
-
-                    for (TlParam param : constructor.params()) {
+                    for (TlParam param : params) {
                         if (param.type().equals("#")) {
                             continue;
                         }
 
-                        MethodSpec.Builder method = MethodSpec.methodBuilder(formatFieldName(param.name()))
-                                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                .returns(mapType(param.type()));
-
-                        if (param.type().startsWith("flags.")) {
-                            method.addAnnotation(Nullable.class);
+                        TypeName paramType = mapType(param.type());
+                        if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
+                            paramType = TypeName.OBJECT;
                         }
 
-                        superType.addMethod(method.build());
+                        boolean optionalInExt = typeTree.get(name).stream()
+                                .flatMap(c -> c.params().stream())
+                                .anyMatch(p -> p.type().startsWith("flags.") &&
+                                        p.name().equals(param.name()));
+
+                        if (optionalInExt) {
+                            paramType = paramType.box();
+                        }
+
+                        MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
+                                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                                .returns(paramType);
+
+                        if (param.type().startsWith("flags.")) {
+                            attribute.addAnnotation(Nullable.class);
+                        }
+
+                        superType.addMethod(attribute.build());
                     }
 
                     JavaFile.builder(packageName, superType.build())
                             .indent(INDENT)
                             .build()
                             .writeTo(filer);
-
-                    computed.put(name, constructor);
-                }
-
-                Set<String> unrecordedSuperTypes = counter.keySet().stream()
-                        .filter(integer -> generalSuperclasses.stream()
-                                .noneMatch(c -> normalizeName(c.type()).equals(integer)))
-                        .collect(Collectors.toSet());
-
-                for (String name : unrecordedSuperTypes) {
-                    if (ignoredTypes.contains(name.toLowerCase()) || computed.containsKey(name)) {
-                        continue;
-                    }
-
-                    try {
-                        JavaFile.builder(packageName, TypeSpec.interfaceBuilder(name)
-                                        .addModifiers(Modifier.PUBLIC)
-                                        .addSuperinterface(TlSerializable.class)
-                                        .build())
-                                .indent(INDENT)
-                                .build()
-                                .writeTo(filer);
-                    } catch (Throwable ignored) {}
-                    computed.put(name, null);
                 }
 
                 progress &= ~STAGE_GENERAL_SUPERCLASSES;
@@ -201,20 +188,30 @@ public class SchemaGenerator extends AbstractProcessor {
                 for (TlConstructor constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
                     String alias = normalizeName(constructor.predicate());
-                    if (ignoredTypes.contains(type.toLowerCase()) || ignoredTypes.contains(alias.toLowerCase()) ||
-                            computed.containsKey(alias)) {
+
+                    boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
+
+                    if (type.equalsIgnoreCase(alias) && multiple) { // e.g. SecureValueError
+                        alias = "Base" + alias;
+                    } else if (!multiple) {
+                        alias = type;
+                    }
+
+                    if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(alias)) {
                         continue;
                     }
 
                     TypeSpec.Builder builder = TypeSpec.interfaceBuilder(alias)
                             .addModifiers(Modifier.PUBLIC);
 
-                    if (!alias.equals(type)) {
-                        computed.entrySet().stream()
-                                .filter(e -> (e.getValue() != null ? normalizeName(e.getValue().predicate()) : e.getKey()).equals(type))
-                                .map(e -> ClassName.get(packageName, type))
-                                .forEach(builder::addSuperinterface);
-                    }
+                    String alias0 = alias;
+                    Set<ClassName> superTypes = typeTree.get(type).stream()
+                            .map(t -> normalizeName(t.type()))
+                            .filter(s -> !s.equals(alias0))
+                            .map(t -> ClassName.get(packageName, t))
+                            .collect(Collectors.toSet());
+
+                    builder.addSuperinterfaces(superTypes);
 
                     builder.addSuperinterface(TlObject.class);
                     builder.addAnnotation(AnnotationSpec.builder(Value.Immutable.class).build());
@@ -232,8 +229,6 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addCode("return ID;")
                             .build());
 
-                    // object attributes
-
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
 
@@ -242,9 +237,20 @@ public class SchemaGenerator extends AbstractProcessor {
                             continue;
                         }
 
+                        TypeName paramType = mapType(param.type());
+
+                        boolean optionalInExt = typeTree.get(type).stream()
+                                .flatMap(c -> c.params().stream())
+                                .anyMatch(p -> p.type().startsWith("flags.") &&
+                                        p.name().equals(param.name()));
+
+                        if (optionalInExt || type.equals("JSONValue") && param.name().equals("value")) {
+                            paramType = paramType.box();
+                        }
+
                         MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
                                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                .returns(mapType(param.type()));
+                                .returns(paramType);
 
                         if (param.type().startsWith("flags.")) {
                             attribute.addAnnotation(Nullable.class);
@@ -310,10 +316,19 @@ public class SchemaGenerator extends AbstractProcessor {
                 for (TlConstructor constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
                     String alias = normalizeName(constructor.predicate());
+
+                    boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
+
+                    if (type.equalsIgnoreCase(alias) && multiple) {
+                        alias = "Base" + alias;
+                    }else if (!multiple) {
+                        alias = type;
+                    }
+
                     String methodName = "serialize" + alias;
-                    if (ignoredTypes.contains(type.toLowerCase()) || ignoredTypes.contains(alias.toLowerCase()) ||
-                            serializer.methodSpecs.stream()
-                                    .anyMatch(spec -> spec.name.equals(methodName))) {
+
+                    if (ignoredTypes.contains(type.toLowerCase()) ||
+                            serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
                         continue;
                     }
 
@@ -337,7 +352,14 @@ public class SchemaGenerator extends AbstractProcessor {
                     serializerMethodBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
 
                     for (TlParam param : attributes) {
-                        String paramType = normalizeName(param.type()).toLowerCase();
+                        String paramType = normalizeName(param.type());
+
+                        boolean multipleParam = typeTree.getOrDefault(paramType, Collections.emptyList()).size() > 1;
+                        if (multipleParam) {
+                            paramType = "base" + paramType;
+                        }
+
+                        paramType = paramType.toLowerCase();
                         String paramName = formatFieldName(param.name());
 
                         String wrapping = "payload.$L()";
@@ -388,6 +410,9 @@ public class SchemaGenerator extends AbstractProcessor {
                                         case "bytes":
                                             specific = "Bytes";
                                             break;
+                                        case "string":
+                                            specific = "String";
+                                            break;
                                     }
                                     wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
                                 } else {
@@ -417,6 +442,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
                                     "calculateFlags", "serializeBytesVector",
                                     "serializeFlags", "serializeIntVector", "serializeLongVector",
+                                    "serializeStringVector",
                                     "serializeVector", "writeString")
                             .indent(INDENT)
                             .build()
@@ -452,8 +478,7 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     private static String normalizeName(String type) {
-        Matcher flag = FLAG_PATTERN.matcher(type);
-        if (flag.matches()) {
+        if (FLAG_PATTERN.matcher(type).matches() || VECTOR_PATTERN.matcher(type).matches()) {
             return type;
         }
 
@@ -547,6 +572,22 @@ public class SchemaGenerator extends AbstractProcessor {
         int position = Integer.parseInt(matcher.group(1));
         TypeName type = mapType(matcher.group(2));
         return new Flag(position, param.name(), type);
+    }
+
+    // java 9
+    public static <T, U, A, R> Collector<T, ?, R> flatMapping(Function<? super T, ? extends Stream<? extends U>> mapper,
+                                                              Collector<? super U, A, R> downstream) {
+        BiConsumer<A, ? super U> downstreamAccumulator = downstream.accumulator();
+        return Collector.of(downstream.supplier(),
+                (r, t) -> {
+                    try (Stream<? extends U> result = mapper.apply(t)) {
+                        if (result != null) {
+                            result.sequential().forEach(u -> downstreamAccumulator.accept(r, u));
+                        }
+                    }
+                },
+                downstream.combiner(), downstream.finisher(),
+                downstream.characteristics().toArray(new Collector.Characteristics[0]));
     }
 
     static class Flag {
