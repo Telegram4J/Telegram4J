@@ -222,6 +222,12 @@ public class SchemaGenerator extends AbstractProcessor {
                             .initializer("0x" + Integer.toHexString(constructor.id()))
                             .build());
 
+                    builder.addMethod(MethodSpec.methodBuilder("builder")
+                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                            .returns(ClassName.get(packageName, "Immutable" + alias, "Builder"))
+                            .addCode("return Immutable$L.builder();", alias)
+                            .build());
+
                     builder.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
                             .returns(TypeName.INT)
