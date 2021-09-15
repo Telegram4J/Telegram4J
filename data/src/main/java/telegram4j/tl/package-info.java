@@ -11,9 +11,8 @@
 )
 @NonNullApi
 @MetaEncodingEnabled
-package telegram4j.tl.mtproto;
+package telegram4j.tl;
 
 import org.immutables.value.Value;
 import reactor.util.annotation.NonNullApi;
 import telegram4j.json.encoding.MetaEncodingEnabled;
-import telegram4j.tl.GenerateSchema;

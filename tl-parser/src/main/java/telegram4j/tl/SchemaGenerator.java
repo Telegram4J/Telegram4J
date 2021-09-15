@@ -42,6 +42,7 @@ public class SchemaGenerator extends AbstractProcessor {
     private static final int STAGE_GENERAL_SUPERCLASSES = 0x1;
     private static final int STAGE_TYPES = 0x2;
     private static final int STAGE_SERIALIZER = 0x4;
+    private static final int STAGE_DESERIALIZER = 0x8;
 
     private static final List<String> ignoredTypes = Collections.unmodifiableList(Arrays.asList(
             "bool", "true", "false", "null", "int", "long",
@@ -63,7 +64,7 @@ public class SchemaGenerator extends AbstractProcessor {
     private Types types;
     private Trees trees;
     private Symbol.PackageSymbol currentElement;
-    private int progress = 0x7;
+    private int progress = 0xf;
 
     private TlSchema schema;
     private Map<String, List<TlConstructor>> typeTree = new HashMap<>();
@@ -123,9 +124,9 @@ public class SchemaGenerator extends AbstractProcessor {
                         .filter(e -> e.getValue().size() > 1)
                         .collect(Collectors.groupingBy(Map.Entry::getKey,
                                 flatMapping(e -> e.getValue().stream()
-                                        .flatMap(c -> c.params().stream())
-                                        .filter(p -> e.getValue().stream()
-                                                .allMatch(c -> c.params().contains(p))),
+                                                .flatMap(c -> c.params().stream())
+                                                .filter(p -> e.getValue().stream()
+                                                        .allMatch(c -> c.params().contains(p))),
                                         Collectors.toCollection(LinkedHashSet::new))));
 
                 for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
@@ -177,7 +178,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 }
 
                 progress &= ~STAGE_GENERAL_SUPERCLASSES;
-                return false;
             }
 
             // generate types
@@ -308,7 +308,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
                         .returns(ByteBuf.class)
                         .addTypeVariable(generalType)
-                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                         .addParameters(Arrays.asList(
                                 ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
                                 ParameterSpec.builder(generalType, "payload").build()));
@@ -323,7 +323,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
                     if (type.equalsIgnoreCase(alias) && multiple) {
                         alias = "Base" + alias;
-                    }else if (!multiple) {
+                    } else if (!multiple) {
                         alias = type;
                     }
 
@@ -337,8 +337,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     serializeMethod.addCode("case $L: return $L(allocator, ($L) payload);\n",
                             "0x" + Integer.toHexString(constructor.id()),
                             methodName, alias);
-
-                    // object attributes
 
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
@@ -450,8 +448,110 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 writeTo(file);
 
-                progress &= ~STAGE_TYPES;
+                progress &= ~STAGE_SERIALIZER;
                 return false;
+            }
+
+            if ((progress & STAGE_DESERIALIZER) != 0) {
+                MethodSpec privateConstructor = MethodSpec.constructorBuilder()
+                        .addModifiers(Modifier.PRIVATE)
+                        .build();
+
+                TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
+                        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                        .addMethod(privateConstructor);
+
+                TypeVariableName generalType = TypeVariableName.get("T", TlSerializable.class);
+
+                MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("deserialize")
+                        .returns(generalType)
+                        .addTypeVariable(generalType)
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
+
+                serializeMethod.addStatement("int identifier = payload.readIntLE()");
+                serializeMethod.beginControlFlow("switch (identifier)");
+
+                for (TlConstructor constructor : schema.constructors()) {
+                    String type = normalizeName(constructor.type());
+                    String alias = normalizeName(constructor.predicate());
+
+                    boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
+
+                    if (type.equalsIgnoreCase(alias) && multiple) {
+                        alias = "Base" + alias;
+                    } else if (!multiple) {
+                        alias = type;
+                    }
+
+                    String methodName = "deserialize" + alias;
+
+                    if (ignoredTypes.contains(type.toLowerCase()) ||
+                            deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                        continue;
+                    }
+
+                    serializeMethod.addCode("case $L: return (T) $L(payload);\n",
+                            "0x" + Integer.toHexString(constructor.id()), methodName);
+
+                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+                    collectAttributesRecursive(type, attributes);
+
+                    ClassName typeName = ClassName.get(packageName, alias);
+                    MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
+                            .returns(typeName)
+                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                            .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
+
+                    boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
+                    if (withFlags) {
+                        ClassName builder = ClassName.get(packageName, "Immutable" + alias, "Builder");
+                        deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
+                    } else {
+                        deserializerBuilder.addCode("return $T.builder()", typeName);
+                    }
+
+                    for (TlParam param : attributes) {
+                        String paramType = normalizeName(param.type());
+
+                        boolean multipleParam = typeTree.getOrDefault(paramType, Collections.emptyList()).size() > 1;
+                        if (multipleParam) {
+                            paramType = "base" + paramType;
+                        }
+
+                        String paramName = formatFieldName(param.name());
+                        if (paramType.equals("#")) {
+                            deserializerBuilder.addCode(";\n");
+                            deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
+                            deserializerBuilder.addCode("return builder");
+                        }
+
+                        String unwrapping = deserializeMethod(paramType);
+                        if (unwrapping != null) {
+                            deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
+                        }
+                    }
+                    deserializerBuilder.addCode("\n\t\t.build();");
+                    deserializer.addMethod(deserializerBuilder.build());
+                }
+
+                serializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + identifier);\n");
+                serializeMethod.endControlFlow();
+                deserializer.addMethod(serializeMethod.build());
+
+                JavaFile file = JavaFile.builder(packageName, deserializer.build())
+                        .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
+                                "deserializeBytesVector",
+                                "deserializeIntVector", "deserializeLongVector",
+                                "deserializeStringVector",
+                                "deserializeVector", "readString",
+                                "readBytes")
+                        .indent(INDENT)
+                        .build();
+
+                writeTo(file);
+
+                progress &= ~STAGE_DESERIALIZER;
             }
         } catch (Throwable t) {
             t.printStackTrace();
@@ -576,14 +676,65 @@ public class SchemaGenerator extends AbstractProcessor {
         }
 
         int position = Integer.parseInt(matcher.group(1));
-        TypeName type = parseType(matcher.group(2));
-        return new Flag(position, param.name(), type);
+        String typeRaw = matcher.group(2);
+        TypeName type = parseType(typeRaw);
+        return new Flag(position, param.name(), type, typeRaw);
     }
 
     private void writeTo(JavaFile file) {
         try {
             file.writeTo(filer);
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Nullable
+    private String deserializeMethod(String type) {
+        switch (type.toLowerCase()) {
+            case "true": return "payload.readBoolean() ? TlTrue.INSTANCE : null";
+            case "bool": return "payload.readBoolean()";
+            case "int": return "payload.readIntLE()";
+            case "long": return "payload.readLongLE()";
+            case "double": return "payload.readDouble()";
+            case "bytes": return "readBytes(payload)";
+            case "string": return "readString(payload)";
+            default:
+                if (type.equals("#")) {
+                    return null;
+                }
+
+                if (type.startsWith("flags.")) {
+                    Matcher matcher = FLAG_PATTERN.matcher(type);
+                    matcher.matches();
+                    int position = Integer.parseInt(matcher.group(1));
+                    String typeRaw = matcher.group(2);
+
+                    String innerMethod = deserializeMethod(typeRaw);
+                    return "(flags & " + (int) Math.pow(2, position) + ") != 0 ? " + innerMethod + " : null";
+                }
+
+                Matcher vector = VECTOR_PATTERN.matcher(type);
+                if (vector.matches()) {
+                    String innerType = vector.group(1);
+                    String specific = "";
+                    switch (innerType.toLowerCase()) {
+                        case "int":
+                            specific = "Int";
+                            break;
+                        case "long":
+                            specific = "Long";
+                            break;
+                        case "bytes":
+                            specific = "Bytes";
+                            break;
+                        case "string":
+                            specific = "String";
+                            break;
+                    }
+                    return "deserialize" + specific + "Vector(payload)";
+                }
+                return "deserialize(payload)";
+        }
     }
 
     // java 9
@@ -606,11 +757,13 @@ public class SchemaGenerator extends AbstractProcessor {
         private final int position;
         private final String name;
         private final TypeName type;
+        private final String typeRaw;
 
-        Flag(int position, String name, TypeName type) {
+        Flag(int position, String name, TypeName type, String typeRaw) {
             this.position = position;
             this.name = name;
             this.type = type;
+            this.typeRaw = typeRaw;
         }
 
         @Override
@@ -618,12 +771,15 @@ public class SchemaGenerator extends AbstractProcessor {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Flag flag = (Flag) o;
-            return position == flag.position && name.equals(flag.name) && type.equals(flag.type);
+            return position == flag.position
+                    && name.equals(flag.name)
+                    && type.equals(flag.type)
+                    && typeRaw.equals(flag.typeRaw);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(position, name, type);
+            return Objects.hash(position, name, type, typeRaw);
         }
 
         @Override
@@ -632,6 +788,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     "position=" + position +
                     ", name='" + name + '\'' +
                     ", type=" + type +
+                    ", typeRaw='" + typeRaw + '\'' +
                     '}';
         }
     }
