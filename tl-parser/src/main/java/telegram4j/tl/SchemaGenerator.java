@@ -15,9 +15,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
 import reactor.util.annotation.Nullable;
-import telegram4j.json.api.tl.TlObject;
-import telegram4j.json.api.tl.TlSerializable;
-import telegram4j.json.api.tl.TlTrue;
 import telegram4j.tl.model.TlConstructor;
 import telegram4j.tl.model.TlParam;
 import telegram4j.tl.model.TlSchema;
@@ -147,7 +144,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             continue;
                         }
 
-                        TypeName paramType = mapType(param.type());
+                        TypeName paramType = parseType(param.type());
                         if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
                             paramType = TypeName.OBJECT;
                         }
@@ -172,10 +169,11 @@ public class SchemaGenerator extends AbstractProcessor {
                         superType.addMethod(attribute.build());
                     }
 
-                    JavaFile.builder(packageName, superType.build())
+                    JavaFile file = JavaFile.builder(packageName, superType.build())
                             .indent(INDENT)
-                            .build()
-                            .writeTo(filer);
+                            .build();
+
+                    writeTo(file);
                 }
 
                 progress &= ~STAGE_GENERAL_SUPERCLASSES;
@@ -243,7 +241,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             continue;
                         }
 
-                        TypeName paramType = mapType(param.type());
+                        TypeName paramType = parseType(param.type());
 
                         boolean optionalInExt = typeTree.get(type).stream()
                                 .flatMap(c -> c.params().stream())
@@ -265,13 +263,11 @@ public class SchemaGenerator extends AbstractProcessor {
                         builder.addMethod(attribute.build());
                     }
 
-                    try {
-                        JavaFile.builder(packageName, builder.build())
-                                .indent(INDENT)
-                                .build()
-                                .writeTo(filer);
-                    } catch (Throwable ignored) {
-                    }
+                    JavaFile file = JavaFile.builder(packageName, builder.build())
+                            .indent(INDENT)
+                            .build();
+
+                    writeTo(file);
 
                     computed.put(alias, constructor);
                 }
@@ -352,7 +348,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameters(Arrays.asList(
                                     ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(mapType(alias), "payload").build()));
+                                    ParameterSpec.builder(parseType(alias), "payload").build()));
 
                     serializerMethodBuilder.addCode("return allocator.buffer()\n");
                     serializerMethodBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
@@ -443,20 +439,19 @@ public class SchemaGenerator extends AbstractProcessor {
                 serializeMethod.endControlFlow();
                 serializer.addMethod(serializeMethod.build());
 
-                try {
-                    JavaFile.builder(packageName, serializer.build())
-                            .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                    "calculateFlags", "serializeBytesVector",
-                                    "serializeFlags", "serializeIntVector", "serializeLongVector",
-                                    "serializeStringVector",
-                                    "serializeVector", "writeString")
-                            .indent(INDENT)
-                            .build()
-                            .writeTo(filer);
-                } catch (Throwable ignored) {
-                }
+                JavaFile file = JavaFile.builder(packageName, serializer.build())
+                        .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
+                                "calculateFlags", "serializeBytesVector",
+                                "serializeFlags", "serializeIntVector", "serializeLongVector",
+                                "serializeStringVector",
+                                "serializeVector", "writeString")
+                        .indent(INDENT)
+                        .build();
+
+                writeTo(file);
 
                 progress &= ~STAGE_TYPES;
+                return false;
             }
         } catch (Throwable t) {
             t.printStackTrace();
@@ -509,6 +504,11 @@ public class SchemaGenerator extends AbstractProcessor {
     private static String formatFieldName(String type) {
         type = camelize(type);
 
+        char f = type.charAt(0);
+        if (Character.isUpperCase(f)) {
+            type = Character.toLowerCase(f) + type.substring(1);
+        }
+
         // keyword handling
         if (!SourceVersion.isName(type)) {
             type += "State";
@@ -517,7 +517,7 @@ public class SchemaGenerator extends AbstractProcessor {
         return type;
     }
 
-    private TypeName mapType(String type) {
+    private TypeName parseType(String type) {
         if (type.equalsIgnoreCase("int")) {
             return TypeName.INT;
         }
@@ -541,14 +541,14 @@ public class SchemaGenerator extends AbstractProcessor {
         }
         Matcher flag = FLAG_PATTERN.matcher(type);
         if (flag.matches()) {
-            TypeName innerType = mapType(flag.group(2));
+            TypeName innerType = parseType(flag.group(2));
             return innerType.box();
         }
 
         Matcher vector = VECTOR_PATTERN.matcher(type);
         if (vector.matches()) {
             String template = normalizeName(vector.group(1));
-            TypeName templateType = mapType(template);
+            TypeName templateType = parseType(template);
             return ParameterizedTypeName.get(LIST_CLASS_NAME, templateType.box());
         }
 
@@ -576,8 +576,14 @@ public class SchemaGenerator extends AbstractProcessor {
         }
 
         int position = Integer.parseInt(matcher.group(1));
-        TypeName type = mapType(matcher.group(2));
+        TypeName type = parseType(matcher.group(2));
         return new Flag(position, param.name(), type);
+    }
+
+    private void writeTo(JavaFile file) {
+        try {
+            file.writeTo(filer);
+        } catch (Throwable ignored) {}
     }
 
     // java 9

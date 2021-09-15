@@ -1,4 +1,4 @@
-package telegram4j.json.api.tl;
+package telegram4j.tl;
 
 public final class TlTrue implements TlObject {
     public static final int ID = 0x3fedd339;

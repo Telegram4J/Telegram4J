@@ -1,7 +1,7 @@
 package telegram4j.tl.mtproto.authkey;
 
 import org.immutables.value.Value;
-import telegram4j.json.api.tl.TlObject;
+import telegram4j.tl.TlObject;
 
 @Value.Immutable
 public interface PqInnerData extends TlObject {

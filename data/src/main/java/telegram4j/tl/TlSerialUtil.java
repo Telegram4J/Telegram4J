@@ -4,9 +4,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.EmptyByteBuf;
 import reactor.util.annotation.Nullable;
-import telegram4j.json.api.tl.TlObject;
-import telegram4j.json.api.tl.TlSerializable;
-import telegram4j.json.api.tl.TlTrue;
 import telegram4j.tl.mtproto.TlSerializer;
 
 import java.nio.charset.StandardCharsets;
