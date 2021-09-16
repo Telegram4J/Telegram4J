@@ -14,16 +14,18 @@ public final class TlSerialUtil {
     private static final ByteBuf EMPTY_BUFFER = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
 
     public static final int VECTOR_ID = 0x1cb5c415;
+    public static final int BOOL_TRUE_ID = 0x997275b5;
+    public static final int BOOL_FALSE_ID = 0xbc799737;
 
     private TlSerialUtil() {
     }
 
     public static byte[] readBytes(ByteBuf buf) {
-        int length = buf.readIntLE();
+        int length = buf.readUnsignedByte();
         if (length == 0xfe) {
-            length = buf.readIntLE() |
-                    buf.readIntLE() << 8 |
-                    buf.readIntLE() << 16;
+            length = buf.readByte() +
+                    buf.readByte() << 8 +
+                    buf.readByte() << 16;
         }
 
         byte[] bytes = new byte[length];
@@ -40,18 +42,23 @@ public final class TlSerialUtil {
     }
 
     public static ByteBuf writeString(ByteBufAllocator allocator, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        int capacity = (bytes.length <= 0xfd ? Integer.BYTES : Integer.BYTES * 4) + bytes.length;
-        capacity += Math.ceil(capacity / 4f) * 4;
+        return writeString(allocator, value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    public static ByteBuf writeString(ByteBufAllocator allocator, byte[] bytes) {
+        int capacity = (bytes.length <= 0xfd ? Byte.BYTES : Byte.BYTES * 4) + bytes.length;
+        if (capacity % 4 != 0) {
+            capacity = (int) (Math.ceil(capacity / 4f) * 4);
+        }
 
         ByteBuf buf = allocator.buffer(capacity);
         if (bytes.length <= 0xfd) {
-            buf.writeIntLE(bytes.length);
+            buf.writeByte(bytes.length);
         } else {
-            buf.writeIntLE(0xfe);
-            buf.writeIntLE(bytes.length & 0xff);
-            buf.writeIntLE(bytes.length & 0xff00 >> 8);
-            buf.writeIntLE(bytes.length & 0xff0000 >> 16);
+            buf.writeByte(0xfe);
+            buf.writeByte(bytes.length & 0xff);
+            buf.writeByte((bytes.length & 0xff00) >> 8);
+            buf.writeByte((bytes.length & 0xff0000) >> 16);
         }
 
         buf.writeBytes(bytes);
@@ -207,11 +214,5 @@ public final class TlSerialUtil {
             flags |= optional != null ? 1 : 0;
         }
         return flags;
-    }
-
-    public static byte[] readBytes(ByteBuf buf, int length) {
-        byte[] bytes = new byte[length];
-        buf.readBytes(bytes);
-        return bytes;
     }
 }

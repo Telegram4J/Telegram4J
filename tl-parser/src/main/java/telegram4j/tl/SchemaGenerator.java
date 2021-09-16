@@ -226,15 +226,23 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addCode("return Immutable$L.builder();", alias)
                             .build());
 
+                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+                    collectAttributesRecursive(type, attributes);
+
+                    if (attributes.stream().allMatch(p -> p.type().startsWith("flags."))) {
+                        builder.addMethod(MethodSpec.methodBuilder("instance")
+                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                                .returns(ClassName.get(packageName, "Immutable" + alias))
+                                .addCode("return Immutable$L.of(ID);", alias)
+                                .build());
+                    }
+
                     builder.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
                             .returns(TypeName.INT)
                             .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
                             .addCode("return ID;")
                             .build());
-
-                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
-                    collectAttributesRecursive(type, attributes);
 
                     for (TlParam param : attributes) {
                         if (param.type().equals("#")) {
@@ -366,11 +374,11 @@ public class SchemaGenerator extends AbstractProcessor {
                         String method;
                         switch (paramType) {
                             case "true":
-                                method = "writeByte";
-                                wrapping = "payload.$L().asByte()";
+                                method = null;
                                 break;
                             case "bool":
-                                method = "writeBoolean";
+                                method = "writeIntLE";
+                                wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
                                 break;
                             case "#":
                                 wrapping = attributes.stream()
@@ -389,8 +397,8 @@ public class SchemaGenerator extends AbstractProcessor {
                                 method = "writeDoubleLE";
                                 break;
                             case "string":
-                                wrapping = "writeString(allocator, payload.$L())";
                             case "bytes":
+                                wrapping = "writeString(allocator, payload.$L())";
                                 method = "writeBytes";
                                 break;
                             default:
@@ -422,10 +430,12 @@ public class SchemaGenerator extends AbstractProcessor {
                                 method = "writeBytes";
                         }
 
-                        if (paramType.equals("#")) {
-                            serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
-                        } else {
-                            serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
+                        if (method != null) {
+                            if (paramType.equals("#")) {
+                                serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
+                            } else {
+                                serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
+                            }
                         }
                     }
                     serializerMethodBuilder.addCode(";");
@@ -441,8 +451,8 @@ public class SchemaGenerator extends AbstractProcessor {
                         .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
                                 "calculateFlags", "serializeBytesVector",
                                 "serializeFlags", "serializeIntVector", "serializeLongVector",
-                                "serializeStringVector",
-                                "serializeVector", "writeString")
+                                "serializeStringVector", "serializeVector", "writeString",
+                                "BOOL_TRUE_ID", "BOOL_FALSE_ID")
                         .indent(INDENT)
                         .build();
 
@@ -545,7 +555,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                 "deserializeIntVector", "deserializeLongVector",
                                 "deserializeStringVector",
                                 "deserializeVector", "readString",
-                                "readBytes")
+                                "readBytes", "BOOL_TRUE_ID", "BOOL_FALSE_ID")
                         .indent(INDENT)
                         .build();
 
@@ -691,8 +701,8 @@ public class SchemaGenerator extends AbstractProcessor {
     @Nullable
     private String deserializeMethod(String type) {
         switch (type.toLowerCase()) {
-            case "true": return "payload.readBoolean() ? TlTrue.INSTANCE : null";
-            case "bool": return "payload.readBoolean()";
+            case "true": return "TlTrue.INSTANCE";
+            case "bool": return "payload.readIntLE() == BOOL_TRUE_ID";
             case "int": return "payload.readIntLE()";
             case "long": return "payload.readLongLE()";
             case "double": return "payload.readDouble()";
