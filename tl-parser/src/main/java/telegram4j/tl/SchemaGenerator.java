@@ -555,21 +555,30 @@ public class SchemaGenerator extends AbstractProcessor {
                 for (TlMethod method : schema.methods()) {
                     String name = normalizeName(method.method());
                     String methodName = "serialize" + name;
+                    boolean generic = !method.method().contains(".");
+                    ClassName typeRaw = ClassName.get(packageName, name);
+                    TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(TlObject.class)) : typeRaw;
 
                     if (serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
                         continue;
                     }
 
-                    serializeMethod.addCode("case $L: return $L(allocator, ($L) payload);\n",
+                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
                             "0x" + Integer.toHexString(method.id()),
-                            methodName, name);
+                            methodName, type);
 
+                    ClassName payloadName = ClassName.get(packageName, name);
+                    TypeName payloadType = generic ? ParameterizedTypeName.get(payloadName, genericTypeRef) : parseType(name);
                     MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
                             .returns(ByteBuf.class)
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameters(Arrays.asList(
                                     ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(parseType(name), "payload").build()));
+                                    ParameterSpec.builder(payloadType, "payload").build()));
+
+                    if (generic) {
+                        serializerBuilder.addTypeVariable(genericType);
+                    }
 
                     serializerBuilder.addCode("return allocator.buffer()\n");
                     serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
