@@ -1,6 +1,5 @@
 package telegram4j.tl;
 
-public interface TlMethod extends TlObject, TlSerializable {
+public interface TlMethod<T> extends TlObject, TlSerializable {
 
-    int getResponseId();
 }
