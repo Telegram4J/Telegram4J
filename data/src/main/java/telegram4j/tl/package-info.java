@@ -6,8 +6,7 @@
         depluralize = true,
         jdkOnly = true,
         allParameters = true,
-        defaultAsDefault = true,
-        attributelessSingleton = true
+        defaultAsDefault = true
 )
 @NonNullApi
 @MetaEncodingEnabled

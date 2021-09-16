@@ -212,7 +212,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     builder.addSuperinterfaces(superTypes);
 
                     builder.addSuperinterface(TlObject.class);
-                    builder.addAnnotation(AnnotationSpec.builder(Value.Immutable.class).build());
 
                     // override #getId() method
                     builder.addField(FieldSpec.builder(TypeName.INT, "ID",
@@ -229,13 +228,18 @@ public class SchemaGenerator extends AbstractProcessor {
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
 
-                    if (attributes.stream().allMatch(p -> p.type().startsWith("flags."))) {
+                    boolean optional = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
+                    AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
+                    if (optional) {
+                        value.addMember("singleton", "true");
+
                         builder.addMethod(MethodSpec.methodBuilder("instance")
                                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                                 .returns(ClassName.get(packageName, "Immutable" + alias))
-                                .addCode("return Immutable$L.of(ID);", alias)
+                                .addCode("return Immutable$L.of();", alias)
                                 .build());
                     }
+                    builder.addAnnotation(value.build());
 
                     builder.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
