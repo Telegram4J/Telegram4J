@@ -388,9 +388,9 @@ public class SchemaGenerator extends AbstractProcessor {
                                 wrapping = attributes.stream()
                                         .filter(p -> p.type().startsWith("flags."))
                                         .map(this::parseFlag)
-                                        .sorted(Comparator.comparingInt(f -> f.position))
-                                        .map(f -> "payload." + formatFieldName(f.name) + "()")
-                                        .collect(Collectors.joining(", ", "calculateFlags(", ")"));
+                                        .map(f -> "(payload." + formatFieldName(f.name) +
+                                                "() != null ? 1 : 0) << " + f.position)
+                                        .collect(Collectors.joining(" | "));
                             case "int":
                                 method = "writeIntLE";
                                 break;
@@ -453,10 +453,10 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 JavaFile file = JavaFile.builder(packageName, serializer.build())
                         .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                "calculateFlags", "serializeBytesVector",
-                                "serializeFlags", "serializeIntVector", "serializeLongVector",
-                                "serializeStringVector", "serializeVector", "writeString",
-                                "BOOL_TRUE_ID", "BOOL_FALSE_ID")
+                                "BOOL_FALSE_ID", "BOOL_TRUE_ID",
+                                "serializeBytesVector", "serializeFlags",
+                                "serializeIntVector", "serializeLongVector", "serializeStringVector",
+                                "serializeVector", "writeString")
                         .indent(INDENT)
                         .build();
 
@@ -522,7 +522,11 @@ public class SchemaGenerator extends AbstractProcessor {
                         ClassName builder = ClassName.get(packageName, "Immutable" + alias, "Builder");
                         deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
                     } else {
-                        deserializerBuilder.addCode("return $T.builder()", typeName);
+                        if (attributes.isEmpty()) {
+                            deserializerBuilder.addCode("return $T.instance();", typeName);
+                        } else {
+                            deserializerBuilder.addCode("return $T.builder()", typeName);
+                        }
                     }
 
                     for (TlParam param : attributes) {
@@ -545,7 +549,9 @@ public class SchemaGenerator extends AbstractProcessor {
                             deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
                         }
                     }
-                    deserializerBuilder.addCode("\n\t\t.build();");
+                    if (!attributes.isEmpty()) {
+                        deserializerBuilder.addCode("\n\t\t.build();");
+                    }
                     deserializer.addMethod(deserializerBuilder.build());
                 }
 
@@ -555,11 +561,11 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 JavaFile file = JavaFile.builder(packageName, deserializer.build())
                         .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                "deserializeBytesVector",
-                                "deserializeIntVector", "deserializeLongVector",
-                                "deserializeStringVector",
-                                "deserializeVector", "readString",
-                                "readBytes", "BOOL_TRUE_ID", "BOOL_FALSE_ID")
+                                "BOOL_FALSE_ID",
+                                "BOOL_TRUE_ID", "deserializeBytesVector",
+                                "deserializeIntVector",
+                                "deserializeLongVector", "deserializeStringVector",
+                                "deserializeVector", "readBytes", "readString")
                         .indent(INDENT)
                         .build();
 

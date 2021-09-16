@@ -207,12 +207,4 @@ public final class TlSerialUtil {
             throw new IllegalArgumentException("Incorrect TL serializable type: " + value + " (" + value.getClass() + ")");
         }
     }
-
-    public static int calculateFlags(Object... optionals) {
-        int flags = 0;
-        for (Object optional : optionals) {
-            flags |= optional != null ? 1 : 0;
-        }
-        return flags;
-    }
 }
