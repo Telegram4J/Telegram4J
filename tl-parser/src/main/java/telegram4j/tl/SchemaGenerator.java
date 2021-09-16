@@ -408,6 +408,10 @@ public class SchemaGenerator extends AbstractProcessor {
                             default:
                                 Matcher vector = VECTOR_PATTERN.matcher(paramType);
                                 if (paramType.startsWith("flags.")) {
+                                    if (paramType.endsWith("true")) {
+                                        method = null;
+                                        break;
+                                    }
                                     wrapping = "serializeFlags(allocator, payload.$L())";
                                 } else if (vector.matches()) {
                                     String innerType = vector.group(1);
