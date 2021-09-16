@@ -67,7 +67,7 @@ public class SchemaGenerator extends AbstractProcessor {
     private int progress = 0xf;
 
     private TlSchema schema;
-    private Map<String, List<TlConstructor>> typeTree = new HashMap<>();
+    private Map<String, List<TlConstructor>> typeTree;
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
@@ -189,9 +189,10 @@ public class SchemaGenerator extends AbstractProcessor {
 
                     boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
 
-                    if (type.equalsIgnoreCase(alias) && multiple) { // e.g. SecureValueError
+                    // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
+                    if (type.equalsIgnoreCase(alias) && multiple) {
                         alias = "Base" + alias;
-                    } else if (!multiple) {
+                    } else if (!multiple) { // use type name if this object type is singleton
                         alias = type;
                     }
 
@@ -633,7 +634,8 @@ public class SchemaGenerator extends AbstractProcessor {
             type = Character.toLowerCase(f) + type.substring(1);
         }
 
-        // keyword handling
+        // This is a strange and in some places illogical problem
+        // solution of matching attribute names with java keywords
         if (!SourceVersion.isName(type)) {
             type += "State";
         }
@@ -700,9 +702,8 @@ public class SchemaGenerator extends AbstractProcessor {
         }
 
         int position = Integer.parseInt(matcher.group(1));
-        String typeRaw = matcher.group(2);
-        TypeName type = parseType(typeRaw);
-        return new Flag(position, param.name(), type, typeRaw);
+        TypeName type = parseType(matcher.group(2));
+        return new Flag(position, param.name(), type);
     }
 
     private void writeTo(JavaFile file) {
@@ -781,13 +782,11 @@ public class SchemaGenerator extends AbstractProcessor {
         private final int position;
         private final String name;
         private final TypeName type;
-        private final String typeRaw;
 
-        Flag(int position, String name, TypeName type, String typeRaw) {
+        Flag(int position, String name, TypeName type) {
             this.position = position;
             this.name = name;
             this.type = type;
-            this.typeRaw = typeRaw;
         }
 
         @Override
@@ -797,13 +796,12 @@ public class SchemaGenerator extends AbstractProcessor {
             Flag flag = (Flag) o;
             return position == flag.position
                     && name.equals(flag.name)
-                    && type.equals(flag.type)
-                    && typeRaw.equals(flag.typeRaw);
+                    && type.equals(flag.type);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(position, name, type, typeRaw);
+            return Objects.hash(position, name, type);
         }
 
         @Override
@@ -812,7 +810,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     "position=" + position +
                     ", name='" + name + '\'' +
                     ", type=" + type +
-                    ", typeRaw='" + typeRaw + '\'' +
                     '}';
         }
     }
