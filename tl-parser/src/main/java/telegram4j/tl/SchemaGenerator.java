@@ -885,10 +885,9 @@ public class SchemaGenerator extends AbstractProcessor {
         for (int i = 0; i < type.length(); i++) {
             char p = i - 1 != -1 ? type.charAt(i - 1) : Character.MIN_VALUE;
             char c = type.charAt(i);
-            boolean isUpperPrev = Character.isUpperCase(p) && Character.isUpperCase(c);
-            boolean isLowerPrev = Character.isLowerCase(p) && Character.isUpperCase(c);
 
-            if (Character.isLetter(c) && Character.isLetter(p) && (isLowerPrev || isUpperPrev)) {
+            if (Character.isLetter(c) && Character.isLetter(p) &&
+                    Character.isLowerCase(p) && Character.isUpperCase(c)) {
                 buf.append('_');
             }
 
