@@ -1,5 +1,6 @@
 package telegram4j.tl.model;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.immutables.value.Value;
@@ -7,14 +8,14 @@ import org.immutables.value.Value;
 import java.util.List;
 
 @Value.Immutable
-@JsonSerialize(as = ImmutableTlConstructor.class)
-@JsonDeserialize(as = ImmutableTlConstructor.class)
-public interface TlConstructor extends TlModelObject {
+@JsonSerialize(as = ImmutableTlEntityObject.class)
+@JsonDeserialize(as = ImmutableTlEntityObject.class)
+public interface TlEntityObject {
 
-    @Override
     int id();
 
-    String predicate();
+    @JsonAlias({"predicate", "method"})
+    String name();
 
     List<TlParam> params();
 

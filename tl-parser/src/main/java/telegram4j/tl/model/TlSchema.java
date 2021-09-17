@@ -11,7 +11,7 @@ import java.util.List;
 @JsonDeserialize(as = ImmutableTlSchema.class)
 public interface TlSchema {
 
-    List<TlConstructor> constructors();
+    List<TlEntityObject> constructors();
 
-    List<TlMethod> methods();
+    List<TlEntityObject> methods();
 }
