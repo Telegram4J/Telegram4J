@@ -4,11 +4,11 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import reactor.netty.FutureMono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -66,6 +66,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         forCleanup.add(con.getConnection().inbound()
                                 .receive()
+                                .map(ByteBuf::retain)
                                 .doOnNext(buf -> con.getReceiver().emitNext(buf, FAIL_FAST))
                                 .subscribe());
 
@@ -89,15 +90,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public Flux<ByteBuf> receiver() {
-        return currentConnection.getReceiver().asFlux()
+        return connect0().flatMapMany(con -> con.getReceiver().asFlux()
+                .map(ByteBuf::retainedDuplicate)
                 .map(buf -> mtProtoResources.getTransport()
-                        .decode(currentConnection.getConnection()
-                                .channel().alloc(), buf));
+                        .decode(con.getConnection()
+                                .channel().alloc(), buf))
+                .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease));
     }
 
     @Override
     public Mono<Void> onDispose() {
-        return currentConnection.getConnection().onDispose();
+        return connect0().flatMap(con -> con.getConnection().onDispose());
     }
 
     private class MTProtoIdentifierChannelInitializer extends ChannelInitializer<SocketChannel> {
