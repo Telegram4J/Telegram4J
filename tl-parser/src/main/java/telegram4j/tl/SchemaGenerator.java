@@ -133,42 +133,77 @@ public class SchemaGenerator extends AbstractProcessor {
                 for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
                     String name = e.getKey();
                     Set<TlParam> params = e.getValue();
-                    if (computed.containsKey(name) || ignoredTypes.contains(name.toLowerCase())) {
-                        continue;
-                    }
+                    String shortenName = extractEnumName(name);
 
-                    TypeSpec.Builder superType = TypeSpec.interfaceBuilder(name)
-                            .addModifiers(Modifier.PUBLIC)
-                            .addSuperinterface(TlSerializable.class);
+                    boolean canMakeEnum = typeTree.get(name).stream()
+                            .mapToInt(c -> c.params().size()).sum() == 0;
 
-                    for (TlParam param : params) {
-                        if (param.type().equals("#")) {
-                            continue;
+                    TypeSpec.Builder superType = canMakeEnum
+                            ? TypeSpec.enumBuilder(name.endsWith("Type") && !shortenName.endsWith("Type")
+                            ? shortenName + "Type"
+                            : shortenName)
+                            : TypeSpec.interfaceBuilder(name);
+
+                    superType.addModifiers(Modifier.PUBLIC);
+                    if (canMakeEnum) {
+                        superType.addSuperinterface(TlObject.class);
+
+                        for (TlConstructor constructor : typeTree.get(name)) {
+                            String subtypeName = normalizeName(constructor.predicate());
+                            String constName = screamilize(subtypeName.substring(shortenName.length()));
+
+                            superType.addEnumConstant(constName, TypeSpec.anonymousClassBuilder(
+                                    "$L", "0x" + Integer.toHexString(constructor.id()))
+                                    .build());
+
+                            computed.put(subtypeName, constructor);
                         }
 
-                        TypeName paramType = parseType(param.type());
-                        if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
-                            paramType = TypeName.OBJECT;
+                        superType.addField(int.class, "identifier", Modifier.PRIVATE, Modifier.FINAL);
+
+                        superType.addMethod(MethodSpec.constructorBuilder()
+                                .addParameter(int.class, "identifier")
+                                .addStatement("this.identifier = identifier")
+                                .build());
+
+                        superType.addMethod(MethodSpec.methodBuilder("identifier")
+                                .addAnnotation(Override.class)
+                                .returns(TypeName.INT)
+                                .addModifiers(Modifier.PUBLIC)
+                                .addCode("return identifier;")
+                                .build());
+                    } else {
+                        superType.addSuperinterface(TlSerializable.class);
+
+                        for (TlParam param : params) {
+                            if (param.type().equals("#")) {
+                                continue;
+                            }
+
+                            TypeName paramType = parseType(param.type());
+                            if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
+                                paramType = TypeName.OBJECT;
+                            }
+
+                            boolean optionalInExt = typeTree.get(name).stream()
+                                    .flatMap(c -> c.params().stream())
+                                    .anyMatch(p -> p.type().startsWith("flags.") &&
+                                            p.name().equals(param.name()));
+
+                            if (optionalInExt) {
+                                paramType = paramType.box();
+                            }
+
+                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
+                                    .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                                    .returns(paramType);
+
+                            if (param.type().startsWith("flags.")) {
+                                attribute.addAnnotation(Nullable.class);
+                            }
+
+                            superType.addMethod(attribute.build());
                         }
-
-                        boolean optionalInExt = typeTree.get(name).stream()
-                                .flatMap(c -> c.params().stream())
-                                .anyMatch(p -> p.type().startsWith("flags.") &&
-                                        p.name().equals(param.name()));
-
-                        if (optionalInExt) {
-                            paramType = paramType.box();
-                        }
-
-                        MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
-                                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                .returns(paramType);
-
-                        if (param.type().startsWith("flags.")) {
-                            attribute.addAnnotation(Nullable.class);
-                        }
-
-                        superType.addMethod(attribute.build());
                     }
 
                     JavaFile file = JavaFile.builder(packageName, superType.build())
@@ -185,28 +220,28 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 for (TlConstructor constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
-                    String alias = normalizeName(constructor.predicate());
+                    String name = normalizeName(constructor.predicate());
 
                     boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
 
                     // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
-                    if (type.equalsIgnoreCase(alias) && multiple) {
-                        alias = "Base" + alias;
+                    if (type.equalsIgnoreCase(name) && multiple) {
+                        name = "Base" + name;
                     } else if (!multiple) { // use type name if this object type is singleton
-                        alias = type;
+                        name = type;
                     }
 
-                    if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(alias)) {
+                    if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(name)) {
                         continue;
                     }
 
-                    TypeSpec.Builder builder = TypeSpec.interfaceBuilder(alias)
+                    TypeSpec.Builder builder = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC);
 
-                    String alias0 = alias;
+                    String name0 = name;
                     Set<ClassName> superTypes = typeTree.get(type).stream()
                             .map(t -> normalizeName(t.type()))
-                            .filter(s -> !s.equals(alias0))
+                            .filter(s -> !s.equals(name0))
                             .map(t -> ClassName.get(packageName, t))
                             .collect(Collectors.toSet());
 
@@ -221,8 +256,8 @@ public class SchemaGenerator extends AbstractProcessor {
 
                     builder.addMethod(MethodSpec.methodBuilder("builder")
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .returns(ClassName.get(packageName, "Immutable" + alias, "Builder"))
-                            .addCode("return Immutable$L.builder();", alias)
+                            .returns(ClassName.get(packageName, "Immutable" + name, "Builder"))
+                            .addCode("return Immutable$L.builder();", name)
                             .build());
 
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
@@ -235,8 +270,8 @@ public class SchemaGenerator extends AbstractProcessor {
 
                         builder.addMethod(MethodSpec.methodBuilder("instance")
                                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(ClassName.get(packageName, "Immutable" + alias))
-                                .addCode("return Immutable$L.of();", alias)
+                                .returns(ClassName.get(packageName, "Immutable" + name))
+                                .addCode("return Immutable$L.of();", name)
                                 .build());
                     }
                     builder.addAnnotation(value.build());
@@ -281,11 +316,10 @@ public class SchemaGenerator extends AbstractProcessor {
 
                     writeTo(file);
 
-                    computed.put(alias, constructor);
+                    computed.put(name, constructor);
                 }
 
                 progress &= ~STAGE_TYPES;
-                return false;
             }
 
             // endregion
@@ -318,7 +352,9 @@ public class SchemaGenerator extends AbstractProcessor {
                     ClassName immutableTypeRaw = ClassName.get(packageName, "Immutable" + name);
                     ClassName immutableTypeBuilderRaw = ClassName.get(packageName, "Immutable" + name, "Builder");
                     TypeName immutableType = generic ? ParameterizedTypeName.get(immutableTypeRaw, genericTypeRef) : immutableTypeRaw;
-                    TypeName immutableBuilderType = generic ? ParameterizedTypeName.get(immutableTypeBuilderRaw, genericTypeRef) : immutableTypeBuilderRaw;
+                    TypeName immutableBuilderType = generic
+                            ? ParameterizedTypeName.get(immutableTypeBuilderRaw, genericTypeRef)
+                            : immutableTypeBuilderRaw;
 
                     MethodSpec.Builder builder = MethodSpec.methodBuilder("builder")
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -430,39 +466,49 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 for (TlConstructor constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
-                    String alias = normalizeName(constructor.predicate());
+                    String name = normalizeName(constructor.predicate());
 
                     boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
 
-                    if (type.equalsIgnoreCase(alias) && multiple) {
-                        alias = "Base" + alias;
+                    String shortenName = extractEnumName(type);
+                    boolean canMakeEnum = typeTree.getOrDefault(type, Collections.emptyList()).stream()
+                            .mapToInt(c -> c.params().size()).sum() == 0;
+
+                    if (type.equalsIgnoreCase(name) && multiple) {
+                        name = "Base" + name;
                     } else if (!multiple) {
-                        alias = type;
+                        name = type;
+                    } else if (canMakeEnum) {
+                        name = type.endsWith("Type") && !shortenName.endsWith("Type")
+                                ? shortenName + "Type"
+                                : shortenName;
                     }
 
-                    String methodName = "serialize" + alias;
+                    String methodName = "serialize" + name;
 
                     if (ignoredTypes.contains(type.toLowerCase()) ||
                             serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
                         continue;
                     }
 
-                    serializeMethod.addCode("case $L: return $L(allocator, ($L) payload);\n",
+                    TypeName payloadType = ClassName.get(packageName, name);
+
+                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
                             "0x" + Integer.toHexString(constructor.id()),
-                            methodName, alias);
+                            methodName, payloadType);
 
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
 
-                    MethodSpec.Builder serializerMethodBuilder = MethodSpec.methodBuilder(methodName)
+                    MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
                             .returns(ByteBuf.class)
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameters(Arrays.asList(
                                     ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(parseType(alias), "payload").build()));
+                                    ParameterSpec.builder(payloadType, "payload").build()));
 
-                    serializerMethodBuilder.addCode("return allocator.buffer()\n");
-                    serializerMethodBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
+                    serializerBuilder.addCode("return allocator.buffer()\n");
+                    serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
 
                     for (TlParam param : attributes) {
                         String paramType = normalizeName(param.type());
@@ -541,15 +587,15 @@ public class SchemaGenerator extends AbstractProcessor {
 
                         if (method != null) {
                             if (paramType.equals("#")) {
-                                serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
+                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
                             } else {
-                                serializerMethodBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
+                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
                             }
                         }
                     }
-                    serializerMethodBuilder.addCode(";");
+                    serializerBuilder.addCode(";");
 
-                    serializer.addMethod(serializerMethodBuilder.build());
+                    serializer.addMethod(serializerBuilder.build());
                 }
 
                 for (TlMethod method : schema.methods()) {
@@ -687,7 +733,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 writeTo(file);
 
                 progress &= ~STAGE_SERIALIZER;
-                return false;
             }
 
             if ((progress & STAGE_DESERIALIZER) != 0) {
@@ -712,17 +757,21 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 for (TlConstructor constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
-                    String alias = normalizeName(constructor.predicate());
+                    String name = normalizeName(constructor.predicate());
+
+                    String shortenName = extractEnumName(type);
+                    boolean canMakeEnum = typeTree.getOrDefault(type, Collections.emptyList()).stream()
+                            .mapToInt(c -> c.params().size()).sum() == 0;
 
                     boolean multiple = typeTree.getOrDefault(type, Collections.emptyList()).size() > 1;
 
-                    if (type.equalsIgnoreCase(alias) && multiple) {
-                        alias = "Base" + alias;
+                    if (type.equalsIgnoreCase(name) && multiple) {
+                        name = "Base" + name;
                     } else if (!multiple) {
-                        alias = type;
+                        name = type;
                     }
 
-                    String methodName = "deserialize" + alias;
+                    String methodName = "deserialize" + name;
 
                     if (ignoredTypes.contains(type.toLowerCase()) ||
                             deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
@@ -735,18 +784,25 @@ public class SchemaGenerator extends AbstractProcessor {
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
 
-                    ClassName typeName = ClassName.get(packageName, alias);
+                    ClassName typeName = ClassName.get(packageName, canMakeEnum
+                            ? type.endsWith("Type") && !shortenName.endsWith("Type")
+                            ? shortenName + "Type"
+                            : shortenName : name);
+
                     MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
                             .returns(typeName)
                             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                             .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
 
                     boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
-                    if (withFlags) {
-                        ClassName builder = ClassName.get(packageName, "Immutable" + alias, "Builder");
+                    if (withFlags && !canMakeEnum) {
+                        ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
                         deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
                     } else {
-                        if (attributes.isEmpty()) {
+                        if (canMakeEnum) {
+                            String constName = screamilize(name.substring(shortenName.length()));
+                            deserializerBuilder.addCode("return $T.$L;", typeName, constName);
+                        } else if (attributes.isEmpty()) {
                             deserializerBuilder.addCode("return $T.instance();", typeName);
                         } else {
                             deserializerBuilder.addCode("return $T.builder()", typeName);
@@ -822,6 +878,30 @@ public class SchemaGenerator extends AbstractProcessor {
             }
         }
         return builder.toString();
+    }
+
+    private static String screamilize(String type) {
+        StringBuilder buf = new StringBuilder(type.length());
+        for (int i = 0; i < type.length(); i++) {
+            char p = i - 1 != -1 ? type.charAt(i - 1) : Character.MIN_VALUE;
+            char c = type.charAt(i);
+            boolean isUpperPrev = Character.isUpperCase(p) && Character.isUpperCase(c);
+            boolean isLowerPrev = Character.isLowerCase(p) && Character.isUpperCase(c);
+
+            if (Character.isLetter(c) && Character.isLetter(p) && (isLowerPrev || isUpperPrev)) {
+                buf.append('_');
+            }
+
+            if (c == '.' || c == '-' || c == '_' || Character.isWhitespace(c) &&
+                Character.isLetterOrDigit(p) && i + 1 < type.length() &&
+                Character.isLetterOrDigit(type.charAt(i + 1))) {
+
+                buf.append('_');
+            } else {
+                buf.append(Character.toUpperCase(c));
+            }
+        }
+        return buf.toString();
     }
 
     private static String normalizeName(String type) {
@@ -935,6 +1015,25 @@ public class SchemaGenerator extends AbstractProcessor {
             file.writeTo(filer);
         } catch (Throwable ignored) {
         }
+    }
+
+    private String extractEnumName(String type) {
+        return typeTree.getOrDefault(type, Collections.emptyList()).stream()
+                .map(c -> normalizeName(c.predicate()))
+                .reduce(SchemaGenerator::findCommonPart)
+                .orElse(type);
+    }
+
+    private static String findCommonPart(String s1, String s2) {
+        if (s1.equals(s2)) {
+            return s1;
+        }
+        for (int i = 0; i < Math.min(s1.length(), s2.length()); i++) {
+            if (s1.charAt(i) != s2.charAt(i)) {
+                return s1.substring(0, i);
+            }
+        }
+        return s1;
     }
 
     @Nullable
