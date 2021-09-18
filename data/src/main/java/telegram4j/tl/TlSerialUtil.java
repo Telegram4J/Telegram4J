@@ -38,8 +38,8 @@ public final class TlSerialUtil {
         int length = buf.readUnsignedByte();
         if (length == 0xfe) {
             length = buf.readByte() +
-                    buf.readByte() << 8 +
-                    buf.readByte() << 16;
+                    (buf.readByte() << 8) +
+                    (buf.readByte() << 16);
         }
 
         byte[] bytes = new byte[length];
