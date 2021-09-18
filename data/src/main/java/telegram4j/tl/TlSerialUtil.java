@@ -20,6 +20,20 @@ public final class TlSerialUtil {
     private TlSerialUtil() {
     }
 
+    public static byte[] readInt128(ByteBuf buf) {
+        return readBytes(buf, Long.BYTES * 2);
+    }
+
+    public static byte[] readInt256(ByteBuf buf) {
+        return readBytes(buf, Long.BYTES * 4);
+    }
+
+    public static byte[] readBytes(ByteBuf buf, int length) {
+        byte[] bytes = new byte[length];
+        buf.readBytes(bytes);
+        return bytes;
+    }
+
     public static byte[] readBytes(ByteBuf buf) {
         int length = buf.readUnsignedByte();
         if (length == 0xfe) {

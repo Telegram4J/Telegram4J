@@ -872,7 +872,8 @@ public class SchemaGenerator extends AbstractProcessor {
                             "BOOL_TRUE_ID", "deserializeBytesVector",
                             "deserializeIntVector",
                             "deserializeLongVector", "deserializeStringVector",
-                            "deserializeVector", "readBytes", "readString")
+                            "deserializeVector", "readBytes", "readString",
+                            "readInt256", "readInt128")
                     .indent(INDENT)
                     .skipJavaLangImports(true)
                     .build());
@@ -1091,6 +1092,8 @@ public class SchemaGenerator extends AbstractProcessor {
             case "double": return "payload.readDouble()";
             case "bytes": return "readBytes(payload)";
             case "string": return "readString(payload)";
+            case "int128": return "readInt128(payload)";
+            case "int256": return "readInt256(payload)";
             default:
                 if (type.equals("#")) {
                     return null;
