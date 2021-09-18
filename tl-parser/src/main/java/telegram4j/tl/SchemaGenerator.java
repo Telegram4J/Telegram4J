@@ -750,7 +750,8 @@ public class SchemaGenerator extends AbstractProcessor {
                 serializer.addMethod(serializerBuilder.build());
             }
 
-            serializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + payload.identifier());\n");
+            serializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(payload.identifier()));\n",
+                    "Incorrect TlObject identifier: 0x");
             serializeMethod.endControlFlow();
             serializer.addMethod(serializeMethod.build());
 
@@ -860,7 +861,8 @@ public class SchemaGenerator extends AbstractProcessor {
                 deserializer.addMethod(deserializerBuilder.build());
             }
 
-            deserializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + identifier);\n");
+            deserializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
+                    "Incorrect TlObject identifier: 0x");
             deserializeMethod.endControlFlow();
             deserializer.addMethod(deserializeMethod.build());
 
