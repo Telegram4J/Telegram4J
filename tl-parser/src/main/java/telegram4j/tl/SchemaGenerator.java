@@ -15,10 +15,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
 import reactor.util.annotation.Nullable;
-import telegram4j.tl.model.ImmutableTlSchema;
-import telegram4j.tl.model.TlEntityObject;
-import telegram4j.tl.model.TlParam;
-import telegram4j.tl.model.TlSchema;
+import telegram4j.tl.model.*;
 
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
@@ -260,9 +257,8 @@ public class SchemaGenerator extends AbstractProcessor {
                 TypeSpec.Builder builder = TypeSpec.interfaceBuilder(name)
                         .addModifiers(Modifier.PUBLIC);
 
-                TlEntityObject superType = computed.get(normalizeName(constructor.type()));
-                if (superType != null) {
-                    builder.addSuperinterface(ClassName.get(getPackageName(superType.type()), normalizeName(superType.type())));
+                if (multiple) {
+                    builder.addSuperinterface(ClassName.get(packageName, type));
                 }
 
                 builder.addSuperinterface(TlObject.class);
