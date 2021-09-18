@@ -28,7 +28,9 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.Writer;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -38,6 +40,9 @@ import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static telegram4j.tl.Strings.camelize;
+import static telegram4j.tl.Strings.screamilize;
+
 @SupportedAnnotationTypes("telegram4j.tl.GenerateSchema")
 public class SchemaGenerator extends AbstractProcessor {
 
@@ -46,6 +51,7 @@ public class SchemaGenerator extends AbstractProcessor {
             "string", "flags", "vector", "#"));
 
     private static final String METHOD_PACKAGE_PREFIX = ".request";
+    private static final String TEMPLATE_PACKAGE_INFO = "template-package-info";
     private static final String UTIL_PACKAGE = "telegram4j.tl";
     private static final String API_SCHEMA = "api.json";
     private static final String MTPROTO_SCHEMA = "mtproto.json";
@@ -122,6 +128,10 @@ public class SchemaGenerator extends AbstractProcessor {
                             !c.type().equalsIgnoreCase("Object"))
                     .collect(Collectors.groupingBy(c -> getPackageName(c.type()) +
                             "." + normalizeName(c.type())));
+
+            // prepare package-info.java file for types
+
+            preparePackages();
         }
 
         if (annotations.size() > 2) {
@@ -326,7 +336,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 computed.put(packageName + "." + name, constructor);
             }
 
-
             // endregion
 
             // region methods
@@ -445,7 +454,6 @@ public class SchemaGenerator extends AbstractProcessor {
                         .skipJavaLangImports(true)
                         .build());
             }
-
 
             // endregion
 
@@ -867,7 +875,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     .skipJavaLangImports(true)
                     .build());
 
-
             // endregion
         } catch (Throwable t) {
             t.printStackTrace();
@@ -876,45 +883,36 @@ public class SchemaGenerator extends AbstractProcessor {
         return true;
     }
 
-    private static String camelize(String type) {
-        if (!type.contains("_")) {
-            return type;
-        }
+    private void preparePackages() {
+        try {
 
-        StringBuilder builder = new StringBuilder(type.length());
-        for (int i = 0; i < type.length(); i++) {
-            char c = type.charAt(i);
-            if (c == '_') {
-                char n = Character.toUpperCase(type.charAt(i++ + 1));
-                builder.append(n);
-            } else {
-                builder.append(c);
-            }
-        }
-        return builder.toString();
-    }
+            String processingPackageName = getPackageName();
+            String template = filer.getResource(StandardLocation.ANNOTATION_PROCESSOR_PATH,
+                    "", TEMPLATE_PACKAGE_INFO).getCharContent(true)
+                    .toString();
 
-    private static String screamilize(String type) {
-        StringBuilder buf = new StringBuilder(type.length());
-        for (int i = 0; i < type.length(); i++) {
-            char p = i - 1 != -1 ? type.charAt(i - 1) : Character.MIN_VALUE;
-            char c = type.charAt(i);
+            Set<String> packages = typeTree.keySet().stream()
+                    .map(this::getPackageName)
+                    .filter(s -> !s.equals(processingPackageName))
+                    .collect(Collectors.toSet());
 
-            if (Character.isLetter(c) && Character.isLetter(p) &&
-                    Character.isLowerCase(p) && Character.isUpperCase(c)) {
-                buf.append('_');
+            // collect methods packages with prefix 'request'
+            packages.addAll(schema.methods().stream()
+                    .map(e -> getPackageName(e.name()))
+                    .map(s -> s.replace(getPackageName(), getPackageName() + METHOD_PACKAGE_PREFIX))
+                    .collect(Collectors.toSet()));
+
+            for (String pack : packages) {
+                String complete = template.replace("${package-name}", pack);
+                try (Writer writer = filer.createSourceFile(pack + ".package-info").openWriter()) {
+                    writer.write(complete);
+                    writer.flush();
+                }
             }
 
-            if (c == '.' || c == '-' || c == '_' || Character.isWhitespace(c) &&
-                    Character.isLetterOrDigit(p) && i + 1 < type.length() &&
-                    Character.isLetterOrDigit(type.charAt(i + 1))) {
-
-                buf.append('_');
-            } else {
-                buf.append(Character.toUpperCase(c));
-            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to prepare packages", e);
         }
-        return buf.toString();
     }
 
     private static String normalizeName(String type) {
@@ -1084,20 +1082,13 @@ public class SchemaGenerator extends AbstractProcessor {
     @Nullable
     private String deserializeMethod(String type) {
         switch (type.toLowerCase()) {
-            case "true":
-                return "TlTrue.INSTANCE";
-            case "bool":
-                return "payload.readIntLE() == BOOL_TRUE_ID";
-            case "int":
-                return "payload.readIntLE()";
-            case "long":
-                return "payload.readLongLE()";
-            case "double":
-                return "payload.readDouble()";
-            case "bytes":
-                return "readBytes(payload)";
-            case "string":
-                return "readString(payload)";
+            case "true": return "TlTrue.INSTANCE";
+            case "bool": return "payload.readIntLE() == BOOL_TRUE_ID";
+            case "int": return "payload.readIntLE()";
+            case "long": return "payload.readLongLE()";
+            case "double": return "payload.readDouble()";
+            case "bytes": return "readBytes(payload)";
+            case "string": return "readString(payload)";
             default:
                 if (type.equals("#")) {
                     return null;
