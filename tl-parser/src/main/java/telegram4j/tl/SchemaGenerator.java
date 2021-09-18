@@ -40,11 +40,6 @@ import java.util.stream.Stream;
 
 @SupportedAnnotationTypes("telegram4j.tl.GenerateSchema")
 public class SchemaGenerator extends AbstractProcessor {
-    private static final int STAGE_SUPERTYPES = 0x1;
-    private static final int STAGE_TYPES = 0x2;
-    private static final int STAGE_METHODS = 0x4;
-    private static final int STAGE_SERIALIZER = 0x8;
-    private static final int STAGE_DESERIALIZER = 0x10;
 
     private static final List<String> ignoredTypes = Collections.unmodifiableList(Arrays.asList(
             "bool", "true", "false", "null", "int", "long",
@@ -66,7 +61,6 @@ public class SchemaGenerator extends AbstractProcessor {
     private Types types;
     private Trees trees;
     private Symbol.PackageSymbol currentElement;
-    private int progress = 0x1f;
 
     // api and mtproto schemas
     private TlSchema schema;
@@ -138,185 +132,81 @@ public class SchemaGenerator extends AbstractProcessor {
         try {
             // region constructors
 
-            if ((progress & STAGE_SUPERTYPES) != 0) {
-                Map<String, Set<TlParam>> sharedParams = typeTree.entrySet().stream()
-                        .filter(e -> e.getValue().size() > 1)
-                        .collect(Collectors.groupingBy(Map.Entry::getKey,
-                                flatMapping(e -> e.getValue().stream()
-                                                .flatMap(c -> c.params().stream())
-                                                .filter(p -> e.getValue().stream()
-                                                        .allMatch(c -> c.params().contains(p))),
-                                        Collectors.toCollection(LinkedHashSet::new))));
+            Map<String, Set<TlParam>> sharedParams = typeTree.entrySet().stream()
+                    .filter(e -> e.getValue().size() > 1)
+                    .collect(Collectors.groupingBy(Map.Entry::getKey,
+                            flatMapping(e -> e.getValue().stream()
+                                            .flatMap(c -> c.params().stream())
+                                            .filter(p -> e.getValue().stream()
+                                                    .allMatch(c -> c.params().contains(p))),
+                                    Collectors.toCollection(LinkedHashSet::new))));
 
-                for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
-                    String name = normalizeName(e.getKey());
-                    Set<TlParam> params = e.getValue();
-                    String packageName = getPackageName(e.getKey());
-                    String qualifiedName = e.getKey();
+            for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
+                String name = normalizeName(e.getKey());
+                Set<TlParam> params = e.getValue();
+                String packageName = getPackageName(e.getKey());
+                String qualifiedName = e.getKey();
 
-                    boolean canMakeEnum = typeTree.get(qualifiedName).stream()
-                            .mapToInt(c -> c.params().size()).sum() == 0 &&
-                            !name.equals("Object");
+                boolean canMakeEnum = typeTree.get(qualifiedName).stream()
+                        .mapToInt(c -> c.params().size()).sum() == 0 &&
+                        !name.equals("Object");
 
-                    String shortenName = extractEnumName(qualifiedName);
-                    String shortenNameFixed = name.endsWith("Type") && !shortenName.endsWith("Type")
-                            ? shortenName + "Type"
-                            : shortenName;
+                String shortenName = extractEnumName(qualifiedName);
+                String shortenNameFixed = name.endsWith("Type") && !shortenName.endsWith("Type")
+                        ? shortenName + "Type"
+                        : shortenName;
 
-                    TypeSpec.Builder superType = canMakeEnum
-                            ? TypeSpec.enumBuilder(shortenNameFixed)
-                            : TypeSpec.interfaceBuilder(name);
+                TypeSpec.Builder superType = canMakeEnum
+                        ? TypeSpec.enumBuilder(shortenNameFixed)
+                        : TypeSpec.interfaceBuilder(name);
 
-                    superType.addModifiers(Modifier.PUBLIC);
-                    if (canMakeEnum) {
-                        superType.addSuperinterface(TlObject.class);
+                superType.addModifiers(Modifier.PUBLIC);
+                if (canMakeEnum) {
+                    superType.addSuperinterface(TlObject.class);
 
-                        for (TlEntityObject constructor : typeTree.get(qualifiedName)) {
-                            String subtypeName = normalizeName(constructor.name());
-                            String constName = screamilize(subtypeName.substring(shortenName.length()));
+                    for (TlEntityObject constructor : typeTree.get(qualifiedName)) {
+                        String subtypeName = normalizeName(constructor.name());
+                        String constName = screamilize(subtypeName.substring(shortenName.length()));
 
-                            superType.addEnumConstant(constName, TypeSpec.anonymousClassBuilder(
-                                    "$L", "0x" + Integer.toHexString(constructor.id()))
-                                    .build());
-
-                            computed.put(subtypeName, constructor);
-                        }
-
-                        superType.addField(int.class, "identifier", Modifier.PRIVATE, Modifier.FINAL);
-
-                        superType.addMethod(MethodSpec.constructorBuilder()
-                                .addParameter(int.class, "identifier")
-                                .addStatement("this.identifier = identifier")
+                        superType.addEnumConstant(constName, TypeSpec.anonymousClassBuilder(
+                                        "$L", "0x" + Integer.toHexString(constructor.id()))
                                 .build());
 
-                        superType.addMethod(MethodSpec.methodBuilder("identifier")
-                                .addAnnotation(Override.class)
-                                .returns(TypeName.INT)
-                                .addModifiers(Modifier.PUBLIC)
-                                .addCode("return identifier;")
-                                .build());
-                    } else {
-                        superType.addSuperinterface(TlSerializable.class);
-
-                        for (TlParam param : params) {
-                            if (param.type().equals("#")) {
-                                continue;
-                            }
-
-                            TypeName paramType = parseType(param.type());
-                            if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
-                                paramType = TypeName.OBJECT;
-                            }
-
-                            boolean optionalInExt = typeTree.get(qualifiedName).stream()
-                                    .flatMap(c -> c.params().stream())
-                                    .anyMatch(p -> p.type().startsWith("flags.") &&
-                                            p.name().equals(param.name()));
-
-                            if (optionalInExt) {
-                                paramType = paramType.box();
-                            }
-
-                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
-                                    .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                    .returns(paramType);
-
-                            if (param.type().startsWith("flags.")) {
-                                attribute.addAnnotation(Nullable.class);
-                            }
-
-                            superType.addMethod(attribute.build());
-                        }
+                        computed.put(getPackageName(constructor.name()) + "." + subtypeName, constructor);
                     }
 
-                    JavaFile file = JavaFile.builder(packageName, superType.build())
-                            .indent(INDENT)
-                            .build();
+                    superType.addField(int.class, "identifier", Modifier.PRIVATE, Modifier.FINAL);
 
-                    writeTo(file);
-                }
-
-                progress &= ~STAGE_SUPERTYPES;
-            }
-
-            if ((progress & STAGE_TYPES) != 0) {
-
-                for (TlEntityObject constructor : schema.constructors()) {
-                    String type = normalizeName(constructor.type());
-                    String name = normalizeName(constructor.name());
-                    String packageName = getPackageName(constructor.type());
-                    String qualifiedTypeName = packageName + "." + type;
-
-                    boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
-
-                    // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
-                    if (type.equalsIgnoreCase(name) && multiple) {
-                        name = "Base" + name;
-                    } else if (!multiple && !type.equals("Object")) { // use type name if this object type is singleton
-                        name = type;
-                    }
-
-                    if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(packageName + "." + name)) {
-                        continue;
-                    }
-
-                    TypeSpec.Builder builder = TypeSpec.interfaceBuilder(name)
-                            .addModifiers(Modifier.PUBLIC);
-
-                    TlEntityObject superType = computed.get(normalizeName(constructor.type()));
-                    if (superType != null) {
-                        builder.addSuperinterface(ClassName.get(getPackageName(superType.type()), normalizeName(superType.type())));
-                    }
-
-                    builder.addSuperinterface(TlObject.class);
-
-                    builder.addField(FieldSpec.builder(TypeName.INT, "ID",
-                                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .initializer("0x" + Integer.toHexString(constructor.id()))
+                    superType.addMethod(MethodSpec.constructorBuilder()
+                            .addParameter(int.class, "identifier")
+                            .addStatement("this.identifier = identifier")
                             .build());
 
-                    builder.addMethod(MethodSpec.methodBuilder("builder")
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .returns(ClassName.get(packageName, "Immutable" + name, "Builder"))
-                            .addCode("return Immutable$L.builder();", name)
-                            .build());
-
-                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
-                    collectAttributesRecursive(type, attributes);
-
-                    boolean optional = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
-                    AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
-                    if (optional) {
-                        value.addMember("singleton", "true");
-
-                        builder.addMethod(MethodSpec.methodBuilder("instance")
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(ClassName.get(packageName, "Immutable" + name))
-                                .addCode("return Immutable$L.of();", name)
-                                .build());
-                    }
-                    builder.addAnnotation(value.build());
-
-                    builder.addMethod(MethodSpec.methodBuilder("identifier")
+                    superType.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
                             .returns(TypeName.INT)
-                            .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                            .addCode("return ID;")
+                            .addModifiers(Modifier.PUBLIC)
+                            .addCode("return identifier;")
                             .build());
+                } else {
+                    superType.addSuperinterface(TlSerializable.class);
 
-                    for (TlParam param : attributes) {
+                    for (TlParam param : params) {
                         if (param.type().equals("#")) {
                             continue;
                         }
 
                         TypeName paramType = parseType(param.type());
+                        if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
+                            paramType = TypeName.OBJECT;
+                        }
 
-                        boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                        boolean optionalInExt = typeTree.get(qualifiedName).stream()
                                 .flatMap(c -> c.params().stream())
                                 .anyMatch(p -> p.type().startsWith("flags.") &&
                                         p.name().equals(param.name()));
 
-                        if (optionalInExt || type.equals("JSONValue") && param.name().equals("value")) {
+                        if (optionalInExt) {
                             paramType = paramType.box();
                         }
 
@@ -328,20 +218,114 @@ public class SchemaGenerator extends AbstractProcessor {
                             attribute.addAnnotation(Nullable.class);
                         }
 
-                        builder.addMethod(attribute.build());
+                        superType.addMethod(attribute.build());
                     }
-
-                    JavaFile file = JavaFile.builder(packageName, builder.build())
-                            .indent(INDENT)
-                            .build();
-
-                    writeTo(file);
-
-                    computed.put(packageName + "." + name, constructor);
                 }
 
-                progress &= ~STAGE_TYPES;
+                writeTo(JavaFile.builder(packageName, superType.build())
+                        .indent(INDENT)
+                        .skipJavaLangImports(true)
+                        .build());
             }
+
+            for (TlEntityObject constructor : schema.constructors()) {
+                String type = normalizeName(constructor.type());
+                String name = normalizeName(constructor.name());
+                String packageName = getPackageName(constructor.type());
+                String qualifiedTypeName = packageName + "." + type;
+
+                boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
+
+                // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
+                if (type.equalsIgnoreCase(name) && multiple) {
+                    name = "Base" + name;
+                } else if (!multiple && !type.equals("Object")) { // use type name if this object type is singleton
+                    name = type;
+                }
+
+                if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(packageName + "." + name)) {
+                    continue;
+                }
+
+                TypeSpec.Builder builder = TypeSpec.interfaceBuilder(name)
+                        .addModifiers(Modifier.PUBLIC);
+
+                TlEntityObject superType = computed.get(normalizeName(constructor.type()));
+                if (superType != null) {
+                    builder.addSuperinterface(ClassName.get(getPackageName(superType.type()), normalizeName(superType.type())));
+                }
+
+                builder.addSuperinterface(TlObject.class);
+
+                builder.addField(FieldSpec.builder(TypeName.INT, "ID",
+                                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                        .initializer("0x" + Integer.toHexString(constructor.id()))
+                        .build());
+
+                builder.addMethod(MethodSpec.methodBuilder("builder")
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .returns(ClassName.get(packageName, "Immutable" + name, "Builder"))
+                        .addCode("return Immutable$L.builder();", name)
+                        .build());
+
+                Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+                collectAttributesRecursive(type, attributes);
+
+                boolean optional = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
+                AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
+                if (optional) {
+                    value.addMember("singleton", "true");
+
+                    builder.addMethod(MethodSpec.methodBuilder("instance")
+                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                            .returns(ClassName.get(packageName, "Immutable" + name))
+                            .addCode("return Immutable$L.of();", name)
+                            .build());
+                }
+                builder.addAnnotation(value.build());
+
+                builder.addMethod(MethodSpec.methodBuilder("identifier")
+                        .addAnnotation(Override.class)
+                        .returns(TypeName.INT)
+                        .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                        .addCode("return ID;")
+                        .build());
+
+                for (TlParam param : attributes) {
+                    if (param.type().equals("#")) {
+                        continue;
+                    }
+
+                    TypeName paramType = parseType(param.type());
+
+                    boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                            .flatMap(c -> c.params().stream())
+                            .anyMatch(p -> p.type().startsWith("flags.") &&
+                                    p.name().equals(param.name()));
+
+                    if (optionalInExt || type.equals("JSONValue") && param.name().equals("value")) {
+                        paramType = paramType.box();
+                    }
+
+                    MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
+                            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                            .returns(paramType);
+
+                    if (param.type().startsWith("flags.")) {
+                        attribute.addAnnotation(Nullable.class);
+                    }
+
+                    builder.addMethod(attribute.build());
+                }
+
+                writeTo(JavaFile.builder(packageName, builder.build())
+                        .indent(INDENT)
+                        .skipJavaLangImports(true)
+                        .build());
+
+                computed.put(packageName + "." + name, constructor);
+            }
+
 
             // endregion
 
@@ -349,123 +333,119 @@ public class SchemaGenerator extends AbstractProcessor {
 
             TypeVariableName genericType = TypeVariableName.get("T", TlObject.class);
             TypeVariableName genericTypeRef = TypeVariableName.get("T");
-            if ((progress & STAGE_METHODS) != 0) {
 
-                for (TlEntityObject method : schema.methods()) {
-                    String type = normalizeName(method.type());
-                    String name = normalizeName(method.name());
-                    String packageNameRaw = getPackageName();
-                    String packageName = getPackageName(method.name())
-                            .replace(packageNameRaw, packageNameRaw + METHOD_PACKAGE_PREFIX);
+            for (TlEntityObject method : schema.methods()) {
+                String type = normalizeName(method.type());
+                String name = normalizeName(method.name());
+                String packageNameRaw = getPackageName();
+                String packageName = getPackageName(method.name())
+                        .replace(packageNameRaw, packageNameRaw + METHOD_PACKAGE_PREFIX);
 
-                    String qualifiedTypeName = getPackageName(method.type()) + "." + type;
+                String qualifiedTypeName = getPackageName(method.type()) + "." + type;
 
-                    boolean generic = method.params().stream()
-                            .anyMatch(p -> p.type().equals("!X"));
+                boolean generic = method.params().stream()
+                        .anyMatch(p -> p.type().equals("!X"));
 
-                    TypeSpec.Builder typeSpec = TypeSpec.interfaceBuilder(name)
-                            .addModifiers(Modifier.PUBLIC);
+                TypeSpec.Builder typeSpec = TypeSpec.interfaceBuilder(name)
+                        .addModifiers(Modifier.PUBLIC);
 
-                    if (generic) {
-                        typeSpec.addTypeVariable(genericType);
-                    }
-
-                    String shortenName = extractEnumName(qualifiedTypeName);
-                    // strange exception in naming
-                    String shortenNameFixed = type.endsWith("Type") && !shortenName.endsWith("Type")
-                            ? shortenName + "Type"
-                            : shortenName;
-
-                    boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                            .mapToInt(c -> c.params().size()).sum() == 0 &&
-                            !type.equals("Object");
-
-                    // TODO: check the signature of HttpWait
-                    String importMethod = method.type().equals("HttpWait") ? packageName + "." + name : method.type();
-
-                    TypeName returnType = ParameterizedTypeName.get(
-                            ClassName.get(TlMethod.class),
-                            parseType(canMakeEnum && !method.type().equals("HttpWait") ? shortenNameFixed : importMethod).box());
-
-                    typeSpec.addSuperinterface(returnType);
-
-                    typeSpec.addField(FieldSpec.builder(TypeName.INT, "ID",
-                                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .initializer("0x" + Integer.toHexString(method.id()))
-                            .build());
-
-                    ClassName immutableTypeRaw = ClassName.get(packageName, "Immutable" + name);
-                    ClassName immutableTypeBuilderRaw = ClassName.get(packageName, "Immutable" + name, "Builder");
-                    TypeName immutableType = generic ? ParameterizedTypeName.get(immutableTypeRaw, genericTypeRef) : immutableTypeRaw;
-                    TypeName immutableBuilderType = generic
-                            ? ParameterizedTypeName.get(immutableTypeBuilderRaw, genericTypeRef)
-                            : immutableTypeBuilderRaw;
-
-                    MethodSpec.Builder builder = MethodSpec.methodBuilder("builder")
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .returns(immutableBuilderType)
-                            .addCode("return $T.builder();", immutableTypeRaw);
-
-                    if (generic) {
-                        builder.addTypeVariable(genericType);
-                    }
-
-                    typeSpec.addMethod(builder.build());
-
-                    AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
-
-                    boolean allOptional = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
-                    if (allOptional) {
-                        value.addMember("singleton", "true");
-
-                        MethodSpec.Builder instance = MethodSpec.methodBuilder("instance")
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(immutableType)
-                                .addCode("return $T.of();", immutableTypeRaw);
-
-                        if (generic) {
-                            instance.addTypeVariable(genericType);
-                        }
-
-                        typeSpec.addMethod(instance.build());
-                    }
-
-                    typeSpec.addAnnotation(value.build());
-
-                    typeSpec.addMethod(MethodSpec.methodBuilder("identifier")
-                            .addAnnotation(Override.class)
-                            .returns(TypeName.INT)
-                            .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                            .addCode("return ID;")
-                            .build());
-
-                    for (TlParam param : method.params()) {
-                        if (param.type().equals("#")) {
-                            continue;
-                        }
-
-                        TypeName paramType = parseType(param.type());
-
-                        MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
-                                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                                .returns(paramType);
-
-                        if (param.type().startsWith("flags.")) {
-                            attribute.addAnnotation(Nullable.class);
-                        }
-
-                        typeSpec.addMethod(attribute.build());
-                    }
-
-                    JavaFile file = JavaFile.builder(packageName, typeSpec.build())
-                            .indent(INDENT)
-                            .build();
-
-                    writeTo(file);
+                if (generic) {
+                    typeSpec.addTypeVariable(genericType);
                 }
 
-                progress &= ~STAGE_METHODS;
+                String shortenName = extractEnumName(qualifiedTypeName);
+                // strange exception in naming
+                String shortenNameFixed = type.endsWith("Type") && !shortenName.endsWith("Type")
+                        ? shortenName + "Type"
+                        : shortenName;
+
+                boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                        .mapToInt(c -> c.params().size()).sum() == 0 &&
+                        !type.equals("Object");
+
+                // TODO: check the signature of HttpWait
+                String importMethod = method.type().equals("HttpWait") ? packageName + "." + name : method.type();
+
+                TypeName returnType = ParameterizedTypeName.get(
+                        ClassName.get(TlMethod.class),
+                        parseType(canMakeEnum && !method.type().equals("HttpWait") ? shortenNameFixed : importMethod).box());
+
+                typeSpec.addSuperinterface(returnType);
+
+                typeSpec.addField(FieldSpec.builder(TypeName.INT, "ID",
+                                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                        .initializer("0x" + Integer.toHexString(method.id()))
+                        .build());
+
+                ClassName immutableTypeRaw = ClassName.get(packageName, "Immutable" + name);
+                ClassName immutableTypeBuilderRaw = ClassName.get(packageName, "Immutable" + name, "Builder");
+                TypeName immutableType = generic ? ParameterizedTypeName.get(immutableTypeRaw, genericTypeRef) : immutableTypeRaw;
+                TypeName immutableBuilderType = generic
+                        ? ParameterizedTypeName.get(immutableTypeBuilderRaw, genericTypeRef)
+                        : immutableTypeBuilderRaw;
+
+                MethodSpec.Builder builder = MethodSpec.methodBuilder("builder")
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .returns(immutableBuilderType)
+                        .addCode("return $T.builder();", immutableTypeRaw);
+
+                if (generic) {
+                    builder.addTypeVariable(genericType);
+                }
+
+                typeSpec.addMethod(builder.build());
+
+                AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
+
+                boolean allOptional = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
+                if (allOptional) {
+                    value.addMember("singleton", "true");
+
+                    MethodSpec.Builder instance = MethodSpec.methodBuilder("instance")
+                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                            .returns(immutableType)
+                            .addCode("return $T.of();", immutableTypeRaw);
+
+                    if (generic) {
+                        instance.addTypeVariable(genericType);
+                    }
+
+                    typeSpec.addMethod(instance.build());
+                }
+
+                typeSpec.addAnnotation(value.build());
+
+                typeSpec.addMethod(MethodSpec.methodBuilder("identifier")
+                        .addAnnotation(Override.class)
+                        .returns(TypeName.INT)
+                        .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                        .addCode("return ID;")
+                        .build());
+
+                for (TlParam param : method.params()) {
+                    if (param.type().equals("#")) {
+                        continue;
+                    }
+
+                    TypeName paramType = parseType(param.type());
+
+                    MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
+                            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+                            .returns(paramType);
+
+                    if (param.type().startsWith("flags.")) {
+                        attribute.addAnnotation(Nullable.class);
+                    }
+
+                    typeSpec.addMethod(attribute.build());
+                }
+
+                writeTo(JavaFile.builder(packageName, typeSpec.build())
+                        .indent(INDENT)
+                        .skipJavaLangImports(true)
+                        .build());
             }
+
 
             // endregion
 
@@ -476,426 +456,417 @@ public class SchemaGenerator extends AbstractProcessor {
                     .addModifiers(Modifier.PRIVATE)
                     .build();
 
-            if ((progress & STAGE_SERIALIZER) != 0) {
 
-                TypeSpec.Builder serializer = TypeSpec.classBuilder("TlSerializer")
-                        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                        .addMethod(privateConstructor);
+            TypeSpec.Builder serializer = TypeSpec.classBuilder("TlSerializer")
+                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                    .addMethod(privateConstructor);
 
-                // special method for supertype objects
-                serializer.addMethod(MethodSpec.methodBuilder("serializeExact")
+            // special method for supertype objects
+            serializer.addMethod(MethodSpec.methodBuilder("serializeExact")
+                    .returns(ByteBuf.class)
+                    .addTypeVariable(serializableType)
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .addParameters(Arrays.asList(
+                            ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                            ParameterSpec.builder(serializableType, "payload").build()))
+                    .beginControlFlow("if (payload instanceof TlObject)")
+                    .addStatement("return serialize(allocator, (TlObject) payload)")
+                    .nextControlFlow("else")
+                    .addStatement("throw new IllegalArgumentException(\"Unrecorded TL Serializable supertype: \" + payload.getClass())")
+                    .endControlFlow()
+                    .build());
+
+            MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
+                    .returns(ByteBuf.class)
+                    .addTypeVariable(genericType)
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .addParameters(Arrays.asList(
+                            ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                            ParameterSpec.builder(genericType, "payload").build()));
+
+            serializeMethod.beginControlFlow("switch (payload.identifier())");
+
+            for (TlEntityObject constructor : schema.constructors()) {
+                String type = normalizeName(constructor.type());
+                String name = normalizeName(constructor.name());
+                String packageName = getPackageName(constructor.name());
+                String qualifiedTypeName = packageName + "." + type;
+
+                boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
+
+                String shortenName = extractEnumName(qualifiedTypeName);
+                boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                        .mapToInt(c -> c.params().size()).sum() == 0 &&
+                        !type.equals("Object");
+
+                if (type.equalsIgnoreCase(name) && multiple) {
+                    name = "Base" + name;
+                } else if (!multiple && !type.equals("Object")) { // see mtproto schema, gzip_packed/Object
+                    name = type;
+                } else if (canMakeEnum) {
+                    name = type.endsWith("Type") && !shortenName.endsWith("Type")
+                            ? shortenName + "Type"
+                            : shortenName;
+                }
+
+                String methodName = "serialize" + name;
+
+                if (ignoredTypes.contains(type.toLowerCase()) ||
+                        serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                    continue;
+                }
+
+                TypeName payloadType = ClassName.get(packageName, name);
+
+                serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
+                        "0x" + Integer.toHexString(constructor.id()),
+                        methodName, payloadType);
+
+                Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+                collectAttributesRecursive(type, attributes);
+
+                MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
                         .returns(ByteBuf.class)
-                        .addTypeVariable(serializableType)
                         .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                         .addParameters(Arrays.asList(
                                 ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                ParameterSpec.builder(serializableType, "payload").build()))
-                        .beginControlFlow("if (payload instanceof TlObject)")
-                        .addStatement("return serialize(allocator, (TlObject) payload)")
-                        .nextControlFlow("else")
-                        .addStatement("throw new IllegalArgumentException(\"Unrecorded TL Serializable supertype: \" + payload.getClass())")
-                        .endControlFlow()
-                        .build());
+                                ParameterSpec.builder(payloadType, "payload").build()));
 
-                MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
-                        .returns(ByteBuf.class)
-                        .addTypeVariable(genericType)
-                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                        .addParameters(Arrays.asList(
-                                ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                ParameterSpec.builder(genericType, "payload").build()));
+                serializerBuilder.addCode("return allocator.buffer()\n");
+                serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
 
-                serializeMethod.beginControlFlow("switch (payload.identifier())");
+                for (TlParam param : attributes) {
+                    String paramType = param.type().toLowerCase();
+                    String paramName = formatFieldName(param.name());
 
-                for (TlEntityObject constructor : schema.constructors()) {
-                    String type = normalizeName(constructor.type());
-                    String name = normalizeName(constructor.name());
-                    String packageName = getPackageName(constructor.name());
-                    String qualifiedTypeName = packageName + "." + type;
-
-                    boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
-
-                    String shortenName = extractEnumName(qualifiedTypeName);
-                    boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                            .mapToInt(c -> c.params().size()).sum() == 0 &&
-                            !type.equals("Object");
-
-                    if (type.equalsIgnoreCase(name) && multiple) {
-                        name = "Base" + name;
-                    } else if (!multiple && !type.equals("Object")) { // see mtproto schema, gzip_packed/Object
-                        name = type;
-                    } else if (canMakeEnum) {
-                        name = type.endsWith("Type") && !shortenName.endsWith("Type")
-                                ? shortenName + "Type"
-                                : shortenName;
-                    }
-
-                    String methodName = "serialize" + name;
-
-                    if (ignoredTypes.contains(type.toLowerCase()) ||
-                            serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
-                        continue;
-                    }
-
-                    TypeName payloadType = ClassName.get(packageName, name);
-
-                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
-                            "0x" + Integer.toHexString(constructor.id()),
-                            methodName, payloadType);
-
-                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
-                    collectAttributesRecursive(type, attributes);
-
-                    MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
-                            .returns(ByteBuf.class)
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .addParameters(Arrays.asList(
-                                    ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(payloadType, "payload").build()));
-
-                    serializerBuilder.addCode("return allocator.buffer()\n");
-                    serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
-
-                    for (TlParam param : attributes) {
-                        String paramType = param.type().toLowerCase();
-                        String paramName = formatFieldName(param.name());
-
-                        String wrapping = "payload.$L()";
-                        String method;
-                        switch (paramType) {
-                            case "true":
-                                method = null;
-                                break;
-                            case "bool":
-                                method = "writeIntLE";
-                                wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
-                                break;
-                            case "#":
-                                wrapping = attributes.stream()
-                                        .filter(p -> p.type().startsWith("flags."))
-                                        .map(this::parseFlag)
-                                        .map(f -> "(payload." + formatFieldName(f.name) +
-                                                "() != null ? 1 : 0) << " + f.position)
-                                        .collect(Collectors.joining(" | "));
-                            case "int":
-                                method = "writeIntLE";
-                                break;
-                            case "long":
-                                method = "writeLongLE";
-                                break;
-                            case "double":
-                                method = "writeDoubleLE";
-                                break;
-                            case "int256":
-                            case "int128":
-                                method = "writeBytes";
-                                break;
-                            case "string":
-                            case "bytes":
-                                wrapping = "writeString(allocator, payload.$L())";
-                                method = "writeBytes";
-                                break;
-                            default:
-                                Matcher vector = VECTOR_PATTERN.matcher(paramType);
-                                if (vector.matches()) {
-                                    String innerType = vector.group(1);
-                                    String specific = "";
-                                    switch (innerType.toLowerCase()) {
-                                        case "int":
-                                            specific = "Int";
-                                            break;
-                                        case "long":
-                                            specific = "Long";
-                                            break;
-                                        case "bytes":
-                                            specific = "Bytes";
-                                            break;
-                                        case "string":
-                                            specific = "String";
-                                            break;
-                                    }
-                                    wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
-                                } else if (paramType.startsWith("flags.")) {
-                                    if (paramType.endsWith("true")) {
-                                        method = null;
+                    String wrapping = "payload.$L()";
+                    String method;
+                    switch (paramType) {
+                        case "true":
+                            method = null;
+                            break;
+                        case "bool":
+                            method = "writeIntLE";
+                            wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
+                            break;
+                        case "#":
+                            wrapping = attributes.stream()
+                                    .filter(p -> p.type().startsWith("flags."))
+                                    .map(this::parseFlag)
+                                    .map(f -> "(payload." + formatFieldName(f.name) +
+                                            "() != null ? 1 : 0) << " + f.position)
+                                    .collect(Collectors.joining(" | "));
+                        case "int":
+                            method = "writeIntLE";
+                            break;
+                        case "long":
+                            method = "writeLongLE";
+                            break;
+                        case "double":
+                            method = "writeDoubleLE";
+                            break;
+                        case "int256":
+                        case "int128":
+                            method = "writeBytes";
+                            break;
+                        case "string":
+                        case "bytes":
+                            wrapping = "writeString(allocator, payload.$L())";
+                            method = "writeBytes";
+                            break;
+                        default:
+                            Matcher vector = VECTOR_PATTERN.matcher(paramType);
+                            if (vector.matches()) {
+                                String innerType = vector.group(1);
+                                String specific = "";
+                                switch (innerType.toLowerCase()) {
+                                    case "int":
+                                        specific = "Int";
                                         break;
-                                    }
-                                    wrapping = "serializeFlags(allocator, payload.$L())";
-                                } else {
-                                    // TODO: use concrete method
-                                    wrapping = "serializeExact(allocator, payload.$L())";
-                                }
-                                method = "writeBytes";
-                        }
-
-                        if (method != null) {
-                            if (paramType.equals("#")) {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
-                            } else {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
-                            }
-                        }
-                    }
-                    serializerBuilder.addCode(";");
-
-                    serializer.addMethod(serializerBuilder.build());
-                }
-
-                for (TlEntityObject method : schema.methods()) {
-                    String name = normalizeName(method.name());
-                    String methodName = "serialize" + name;
-                    boolean generic = method.params().stream()
-                            .anyMatch(p -> p.type().equals("!X"));
-
-                    String packageNameRaw = getPackageName();
-                    String packageName = getPackageName(method.name())
-                            .replace(packageNameRaw, packageNameRaw + METHOD_PACKAGE_PREFIX);
-
-                    ClassName typeRaw = ClassName.get(packageName, name);
-                    TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(TlObject.class)) : typeRaw;
-
-                    if (serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
-                        continue;
-                    }
-
-                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
-                            "0x" + Integer.toHexString(method.id()),
-                            methodName, type);
-
-                    TypeName payloadType = generic ? ParameterizedTypeName.get(typeRaw, genericTypeRef) : typeRaw;
-
-                    MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
-                            .returns(ByteBuf.class)
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .addParameters(Arrays.asList(
-                                    ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(payloadType, "payload").build()));
-
-                    if (generic) {
-                        serializerBuilder.addTypeVariable(genericType);
-                    }
-
-                    serializerBuilder.addCode("return allocator.buffer()\n");
-                    serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
-
-                    for (TlParam param : method.params()) {
-                        String paramType = param.type().toLowerCase();
-                        String paramName = formatFieldName(param.name());
-
-                        String wrapping = "payload.$L()";
-                        String method0;
-                        switch (paramType) {
-                            case "true":
-                                method0 = null;
-                                break;
-                            case "bool":
-                                method0 = "writeIntLE";
-                                wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
-                                break;
-                            case "#":
-                                wrapping = method.params().stream()
-                                        .filter(p -> p.type().startsWith("flags."))
-                                        .map(this::parseFlag)
-                                        .map(f -> "(payload." + formatFieldName(f.name) +
-                                                "() != null ? 1 : 0) << " + f.position)
-                                        .collect(Collectors.joining(" | "));
-                            case "int":
-                                method0 = "writeIntLE";
-                                break;
-                            case "int256":
-                            case "int128":
-                                method0 = "writeBytes";
-                                break;
-                            case "long":
-                                method0 = "writeLongLE";
-                                break;
-                            case "double":
-                                method0 = "writeDoubleLE";
-                                break;
-                            case "string":
-                            case "bytes":
-                                wrapping = "writeString(allocator, payload.$L())";
-                                method0 = "writeBytes";
-                                break;
-                            default:
-                                Matcher vector = VECTOR_PATTERN.matcher(paramType);
-                                if (vector.matches()) {
-                                    String innerType = vector.group(1);
-                                    String specific = "";
-                                    switch (innerType.toLowerCase()) {
-                                        case "int":
-                                            specific = "Int";
-                                            break;
-                                        case "long":
-                                            specific = "Long";
-                                            break;
-                                        case "bytes":
-                                            specific = "Bytes";
-                                            break;
-                                        case "string":
-                                            specific = "String";
-                                            break;
-                                    }
-                                    wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
-                                } else if (paramType.startsWith("flags.")) {
-                                    if (paramType.endsWith("true")) {
-                                        method0 = null;
+                                    case "long":
+                                        specific = "Long";
                                         break;
-                                    }
-                                    wrapping = "serializeFlags(allocator, payload.$L())";
-                                } else {
-                                    // TODO: use concrete method
-                                    wrapping = "serializeExact(allocator, payload.$L())";
+                                    case "bytes":
+                                        specific = "Bytes";
+                                        break;
+                                    case "string":
+                                        specific = "String";
+                                        break;
                                 }
-                                method0 = "writeBytes";
-                        }
-
-                        if (method0 != null) {
-                            if (paramType.equals("#")) {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0);
+                                wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
+                            } else if (paramType.startsWith("flags.")) {
+                                if (paramType.endsWith("true")) {
+                                    method = null;
+                                    break;
+                                }
+                                wrapping = "serializeFlags(allocator, payload.$L())";
                             } else {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0, paramName);
+                                // TODO: use concrete method
+                                wrapping = "serializeExact(allocator, payload.$L())";
                             }
+                            method = "writeBytes";
+                    }
+
+                    if (method != null) {
+                        if (paramType.equals("#")) {
+                            serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
+                        } else {
+                            serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
                         }
                     }
-                    serializerBuilder.addCode(";");
-
-                    serializer.addMethod(serializerBuilder.build());
                 }
+                serializerBuilder.addCode(";");
 
-                serializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + payload.identifier());\n");
-                serializeMethod.endControlFlow();
-                serializer.addMethod(serializeMethod.build());
-
-                JavaFile file = JavaFile.builder(getPackageName(), serializer.build())
-                        .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                "BOOL_FALSE_ID", "BOOL_TRUE_ID",
-                                "serializeBytesVector", "serializeFlags",
-                                "serializeIntVector", "serializeLongVector", "serializeStringVector",
-                                "serializeVector", "writeString")
-                        .indent(INDENT)
-                        .build();
-
-                writeTo(file);
-
-                progress &= ~STAGE_SERIALIZER;
+                serializer.addMethod(serializerBuilder.build());
             }
 
-            if ((progress & STAGE_DESERIALIZER) != 0) {
-                TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
-                        .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                        .addMethod(privateConstructor);
+            for (TlEntityObject method : schema.methods()) {
+                String name = normalizeName(method.name());
+                String methodName = "serialize" + name;
+                boolean generic = method.params().stream()
+                        .anyMatch(p -> p.type().equals("!X"));
 
-                MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("deserialize")
-                        .returns(serializableType)
-                        .addTypeVariable(serializableType)
+                String packageNameRaw = getPackageName();
+                String packageName = getPackageName(method.name())
+                        .replace(packageNameRaw, packageNameRaw + METHOD_PACKAGE_PREFIX);
+
+                ClassName typeRaw = ClassName.get(packageName, name);
+                TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(TlObject.class)) : typeRaw;
+
+                if (serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                    continue;
+                }
+
+                serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
+                        "0x" + Integer.toHexString(method.id()),
+                        methodName, type);
+
+                TypeName payloadType = generic ? ParameterizedTypeName.get(typeRaw, genericTypeRef) : typeRaw;
+
+                MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
+                        .returns(ByteBuf.class)
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .addParameters(Arrays.asList(
+                                ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                                ParameterSpec.builder(payloadType, "payload").build()));
+
+                if (generic) {
+                    serializerBuilder.addTypeVariable(genericType);
+                }
+
+                serializerBuilder.addCode("return allocator.buffer()\n");
+                serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
+
+                for (TlParam param : method.params()) {
+                    String paramType = param.type().toLowerCase();
+                    String paramName = formatFieldName(param.name());
+
+                    String wrapping = "payload.$L()";
+                    String method0;
+                    switch (paramType) {
+                        case "true":
+                            method0 = null;
+                            break;
+                        case "bool":
+                            method0 = "writeIntLE";
+                            wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
+                            break;
+                        case "#":
+                            wrapping = method.params().stream()
+                                    .filter(p -> p.type().startsWith("flags."))
+                                    .map(this::parseFlag)
+                                    .map(f -> "(payload." + formatFieldName(f.name) +
+                                            "() != null ? 1 : 0) << " + f.position)
+                                    .collect(Collectors.joining(" | "));
+                        case "int":
+                            method0 = "writeIntLE";
+                            break;
+                        case "int256":
+                        case "int128":
+                            method0 = "writeBytes";
+                            break;
+                        case "long":
+                            method0 = "writeLongLE";
+                            break;
+                        case "double":
+                            method0 = "writeDoubleLE";
+                            break;
+                        case "string":
+                        case "bytes":
+                            wrapping = "writeString(allocator, payload.$L())";
+                            method0 = "writeBytes";
+                            break;
+                        default:
+                            Matcher vector = VECTOR_PATTERN.matcher(paramType);
+                            if (vector.matches()) {
+                                String innerType = vector.group(1);
+                                String specific = "";
+                                switch (innerType.toLowerCase()) {
+                                    case "int":
+                                        specific = "Int";
+                                        break;
+                                    case "long":
+                                        specific = "Long";
+                                        break;
+                                    case "bytes":
+                                        specific = "Bytes";
+                                        break;
+                                    case "string":
+                                        specific = "String";
+                                        break;
+                                }
+                                wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
+                            } else if (paramType.startsWith("flags.")) {
+                                if (paramType.endsWith("true")) {
+                                    method0 = null;
+                                    break;
+                                }
+                                wrapping = "serializeFlags(allocator, payload.$L())";
+                            } else {
+                                // TODO: use concrete method
+                                wrapping = "serializeExact(allocator, payload.$L())";
+                            }
+                            method0 = "writeBytes";
+                    }
+
+                    if (method0 != null) {
+                        if (paramType.equals("#")) {
+                            serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0);
+                        } else {
+                            serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0, paramName);
+                        }
+                    }
+                }
+                serializerBuilder.addCode(";");
+
+                serializer.addMethod(serializerBuilder.build());
+            }
+
+            serializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + payload.identifier());\n");
+            serializeMethod.endControlFlow();
+            serializer.addMethod(serializeMethod.build());
+
+            writeTo(JavaFile.builder(getPackageName(), serializer.build())
+                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
+                            "BOOL_FALSE_ID", "BOOL_TRUE_ID",
+                            "serializeBytesVector", "serializeFlags",
+                            "serializeIntVector", "serializeLongVector", "serializeStringVector",
+                            "serializeVector", "writeString")
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+
+            TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
+                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                    .addMethod(privateConstructor);
+
+            MethodSpec.Builder deserializeMethod = MethodSpec.methodBuilder("deserialize")
+                    .returns(serializableType)
+                    .addTypeVariable(serializableType)
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
+
+            deserializeMethod.addStatement("int identifier = payload.readIntLE()");
+            deserializeMethod.beginControlFlow("switch (identifier)");
+
+            for (TlEntityObject constructor : schema.constructors()) {
+                String type = normalizeName(constructor.type());
+                String name = normalizeName(constructor.name());
+                String packageName = getPackageName(constructor.type());
+                String qualifiedTypeName = packageName + "." + type;
+
+                boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                        .mapToInt(c -> c.params().size()).sum() == 0 &&
+                        !type.equals("Object");
+
+                boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
+
+                if (type.equalsIgnoreCase(name) && multiple) {
+                    name = "Base" + name;
+                } else if (!multiple && !type.equals("Object")) {
+                    name = type;
+                }
+
+                String methodName = "deserialize" + name;
+
+                if (ignoredTypes.contains(type.toLowerCase())) {
+                    continue;
+                }
+
+                if (deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                    continue;
+                }
+
+                deserializeMethod.addCode("case $L: return (T) $L(payload);\n",
+                        "0x" + Integer.toHexString(constructor.id()), methodName);
+
+                Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+                collectAttributesRecursive(type, attributes);
+
+                String shortenName = extractEnumName(qualifiedTypeName);
+                String shortenNameFixed = canMakeEnum
+                        ? type.endsWith("Type") && !shortenName.endsWith("Type")
+                        ? shortenName + "Type"
+                        : shortenName : name;
+
+                ClassName typeName = ClassName.get(packageName, canMakeEnum ? shortenNameFixed : name);
+
+                MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
+                        .returns(typeName)
                         .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                         .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
 
-                serializeMethod.addStatement("int identifier = payload.readIntLE()");
-                serializeMethod.beginControlFlow("switch (identifier)");
-
-                for (TlEntityObject constructor : schema.constructors()) {
-                    String type = normalizeName(constructor.type());
-                    String name = normalizeName(constructor.name());
-                    String packageName = getPackageName(constructor.type());
-                    String qualifiedTypeName = packageName + "." + type;
-
-                    boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                            .mapToInt(c -> c.params().size()).sum() == 0 &&
-                            !type.equals("Object");
-
-                    boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
-
-                    if (type.equalsIgnoreCase(name) && multiple) {
-                        name = "Base" + name;
-                    } else if (!multiple && !type.equals("Object")) {
-                        name = type;
-                    }
-
-                    String methodName = "deserialize" + name;
-
-                    if (ignoredTypes.contains(type.toLowerCase())) {
-                        continue;
-                    }
-
-                    if (deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
-                        continue;
-                    }
-
-                    serializeMethod.addCode("case $L: return (T) $L(payload);\n",
-                            "0x" + Integer.toHexString(constructor.id()), methodName);
-
-                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
-                    collectAttributesRecursive(type, attributes);
-
-                    String shortenName = extractEnumName(qualifiedTypeName);
-                    String shortenNameFixed = canMakeEnum
-                            ? type.endsWith("Type") && !shortenName.endsWith("Type")
-                            ? shortenName + "Type"
-                            : shortenName : name;
-
-                    ClassName typeName = ClassName.get(packageName, canMakeEnum ? shortenNameFixed : name);
-
-                    MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
-                            .returns(typeName)
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
-
-                    boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
-                    if (withFlags && !canMakeEnum) {
-                        ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
-                        deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
+                boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
+                if (withFlags && !canMakeEnum) {
+                    ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
+                    deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
+                } else {
+                    if (canMakeEnum) {
+                        String constName = screamilize(name.substring(shortenName.length()));
+                        deserializerBuilder.addCode("return $T.$L;", typeName, constName);
+                    } else if (attributes.isEmpty()) {
+                        deserializerBuilder.addCode("return $T.instance();", typeName);
                     } else {
-                        if (canMakeEnum) {
-                            String constName = screamilize(name.substring(shortenName.length()));
-                            deserializerBuilder.addCode("return $T.$L;", typeName, constName);
-                        } else if (attributes.isEmpty()) {
-                            deserializerBuilder.addCode("return $T.instance();", typeName);
-                        } else {
-                            deserializerBuilder.addCode("return $T.builder()", typeName);
-                        }
+                        deserializerBuilder.addCode("return $T.builder()", typeName);
                     }
-
-                    for (TlParam param : attributes) {
-                        String paramType = param.type();
-
-                        String paramName = formatFieldName(param.name());
-                        if (paramType.equals("#")) {
-                            deserializerBuilder.addCode(";\n");
-                            deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
-                            deserializerBuilder.addCode("return builder");
-                        }
-
-                        String unwrapping = deserializeMethod(paramType);
-                        if (unwrapping != null) {
-                            deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
-                        }
-                    }
-                    if (!attributes.isEmpty()) {
-                        deserializerBuilder.addCode("\n\t\t.build();");
-                    }
-                    deserializer.addMethod(deserializerBuilder.build());
                 }
 
-                serializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + identifier);\n");
-                serializeMethod.endControlFlow();
-                deserializer.addMethod(serializeMethod.build());
+                for (TlParam param : attributes) {
+                    String paramType = param.type();
 
-                JavaFile file = JavaFile.builder(getPackageName(), deserializer.build())
-                        .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
-                                "BOOL_FALSE_ID",
-                                "BOOL_TRUE_ID", "deserializeBytesVector",
-                                "deserializeIntVector",
-                                "deserializeLongVector", "deserializeStringVector",
-                                "deserializeVector", "readBytes", "readString")
-                        .indent(INDENT)
-                        .build();
+                    String paramName = formatFieldName(param.name());
+                    if (paramType.equals("#")) {
+                        deserializerBuilder.addCode(";\n");
+                        deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
+                        deserializerBuilder.addCode("return builder");
+                    }
 
-                writeTo(file);
-
-                progress &= ~STAGE_DESERIALIZER;
+                    String unwrapping = deserializeMethod(paramType);
+                    if (unwrapping != null) {
+                        deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
+                    }
+                }
+                if (!attributes.isEmpty()) {
+                    deserializerBuilder.addCode("\n\t\t.build();");
+                }
+                deserializer.addMethod(deserializerBuilder.build());
             }
+
+            deserializeMethod.addCode("default: throw new IllegalArgumentException(\"Incorrect TlObject identifier: \" + identifier);\n");
+            deserializeMethod.endControlFlow();
+            deserializer.addMethod(deserializeMethod.build());
+
+            writeTo(JavaFile.builder(getPackageName(), deserializer.build())
+                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"),
+                            "BOOL_FALSE_ID",
+                            "BOOL_TRUE_ID", "deserializeBytesVector",
+                            "deserializeIntVector",
+                            "deserializeLongVector", "deserializeStringVector",
+                            "deserializeVector", "readBytes", "readString")
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+
 
             // endregion
         } catch (Throwable t) {
@@ -935,8 +906,8 @@ public class SchemaGenerator extends AbstractProcessor {
             }
 
             if (c == '.' || c == '-' || c == '_' || Character.isWhitespace(c) &&
-                Character.isLetterOrDigit(p) && i + 1 < type.length() &&
-                Character.isLetterOrDigit(type.charAt(i + 1))) {
+                    Character.isLetterOrDigit(p) && i + 1 < type.length() &&
+                    Character.isLetterOrDigit(type.charAt(i + 1))) {
 
                 buf.append('_');
             } else {
@@ -1113,13 +1084,20 @@ public class SchemaGenerator extends AbstractProcessor {
     @Nullable
     private String deserializeMethod(String type) {
         switch (type.toLowerCase()) {
-            case "true": return "TlTrue.INSTANCE";
-            case "bool": return "payload.readIntLE() == BOOL_TRUE_ID";
-            case "int": return "payload.readIntLE()";
-            case "long": return "payload.readLongLE()";
-            case "double": return "payload.readDouble()";
-            case "bytes": return "readBytes(payload)";
-            case "string": return "readString(payload)";
+            case "true":
+                return "TlTrue.INSTANCE";
+            case "bool":
+                return "payload.readIntLE() == BOOL_TRUE_ID";
+            case "int":
+                return "payload.readIntLE()";
+            case "long":
+                return "payload.readLongLE()";
+            case "double":
+                return "payload.readDouble()";
+            case "bytes":
+                return "readBytes(payload)";
+            case "string":
+                return "readString(payload)";
             default:
                 if (type.equals("#")) {
                     return null;
