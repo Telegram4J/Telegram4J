@@ -57,7 +57,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                             .addHandler(new MTProtoIdentifierChannelInitializer()))))
                     .next()
                     .doOnNext(con -> {
-                        log.info("Connected to datacenter #{}", con.getDataCenter().getId());
+                        log.debug("Connected to datacenter #{}", con.getDataCenter().getId());
                         connections.put(con.getDataCenter(), con);
                         currentConnection = con;
                     })
@@ -95,6 +95,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .map(buf -> mtProtoResources.getTransport()
                         .decode(con.getConnection()
                                 .channel().alloc(), buf))
+                .flatMap(buf -> {
+                    if (buf.readableBytes() == Integer.BYTES) { // error code
+                        int code = buf.readIntLE();
+                        return Mono.error(() -> TransportException.create(code));
+                    }
+                    return Mono.just(buf);
+                })
                 .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease));
     }
 
@@ -106,7 +113,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private class MTProtoIdentifierChannelInitializer extends ChannelInitializer<SocketChannel> {
         @Override
         protected void initChannel(SocketChannel ch) {
-            log.info("Sending header identifier to the server.");
+            log.debug("Sending header identifier to the server.");
 
             ByteBuf identifier = mtProtoResources.getTransport()
                     .identifier(ch.alloc());

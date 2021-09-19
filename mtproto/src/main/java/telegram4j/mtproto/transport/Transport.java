@@ -1,4 +1,4 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.transport;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;

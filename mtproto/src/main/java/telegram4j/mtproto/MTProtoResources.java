@@ -1,6 +1,8 @@
 package telegram4j.mtproto;
 
 import reactor.netty.tcp.TcpClient;
+import telegram4j.mtproto.transport.AbridgedTransport;
+import telegram4j.mtproto.transport.Transport;
 
 import java.util.function.Supplier;
 
