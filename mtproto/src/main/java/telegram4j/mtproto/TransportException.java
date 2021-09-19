@@ -17,11 +17,11 @@ public class TransportException extends RuntimeException {
 
         switch (code) {
             case 404:
-                message = "Attempt to invoke a non-existent object/method";
+                message = "Attempt to invoke a non-existent object/method.";
                 break;
         }
 
-        message = "code: " + code + ", " + message;
+        message = "code: " + code + ", message: " + message;
 
         return new TransportException(message, code);
     }
