@@ -5,7 +5,7 @@ import reactor.core.publisher.Sinks;
 import reactor.netty.Connection;
 import reactor.util.concurrent.Queues;
 
-public class MTProtoConnection {
+class MTProtoConnection {
     private final Connection connection;
     private final Sinks.Many<ByteBuf> receiver;
     private final DataCenter dataCenter;
