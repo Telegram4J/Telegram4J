@@ -97,7 +97,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 .channel().alloc(), buf))
                 .flatMap(buf -> {
                     if (buf.readableBytes() == Integer.BYTES) { // error code
-                        int code = buf.readIntLE();
+                        int code = buf.readIntLE() * -1;
                         return Mono.error(() -> TransportException.create(code));
                     }
                     return Mono.just(buf);

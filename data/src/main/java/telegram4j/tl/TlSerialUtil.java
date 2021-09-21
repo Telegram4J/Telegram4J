@@ -117,7 +117,7 @@ public final class TlSerialUtil {
         int size = buf.readIntLE();
         List<byte[]> list = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            list.add(readString(buf).getBytes(StandardCharsets.UTF_8));
+            list.add(readBytes(buf));
         }
         return list;
     }
@@ -136,7 +136,7 @@ public final class TlSerialUtil {
         ByteBuf buf = allocator.buffer();
         buf.writeIntLE(VECTOR_ID);
         buf.writeIntLE(vector.size());
-        for (Long l : vector) {
+        for (long l : vector) {
             buf.writeLongLE(l);
         }
         return buf;
@@ -146,7 +146,7 @@ public final class TlSerialUtil {
         ByteBuf buf = allocator.buffer();
         buf.writeIntLE(VECTOR_ID);
         buf.writeIntLE(vector.size());
-        for (Integer i : vector) {
+        for (int i : vector) {
             buf.writeIntLE(i);
         }
         return buf;

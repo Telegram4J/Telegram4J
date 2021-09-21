@@ -12,7 +12,6 @@ public class TransportException extends RuntimeException {
     }
 
     static TransportException create(int code) {
-        code = Math.abs(code);
         String message = null;
 
         switch (code) {
