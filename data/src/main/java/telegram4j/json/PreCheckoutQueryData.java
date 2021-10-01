@@ -31,7 +31,7 @@ public interface PreCheckoutQueryData {
     String invoicePayload();
 
     @JsonProperty("shipping_option_id")
-    Optional<String> shipping_option_id();
+    Optional<String> shippingOptionId();
 
     @JsonProperty("order_info")
     Optional<OrderInfoData> orderInfo();
