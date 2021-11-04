@@ -34,11 +34,6 @@ public final class SupergroupChat extends GroupChat implements LinkedChat, Named
         return getData().inviteLink();
     }
 
-    @Override
-    public Optional<ChatPermissions> getPermissions() {
-        return getData().permissions().map(data -> new ChatPermissions(getClient(), data));
-    }
-
     public Optional<Integer> getSlowModeDelay() {
         return getData().slowModeDelay();
     }
