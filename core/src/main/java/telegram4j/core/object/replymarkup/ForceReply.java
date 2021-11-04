@@ -17,4 +17,9 @@ public class ForceReply extends ReplyMarkup {
     public Optional<Boolean> isSelective() {
         return getData().selective();
     }
+
+    @Override
+    public String toString() {
+        return "ForceReply{} " + super.toString();
+    }
 }

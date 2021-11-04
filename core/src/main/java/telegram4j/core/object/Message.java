@@ -294,7 +294,7 @@ public class Message implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(getId());
+        return getId().hashCode();
     }
 
     @Override

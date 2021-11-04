@@ -79,7 +79,7 @@ public class InputMedia implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (!(o instanceof InputMedia)) return false;
         InputMedia that = (InputMedia) o;
@@ -88,7 +88,7 @@ public class InputMedia implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

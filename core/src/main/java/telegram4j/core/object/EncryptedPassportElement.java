@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.EncryptedPassportElementData;
 import telegram4j.json.EncryptedPassportElementType;
@@ -74,7 +75,7 @@ public class EncryptedPassportElement implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         EncryptedPassportElement that = (EncryptedPassportElement) o;
@@ -83,7 +84,7 @@ public class EncryptedPassportElement implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

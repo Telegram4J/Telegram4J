@@ -1,5 +1,6 @@
 package telegram4j.core.object.replymarkup;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.object.LoginUrl;
 import telegram4j.json.InlineKeyboardButtonData;
 
@@ -53,7 +54,7 @@ public final class InlineKeyboardButton {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         InlineKeyboardButton that = (InlineKeyboardButton) o;
@@ -62,7 +63,7 @@ public final class InlineKeyboardButton {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

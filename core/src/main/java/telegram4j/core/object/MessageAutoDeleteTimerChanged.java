@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.MessageAutoDeleteTimerChangedData;
 
@@ -29,7 +30,7 @@ public class MessageAutoDeleteTimerChanged implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         MessageAutoDeleteTimerChanged that = (MessageAutoDeleteTimerChanged) o;
@@ -38,7 +39,7 @@ public class MessageAutoDeleteTimerChanged implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

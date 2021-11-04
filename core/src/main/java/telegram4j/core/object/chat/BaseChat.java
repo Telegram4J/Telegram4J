@@ -1,5 +1,6 @@
 package telegram4j.core.object.chat;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.Message;
@@ -56,7 +57,7 @@ class BaseChat implements Chat {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (!(o instanceof Chat)) return false;
         Chat that = (Chat) o;
@@ -65,7 +66,7 @@ class BaseChat implements Chat {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(getId());
+        return getId().hashCode();
     }
 
     @Override

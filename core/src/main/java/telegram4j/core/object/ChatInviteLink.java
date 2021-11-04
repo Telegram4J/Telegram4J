@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.ChatInviteLinkData;
 import telegram4j.json.UserData;
@@ -51,7 +52,7 @@ public class ChatInviteLink implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ChatInviteLink that = (ChatInviteLink) o;

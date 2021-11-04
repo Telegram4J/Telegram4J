@@ -51,7 +51,7 @@ public class ChatPhoto implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

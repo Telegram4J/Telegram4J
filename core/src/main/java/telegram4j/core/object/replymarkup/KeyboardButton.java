@@ -1,5 +1,6 @@
 package telegram4j.core.object.replymarkup;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.json.KeyboardButtonData;
 import telegram4j.json.KeyboardButtonPollType;
 
@@ -39,7 +40,7 @@ public final class KeyboardButton {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         KeyboardButton that = (KeyboardButton) o;
@@ -48,7 +49,7 @@ public final class KeyboardButton {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

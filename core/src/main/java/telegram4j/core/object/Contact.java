@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.ContactData;
 import telegram4j.json.api.Id;
@@ -47,16 +48,16 @@ public class Contact implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Contact that = (Contact) o;
-        return data.equals(that.data);
+        Contact contact = (Contact) o;
+        return data.equals(contact.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

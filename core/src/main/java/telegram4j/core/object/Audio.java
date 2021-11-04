@@ -68,13 +68,13 @@ public class Audio implements Attachment {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Audio that = (Audio) o;
-        return data.equals(that.data);
+        Audio audio = (Audio) o;
+        return data.equals(audio.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

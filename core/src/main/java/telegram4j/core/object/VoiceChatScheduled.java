@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.VoiceChatScheduledData;
 
@@ -30,7 +31,7 @@ public class VoiceChatScheduled implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         VoiceChatScheduled that = (VoiceChatScheduled) o;
@@ -39,7 +40,7 @@ public class VoiceChatScheduled implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

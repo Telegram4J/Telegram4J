@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.TelegramClient;
 import telegram4j.json.InvoiceData;
 
@@ -45,7 +46,7 @@ public class Invoice implements TelegramObject {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Invoice that = (Invoice) o;
@@ -54,7 +55,7 @@ public class Invoice implements TelegramObject {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override

@@ -1,5 +1,6 @@
 package telegram4j.core.object.replymarkup;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.json.ReplyMarkupData;
 
 import java.util.Objects;
@@ -17,7 +18,7 @@ public class ReplyMarkup {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (!(o instanceof ReplyMarkup)) return false;
         ReplyMarkup that = (ReplyMarkup) o;
@@ -26,7 +27,7 @@ public class ReplyMarkup {
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(data);
+        return data.hashCode();
     }
 
     @Override
