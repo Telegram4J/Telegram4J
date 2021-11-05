@@ -27,7 +27,6 @@ public class GroupChat extends BaseChat implements GrouporizableChat {
         return getData().inviteLink();
     }
 
-    @Override
     public Optional<ChatPermissions> getPermissions() {
         return getData().permissions().map(data -> new ChatPermissions(getClient(), data));
     }
