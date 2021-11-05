@@ -1,6 +1,5 @@
 package telegram4j.core;
 
-import reactor.core.publisher.Mono;
 import telegram4j.core.event.MessageCreateEvent;
 import telegram4j.core.spec.MessageCreateSpec;
 import telegram4j.json.BotCommandData;
@@ -28,30 +27,14 @@ public class TelegramClientExample {
 
         client.on(MessageCreateEvent.class)
                 .filter(event -> event.getMessage().getEntities()
-                        .map(list -> list.stream().anyMatch(entity -> entity.getType() == MessageEntityType.BOT_COMMAND))
-                        .map(bool -> bool && event.getMessage().getText()
-                                .map(s -> s.contains("/shrug"))
-                                .orElse(false))
+                        .map(list -> list.stream().anyMatch(entity ->
+                                entity.getType() == MessageEntityType.BOT_COMMAND &&
+                                entity.getContent().contains("shrug")))
                         .orElse(false))
                 .flatMap(event -> client.sendMessage(MessageCreateSpec.builder()
                         .text("¯\\_(ツ)_/¯")
                         .chatId(event.getMessage().getChatId())
                         .build()))
-                .subscribe();
-
-        client.on(MessageCreateEvent.class)
-                .filter(event -> event.getMessage().getText()
-                        .map("амогус"::equals)
-                        .orElse(false))
-                .flatMap(event -> {
-                    long time = System.currentTimeMillis();
-                    return client.sendMessage(MessageCreateSpec.builder()
-                                    .chatId(event.getMessage().getChat().getId().asLong())
-                                    .text("amogus")
-                                    .build())
-                            .then(Mono.fromRunnable(() -> System.out.println("Executed for " +
-                                    (System.currentTimeMillis() - time) + "ms")));
-                })
                 .subscribe();
 
         client.login().block();
