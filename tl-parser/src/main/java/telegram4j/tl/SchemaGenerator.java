@@ -1102,7 +1102,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     String typeRaw = matcher.group(2);
 
                     String innerMethod = deserializeMethod(typeRaw);
-                    return "(flags & " + (int) Math.pow(2, position) + ") != 0 ? " + innerMethod + " : null";
+                    return "(flags & " + (1 << position) + ") != 0 ? " + innerMethod + " : null";
                 }
 
                 Matcher vector = VECTOR_PATTERN.matcher(type);
