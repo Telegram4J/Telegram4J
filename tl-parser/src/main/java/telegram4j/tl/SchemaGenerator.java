@@ -913,6 +913,15 @@ public class SchemaGenerator extends AbstractProcessor {
         return true;
     }
 
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        SupportedSourceVersion sourceVersion = getClass().getAnnotation(SupportedSourceVersion.class);
+        if (sourceVersion != null) {
+            return sourceVersion.value();
+        }
+        return SourceVersion.latestSupported();
+    }
+
     private void preparePackages() {
         try {
 
