@@ -90,10 +90,8 @@ public class SchemaGenerator extends AbstractProcessor {
                 .build();
 
         try {
-            InputStream api = filer.getResource(
-                    StandardLocation.ANNOTATION_PROCESSOR_PATH, "", API_SCHEMA).openInputStream();
-            InputStream mtproto = filer.getResource(
-                    StandardLocation.ANNOTATION_PROCESSOR_PATH, "", MTPROTO_SCHEMA).openInputStream();
+            InputStream api = filer.getResource(StandardLocation.ANNOTATION_PROCESSOR_PATH, "", API_SCHEMA).openInputStream();
+            InputStream mtproto = filer.getResource(StandardLocation.ANNOTATION_PROCESSOR_PATH, "", MTPROTO_SCHEMA).openInputStream();
 
             TlSchema apiSchema = mapper.readValue(api, TlSchema.class);
             TlSchema mtprotoSchema = mapper.readValue(mtproto, TlSchema.class);
@@ -159,17 +157,20 @@ public class SchemaGenerator extends AbstractProcessor {
                         !name.equals("Object");
 
                 String shortenName = extractEnumName(qualifiedName);
-                String shortenNameFixed = name.endsWith("Type") && !shortenName.endsWith("Type")
-                        ? shortenName + "Type"
-                        : shortenName;
 
                 TypeSpec.Builder superType = canMakeEnum
-                        ? TypeSpec.enumBuilder(shortenNameFixed)
+                        ? TypeSpec.enumBuilder(name)
                         : TypeSpec.interfaceBuilder(name);
 
                 superType.addModifiers(Modifier.PUBLIC);
                 if (canMakeEnum) {
                     superType.addSuperinterface(TlObject.class);
+
+                    MethodSpec.Builder ofMethod = MethodSpec.methodBuilder("of")
+                            .addParameter(int.class, "identifier")
+                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                            .returns(ClassName.get(packageName, name))
+                            .beginControlFlow("switch (identifier)");
 
                     for (TlEntityObject constructor : typeTree.get(qualifiedName)) {
                         String subtypeName = normalizeName(constructor.name());
@@ -179,6 +180,9 @@ public class SchemaGenerator extends AbstractProcessor {
                                         "$L", "0x" + Integer.toHexString(constructor.id()))
                                 .build());
 
+                        ofMethod.addCode("case $L: return $L;\n",
+                                "0x" + Integer.toHexString(constructor.id()),
+                                constName);
                         computed.put(getPackageName(constructor.name()) + "." + subtypeName, constructor);
                     }
 
@@ -189,12 +193,18 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addStatement("this.identifier = identifier")
                             .build());
 
+                    ofMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
+                            "Incorrect type identifier: 0x");
+                    ofMethod.endControlFlow();
+
                     superType.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
                             .returns(TypeName.INT)
                             .addModifiers(Modifier.PUBLIC)
                             .addCode("return identifier;")
                             .build());
+
+                    superType.addMethod(ofMethod.build());
                 } else {
                     superType.addSuperinterface(TlSerializable.class);
 
@@ -358,12 +368,6 @@ public class SchemaGenerator extends AbstractProcessor {
                     typeSpec.addTypeVariable(genericType);
                 }
 
-                String shortenName = extractEnumName(qualifiedTypeName);
-                // strange exception in naming
-                String shortenNameFixed = type.endsWith("Type") && !shortenName.endsWith("Type")
-                        ? shortenName + "Type"
-                        : shortenName;
-
                 boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
                         .mapToInt(c -> c.params().size()).sum() == 0 &&
                         !type.equals("Object");
@@ -373,7 +377,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
                 TypeName returnType = ParameterizedTypeName.get(
                         ClassName.get(TlMethod.class),
-                        parseType(canMakeEnum && !method.type().equals("HttpWait") ? shortenNameFixed : importMethod).box());
+                        parseType(canMakeEnum && !method.type().equals("HttpWait") ? type : importMethod).box());
 
                 typeSpec.addSuperinterface(returnType);
 
@@ -455,11 +459,18 @@ public class SchemaGenerator extends AbstractProcessor {
 
             // region serializer
 
+            Map<String, List<Integer>> enumTypes = typeTree.entrySet().stream()
+                    .filter(e -> e.getValue().stream()
+                            .mapToInt(c -> c.params().size())
+                            .sum() == 0)
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().stream()
+                            .map(TlEntityObject::id)
+                            .collect(Collectors.toList())));
+
             TypeVariableName serializableType = TypeVariableName.get("T", TlSerializable.class);
             MethodSpec privateConstructor = MethodSpec.constructorBuilder()
                     .addModifiers(Modifier.PRIVATE)
                     .build();
-
 
             TypeSpec.Builder serializer = TypeSpec.classBuilder("TlSerializer")
                     .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
@@ -473,8 +484,8 @@ public class SchemaGenerator extends AbstractProcessor {
                     .addParameters(Arrays.asList(
                             ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
                             ParameterSpec.builder(serializableType, "payload").build()))
-                    .beginControlFlow("if (payload instanceof TlObject)")
-                    .addStatement("return serialize(allocator, (TlObject) payload)")
+                    .beginControlFlow("if (payload instanceof $T)", TlObject.class)
+                    .addStatement("return serialize(allocator, ($T) payload)", TlObject.class)
                     .nextControlFlow("else")
                     .addStatement("throw new IllegalArgumentException(\"Unrecorded TL Serializable supertype: \" + payload.getClass())")
                     .endControlFlow()
@@ -496,31 +507,30 @@ public class SchemaGenerator extends AbstractProcessor {
                 String packageName = getPackageName(constructor.name());
                 String qualifiedTypeName = packageName + "." + type;
 
-                boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
+                // Enums must be handled after types
+                if (enumTypes.containsKey(qualifiedTypeName)) {
+                    continue;
+                }
 
-                String shortenName = extractEnumName(qualifiedTypeName);
-                boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                        .mapToInt(c -> c.params().size()).sum() == 0 &&
-                        !type.equals("Object");
+                boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
 
                 if (type.equalsIgnoreCase(name) && multiple) {
                     name = "Base" + name;
                 } else if (!multiple && !type.equals("Object")) { // see mtproto schema, gzip_packed/Object
                     name = type;
-                } else if (canMakeEnum) {
-                    name = type.endsWith("Type") && !shortenName.endsWith("Type")
-                            ? shortenName + "Type"
-                            : shortenName;
                 }
 
-                String methodName = "serialize" + name;
-
-                if (ignoredTypes.contains(type.toLowerCase()) ||
-                        serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                if (ignoredTypes.contains(type.toLowerCase())) {
                     continue;
                 }
 
                 TypeName payloadType = ClassName.get(packageName, name);
+
+                String methodName = "serialize" + name;
+
+                if (serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName))) {
+                    continue;
+                }
 
                 serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
                         "0x" + Integer.toHexString(constructor.id()),
@@ -557,8 +567,8 @@ public class SchemaGenerator extends AbstractProcessor {
                             wrapping = attributes.stream()
                                     .filter(p -> p.type().startsWith("flags."))
                                     .map(this::parseFlag)
-                                    .map(f -> "(payload." + formatFieldName(f.name) +
-                                            "() != null ? 1 : 0) << " + f.position)
+                                    .map(f -> "(payload." + formatFieldName(f.getName()) +
+                                            "() != null ? 1 : 0) << " + f.getPosition())
                                     .collect(Collectors.joining(" | "));
                         case "int":
                             method = "writeIntLE";
@@ -679,8 +689,8 @@ public class SchemaGenerator extends AbstractProcessor {
                             wrapping = method.params().stream()
                                     .filter(p -> p.type().startsWith("flags."))
                                     .map(this::parseFlag)
-                                    .map(f -> "(payload." + formatFieldName(f.name) +
-                                            "() != null ? 1 : 0) << " + f.position)
+                                    .map(f -> "(payload." + formatFieldName(f.getName()) +
+                                            "() != null ? 1 : 0) << " + f.getPosition())
                                     .collect(Collectors.joining(" | "));
                         case "int":
                             method0 = "writeIntLE";
@@ -746,6 +756,20 @@ public class SchemaGenerator extends AbstractProcessor {
                 serializer.addMethod(serializerBuilder.build());
             }
 
+            // Enums serialization
+            for (Iterator<List<Integer>> iterator = enumTypes.values().iterator(); iterator.hasNext(); ) {
+                List<Integer> chunk = iterator.next();
+                for (int i = 0; i < chunk.size(); i++) {
+                    int id = chunk.get(i);
+
+                    String sep = "\n";
+                    if (i + 1 == chunk.size() && !iterator.hasNext()) {
+                        sep = " return allocator.buffer().writeIntLE(payload.identifier());\n";
+                    }
+                    serializeMethod.addCode("case $L:" + sep, "0x" + Integer.toHexString(id));
+                }
+            }
+
             serializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(payload.identifier()));\n",
                     "Incorrect TlObject identifier: 0x");
             serializeMethod.endControlFlow();
@@ -809,12 +833,8 @@ public class SchemaGenerator extends AbstractProcessor {
                 collectAttributesRecursive(type, attributes);
 
                 String shortenName = extractEnumName(qualifiedTypeName);
-                String shortenNameFixed = canMakeEnum
-                        ? type.endsWith("Type") && !shortenName.endsWith("Type")
-                        ? shortenName + "Type"
-                        : shortenName : name;
 
-                ClassName typeName = ClassName.get(packageName, canMakeEnum ? shortenNameFixed : name);
+                ClassName typeName = ClassName.get(packageName, canMakeEnum ? type : name);
 
                 MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
                         .returns(typeName)
@@ -961,49 +981,34 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     private TypeName parseType(String type) {
-        if (type.equalsIgnoreCase("!x") ||
-                type.equalsIgnoreCase("x")) {
-            return TypeVariableName.get("T", TlSerializable.class);
-        }
-        if (type.equalsIgnoreCase("int")) {
-            return TypeName.INT;
-        }
-        if (type.equalsIgnoreCase("true")) {
-            return ClassName.get(TlTrue.class);
-        }
-        if (type.equalsIgnoreCase("bool")) {
-            return TypeName.BOOLEAN;
-        }
-        if (type.equalsIgnoreCase("long")) {
-            return TypeName.LONG;
-        }
-        if (type.equalsIgnoreCase("double")) {
-            return TypeName.DOUBLE;
-        }
-        if (type.equalsIgnoreCase("bytes") ||
-                type.equalsIgnoreCase("int128") ||
-                type.equalsIgnoreCase("int256")) {
-            return TypeName.get(byte[].class);
-        }
-        if (type.equalsIgnoreCase("string")) {
-            return TypeName.get(String.class);
-        }
-        if (type.equalsIgnoreCase("object")) {
-            return ClassName.get(TlObject.class);
-        }
-        Matcher flag = FLAG_PATTERN.matcher(type);
-        if (flag.matches()) {
-            TypeName innerType = parseType(flag.group(2));
-            return innerType.box();
-        }
+        switch (type.toLowerCase(Locale.ROOT)) {
+            case "!x":
+            case "x": return TypeVariableName.get("T", TlSerializable.class);
+            case "int": return TypeName.INT;
+            case "true": return ClassName.get(TlTrue.class);
+            case "bool": return TypeName.BOOLEAN;
+            case "long": return TypeName.LONG;
+            case "double": return TypeName.DOUBLE;
+            case "bytes":
+            case "int128":
+            case "int256": return TypeName.get(byte[].class);
+            case "string": return TypeName.get(String.class);
+            case "object": return ClassName.get(TlObject.class);
+            default:
+                Matcher flag = FLAG_PATTERN.matcher(type);
+                if (flag.matches()) {
+                    TypeName innerType = parseType(flag.group(2));
+                    return innerType.box();
+                }
 
-        Matcher vector = VECTOR_PATTERN.matcher(type);
-        if (vector.matches()) {
-            TypeName templateType = parseType(vector.group(1));
-            return ParameterizedTypeName.get(ClassName.get(List.class), templateType.box());
-        }
+                Matcher vector = VECTOR_PATTERN.matcher(type);
+                if (vector.matches()) {
+                    TypeName templateType = parseType(vector.group(1));
+                    return ParameterizedTypeName.get(ClassName.get(List.class), templateType.box());
+                }
 
-        return ClassName.get(getPackageName(type), normalizeName(type));
+                return ClassName.get(getPackageName(type), normalizeName(type));
+        }
     }
 
     private void collectAttributesRecursive(String name, Set<TlParam> params) {
@@ -1095,11 +1100,10 @@ public class SchemaGenerator extends AbstractProcessor {
                     return null;
                 }
 
-                if (type.startsWith("flags.")) {
-                    Matcher matcher = FLAG_PATTERN.matcher(type);
-                    matcher.matches();
-                    int position = Integer.parseInt(matcher.group(1));
-                    String typeRaw = matcher.group(2);
+                Matcher flag = FLAG_PATTERN.matcher(type);
+                if (flag.matches()) {
+                    int position = Integer.parseInt(flag.group(1));
+                    String typeRaw = flag.group(2);
 
                     String innerMethod = deserializeMethod(typeRaw);
                     return "(flags & " + (1 << position) + ") != 0 ? " + innerMethod + " : null";
@@ -1130,7 +1134,7 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     // java 9
-    public static <T, U, A, R> Collector<T, ?, R> flatMapping(Function<? super T, ? extends Stream<? extends U>> mapper,
+    static <T, U, A, R> Collector<T, ?, R> flatMapping(Function<? super T, ? extends Stream<? extends U>> mapper,
                                                               Collector<? super U, A, R> downstream) {
         BiConsumer<A, ? super U> downstreamAccumulator = downstream.accumulator();
         return Collector.of(downstream.supplier(),
@@ -1143,41 +1147,5 @@ public class SchemaGenerator extends AbstractProcessor {
                 },
                 downstream.combiner(), downstream.finisher(),
                 downstream.characteristics().toArray(new Collector.Characteristics[0]));
-    }
-
-    static class Flag {
-        private final int position;
-        private final String name;
-        private final TypeName type;
-
-        Flag(int position, String name, TypeName type) {
-            this.position = position;
-            this.name = name;
-            this.type = type;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Flag flag = (Flag) o;
-            return position == flag.position
-                    && name.equals(flag.name)
-                    && type.equals(flag.type);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(position, name, type);
-        }
-
-        @Override
-        public String toString() {
-            return "Flag{" +
-                    "position=" + position +
-                    ", name='" + name + '\'' +
-                    ", type=" + type +
-                    '}';
-        }
     }
 }
