@@ -459,13 +459,11 @@ public class SchemaGenerator extends AbstractProcessor {
 
             // region serializer
 
-            Map<String, List<Integer>> enumTypes = typeTree.entrySet().stream()
+            Map<String, List<TlEntityObject>> enumTypes = typeTree.entrySet().stream()
                     .filter(e -> e.getValue().stream()
                             .mapToInt(c -> c.params().size())
                             .sum() == 0)
-                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().stream()
-                            .map(TlEntityObject::id)
-                            .collect(Collectors.toList())));
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             TypeVariableName serializableType = TypeVariableName.get("T", TlSerializable.class);
             MethodSpec privateConstructor = MethodSpec.constructorBuilder()
@@ -757,10 +755,10 @@ public class SchemaGenerator extends AbstractProcessor {
             }
 
             // Enums serialization
-            for (Iterator<List<Integer>> iterator = enumTypes.values().iterator(); iterator.hasNext(); ) {
-                List<Integer> chunk = iterator.next();
+            for (Iterator<List<TlEntityObject>> iterator = enumTypes.values().iterator(); iterator.hasNext(); ) {
+                List<TlEntityObject> chunk = iterator.next();
                 for (int i = 0; i < chunk.size(); i++) {
-                    int id = chunk.get(i);
+                    int id = chunk.get(i).id();
 
                     String sep = "\n";
                     if (i + 1 == chunk.size() && !iterator.hasNext()) {
@@ -808,9 +806,10 @@ public class SchemaGenerator extends AbstractProcessor {
                 String packageName = getPackageName(constructor.type());
                 String qualifiedTypeName = packageName + "." + type;
 
-                boolean canMakeEnum = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                        .mapToInt(c -> c.params().size()).sum() == 0 &&
-                        !type.equals("Object");
+                // Enums must be handled after types
+                if (enumTypes.containsKey(qualifiedTypeName)) {
+                    continue;
+                }
 
                 boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
 
@@ -836,9 +835,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                 collectAttributesRecursive(type, attributes);
 
-                String shortenName = extractEnumName(qualifiedTypeName);
-
-                ClassName typeName = ClassName.get(packageName, canMakeEnum ? type : name);
+                ClassName typeName = ClassName.get(packageName, name);
 
                 MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(methodName)
                         .returns(typeName)
@@ -846,18 +843,13 @@ public class SchemaGenerator extends AbstractProcessor {
                         .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
 
                 boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
-                if (withFlags && !canMakeEnum) {
+                if (withFlags) {
                     ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
                     deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
+                } else if (attributes.isEmpty()) {
+                    deserializerBuilder.addCode("return $T.instance();", typeName);
                 } else {
-                    if (canMakeEnum) {
-                        String constName = screamilize(name.substring(shortenName.length()));
-                        deserializerBuilder.addCode("return $T.$L;", typeName, constName);
-                    } else if (attributes.isEmpty()) {
-                        deserializerBuilder.addCode("return $T.instance();", typeName);
-                    } else {
-                        deserializerBuilder.addCode("return $T.builder()", typeName);
-                    }
+                    deserializerBuilder.addCode("return $T.builder()", typeName);
                 }
 
                 for (TlParam param : attributes) {
@@ -879,6 +871,21 @@ public class SchemaGenerator extends AbstractProcessor {
                     deserializerBuilder.addCode("\n\t\t.build();");
                 }
                 deserializer.addMethod(deserializerBuilder.build());
+            }
+
+            // Enums deserialization
+            for (List<TlEntityObject> chunk : enumTypes.values()) {
+                for (int i = 0; i < chunk.size(); i++) {
+                    TlEntityObject obj = chunk.get(i);
+                    if (i + 1 == chunk.size()) {
+                        String type = normalizeName(obj.type());
+                        String packageName = getPackageName(obj.type());
+                        deserializeMethod.addCode("case $L: return (T) $T.of(identifier);\n", "0x" + Integer.toHexString(obj.id()),
+                                ClassName.get(packageName, type));
+                    } else {
+                        deserializeMethod.addCode("case $L:\n", "0x" + Integer.toHexString(obj.id()));
+                    }
+                }
             }
 
             deserializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
