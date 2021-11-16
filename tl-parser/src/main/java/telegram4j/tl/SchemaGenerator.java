@@ -129,7 +129,7 @@ public class SchemaGenerator extends AbstractProcessor {
             preparePackages();
         }
 
-        if (annotations.size() > 2) {
+        if (annotations.size() > 1) {
             messager.printMessage(Diagnostic.Kind.ERROR, "[TL parser] Generation package must be specified once!", currentElement);
             return true;
         }
@@ -784,6 +784,10 @@ public class SchemaGenerator extends AbstractProcessor {
                     .indent(INDENT)
                     .skipJavaLangImports(true)
                     .build());
+
+            // endregion
+
+            // region deserialization
 
             TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
                     .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
