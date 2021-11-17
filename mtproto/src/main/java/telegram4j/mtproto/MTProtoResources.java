@@ -1,7 +1,7 @@
 package telegram4j.mtproto;
 
 import reactor.netty.tcp.TcpClient;
-import telegram4j.mtproto.transport.AbridgedTransport;
+import telegram4j.mtproto.transport.IntermediateTransport;
 import telegram4j.mtproto.transport.Transport;
 
 import java.util.function.Supplier;
@@ -9,7 +9,7 @@ import java.util.function.Supplier;
 public class MTProtoResources {
 
     public static final Supplier<TcpClient> DEFAULT_TCP_CLIENT = TcpClient::create;
-    public static final Supplier<Transport> DEFAULT_TRANSPORT = AbridgedTransport::new;
+    public static final Supplier<Transport> DEFAULT_TRANSPORT = IntermediateTransport::new;
 
     private final TcpClient tcpClient;
     private final boolean test;

@@ -38,8 +38,8 @@ public final class PublicRsaKey {
                         "f18d978d54f8b7c713eb10247607e69af9ef44f38e28f8b439f257a11572945cc0406fe3f37bb92b79112db69eedf2d" +
                         "c71584a661638ea5becb9e23585074b80d57d9f5710dd30d2da940e0ada2f1b878397dc1a72b5ce2531b6f7dd158e09" +
                         "c828d03450ca0ff8a174deacebcaa22dde84ef66ad370f259d18af806638012da0ca4a70baa83d9c158f3552bc9158e" +
-                        "69bf332a45809e1c36905a5caa12348dd57941a482131be7b2355a5f4635374f3bd3ddf5ff925bf4809ee27c1e67d912" +
-                        "0c5fe08a9de458b1b4a3c5d0a428437f2beca81f4e2d5ff", 16),
+                        "69bf332a45809e1c36905a5caa12348dd57941a482131be7b2355a5f4635374f3bd3ddf5ff925bf4809ee27c1e67d91" +
+                        "20c5fe08a9de458b1b4a3c5d0a428437f2beca81f4e2d5ff", 16),
                 new BigInteger("010001", 16)));
 
         tmp.put(0xaeae98e13cd7f94fL, create(

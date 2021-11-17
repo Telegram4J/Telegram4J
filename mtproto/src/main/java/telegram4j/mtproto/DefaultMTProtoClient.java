@@ -62,17 +62,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         currentConnection = con;
                     })
                     .flatMap(con -> Mono.create(sink -> {
-                        Disposable.Composite forCleanup = Disposables.composite();
+                        sink.success(con);
 
-                        forCleanup.add(con.getConnection().inbound()
+                        sink.onCancel(con.getConnection().inbound()
                                 .receive()
                                 .map(ByteBuf::retain)
                                 .doOnNext(buf -> con.getReceiver().emitNext(buf, FAIL_FAST))
                                 .subscribe());
-
-                        sink.success(con);
-
-                        sink.onCancel(forCleanup);
                     }));
         });
     }
@@ -96,7 +92,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         .decode(con.getConnection()
                                 .channel().alloc(), buf))
                 .flatMap(buf -> {
-                    if (buf.readableBytes() == Integer.BYTES) { // error code
+                    if (buf.readableBytes() == Integer.BYTES) { // error code writes as negative int32
                         int code = buf.readIntLE() * -1;
                         return Mono.error(() -> TransportException.create(code));
                     }
