@@ -18,6 +18,10 @@ public class TransportException extends RuntimeException {
             case 404:
                 message = "Attempt to invoke a non-existent object/method.";
                 break;
+
+            case 429:
+                message = "Too many connections are established to the same IP in a too short lapse of time.";
+                break;
         }
 
         message = "code: " + code + ", message: " + message;
