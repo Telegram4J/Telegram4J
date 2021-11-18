@@ -11,8 +11,8 @@ public class IntermediateTransport implements Transport {
 
     @Override
     public ByteBuf encode(ByteBufAllocator allocator, ByteBuf payload) {
-        return allocator.buffer(Integer.BYTES + payload.writerIndex())
-                .writeIntLE(payload.writerIndex())
+        return allocator.buffer(Integer.BYTES + payload.readableBytes())
+                .writeIntLE(payload.readableBytes())
                 .writeBytes(payload);
     }
 
