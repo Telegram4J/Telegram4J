@@ -8,6 +8,7 @@ import reactor.util.annotation.Nullable;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 public final class TlSerialUtil {
 
@@ -35,17 +36,18 @@ public final class TlSerialUtil {
     }
 
     public static byte[] readBytes(ByteBuf buf) {
-        int length = buf.readUnsignedByte();
-        if (length == 0xfe) {
-            length = buf.readByte() +
-                    (buf.readByte() << 8) +
-                    (buf.readByte() << 16);
+        int count = buf.readUnsignedByte();
+        int start = 1;
+        if (count >= 0xfe) {
+            count = buf.readUnsignedByte() | buf.readUnsignedByte() << 8 | buf.readUnsignedByte() << 16;
+            start = 4;
         }
 
-        byte[] bytes = new byte[length];
-        buf.readBytes(bytes);
-        while (buf.readerIndex() % 4 != 0) {
-            buf.readByte();
+        byte[] bytes = readBytes(buf, count);
+        int offset = (count + start) % 4;
+        if (offset != 0) {
+            int offsetCount = 4 - offset;
+            buf.skipBytes(offsetCount);
         }
 
         return bytes;
@@ -60,76 +62,63 @@ public final class TlSerialUtil {
     }
 
     public static ByteBuf writeString(ByteBufAllocator allocator, byte[] bytes) {
-        int capacity = (bytes.length <= 0xfd ? Byte.BYTES : Byte.BYTES * 4) + bytes.length;
-        if (capacity % 4 != 0) {
-            capacity = (int) (Math.ceil(capacity / 4f) * 4);
-        }
+        ByteBuf buf = allocator.buffer();
 
-        ByteBuf buf = allocator.buffer(capacity);
-        if (bytes.length <= 0xfd) {
-            buf.writeByte(bytes.length);
-        } else {
+        int startOffset = 1;
+        if (bytes.length >= 0xfe) {
+            startOffset = 4;
             buf.writeByte(0xfe);
             buf.writeByte(bytes.length & 0xff);
-            buf.writeByte((bytes.length & 0xff00) >> 8);
-            buf.writeByte((bytes.length & 0xff0000) >> 16);
+            buf.writeByte(bytes.length >> 8 & 0xff);
+            buf.writeByte(bytes.length >> 16 & 0xff);
+        } else {
+            buf.writeByte(bytes.length);
         }
 
         buf.writeBytes(bytes);
-        while (buf.writerIndex() % 4 != 0) {
-            buf.writeByte(0);
+
+        int offset = (bytes.length + startOffset) % 4;
+        if (offset != 0) {
+            int offsetCount = 4 - offset;
+            byte[] data = new byte[offsetCount];
+            buf.writeBytes(data);
         }
+
         return buf;
     }
 
     public static List<Long> deserializeLongVector(ByteBuf buf) {
-        buf.readIntLE(); // vector id
-        int size = buf.readIntLE();
-        List<Long> list = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            list.add(buf.readLongLE());
-        }
-        return list;
+        return deserializeVector0(buf, false, ByteBuf::readLongLE);
     }
 
     public static List<Integer> deserializeIntVector(ByteBuf buf) {
-        buf.readIntLE(); // vector id
-        int size = buf.readIntLE();
-        List<Integer> list = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            list.add(buf.readIntLE());
-        }
-        return list;
+        return deserializeVector0(buf, false, ByteBuf::readIntLE);
     }
 
     public static List<String> deserializeStringVector(ByteBuf buf) {
-        buf.readIntLE(); // vector id
-        int size = buf.readIntLE();
-        List<String> list = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            list.add(readString(buf));
-        }
-        return list;
+        return deserializeVector0(buf, false, TlSerialUtil::readString);
     }
 
     public static List<byte[]> deserializeBytesVector(ByteBuf buf) {
-        buf.readIntLE(); // vector id
+        return deserializeVector0(buf, false, TlSerialUtil::readBytes);
+    }
+
+    public static <T> List<T> deserializeVector0(ByteBuf buf, boolean bare, Function<? super ByteBuf, ? extends T> parser) {
+        assert bare || buf.readIntLE() == VECTOR_ID;
         int size = buf.readIntLE();
-        List<byte[]> list = new ArrayList<>(size);
+        List<T> list = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            list.add(readBytes(buf));
+            list.add(parser.apply(buf));
         }
         return list;
     }
 
+    public static <T extends TlSerializable> List<T> deserializeVector(ByteBuf buf, boolean bare) {
+        return deserializeVector0(buf, bare, TlDeserializer::deserialize);
+    }
+
     public static <T extends TlSerializable> List<T> deserializeVector(ByteBuf buf) {
-        buf.readIntLE(); // vector id
-        int size = buf.readIntLE();
-        List<T> list = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            list.add(TlDeserializer.deserialize(buf));
-        }
-        return list;
+        return deserializeVector(buf, false);
     }
 
     public static ByteBuf serializeLongVector(ByteBufAllocator allocator, List<Long> vector) {
