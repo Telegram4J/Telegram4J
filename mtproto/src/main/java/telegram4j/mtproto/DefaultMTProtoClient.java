@@ -5,17 +5,20 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.ReferenceCountUtil;
-import reactor.core.Disposable;
-import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.netty.FutureMono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.concurrent.Queues;
+import telegram4j.mtproto.crypto.MTProtoAuthorizationContext;
+import telegram4j.mtproto.crypto.MTProtoAuthorizationHandler;
 
+import java.net.InetSocketAddress;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 
@@ -24,11 +27,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
 
     private final MTProtoResources mtProtoResources;
-    private final Map<DataCenter, MTProtoConnection> connections = new ConcurrentHashMap<>();
+    private final ConcurrentMap<DataCenter, MTProtoConnection> connections = new ConcurrentHashMap<>();
+    private final MTProtoAuthorizationHandler authorizationHandler;
     private volatile MTProtoConnection currentConnection;
 
     public DefaultMTProtoClient(MTProtoResources mtProtoResources) {
         this.mtProtoResources = mtProtoResources;
+        this.authorizationHandler = new MTProtoAuthorizationHandler(this, new MTProtoAuthorizationContext());
+    }
+
+    public MTProtoAuthorizationHandler getAuthorizationHandler() {
+        return authorizationHandler;
     }
 
     @Override
@@ -48,29 +57,34 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             return Flux.fromIterable(dataCenters)
                     .flatMap(dc -> Mono.fromSupplier(() -> connections.get(dc))
-                            .switchIfEmpty(mtProtoResources.getTcpClient()
-                                    .host(dc.getAddress())
-                                    .port(dc.getPort())
-                                    .connect()
-                                    .map(con -> new MTProtoConnection(con, dc))
-                                    .doOnNext(con -> con.getConnection()
-                                            .addHandler(new MTProtoIdentifierChannelInitializer()))))
+                            .switchIfEmpty(createConnection(dc)))
                     .next()
+                    .doOnNext(con -> currentConnection = con);
+        });
+    }
+
+    private Mono<MTProtoConnection> createConnection(DataCenter dc) {
+        return Mono.defer(() -> {
+            Sinks.Many<ByteBuf> inboundSink = newEmitterSink();
+
+            return mtProtoResources.getTcpClient()
+                    .remoteAddress(() -> new InetSocketAddress(dc.getAddress(), dc.getPort()))
+                    .handle((inbound, outbound) -> inbound.receive()
+                            .map(ByteBuf::retain)
+                            .doOnNext(buf -> inboundSink.emitNext(buf, FAIL_FAST))
+                            .then())
+                    .connect()
+                    .doOnNext(con -> con.addHandler(new MTProtoIdentifierChannelInitializer()))
+                    .map(con -> new MTProtoConnection(con, inboundSink, dc))
                     .doOnNext(con -> {
                         log.debug("Connected to datacenter #{}", con.getDataCenter().getId());
                         connections.put(con.getDataCenter(), con);
-                        currentConnection = con;
-                    })
-                    .flatMap(con -> Mono.create(sink -> {
-                        sink.success(con);
-
-                        sink.onCancel(con.getConnection().inbound()
-                                .receive()
-                                .map(ByteBuf::retain)
-                                .doOnNext(buf -> con.getReceiver().emitNext(buf, FAIL_FAST))
-                                .subscribe());
-                    }));
+                    });
         });
+    }
+
+    private static <T> Sinks.Many<T> newEmitterSink() {
+        return Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
     }
 
     @Override
@@ -92,7 +106,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         .decode(con.getConnection()
                                 .channel().alloc(), buf))
                 .flatMap(buf -> {
-                    if (buf.readableBytes() == Integer.BYTES) { // error code writes as negative int32
+                    if (buf.readableBytes() == Integer.BYTES) { // The error code writes as negative int32
                         int code = buf.readIntLE() * -1;
                         return Mono.error(() -> TransportException.create(code));
                     }
