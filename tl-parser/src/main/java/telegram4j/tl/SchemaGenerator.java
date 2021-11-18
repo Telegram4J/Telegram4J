@@ -50,7 +50,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
     private static final String METHOD_PACKAGE_PREFIX = ".request";
     private static final String MTPROTO_PACKAGE_PREFIX = ".mtproto";
-    private static final String TEMPLATE_PACKAGE_INFO = "template-package-info";
+    private static final String TEMPLATE_PACKAGE_INFO = "package-info.template";
     private static final String UTIL_PACKAGE = "telegram4j.tl";
     private static final String API_SCHEMA = "api.json";
     private static final String MTPROTO_SCHEMA = "mtproto.json";
