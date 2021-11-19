@@ -22,7 +22,7 @@ public class ChatTest {
                 .build();
 
         ByteBufAllocator allocator = ByteBufAllocator.DEFAULT;
-        ByteBuf bytes = TlSerializer.serializeExact(allocator, expected);
+        ByteBuf bytes = TlSerializer.serialize(allocator, expected);
 
         Chat result = TlDeserializer.deserialize(bytes);
         assertEquals(result, expected);

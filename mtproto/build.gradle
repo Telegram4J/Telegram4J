@@ -1,3 +1,5 @@
 dependencies {
     api project(":data")
+
+    testImplementation "ch.qos.logback:logback-classic:$logback_version"
 }

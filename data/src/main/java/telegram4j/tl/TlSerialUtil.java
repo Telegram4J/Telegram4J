@@ -1,14 +1,17 @@
 package telegram4j.tl;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.EmptyByteBuf;
+import io.netty.buffer.*;
+import reactor.core.Exceptions;
 import reactor.util.annotation.Nullable;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public final class TlSerialUtil {
 
@@ -19,6 +22,41 @@ public final class TlSerialUtil {
     public static final int BOOL_FALSE_ID = 0xbc799737;
 
     private TlSerialUtil() {
+    }
+
+    public static ByteBuf compressGzip(ByteBufAllocator allocator, TlObject object) {
+        ByteBufOutputStream bufOut = new ByteBufOutputStream(allocator.buffer());
+        try (GZIPOutputStream out = new GZIPOutputStream(bufOut)) {
+            ByteBuf buf = TlSerializer.serialize(allocator, object);
+            out.write(ByteBufUtil.getBytes(buf));
+            return bufOut.buffer();
+        }catch (IOException e) {
+            throw Exceptions.propagate(e);
+        }
+    }
+
+    public static <T extends TlObject> T decompressGzip(ByteBuf buf) {
+        try (BufferedInputStream in = new BufferedInputStream(new GZIPInputStream(new ByteBufInputStream(buf)))) {
+            ByteBuf payload = buf.alloc().buffer();
+            int remaining = buf.readableBytes() * 2;
+            int n;
+            do {
+                byte[] tmp = new byte[Math.min(remaining, 8192)];
+                int nread = 0;
+                while ((n = in.read(tmp, nread, Math.min(tmp.length - nread, remaining))) > 0) {
+                    nread += n;
+                    remaining -= n;
+                }
+
+                if (nread > 0) {
+                    payload.writeBytes(tmp);
+                }
+            } while (n >= 0 && remaining > 0);
+
+            return TlDeserializer.deserialize(payload);
+        }catch (IOException e) {
+            throw Exceptions.propagate(e);
+        }
     }
 
     public static byte[] readInt128(ByteBuf buf) {
@@ -113,11 +151,11 @@ public final class TlSerialUtil {
         return list;
     }
 
-    public static <T extends TlSerializable> List<T> deserializeVector(ByteBuf buf, boolean bare) {
+    public static <T> List<T> deserializeVector(ByteBuf buf, boolean bare) {
         return deserializeVector0(buf, bare, TlDeserializer::deserialize);
     }
 
-    public static <T extends TlSerializable> List<T> deserializeVector(ByteBuf buf) {
+    public static <T> List<T> deserializeVector(ByteBuf buf) {
         return deserializeVector(buf, false);
     }
 
@@ -161,12 +199,12 @@ public final class TlSerialUtil {
         return buf;
     }
 
-    public static ByteBuf serializeVector(ByteBufAllocator allocator, List<? extends TlSerializable> vector) {
+    public static ByteBuf serializeVector(ByteBufAllocator allocator, List<? extends TlObject> vector) {
         ByteBuf buf = allocator.buffer();
         buf.writeIntLE(VECTOR_ID);
         buf.writeIntLE(vector.size());
-        for (TlSerializable o : vector) {
-            buf.writeBytes(TlSerializer.serializeExact(allocator, o));
+        for (TlObject o : vector) {
+            buf.writeBytes(TlSerializer.serialize(allocator, o));
         }
         return buf;
     }
@@ -203,9 +241,9 @@ public final class TlSerialUtil {
                 buf.writeBytes(serializeUnknown(allocator, o));
             }
             return buf;
-        } else if (value instanceof TlSerializable) {
-            TlSerializable value0 = (TlSerializable) value;
-            return TlSerializer.serializeExact(allocator, value0);
+        } else if (value instanceof TlObject) {
+            TlObject value0 = (TlObject) value;
+            return TlSerializer.serialize(allocator, value0);
         } else {
             throw new IllegalArgumentException("Incorrect TL serializable type: " + value + " (" + value.getClass() + ")");
         }
