@@ -1,6 +1,6 @@
 package telegram4j.tl;
 
-public interface TlObject extends TlSerializable {
+public interface TlObject {
 
     int identifier();
 }

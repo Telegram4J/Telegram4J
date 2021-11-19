@@ -1,6 +1,7 @@
 package telegram4j.mtproto.crypto;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
 
@@ -9,12 +10,12 @@ import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.RSAPublicKeySpec;
 
-final class CryptoUtil {
+public final class CryptoUtil {
 
     private CryptoUtil() {
     }
 
-    static final SecureRandom random = new SecureRandom();
+    public static final SecureRandom random = new SecureRandom();
 
     static ThreadLocal<MessageDigest> SHA1 = ThreadLocal.withInitial(() -> {
         try {
@@ -24,11 +25,19 @@ final class CryptoUtil {
         }
     });
 
-    static BigInteger fromByteArray(byte[] data) {
+    static ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> {
+        try {
+            return MessageDigest.getInstance("SHA256");
+        } catch (NoSuchAlgorithmException e) {
+            throw Exceptions.propagate(e);
+        }
+    });
+
+    public static BigInteger fromByteArray(byte[] data) {
         return new BigInteger(1, data);
     }
 
-    static byte[] toByteArray(ByteBuf buf) {
+    public static byte[] toByteArray(ByteBuf buf) {
         byte[] data = new byte[buf.readableBytes()];
         buf.markReaderIndex();
         buf.readBytes(data);
@@ -36,7 +45,7 @@ final class CryptoUtil {
         return data;
     }
 
-    static byte[] toByteArray(BigInteger val) {
+    public static byte[] toByteArray(BigInteger val) {
         byte[] res = val.toByteArray();
         if (res[0] == 0) {
             byte[] res2 = new byte[res.length - 1];
@@ -46,7 +55,7 @@ final class CryptoUtil {
         return res;
     }
 
-    static byte[] concat(byte[]... v) {
+    public static byte[] concat(byte[]... v) {
         int len = 0;
         for (byte[] value : v) {
             len += value.length;
@@ -61,7 +70,7 @@ final class CryptoUtil {
     }
 
     // from https://github.com/zhukov/webogram/blob/6c8b8474194ed8a76c4cf70db303c0c1cd86891f/app/js/lib/bin_utils.js#L597
-    static long pqPrimeLeemon(long n) {
+    public static long pqPrimeLeemon(long n) {
         long g = 0;
         for (int i = 0; i < 3; i++) {
             int q = (random.nextInt(128) & 15) + 17;
@@ -128,14 +137,19 @@ final class CryptoUtil {
         }
     }
 
+    public static byte[] sha256Digest(byte[] bytes) {
+        MessageDigest sha256 = SHA256.get();
+        sha256.reset();
+        return sha256.digest(bytes);
+    }
 
-    static byte[] sha1Digest(byte[] bytes) {
+    public static byte[] sha1Digest(byte[] bytes) {
         MessageDigest sha1 = SHA1.get();
         sha1.reset();
         return sha1.digest(bytes);
     }
 
-    static byte[] sha1Digest(byte[]... bytes) {
+    public static byte[] sha1Digest(byte[]... bytes) {
         MessageDigest sha1 = SHA1.get();
         sha1.reset();
         for (byte[] b : bytes) {
@@ -144,13 +158,13 @@ final class CryptoUtil {
         return sha1.digest();
     }
 
-    static byte[] substring(byte[] src, int start, int len) {
+    public static byte[] substring(byte[] src, int start, int len) {
         byte[] res = new byte[len];
         System.arraycopy(src, start, res, 0, len);
         return res;
     }
 
-    static byte[] alignKeyZero(byte[] src, int size) {
+    public static byte[] alignKeyZero(byte[] src, int size) {
         if (src.length == size) {
             return src;
         }
@@ -161,7 +175,7 @@ final class CryptoUtil {
         return concat(new byte[size - src.length], src);
     }
 
-    static byte[] xor(byte[] a, byte[] b) {
+    public static byte[] xor(byte[] a, byte[] b) {
         byte[] res = new byte[a.length];
         for (int i = 0; i < a.length; i++) {
             res[i] = (byte) (a[i] ^ b[i]);
@@ -169,12 +183,46 @@ final class CryptoUtil {
         return res;
     }
 
-    static byte[] align(byte[] src, int factor) {
+    public static byte[] align(byte[] src, int factor) {
         if (src.length % factor == 0) {
             return src;
         }
         int padding = factor - src.length % factor;
 
         return concat(src, random.generateSeed(padding));
+    }
+
+    public static long readLongLE(byte[] bytes) {
+        return (long) bytes[0] & 0xff |
+                ((long) bytes[1] & 0xff) << 8 |
+                ((long) bytes[2] & 0xff) << 16 |
+                ((long) bytes[3] & 0xff) << 24 |
+                ((long) bytes[4] & 0xff) << 32 |
+                ((long) bytes[5] & 0xff) << 40 |
+                ((long) bytes[6] & 0xff) << 48 |
+                ((long) bytes[7] & 0xff) << 56;
+    }
+
+    public static AES256IGECipher createAesCipher(byte[] messageKey, ByteBuf authKeyBuf, boolean server) {
+        ByteBufAllocator alloc = authKeyBuf.alloc();
+        int x = server ? 8 : 0;
+
+        ByteBuf sha256a = alloc.buffer().writeBytes(sha256Digest(
+                concat(messageKey, toByteArray(authKeyBuf.slice(x, 36)))));
+
+        ByteBuf sha256b = alloc.buffer().writeBytes(sha256Digest(
+                concat(toByteArray(authKeyBuf.slice(x + 40, 36)), messageKey)));
+
+        byte[] aesKey = concat(
+                toByteArray(sha256a.slice(0, 8)),
+                toByteArray(sha256b.slice(8, 16)),
+                toByteArray(sha256a.slice(24, 8)));
+
+        byte[] aesIV = concat(
+                toByteArray(sha256b.slice(0, 8)),
+                toByteArray(sha256a.slice(8, 16)),
+                toByteArray(sha256b.slice(24, 8)));
+
+        return new AES256IGECipher(aesKey, aesIV);
     }
 }

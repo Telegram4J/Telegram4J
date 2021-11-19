@@ -34,12 +34,15 @@ public class MTProtoAuthorizationHandler {
     }
 
     public Mono<Void> start() {
-        byte[] nonce = random.generateSeed(16);
-        context.setNonce(nonce);
+        return Mono.defer(() -> {
+            byte[] nonce = random.generateSeed(16);
+            context.setNonce(nonce);
 
-        return send(ByteBufAllocator.DEFAULT, ReqPqMulti.builder()
-                .nonce(nonce)
-                .build());
+            log.info("start");
+            return send(ByteBufAllocator.DEFAULT, ReqPqMulti.builder()
+                    .nonce(nonce)
+                    .build());
+        });
     }
 
     public Mono<Void> handle(ByteBuf payload) {
