@@ -5,7 +5,6 @@ import reactor.core.Exceptions;
 import reactor.util.annotation.Nullable;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +43,7 @@ public final class TlSerialUtil {
                 byte[] buf1 = new byte[Math.min(remaining, 1024 * 8)];
                 int nread = 0;
 
-                while ((n = ((InputStream) in).read(buf1, nread, Math.min(buf1.length - nread, remaining))) > 0) {
+                while ((n = in.read(buf1, nread, Math.min(buf1.length - nread, remaining))) > 0) {
                     nread += n;
                     remaining -= n;
                 }
@@ -78,7 +77,7 @@ public final class TlSerialUtil {
         int count = buf.readUnsignedByte();
         int start = 1;
         if (count >= 0xfe) {
-            count = buf.readUnsignedByte() | buf.readUnsignedByte() << 8 | buf.readUnsignedByte() << 16;
+            count = buf.readUnsignedMediumLE();
             start = 4;
         }
 
@@ -105,9 +104,7 @@ public final class TlSerialUtil {
 
         if (bytes.length >= 0xfe) {
             buf.writeByte(0xfe);
-            buf.writeByte(bytes.length & 0xff);
-            buf.writeByte(bytes.length >> 8 & 0xff);
-            buf.writeByte(bytes.length >> 16 & 0xff);
+            buf.writeMediumLE(bytes.length);
         } else {
             buf.writeByte(bytes.length);
         }
