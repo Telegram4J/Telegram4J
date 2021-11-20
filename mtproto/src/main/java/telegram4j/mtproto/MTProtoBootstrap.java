@@ -14,27 +14,26 @@ import java.util.function.Function;
 public class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
+    private final TelegramResources telegramResources;
 
     private MTProtoResources mtProtoResources;
     private int acksSendThreshold = 5;
 
-    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier) {
+    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, TelegramResources telegramResources) {
         this.optionsModifier = optionsModifier;
+        this.telegramResources = telegramResources;
     }
 
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
-        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier));
+        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), telegramResources);
     }
 
-    public MTProtoBootstrap<O> setMTProtoResources(MTProtoResources resources) {
-        this.mtProtoResources = Objects.requireNonNull(resources, "resources");
+    public MTProtoBootstrap<O> setMTProtoResources(MTProtoResources mtProtoResources) {
+        this.mtProtoResources = Objects.requireNonNull(mtProtoResources, "mtProtoResources");
         return this;
     }
 
     public void setAcksSendThreshold(int acksSendThreshold) {
-        if (acksSendThreshold < 0) {
-            throw new IllegalArgumentException("acksSendThreshold must be positive.");
-        }
         this.acksSendThreshold = acksSendThreshold;
     }
 
@@ -54,7 +53,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
 
                     Sinks.Empty<Void> onCloseSink = Sinks.empty();
                     Sinks.One<Boolean> onAuthSink = Sinks.one();
-                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(onCloseSink.asMono(), session);
+                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(telegramResources, onCloseSink.asMono(), session);
 
                     MTProtoAuthorizationHandler authorizationHandler = new MTProtoAuthorizationHandler(session, onAuthSink);
                     RpcHandler rpcHandler = new RpcHandler(session);
