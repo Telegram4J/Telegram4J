@@ -4,8 +4,8 @@ import io.netty.buffer.*;
 import reactor.core.Exceptions;
 import reactor.util.annotation.Nullable;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,25 +35,26 @@ public final class TlSerialUtil {
         }
     }
 
-    public static <T extends TlObject> T decompressGzip(ByteBuf buf) {
-        try (BufferedInputStream in = new BufferedInputStream(new GZIPInputStream(new ByteBufInputStream(buf)))) {
-            ByteBuf payload = buf.alloc().buffer();
-            int remaining = buf.readableBytes() * 2;
+    public static <T extends TlObject> T decompressGzip(ByteBuf packed) {
+        try (GZIPInputStream in = new GZIPInputStream(new ByteBufInputStream(packed))) {
+            ByteBuf result = packed.alloc().buffer();
+            int remaining = Integer.MAX_VALUE;
             int n;
             do {
-                byte[] tmp = new byte[Math.min(remaining, 8192)];
+                byte[] buf1 = new byte[Math.min(remaining, 1024 * 8)];
                 int nread = 0;
-                while ((n = in.read(tmp, nread, Math.min(tmp.length - nread, remaining))) > 0) {
+
+                while ((n = ((InputStream) in).read(buf1, nread, Math.min(buf1.length - nread, remaining))) > 0) {
                     nread += n;
                     remaining -= n;
                 }
 
                 if (nread > 0) {
-                    payload.writeBytes(tmp);
+                    result.writeBytes(buf1, 0, nread);
                 }
             } while (n >= 0 && remaining > 0);
 
-            return TlDeserializer.deserialize(payload);
+            return TlDeserializer.deserialize(result);
         }catch (IOException e) {
             throw Exceptions.propagate(e);
         }
@@ -102,9 +103,7 @@ public final class TlSerialUtil {
     public static ByteBuf writeString(ByteBufAllocator allocator, byte[] bytes) {
         ByteBuf buf = allocator.buffer();
 
-        int startOffset = 1;
         if (bytes.length >= 0xfe) {
-            startOffset = 4;
             buf.writeByte(0xfe);
             buf.writeByte(bytes.length & 0xff);
             buf.writeByte(bytes.length >> 8 & 0xff);
@@ -115,7 +114,7 @@ public final class TlSerialUtil {
 
         buf.writeBytes(bytes);
 
-        int offset = (bytes.length + startOffset) % 4;
+        int offset = ((bytes.length >= 0xfe ? 4 : 1) + bytes.length) % 4;
         if (offset != 0) {
             int offsetCount = 4 - offset;
             byte[] data = new byte[offsetCount];
