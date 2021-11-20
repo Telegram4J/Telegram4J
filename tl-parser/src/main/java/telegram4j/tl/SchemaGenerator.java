@@ -47,6 +47,10 @@ public class SchemaGenerator extends AbstractProcessor {
             "bool", "true", "false", "null", "int", "long",
             "string", "flags", "vector", "#"));
 
+    private static final List<String> rpcTypes = Collections.unmodifiableList(Arrays.asList(
+            "MsgDetailedInfo", "MsgDetailedInfo", "MsgResendReq",
+            "MsgsAck", "MsgsAllInfo", "MsgsStateInfo", "MsgsStateReq"));
+
     private static final String METHOD_PACKAGE_PREFIX = ".request";
     private static final String MTPROTO_PACKAGE_PREFIX = ".mtproto";
     private static final String TEMPLATE_PACKAGE_INFO = "package-info.template";
@@ -322,6 +326,10 @@ public class SchemaGenerator extends AbstractProcessor {
 
                     TypeSpec.Builder builder = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC);
+
+                    if (rpcTypes.contains(type)) { // rpc messages aren't methods
+                        builder.addSuperinterface(ParameterizedTypeName.get(TlMethod.class, Void.class));
+                    }
 
                     if (multiple) {
                         builder.addSuperinterface(ClassName.get(packageName, type));
@@ -1020,7 +1028,7 @@ public class SchemaGenerator extends AbstractProcessor {
             case "int128":
             case "int256": return TypeName.get(byte[].class);
             case "string": return TypeName.get(String.class);
-            case "object": return ClassName.get(schema.superType());
+            case "object": return ClassName.get(TlObject.class);
             default:
                 Matcher flag = FLAG_PATTERN.matcher(type);
                 if (flag.matches()) {
