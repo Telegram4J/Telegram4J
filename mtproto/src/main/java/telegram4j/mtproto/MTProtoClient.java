@@ -1,16 +1,12 @@
 package telegram4j.mtproto;
 
-import io.netty.buffer.ByteBuf;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface MTProtoClient {
 
-    Mono<Void> connect();
+    Mono<MTProtoSession> openSession();
 
-    Mono<Void> send(ByteBuf payload);
+    MTProtoOptions getOptions();
 
-    Flux<ByteBuf> receiver();
-
-    Mono<Void> onDispose();
+    Mono<Void> close();
 }

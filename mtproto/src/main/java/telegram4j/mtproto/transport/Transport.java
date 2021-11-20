@@ -7,7 +7,7 @@ public interface Transport {
 
     ByteBuf identifier(ByteBufAllocator allocator);
 
-    ByteBuf encode(ByteBufAllocator allocator, ByteBuf payload);
+    ByteBuf encode(ByteBuf payload);
 
-    ByteBuf decode(ByteBufAllocator allocator, ByteBuf payload);
+    ByteBuf decode(ByteBuf payload);
 }

@@ -2,88 +2,155 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.crypto.AES256IGECipher;
-import telegram4j.mtproto.crypto.MTProtoAuthorizationContext;
-import telegram4j.tl.TlDeserializer;
+import telegram4j.mtproto.crypto.PayloadMapperStrategy;
 import telegram4j.tl.TlObject;
-import telegram4j.tl.mtproto.RpcError;
+import telegram4j.tl.TlSerialUtil;
+import telegram4j.tl.mtproto.*;
 
-import java.util.Arrays;
-
-import static telegram4j.mtproto.crypto.CryptoUtil.*;
-import static telegram4j.tl.TlSerialUtil.*;
+import java.util.Objects;
+import java.util.Queue;
 
 public class RpcHandler {
 
     private static final Logger log = Loggers.getLogger(RpcHandler.class);
 
-    private final MTProtoClient client;
+    private final MTProtoSession session;
 
-    public RpcHandler(MTProtoClient client) {
-        this.client = client;
+    public RpcHandler(MTProtoSession session) {
+        this.session = session;
     }
 
     public Mono<Void> handle(ByteBuf payload) {
-        MTProtoAuthorizationContext ctx = client.getContext();
-        ByteBufAllocator alloc = payload.alloc();
-        if (ctx.getServerSalt() == null || ctx.getAuthKey() == null) {
-            return Mono.empty();
+        return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
+                .receive(payload)
+                .flatMap(obj -> handleServiceMessage(obj, session.getLastMessageId()));
+    }
+
+    private Mono<Void> handleServiceMessage(TlObject obj, long messageId) {
+        if (session.getAcknowledgments().contains(messageId)) {
+            return sendAcknowledgments();
         }
-
-        long authKeyId = payload.readLongLE();
-        if (authKeyId == 0) {
-            return Mono.error(new IllegalStateException("Auth key id must be non zero."));
-        }
-
-        // if (authKeyId != readLongLE(authKeyId)) {
-        //    return Mono.error(new IllegalStateException("Incorrect auth key id."));
-        // }
-
-        byte[] messageKey = readInt128(payload);
-
-        ByteBuf authKeyBuf = alloc.buffer().writeBytes(ctx.getAuthKey());
-        AES256IGECipher cipher = createAesCipher(messageKey, authKeyBuf, true);
-
-        byte[] decrypted = cipher.decrypt(toByteArray(payload));
-        byte[] messageKeyCLarge = sha256Digest(concat(toByteArray(authKeyBuf.slice(96, 32)), decrypted));
-        byte[] messageKeyC = Arrays.copyOfRange(messageKeyCLarge, 8, 24);
-
-        if(!Arrays.equals(messageKey, messageKeyC)){
-            return Mono.error(new IllegalStateException("Incorrect message key."));
-        }
-
-        ByteBuf decryptedBuf = alloc.buffer().writeBytes(decrypted);
-
-        long salt = decryptedBuf.readLongLE();
-        log.info("salt: {}", salt);
-        long sessionId = decryptedBuf.readLongLE();
-        log.info("sessionId: {}", sessionId);
-        long messageId = decryptedBuf.readLongLE();
-        log.info("messageId: {}", messageId);
-        int seqNo = decryptedBuf.readIntLE();
-        log.info("seqNo: {}", seqNo);
-        int length = decryptedBuf.readIntLE();
-        log.info("length: {}", length);
-
-        if (length % 4 != 0) {
-            return Mono.error(new IllegalStateException("Length of data isn't a multiple of four."));
-        }
-
-        TlObject obj = TlDeserializer.deserialize(decryptedBuf.readBytes(length));
-        log.info("received object: {}", obj);
 
         if (obj instanceof RpcError) {
             RpcError rpcError = (RpcError) obj;
             return Mono.error(() -> RpcException.create(rpcError));
         }
 
-        return Mono.empty();
+        if (obj instanceof RpcResult) {
+            RpcResult rpcResult = (RpcResult) obj;
+
+            if (log.isDebugEnabled()) {
+                log.debug("Handling rpc result for message: {}", rpcResult.reqMsgId());
+            }
+
+            TlObject unpacked = rpcResult.result();
+
+            if (unpacked instanceof GzipPacked) {
+                GzipPacked gzipPacked = (GzipPacked) unpacked;
+                ByteBufAllocator alloc = session.getConnection().channel().alloc();
+                unpacked = TlSerialUtil.decompressGzip(alloc.buffer()
+                        .writeBytes(gzipPacked.packedData()));
+            }
+
+            return handleServiceMessage(unpacked, rpcResult.reqMsgId());
+        }
+
+        if (obj instanceof MessageContainer) {
+            MessageContainer messageContainer = (MessageContainer) obj;
+            if (log.isDebugEnabled()) {
+                log.debug("Handling message container: {}", messageContainer);
+            }
+
+            return Flux.fromIterable(messageContainer.messages())
+                    .flatMap(message -> handleServiceMessage(
+                            message.body(), message.msgId()))
+                    .then();
+        }
+
+        if (obj instanceof NewSession) {
+            NewSession newSession = (NewSession) obj;
+
+            log.debug("Handling new session salt creation.");
+
+            session.setServerSalt(newSession.serverSalt());
+
+            return acknowledgmentMessage(messageId);
+        }
+
+        if (obj instanceof BadMsgNotification) {
+            BadMsgNotification badMsgNotification = (BadMsgNotification) obj;
+            if (log.isDebugEnabled()) {
+                log.debug("Handling bad msg notification: {}", badMsgNotification);
+            }
+
+            if (obj instanceof BadServerSalt) {
+                BadServerSalt badServerSalt = (BadServerSalt) obj;
+                session.setServerSalt(badServerSalt.newServerSalt());
+            }
+
+            switch (badMsgNotification.errorCode()) {
+                case 16: // msg_id too low
+                case 17: // msg_id too high
+                    if (session.updateTimeOffset(session.getLastMessageId())) {
+                        session.reset();
+                    }
+                    break;
+            }
+
+            Sinks.One<Object> sink = session.getResolvers().get(badMsgNotification.badMsgId());
+            if (sink != null) {
+                sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+            }
+
+            return Mono.empty();
+        }
+
+        if (obj instanceof MsgsAck) {
+            MsgsAck msgsAck = (MsgsAck) obj;
+
+            if (log.isDebugEnabled()) {
+                log.debug("Handling acknowledge for message(s): {}", msgsAck.msgIds());
+            }
+
+            msgsAck.msgIds().stream()
+                    .map(session.getResolvers()::get)
+                    .filter(Objects::nonNull)
+                    .forEach(sink -> sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST));
+
+            return Mono.empty();
+        }
+
+        log.info(obj.toString());
+        Sinks.One<Object> sink = session.getResolvers().get(messageId);
+        if (sink != null) {
+            sink.emitValue(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+        }
+
+        return acknowledgmentMessage(messageId);
     }
 
-    public MTProtoClient getClient() {
-        return client;
+    private Mono<Void> acknowledgmentMessage(long messageId) {
+        session.getAcknowledgments().add(messageId);
+
+        return sendAcknowledgments();
+    }
+
+    private Mono<Void> sendAcknowledgments() {
+        return Mono.defer(() -> {
+            Queue<Long> acks = session.getAcknowledgments();
+            int threshold = session.getClient().getOptions().getAcksSendThreshold();
+            if (acks.isEmpty() || acks.size() < threshold) {
+                return Mono.empty();
+            }
+
+            return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
+                    .send(MsgsAck.builder().msgIds(acks).build())
+                    .then(Mono.fromRunnable(acks::clear));
+        });
     }
 }

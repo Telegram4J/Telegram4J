@@ -5,14 +5,19 @@ import telegram4j.tl.mtproto.ServerDHParams;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static telegram4j.mtproto.crypto.CryptoUtil.sha1Digest;
+import static telegram4j.mtproto.crypto.CryptoUtil.substring;
+
 public final class MTProtoAuthorizationContext {
-    private byte[] nonce;
-    private byte[] newNonce;
-    private byte[] serverNonce;
-    private byte[] authKey;
-    private byte[] serverSalt;
-    private byte[] authAuxHash;
-    private ServerDHParams serverDHParams;
+    private volatile byte[] nonce;
+    private volatile byte[] newNonce;
+    private volatile byte[] serverNonce;
+    private volatile byte[] authKey;
+    private volatile long serverSalt;
+    private volatile byte[] authAuxHash;
+    private volatile byte[] authKeyId;
+    private volatile ServerDHParams serverDHParams;
+
     private final AtomicInteger retry = new AtomicInteger();
 
     public byte[] getNonce() {
@@ -47,12 +52,12 @@ public final class MTProtoAuthorizationContext {
         this.authKey = Objects.requireNonNull(authKey, "authKey");
     }
 
-    public byte[] getServerSalt() {
+    public long getServerSalt() {
         return serverSalt;
     }
 
-    public void setServerSalt(byte[] serverSalt) {
-        this.serverSalt = Objects.requireNonNull(serverSalt, "serverSalt");
+    public void setServerSalt(long serverSalt) {
+        this.serverSalt = serverSalt;
     }
 
     public byte[] getAuthAuxHash() {
@@ -73,5 +78,17 @@ public final class MTProtoAuthorizationContext {
 
     public AtomicInteger getRetry() {
         return retry;
+    }
+
+    public boolean isAuthorized() {
+        return authKey != null && serverSalt != 0;
+    }
+
+    public byte[] getAuthKeyId() {
+        if (authKeyId == null) {
+            byte[] authKeyHash = sha1Digest(authKey);
+            authKeyId = substring(authKeyHash, authKeyHash.length - 8, 8);
+        }
+        return authKeyId;
     }
 }

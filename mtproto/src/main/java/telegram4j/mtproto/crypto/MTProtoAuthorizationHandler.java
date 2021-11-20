@@ -4,13 +4,17 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoSession;
 import telegram4j.mtproto.PublicRsaKey;
-import telegram4j.tl.*;
+import telegram4j.tl.TlDeserializer;
+import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
-import telegram4j.tl.request.mtproto.*;
+import telegram4j.tl.request.mtproto.ReqDHParams;
+import telegram4j.tl.request.mtproto.ReqPqMulti;
+import telegram4j.tl.request.mtproto.SetClientDHParams;
 
 import java.math.BigInteger;
 import java.util.Arrays;
@@ -21,152 +25,166 @@ import static telegram4j.tl.TlSerialUtil.writeString;
 
 public class MTProtoAuthorizationHandler {
 
-    public static long timeDelta;
-
     private static final Logger log = Loggers.getLogger(MTProtoAuthorizationHandler.class);
 
-    private final MTProtoClient client;
+    private final MTProtoSession session;
     private final MTProtoAuthorizationContext context;
+    private final Sinks.One<Boolean> onAuthSink;
 
-    public MTProtoAuthorizationHandler(MTProtoClient client, MTProtoAuthorizationContext context) {
-        this.client = client;
-        this.context = context;
+    public MTProtoAuthorizationHandler(MTProtoSession session, Sinks.One<Boolean> onAuthSink) {
+        this.session = session;
+        this.context = session.getClient().getOptions().getAuthorizationContext();
+        this.onAuthSink = onAuthSink;
     }
 
     public Mono<Void> start() {
         return Mono.defer(() -> {
+            log.debug("Auth key generation started!");
+
             byte[] nonce = random.generateSeed(16);
             context.setNonce(nonce);
 
-            log.info("start");
-            return send(ByteBufAllocator.DEFAULT, ReqPqMulti.builder()
-                    .nonce(nonce)
-                    .build());
+            return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
+                    .send(ReqPqMulti.builder().nonce(nonce).build())
+                    .then();
         });
     }
 
     public Mono<Void> handle(ByteBuf payload) {
-        if (context.getServerSalt() != null) { // authorization key has already generated
-            return Mono.empty();
-        }
+        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
+                .receive(payload)
+                .flatMap(obj -> {
+                    // first step. DH exchange initiation
+                    if (obj instanceof ResPQ) {
+                        ResPQ resPQ = (ResPQ) obj;
+                        return handleResPQ(resPQ);
+                    }
 
-        ByteBufAllocator alloc = payload.alloc();
+                    // Step 2. Presenting proof of work; Server authentication
+                    if (obj instanceof ServerDHParams) {
+                        ServerDHParams serverDHParams = (ServerDHParams) obj;
+                        return handleServerDHParams(serverDHParams);
+                    }
 
-        long authKeyId = payload.readLongLE();
-        if (authKeyId != 0) {
-            return Mono.error(new IllegalStateException("Auth key id must be zero, but received: " + authKeyId));
-        }
-        payload.skipBytes(12); // message id (8) + payload length (4)
+                    // Step 3. DH key exchange complete
+                    if (obj instanceof DhGenOk) {
+                        DhGenOk dhGenOk = (DhGenOk) obj;
+                        return handleDhGenOk(dhGenOk);
+                    }
 
-        if (log.isTraceEnabled()) {
-            log.trace("dump: {}", ByteBufUtil.hexDump(payload));
-        }
-        TlObject obj = TlDeserializer.deserialize(payload);
-        if (log.isTraceEnabled()) {
-            log.trace("received: {}/{}", obj.getClass().getCanonicalName(), Integer.toHexString(obj.identifier()));
-            log.trace(obj.toString());
-        }
+                    if (obj instanceof DhGenRetry) {
+                        DhGenRetry dhGenRetry = (DhGenRetry) obj;
+                        return handleDhGenRetry(dhGenRetry);
+                    }
 
-        // first step. DH exchange initiation
-        if (obj instanceof ResPQ) {
-            ResPQ resPQ = (ResPQ) obj;
-            context.setServerNonce(resPQ.serverNonce());
-            byte[] pqB = resPQ.pq();
+                    if (obj instanceof DhGenFail) {
+                        DhGenFail dhGenFail = (DhGenFail) obj;
+                        return handleDhGenFail(dhGenFail);
+                    }
 
-            List<Long> fingerprints = resPQ.serverPublicKeyFingerprints();
-            long fingerprint = fingerprints.get(0);
-            PublicRsaKey key = PublicRsaKey.publicKeys.get(fingerprint);
-
-            BigInteger pq = fromByteArray(pqB);
-            BigInteger p = BigInteger.valueOf(pqPrimeLeemon(pq.longValueExact()));
-            BigInteger q = pq.divide(p);
-
-            context.setNewNonce(random.generateSeed(32));
-
-            assert p.longValueExact() < q.longValueExact();
-
-            ByteBuf pqInnerData = alloc.heapBuffer()
-                    .writeIntLE(0x83c95aec)
-                    .writeBytes(writeString(alloc, pqB))
-                    .writeBytes(writeString(alloc, toByteArray(p)))
-                    .writeBytes(writeString(alloc, toByteArray(q)))
-                    .writeBytes(context.getNonce())
-                    .writeBytes(context.getServerNonce())
-                    .writeBytes(context.getNewNonce());
-
-            byte[] pqInnerDataB = toByteArray(pqInnerData);
-            byte[] hash = sha1Digest(pqInnerDataB);
-            byte[] seed = random.generateSeed(255 - hash.length - pqInnerDataB.length);
-            byte[] dataWithHash = concat(hash, pqInnerDataB, seed);
-            byte[] encrypted = rsaEncrypt(dataWithHash, key);
-
-            return send(alloc, ReqDHParams.builder()
-                    .nonce(context.getNonce())
-                    .serverNonce(context.getServerNonce())
-                    .encryptedData(encrypted)
-                    .p(toByteArray(p))
-                    .q(toByteArray(q))
-                    .publicKeyFingerprint(fingerprint)
-                    .build());
-        }
-
-        // Step 2. Presenting proof of work; Server authentication
-        if (obj instanceof ServerDHParams) {
-            ServerDHParams serverDHParams = (ServerDHParams) obj;
-            context.setServerDHParams(serverDHParams); // for DhGenRetry
-            return sendSetClientDHParams(alloc, serverDHParams);
-        }
-
-        // Step 3. DH key exchange complete
-        if (obj instanceof DhGenOk) {
-            DhGenOk dhGenOk = (DhGenOk) obj;
-            byte[] newNonceHash1 = dhGenOk.newNonceHash1();
-            byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{1}, context.getAuthAuxHash()), 4, 16);
-
-            if (!Arrays.equals(dhGenOk.newNonceHash1(), newNonceHash)) {
-                return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                        + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash1)));
-            }
-
-            context.setServerSalt(xor(substring(context.getNewNonce(), 0, 8),
-                    substring(context.getServerNonce(), 0, 8)));
-            return Mono.empty();
-        }
-
-        if (obj instanceof DhGenRetry) {
-            DhGenRetry dhGenRetry = (DhGenRetry) obj;
-            byte[] newNonceHash2 = dhGenRetry.newNonceHash2();
-            byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{2}, context.getAuthAuxHash()), 4, 16);
-
-            if (!Arrays.equals(dhGenRetry.newNonceHash2(), newNonceHash)) {
-                return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                        + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash2)));
-            }
-
-            ServerDHParams serverDHParams = context.getServerDHParams();
-            return sendSetClientDHParams(alloc, serverDHParams);
-        }
-
-        if (obj instanceof DhGenFail) {
-            DhGenFail dhGenFail = (DhGenFail) obj;
-            byte[] newNonceHash3 = dhGenFail.newNonceHash3();
-            byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{3}, context.getAuthAuxHash()), 4, 16);
-
-            if (!Arrays.equals(newNonceHash3, newNonceHash)) {
-                return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                        + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash3)));
-            }
-
-            return Mono.error(new IllegalStateException("Failed to create an authorization key."));
-        }
-
-        return Mono.error(() -> new IllegalStateException("Unexpected type: 0x" + Integer.toHexString(obj.identifier())));
+                    return Mono.error(() -> new IllegalStateException("Unexpected type: 0x" + Integer.toHexString(obj.identifier())));
+                });
     }
 
-    private Mono<Void> sendSetClientDHParams(ByteBufAllocator alloc, ServerDHParams serverDHParams) {
+    private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
+        byte[] newNonceHash3 = dhGenFail.newNonceHash3();
+        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{3}, context.getAuthAuxHash()), 4, 16);
+
+        if (!Arrays.equals(newNonceHash3, newNonceHash)) {
+            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
+                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash3)));
+        }
+
+        return Mono.error(new IllegalStateException("Failed to create an authorization key."));
+    }
+
+    private Mono<Void> handleResPQ(ResPQ resPQ) {
+        ByteBufAllocator alloc = session.getConnection().channel().alloc();
+        context.setServerNonce(resPQ.serverNonce());
+        byte[] pqBytes = resPQ.pq();
+
+        List<Long> fingerprints = resPQ.serverPublicKeyFingerprints();
+        long fingerprint = fingerprints.get(0);
+        PublicRsaKey key = PublicRsaKey.publicKeys.get(fingerprint);
+
+        BigInteger pq = fromByteArray(pqBytes);
+        BigInteger p = BigInteger.valueOf(pqPrimeLeemon(pq.longValueExact()));
+        byte[] pBytes = toByteArray(p);
+        BigInteger q = pq.divide(p);
+        byte[] qBytes = toByteArray(q);
+
+        context.setNewNonce(random.generateSeed(32));
+
+        assert p.longValueExact() < q.longValueExact();
+
+        ByteBuf pqInnerData = alloc.buffer()
+                .writeIntLE(0x83c95aec)
+                .writeBytes(writeString(alloc, pqBytes))
+                .writeBytes(writeString(alloc, pBytes))
+                .writeBytes(writeString(alloc, qBytes))
+                .writeBytes(context.getNonce())
+                .writeBytes(context.getServerNonce())
+                .writeBytes(context.getNewNonce());
+
+        byte[] pqInnerDataBytes = toByteArray(pqInnerData);
+        byte[] hash = sha1Digest(pqInnerDataBytes);
+        byte[] seed = random.generateSeed(255 - hash.length - pqInnerDataBytes.length);
+        byte[] dataWithHash = concat(hash, pqInnerDataBytes, seed);
+        byte[] encrypted = rsaEncrypt(dataWithHash, key);
+
+        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
+                .send(ReqDHParams.builder()
+                        .nonce(context.getNonce())
+                        .serverNonce(context.getServerNonce())
+                        .encryptedData(encrypted)
+                        .p(pBytes)
+                        .q(qBytes)
+                        .publicKeyFingerprint(fingerprint)
+                        .build())
+                .then();
+    }
+
+    private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
+        byte[] newNonceHash1 = dhGenOk.newNonceHash1();
+        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{1}, context.getAuthAuxHash()), 4, 16);
+
+        if (!Arrays.equals(newNonceHash1, newNonceHash)) {
+            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
+                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash1)));
+        }
+
+        long serverSalt = readLongLE(xor(substring(context.getNewNonce(), 0, 8),
+                substring(context.getServerNonce(), 0, 8)));
+
+        context.setServerSalt(serverSalt);
+        session.setServerSalt(serverSalt);
+
+        log.debug("Auth key generation completed!");
+        onAuthSink.tryEmitValue(true);
+        return Mono.empty();
+    }
+
+    private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {
+        byte[] newNonceHash2 = dhGenRetry.newNonceHash2();
+        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{2}, context.getAuthAuxHash()), 4, 16);
+
+        if (!Arrays.equals(newNonceHash2, newNonceHash)) {
+            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
+                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash2)));
+        }
+
+        ServerDHParams serverDHParams = context.getServerDHParams();
+        log.debug("Retrying dh params extending, attempt: {}.", context.getRetry());
+        return handleServerDHParams(serverDHParams);
+    }
+
+    private Mono<Void> handleServerDHParams(ServerDHParams serverDHParams) {
+        ByteBufAllocator alloc = session.getConnection().channel().alloc();
+        context.setServerDHParams(serverDHParams); // for DhGenRetry
         byte[] encryptedAnswerB = serverDHParams.encryptedAnswer();
 
-        byte[] tmpAesKey = concat(sha1Digest(context.getNewNonce(), context.getServerNonce()),
+        byte[] tmpAesKey = concat(
+                sha1Digest(context.getNewNonce(), context.getServerNonce()),
                 substring(sha1Digest(context.getServerNonce(), context.getNewNonce()), 0, 12));
 
         byte[] tmpAesIv = concat(concat(substring(
@@ -175,7 +193,7 @@ public class MTProtoAuthorizationHandler {
                 substring(context.getNewNonce(), 0, 4));
 
         AES256IGECipher cipher = new AES256IGECipher(tmpAesKey, tmpAesIv);
-        ByteBuf answer = alloc.heapBuffer()
+        ByteBuf answer = alloc.buffer()
                 .writeBytes(cipher.decrypt(encryptedAnswerB))
                 .skipBytes(20); // answer hash
 
@@ -201,31 +219,14 @@ public class MTProtoAuthorizationHandler {
         byte[] innerDataWithHash = align(concat(sha1Digest(innerData), innerData), 16);
         byte[] dataWithHashEnc = cipher.encrypt(innerDataWithHash);
 
-        return send(alloc, SetClientDHParams.builder()
-                .nonce(context.getNonce())
-                .serverNonce(context.getServerNonce())
-                .encryptedData(dataWithHashEnc)
-                .build());
-    }
+        session.updateTimeOffset(serverDHInnerData.serverTime());
 
-    public MTProtoAuthorizationContext getContext() {
-        return context;
-    }
-
-    public MTProtoClient getClient() {
-        return client;
-    }
-
-    private <T extends TlObject> Mono<Void> send(ByteBufAllocator alloc, TlMethod<? super T> object) {
-        return Mono.defer(() -> {
-            long messageId = (System.currentTimeMillis() + timeDelta) / 1000 << 32;
-            ByteBuf data = TlSerializer.serialize(alloc, object);
-
-            return client.send(alloc.buffer()
-                    .writeLongLE(0) // auth key id
-                    .writeLongLE(messageId)
-                    .writeIntLE(data.readableBytes())
-                    .writeBytes(data));
-        });
+        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
+                .send(SetClientDHParams.builder()
+                        .nonce(context.getNonce())
+                        .serverNonce(context.getServerNonce())
+                        .encryptedData(dataWithHashEnc)
+                        .build())
+                .then();
     }
 }
