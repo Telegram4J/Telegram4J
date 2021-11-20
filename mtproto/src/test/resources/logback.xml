@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
-    <logger name="telegram4j.mtproto.crypto" level="INFO"/>
+    <logger name="telegram4j.mtproto" level="TRACE"/>
+    <logger name="telegram4j.mtproto.crypto" level="TRACE"/>
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
