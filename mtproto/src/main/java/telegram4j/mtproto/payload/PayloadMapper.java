@@ -1,4 +1,4 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.payload;
 
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;

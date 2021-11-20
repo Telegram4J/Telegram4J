@@ -11,10 +11,6 @@ public final class TlTrue implements TlObject {
         return ID;
     }
 
-    public byte asByte() {
-        return 1;
-    }
-
     public boolean asBoolean() {
         return true;
     }

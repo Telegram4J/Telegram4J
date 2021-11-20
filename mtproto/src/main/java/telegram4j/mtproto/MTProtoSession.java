@@ -6,17 +6,21 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.netty.Connection;
-import telegram4j.mtproto.crypto.PayloadMapper;
-import telegram4j.mtproto.crypto.PayloadMapperStrategy;
+import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.payload.PayloadMapper;
+import telegram4j.mtproto.payload.PayloadMapperStrategy;
+import telegram4j.tl.TlObject;
+import telegram4j.tl.mtproto.MsgsAck;
+import telegram4j.tl.request.mtproto.Ping;
 
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
-import static telegram4j.mtproto.crypto.CryptoUtil.random;
+import static telegram4j.mtproto.util.CryptoUtil.random;
 
 public final class MTProtoSession {
     private final MTProtoClient client;
@@ -24,12 +28,13 @@ public final class MTProtoSession {
     private final Sinks.Many<ByteBuf> receiver;
     private final DataCenter dataCenter;
 
-    private final AtomicLong sessionId = new AtomicLong(random.nextLong());
+    private volatile AuthorizationKeyHolder authorizationKey;
+    private volatile long sessionId = random.nextLong();
+    private volatile int timeOffset;
+    private volatile long serverSalt;
+    private volatile long lastMessageId;
+    private volatile long lastGeneratedMessageId;
     private final AtomicInteger seqNo = new AtomicInteger();
-    private final AtomicInteger timeOffset = new AtomicInteger();
-    private final AtomicLong serverSalt = new AtomicLong();
-    private final AtomicLong lastMessageId = new AtomicLong();
-    private final AtomicLong lastGeneratedMessageId = new AtomicLong();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentMap<Long, Sinks.One<Object>> resolvers = new ConcurrentHashMap<>();
 
@@ -67,11 +72,20 @@ public final class MTProtoSession {
         return dataCenter;
     }
 
-    public long getSessionId() {
-        return sessionId.get();
+    public AuthorizationKeyHolder getAuthorizationKey() {
+        return authorizationKey;
     }
 
-    public int updateSeqNo(boolean content) {
+    public void setAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
+        this.authorizationKey = Objects.requireNonNull(authorizationKey, "authorizationKey");
+    }
+
+    public long getSessionId() {
+        return sessionId;
+    }
+
+    public int updateSeqNo(TlObject object) {
+        boolean content = isContentRelated(object);
         int no = seqNo.get() * 2 + (content ? 1 : 0);
         if (content) {
             seqNo.incrementAndGet();
@@ -80,45 +94,40 @@ public final class MTProtoSession {
         return no;
     }
 
+    private static boolean isContentRelated(TlObject object) {
+        return !(object instanceof MsgsAck) && !(object instanceof Ping);
+    }
+
     public long getMessageId() {
         long millis = System.currentTimeMillis();
         long seconds = millis / 1000;
         long mod = millis % 1000;
-        long messageId = seconds + timeOffset.get() << 32 | mod << 22 | random.nextInt(524288) << 2;
+        long messageId = seconds + timeOffset << 32 | mod << 22 | random.nextInt(524288) << 2;
 
-        if (lastGeneratedMessageId.get() >= messageId) {
-            messageId = lastMessageId.get() + 4;
+        if (lastGeneratedMessageId >= messageId) {
+            messageId = lastMessageId + 4;
         }
 
-        lastGeneratedMessageId.set(messageId);
+        lastGeneratedMessageId = messageId;
         return messageId;
     }
 
     public boolean updateTimeOffset(long serverTime) {
         int updated = Math.toIntExact(serverTime - System.currentTimeMillis() / 1000);
-        boolean changed = Math.abs(timeOffset.get() - updated) > 10;
+        boolean changed = Math.abs(timeOffset - updated) > 10;
 
-        lastGeneratedMessageId.set(0);
-        timeOffset.set(updated);
+        lastGeneratedMessageId = 0;
+        timeOffset = updated;
 
         return changed;
     }
 
     public void setServerSalt(long serverSalt) {
-        this.serverSalt.set(serverSalt);
+        this.serverSalt = serverSalt;
     }
 
     public long getServerSalt() {
-        return serverSalt.get();
-    }
-
-    // TODO: must fetch from cache/store.
-    public byte[] getAuthKey() {
-        return client.getOptions().getAuthorizationContext().getAuthKey();
-    }
-
-    public byte[] getAuthKeyId() {
-        return client.getOptions().getAuthorizationContext().getAuthKeyId();
+        return serverSalt;
     }
 
     public PayloadMapper withPayloadMapper(PayloadMapperStrategy strategy) {
@@ -135,17 +144,17 @@ public final class MTProtoSession {
 
     // TODO: find way to write this to the reactive context
     public void setLastMessageId(long lastMessageId) {
-        this.lastMessageId.set(lastMessageId);
+        this.lastMessageId = lastMessageId;
     }
 
     public long getLastMessageId() {
-        return lastMessageId.get();
+        return lastMessageId;
     }
 
     public void reset() {
-        sessionId.set(random.nextLong());
-        timeOffset.set(0);
-        lastGeneratedMessageId.set(0);
+        sessionId = random.nextLong();
+        timeOffset = 0;
+        lastGeneratedMessageId = 0;
         seqNo.set(0);
     }
 }

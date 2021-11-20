@@ -4,7 +4,7 @@ plugins {
 }
 
 ext {
-    reactor_bom_version = '2020.0.10'
+    reactor_bom_version = '2020.0.13'
     jackson_version = '2.13.0-rc1'
     immutables_version = '2.9.0-beta3'
     findbugs_version = '3.0.1'

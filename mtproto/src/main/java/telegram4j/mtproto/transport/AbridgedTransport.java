@@ -8,18 +8,16 @@ public class AbridgedTransport implements Transport {
 
     @Override
     public ByteBuf identifier(ByteBufAllocator allocator) {
-        return allocator.buffer(1).writeByte(ID);
+        return allocator.buffer(Integer.BYTES).writeByte(ID);
     }
 
     @Override
     public ByteBuf encode(ByteBuf payload) {
         int length = payload.readableBytes() / 4;
-        ByteBuf buf = payload.alloc().buffer(payload.readableBytes() + (length >= 0x7f ? 4 : 3));
+        ByteBuf buf = payload.alloc().buffer();
         if (length >= 0x7f) {
             buf.writeByte(0x7f);
-            buf.writeByte(length);
-            buf.writeByte(length >> 8);
-            buf.writeByte(length >> 16);
+            buf.writeMediumLE(length);
         } else {
             buf.writeByte(length);
         }
@@ -31,7 +29,7 @@ public class AbridgedTransport implements Transport {
     public ByteBuf decode(ByteBuf payload) {
         int partialLength = payload.readUnsignedByte();
         if (partialLength == 0x7f) {
-            partialLength = payload.readUnsignedByte() | payload.readUnsignedByte() << 8 | payload.readUnsignedByte() << 16;
+            partialLength = payload.readUnsignedMediumLE();
         }
 
         int payloadLength = partialLength * 4;

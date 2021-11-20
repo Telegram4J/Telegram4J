@@ -1,4 +1,4 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.util;
 
 import javax.crypto.*;
 import javax.crypto.spec.SecretKeySpec;
@@ -9,13 +9,13 @@ public final class AES256IGECipher {
     private static final String AES_CBC_ALGORITHM = "AES/ECB/NoPadding";
 
     private final Cipher encryptor;
-    private final Cipher decryptor;
+    private final Cipher decrypter;
     private final SecretKey secretKey;
     private final byte[] iv;
 
     public AES256IGECipher(byte[] key, byte[] iv) {
         this.encryptor = newCipher(AES_CBC_ALGORITHM);
-        this.decryptor = newCipher(AES_CBC_ALGORITHM);
+        this.decrypter = newCipher(AES_CBC_ALGORITHM);
         this.secretKey = new SecretKeySpec(key, "AES");
         this.iv = iv.clone();
     }
@@ -56,10 +56,10 @@ public final class AES256IGECipher {
     }
 
     public byte[] decrypt(byte[] data) {
-        synchronized (decryptor) {
-            initCipher(decryptor, Cipher.DECRYPT_MODE, secretKey);
+        synchronized (decrypter) {
+            initCipher(decrypter, Cipher.DECRYPT_MODE, secretKey);
 
-            int blockSize = decryptor.getBlockSize();
+            int blockSize = decrypter.getBlockSize();
             byte[] decrypted = new byte[data.length];
             byte[] decryptedBlock = new byte[blockSize];
 
@@ -73,7 +73,7 @@ public final class AES256IGECipher {
                     decryptedBlock[j] = (byte) (data[offset + j] ^ x[xOffset + j]);
                 }
 
-                decryptedBlock = doFinal(decryptor, decryptedBlock);
+                decryptedBlock = doFinal(decrypter, decryptedBlock);
                 for (int j = 0; j < blockSize; j++) {
                     decryptedBlock[j] ^= y[yOffset + j];
                 }

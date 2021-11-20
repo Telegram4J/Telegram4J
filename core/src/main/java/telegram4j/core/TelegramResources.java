@@ -1,4 +1,4 @@
-package telegram4j.mtproto;
+package telegram4j.core;
 
 import java.util.Objects;
 

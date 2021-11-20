@@ -1,13 +1,13 @@
 package telegram4j.mtproto;
 
-import telegram4j.mtproto.crypto.MTProtoAuthorizationContext;
+import telegram4j.mtproto.auth.AuthorizationContext;
 
 public class MTProtoOptions {
     private final MTProtoResources resources;
-    private final MTProtoAuthorizationContext authorizationContext;
+    private final AuthorizationContext authorizationContext;
     private final int acksSendThreshold;
 
-    public MTProtoOptions(MTProtoResources resources, MTProtoAuthorizationContext authorizationContext, int acksSendThreshold) {
+    public MTProtoOptions(MTProtoResources resources, AuthorizationContext authorizationContext, int acksSendThreshold) {
         this.resources = resources;
         this.authorizationContext = authorizationContext;
         this.acksSendThreshold = acksSendThreshold;
@@ -17,7 +17,7 @@ public class MTProtoOptions {
         return resources;
     }
 
-    public MTProtoAuthorizationContext getAuthorizationContext() {
+    public AuthorizationContext getAuthorizationContext() {
         return authorizationContext;
     }
 

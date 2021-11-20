@@ -1,8 +1,7 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.payload;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -10,16 +9,16 @@ import reactor.netty.FutureMono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.MTProtoSession;
+import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlMethod;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerializer;
-import telegram4j.tl.mtproto.MsgsAck;
-import telegram4j.tl.request.mtproto.Ping;
 
 import java.util.Arrays;
 
-import static telegram4j.mtproto.crypto.CryptoUtil.*;
+import static telegram4j.mtproto.util.CryptoUtil.*;
 import static telegram4j.tl.TlSerialUtil.readInt128;
 
 class EncryptedPayloadMapper implements PayloadMapper {
@@ -42,7 +41,7 @@ class EncryptedPayloadMapper implements PayloadMapper {
             ByteBuf data = TlSerializer.serialize(alloc, object);
 
             long messageId = session.getMessageId();
-            int seqNo = session.updateSeqNo(isContentRelated(object));
+            int seqNo = session.updateSeqNo(object);
             long sessionId = session.getSessionId();
 
             int minPadding = 12;
@@ -58,8 +57,9 @@ class EncryptedPayloadMapper implements PayloadMapper {
                     .writeBytes(data)
                     .writeBytes(random.generateSeed(padding));
 
-            byte[] authKey = session.getAuthKey();
-            byte[] authKeyId = session.getAuthKeyId();
+            AuthorizationKeyHolder authorizationKey = session.getAuthorizationKey();
+            byte[] authKey = authorizationKey.getAuthKey();
+            byte[] authKeyId = authorizationKey.getAuthKeyId();
 
             byte[] plainDataB = toByteArray(plainData);
             byte[] msgKeyLarge = sha256Digest(concat(Arrays.copyOfRange(authKey, 88, 120), plainDataB));
@@ -89,17 +89,19 @@ class EncryptedPayloadMapper implements PayloadMapper {
             ByteBufAllocator alloc = payload.alloc();
             long authKeyId = payload.readLongLE();
             if (authKeyId == 0) {
-//                throw new IllegalStateException("Auth key id must be non zero.");
-                return null;
+                throw new IllegalStateException("Auth key id must be non zero.");
             }
 
-            if (authKeyId != readLongLE(session.getAuthKeyId())) {
-                throw new IllegalStateException("Incorrect auth key id.");
+            AuthorizationKeyHolder authorizationKey = session.getAuthorizationKey();
+            long longAuthKeyId = readLongLE(authorizationKey.getAuthKeyId());
+            if (authKeyId != longAuthKeyId) {
+                throw new IllegalStateException("Incorrect auth key id. Received: "
+                        + authKeyId + ", but excepted: " + longAuthKeyId);
             }
 
             byte[] messageKey = readInt128(payload);
 
-            ByteBuf authKeyBuf = alloc.buffer().writeBytes(session.getAuthKey());
+            ByteBuf authKeyBuf = alloc.buffer().writeBytes(authorizationKey.getAuthKey());
             AES256IGECipher cipher = createAesCipher(messageKey, authKeyBuf, true);
 
             byte[] decrypted = cipher.decrypt(toByteArray(payload));
@@ -134,9 +136,5 @@ class EncryptedPayloadMapper implements PayloadMapper {
 
             return obj;
         });
-    }
-
-    private boolean isContentRelated(TlObject object) {
-        return !(object instanceof MsgsAck) && !(object instanceof Ping);
     }
 }

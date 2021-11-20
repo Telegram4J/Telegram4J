@@ -1,4 +1,4 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.auth;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -9,6 +9,8 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.MTProtoSession;
 import telegram4j.mtproto.PublicRsaKey;
+import telegram4j.mtproto.util.AES256IGECipher;
+import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
@@ -20,18 +22,18 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 
-import static telegram4j.mtproto.crypto.CryptoUtil.*;
+import static telegram4j.mtproto.util.CryptoUtil.*;
 import static telegram4j.tl.TlSerialUtil.writeString;
 
-public class MTProtoAuthorizationHandler {
+public final class AuthorizationHandler {
 
-    private static final Logger log = Loggers.getLogger(MTProtoAuthorizationHandler.class);
+    private static final Logger log = Loggers.getLogger(AuthorizationHandler.class);
 
     private final MTProtoSession session;
-    private final MTProtoAuthorizationContext context;
-    private final Sinks.One<Boolean> onAuthSink;
+    private final AuthorizationContext context;
+    private final Sinks.One<AuthorizationKeyHolder> onAuthSink;
 
-    public MTProtoAuthorizationHandler(MTProtoSession session, Sinks.One<Boolean> onAuthSink) {
+    public AuthorizationHandler(MTProtoSession session, Sinks.One<AuthorizationKeyHolder> onAuthSink) {
         this.session = session;
         this.context = session.getClient().getOptions().getAuthorizationContext();
         this.onAuthSink = onAuthSink;
@@ -160,8 +162,11 @@ public class MTProtoAuthorizationHandler {
         session.setServerSalt(serverSalt);
 
         log.debug("Auth key generation completed!");
-        onAuthSink.tryEmitValue(true);
-        return Mono.empty();
+        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(context.getAuthKey());
+        onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
+        return session.getClient().getOptions()
+                .getResources().getStoreLayout()
+                .updateAuthorizationKey(authKey);
     }
 
     private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {

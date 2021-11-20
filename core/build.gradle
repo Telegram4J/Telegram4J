@@ -1,0 +1,5 @@
+dependencies {
+    implementation project(":mtproto")
+
+    testImplementation "ch.qos.logback:logback-classic:$logback_version"
+}

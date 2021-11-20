@@ -47,6 +47,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
+    public Mono<MTProtoSession> getSession(DataCenter dc) {
+        return Mono.fromSupplier(() -> sessions.get(dc));
+    }
+
+    @Override
     public MTProtoOptions getOptions() {
         return options;
     }
@@ -82,7 +87,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private static <T> Sinks.Many<T> newEmitterSink() {
-        return Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        return Sinks.many().multicast().onBackpressureBuffer();
     }
 
     @Override

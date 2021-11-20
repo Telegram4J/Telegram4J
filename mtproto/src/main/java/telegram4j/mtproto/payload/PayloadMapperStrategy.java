@@ -1,4 +1,4 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.payload;
 
 import telegram4j.mtproto.MTProtoSession;
 

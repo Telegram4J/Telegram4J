@@ -1,4 +1,4 @@
-package telegram4j.mtproto.crypto;
+package telegram4j.mtproto.util;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -187,8 +187,8 @@ public final class CryptoUtil {
         if (src.length % factor == 0) {
             return src;
         }
-        int padding = factor - src.length % factor;
 
+        int padding = factor - src.length % factor;
         return concat(src, random.generateSeed(padding));
     }
 

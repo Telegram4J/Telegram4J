@@ -1,6 +1,8 @@
-package telegram4j.mtproto;
+package telegram4j.core;
 
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.MTProtoOptions;
+import telegram4j.mtproto.MTProtoSession;
 
 import java.util.function.Function;
 

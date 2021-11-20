@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.crypto.PayloadMapperStrategy;
+import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.mtproto.*;
