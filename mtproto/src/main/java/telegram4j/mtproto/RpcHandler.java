@@ -174,7 +174,7 @@ public class RpcHandler {
 
             return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
                     .send(MsgsAck.builder().msgIds(acks).build())
-                    .then(Mono.fromRunnable(acks::clear));
+                    .and(Mono.fromRunnable(acks::clear));
         });
     }
 }

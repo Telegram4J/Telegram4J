@@ -2,21 +2,27 @@ package telegram4j.core;
 
 import reactor.core.Disposable;
 import reactor.core.Disposables;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.Logger;
+import reactor.util.Loggers;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.payload.PayloadMapperStrategy;
+import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlObject;
+import telegram4j.tl.Updates;
 import telegram4j.tl.mtproto.FutureSalt;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
+import telegram4j.tl.request.mtproto.Ping;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -24,13 +30,16 @@ import java.util.function.Function;
 
 public class MTProtoBootstrap<O extends MTProtoOptions> {
 
+    private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
+
     private static final Duration FUTURE_SALT_QUERY_PERIOD = Duration.ofMinutes(45);
+    private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
     private final AuthorizationResources authorizationResources;
 
     private MTProtoResources mtProtoResources;
-    private int acksSendThreshold = 5;
+    private int acksSendThreshold = 3;
     private InitConnection<TlObject> initConnection;
 
     MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authorizationResources) {
@@ -96,11 +105,12 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             .then()
                             .subscribe());
 
-                    composite.add(session.dispatch().asFlux()
-                            .takeUntilOther(onCloseSink.asMono())
-                            .checkpoint("Event dispatch handler.")
-                            .log()
-                            .subscribe());
+//                    composite.add(session.dispatch().asFlux()
+//                            .takeUntilOther(onCloseSink.asMono())
+//                            .ofType(Updates.class)
+//                            .checkpoint("Event dispatch handler.")
+//
+//                            .subscribe());
 
                     ResettableInterval futureSalt = new ResettableInterval(Schedulers.boundedElastic());
 
@@ -115,9 +125,19 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                                 int delaySeconds = salt.validUntil() - futureSalts.now() - 900;
                                 session.setServerSalt(salt.salt());
 
+                                log.debug("Delaying future salt for {} seconds.", delaySeconds);
+
                                 futureSalt.start(Duration.ofSeconds(delaySeconds), FUTURE_SALT_QUERY_PERIOD);
                             })
                             .subscribe());
+
+                    Mono<Void> pingLoop = Flux.interval(PING_QUERY_PERIOD)
+                            .takeUntilOther(onCloseSink.asMono())
+                            .checkpoint("Ping loop.")
+                            .flatMap(tick -> session
+                                    .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
+                                    .send(Ping.builder().pingId(CryptoUtil.random.nextInt()).build()))
+                            .then();
 
                     Mono<Void> initializeConnection = session
                             .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
@@ -140,6 +160,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             .doOnNext(session::setAuthorizationKey)
                             .delayUntil(ignored -> initializeConnection)
                             .doOnNext(ignored -> sink.success(telegramClient))
+                            .flatMap(ignored -> pingLoop)
                             .subscribe());
 
                     sink.onCancel(composite);

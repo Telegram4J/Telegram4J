@@ -35,7 +35,6 @@ class EncryptedPayloadMapper implements PayloadMapper {
     @SuppressWarnings("unchecked")
     public <R, T extends TlMethod<R>> Mono<R> send(T object) {
         return Mono.defer(() -> {
-
             Channel channel = session.getConnection().channel();
             ByteBufAllocator alloc = channel.alloc();
             ByteBuf data = TlSerializer.serialize(alloc, object);
