@@ -133,9 +133,6 @@ public class RpcHandler {
             messageId = futureSalts.reqMsgId();
         }
 
-        log.info(obj.toString());
-        log.info(session.getResolvers().toString());
-
         if (!session.getResolvers().containsKey(messageId)) {
             session.dispatch().emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
         } else {

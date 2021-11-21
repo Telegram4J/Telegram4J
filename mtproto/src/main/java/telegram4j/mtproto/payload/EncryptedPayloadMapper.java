@@ -15,6 +15,7 @@ import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlMethod;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerializer;
+import telegram4j.tl.mtproto.MsgsAck;
 
 import java.util.Arrays;
 
@@ -73,7 +74,11 @@ class EncryptedPayloadMapper implements PayloadMapper {
                     .writeBytes(cipher.encrypt(plainDataB));
 
             Sinks.One<R> sink = Sinks.one();
-            session.getResolvers().put(messageId, (Sinks.One<Object>) sink);
+            if (object instanceof MsgsAck) {
+                sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+            } else {
+                session.getResolvers().put(messageId, (Sinks.One<Object>) sink);
+            }
 
             return FutureMono.from(channel.writeAndFlush(session.getClient()
                     .getOptions().getResources().getTransport()
