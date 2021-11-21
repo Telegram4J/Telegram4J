@@ -20,6 +20,7 @@ public final class AES256IGECipher {
         this.iv = iv.clone();
     }
 
+    // TODO: replace byte[] usages to netty's ByteBuf
     public byte[] encrypt(byte[] data) {
         synchronized (encryptor) {
             initCipher(encryptor, Cipher.ENCRYPT_MODE, secretKey);

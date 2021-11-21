@@ -10,6 +10,7 @@ import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.payload.PayloadMapper;
 import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.tl.TlObject;
+import telegram4j.tl.mtproto.MessageContainer;
 import telegram4j.tl.mtproto.MsgsAck;
 import telegram4j.tl.request.mtproto.Ping;
 
@@ -26,6 +27,7 @@ public final class MTProtoSession {
     private final MTProtoClient client;
     private final Connection connection;
     private final Sinks.Many<ByteBuf> receiver;
+    private final Sinks.Many<TlObject> dispatch;
     private final DataCenter dataCenter;
 
     private volatile AuthorizationKeyHolder authorizationKey;
@@ -44,6 +46,8 @@ public final class MTProtoSession {
         this.connection = connection;
         this.receiver = receiver;
         this.dataCenter = dataCenter;
+
+        this.dispatch = Sinks.many().multicast().onBackpressureBuffer();
     }
 
     public MTProtoClient getClient() {
@@ -66,6 +70,10 @@ public final class MTProtoSession {
                     return Mono.just(buf);
                 })
                 .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease);
+    }
+
+    public Sinks.Many<TlObject> dispatch() {
+        return dispatch;
     }
 
     public DataCenter getDataCenter() {
@@ -95,7 +103,7 @@ public final class MTProtoSession {
     }
 
     private static boolean isContentRelated(TlObject object) {
-        return !(object instanceof MsgsAck) && !(object instanceof Ping);
+        return !(object instanceof MsgsAck) && !(object instanceof Ping) && !(object instanceof MessageContainer);
     }
 
     public long getMessageId() {

@@ -6,7 +6,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import reactor.util.concurrent.Queues;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -58,7 +57,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private Mono<MTProtoSession> createSession(DataCenter dc) {
         return Mono.defer(() -> {
-            Sinks.Many<ByteBuf> inboundSink = newEmitterSink();
+            Sinks.Many<ByteBuf> inboundSink = Sinks.many().multicast().onBackpressureBuffer();
 
             return options.getResources().getTcpClient()
                     .remoteAddress(() -> new InetSocketAddress(dc.getAddress(), dc.getPort()))
@@ -84,10 +83,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         sessions.put(dc, session);
                     });
         });
-    }
-
-    private static <T> Sinks.Many<T> newEmitterSink() {
-        return Sinks.many().multicast().onBackpressureBuffer();
     }
 
     @Override

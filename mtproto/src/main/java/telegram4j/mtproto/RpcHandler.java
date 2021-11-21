@@ -12,7 +12,6 @@ import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.mtproto.*;
 
-import java.util.Objects;
 import java.util.Queue;
 
 public class RpcHandler {
@@ -32,7 +31,7 @@ public class RpcHandler {
     }
 
     private Mono<Void> handleServiceMessage(TlObject obj, long messageId) {
-        if (session.getAcknowledgments().contains(messageId)) {
+        if (isAwaitAcknowledge(messageId)) {
             return sendAcknowledgments();
         }
 
@@ -102,10 +101,10 @@ public class RpcHandler {
                     break;
             }
 
-            Sinks.One<Object> sink = session.getResolvers().get(badMsgNotification.badMsgId());
-            if (sink != null) {
+            session.getResolvers().computeIfPresent(badMsgNotification.badMsgId(), (k, sink) -> {
                 sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-            }
+                return null;
+            });
 
             return Mono.empty();
         }
@@ -117,18 +116,33 @@ public class RpcHandler {
                 log.debug("Handling acknowledge for message(s): {}", msgsAck.msgIds());
             }
 
-            msgsAck.msgIds().stream()
-                    .map(session.getResolvers()::get)
-                    .filter(Objects::nonNull)
-                    .forEach(sink -> sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST));
-
             return Mono.empty();
         }
 
+        if (obj instanceof Pong) {
+            Pong pong = (Pong) obj;
+
+            log.debug("Handling pong: {}", pong.pingId());
+
+            messageId = pong.msgId();
+        }
+
+        if (obj instanceof FutureSalts) {
+            FutureSalts futureSalts = (FutureSalts) obj;
+
+            messageId = futureSalts.reqMsgId();
+        }
+
         log.info(obj.toString());
-        Sinks.One<Object> sink = session.getResolvers().get(messageId);
-        if (sink != null) {
-            sink.emitValue(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+        log.info(session.getResolvers().toString());
+
+        if (!session.getResolvers().containsKey(messageId)) {
+            session.dispatch().emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+        } else {
+            session.getResolvers().computeIfPresent(messageId, (k, sink) -> {
+                sink.emitValue(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+                return null;
+            });
         }
 
         return acknowledgmentMessage(messageId);
@@ -140,12 +154,22 @@ public class RpcHandler {
         return sendAcknowledgments();
     }
 
+    private boolean isAwaitAcknowledge(long messageId) {
+        int threshold = session.getClient().getOptions().getAcksSendThreshold();
+        Queue<Long> acks = session.getAcknowledgments();
+        return acks.contains(messageId) && acks.size() + 1 > threshold;
+    }
+
     private Mono<Void> sendAcknowledgments() {
         return Mono.defer(() -> {
             Queue<Long> acks = session.getAcknowledgments();
             int threshold = session.getClient().getOptions().getAcksSendThreshold();
             if (acks.isEmpty() || acks.size() < threshold) {
                 return Mono.empty();
+            }
+
+            if (log.isDebugEnabled()) {
+                log.debug("Sending acknowledges for message(s): {}", acks);
             }
 
             return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
