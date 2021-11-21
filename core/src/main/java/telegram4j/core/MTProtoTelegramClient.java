@@ -10,11 +10,11 @@ import java.util.function.Function;
 public final class MTProtoTelegramClient {
     public static final int LAYER = 133;
 
-    private final TelegramResources telegramResources;
+    private final AuthorizationResources telegramResources;
     private final Mono<Void> onDisconnect;
     private final MTProtoSession session;
 
-    MTProtoTelegramClient(TelegramResources telegramResources, Mono<Void> onDisconnect, MTProtoSession session) {
+    MTProtoTelegramClient(AuthorizationResources telegramResources, Mono<Void> onDisconnect, MTProtoSession session) {
         this.telegramResources = telegramResources;
         this.onDisconnect = onDisconnect;
         this.session = session;
@@ -23,15 +23,15 @@ public final class MTProtoTelegramClient {
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
         Objects.requireNonNull(botAuthToken, "botAuthToken");
         return new MTProtoBootstrap<>(Function.identity(),
-                new TelegramResources(appId, appHash, botAuthToken, AuthorizationType.BOT));
+                new AuthorizationResources(appId, appHash, botAuthToken, AuthorizationResources.Type.BOT));
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash) {
         return new MTProtoBootstrap<>(Function.identity(),
-                new TelegramResources(appId, appHash, null, AuthorizationType.USER));
+                new AuthorizationResources(appId, appHash, null, AuthorizationResources.Type.USER));
     }
 
-    public TelegramResources getTelegramResources() {
+    public AuthorizationResources getTelegramResources() {
         return telegramResources;
     }
 

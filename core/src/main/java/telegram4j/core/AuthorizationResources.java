@@ -5,18 +5,18 @@ import reactor.util.annotation.Nullable;
 import java.util.Objects;
 import java.util.Optional;
 
-public class TelegramResources {
+public class AuthorizationResources {
     private final int appId;
     private final String appHash;
     @Nullable
     private final String botAuthToken;
-    private final AuthorizationType authorizationType;
+    private final Type type;
 
-    public TelegramResources(int appId, String appHash, @Nullable String botAuthToken, AuthorizationType authorizationType) {
+    public AuthorizationResources(int appId, String appHash, @Nullable String botAuthToken, Type type) {
         this.appId = appId;
         this.appHash = Objects.requireNonNull(appHash, "appHash");
         this.botAuthToken = botAuthToken;
-        this.authorizationType = Objects.requireNonNull(authorizationType, "authorizationType");
+        this.type = Objects.requireNonNull(type, "type");
     }
 
     public int getAppId() {
@@ -31,7 +31,12 @@ public class TelegramResources {
         return Optional.ofNullable(botAuthToken);
     }
 
-    public AuthorizationType getAuthorizationType() {
-        return authorizationType;
+    public Type getType() {
+        return type;
+    }
+
+    public enum Type {
+        BOT,
+        USER
     }
 }

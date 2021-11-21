@@ -27,19 +27,19 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     private static final Duration FUTURE_SALT_QUERY_PERIOD = Duration.ofMinutes(45);
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
-    private final TelegramResources telegramResources;
+    private final AuthorizationResources authorizationResources;
 
     private MTProtoResources mtProtoResources;
     private int acksSendThreshold = 5;
     private InitConnection<TlObject> initConnection;
 
-    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, TelegramResources telegramResources) {
+    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authorizationResources) {
         this.optionsModifier = optionsModifier;
-        this.telegramResources = telegramResources;
+        this.authorizationResources = authorizationResources;
     }
 
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
-        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), telegramResources);
+        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authorizationResources);
     }
 
     public MTProtoBootstrap<O> setMTProtoResources(MTProtoResources mtProtoResources) {
@@ -76,7 +76,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                     Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
 
                     MTProtoOptions options = session.getClient().getOptions();
-                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(telegramResources, onCloseSink.asMono(), session);
+                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(authorizationResources, onCloseSink.asMono(), session);
 
                     AuthorizationHandler authorizationHandler = new AuthorizationHandler(session, onAuthSink);
                     RpcHandler rpcHandler = new RpcHandler(session);
@@ -147,13 +147,13 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     private TlObject importAuthorization() {
-        switch (telegramResources.getAuthorizationType()) {
+        switch (authorizationResources.getType()) {
             case BOT:
                 return ImportBotAuthorization.builder()
                         .flags(0)
-                        .apiId(telegramResources.getAppId())
-                        .apiHash(telegramResources.getAppHash())
-                        .botAuthToken(telegramResources.getBotAuthToken()
+                        .apiId(authorizationResources.getAppId())
+                        .apiHash(authorizationResources.getAppHash())
+                        .botAuthToken(authorizationResources.getBotAuthToken()
                                 .orElseThrow(IllegalStateException::new))
                         .build();
             case USER: throw new UnsupportedOperationException("User authorization hasn't yet implemented.");
@@ -173,7 +173,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
             return initConnection;
         }
         return InitConnection.builder()
-                .apiId(telegramResources.getAppId())
+                .apiId(authorizationResources.getAppId())
                 .appVersion("0.1.0")
                 .deviceModel("telegram4j")
                 .langCode("en")

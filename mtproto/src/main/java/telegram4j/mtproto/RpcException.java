@@ -12,6 +12,7 @@ public class RpcException extends RuntimeException {
         this.error = error;
     }
 
+    // TODO: message templates with X should be detected via a regexp
     static RpcException create(RpcError error) {
         String message = null;
 
