@@ -1157,8 +1157,12 @@ public class SchemaGenerator extends AbstractProcessor {
                             specific = Character.toUpperCase(innerType.charAt(0)) + innerType.substring(1);
                             break;
                     }
+
+                    // bare vectors (msg_container, future_salts)
                     if (type.contains("%")) {
                        return "deserializeVector0(payload, true, TlDeserializer::deserializeMessage)";
+                    } else if (type.contains("future_salt")) {
+                        return "deserializeVector0(payload, true, TlDeserializer::deserializeFutureSalt)";
                     }
                     return "deserialize" + specific + "Vector(payload)";
                 }
