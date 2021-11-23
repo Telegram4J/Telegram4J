@@ -119,20 +119,8 @@ public class SchemaGenerator extends AbstractProcessor {
         }
 
         if (typeTree == null) {
-            Function<TlSchema, Map<String, List<TlEntityObject>>> constructorCollector = schema -> schema.constructors().stream()
-                    .filter(c -> !ignoredTypes.contains(normalizeName(c.type()).toLowerCase()) &&
-                            !c.type().equalsIgnoreCase("Object"))
-                    .collect(Collectors.groupingBy(c -> {
-                        String packageNameRaw = getPackageName(c.type());
-                        if(schema.packagePrefix().isEmpty()){
-                            return packageNameRaw + "." + normalizeName(c.type());
-                        }
-                        return packageNameRaw.replace(packageNameRaw, packageNameRaw + schema.packagePrefix())
-                                + "." + normalizeName(c.type());
-                    }));
-
-            typeTree = constructorCollector.apply(apiSchema);
-            typeTree.putAll(constructorCollector.apply(mtprotoSchema));
+            typeTree = collectTypeTree(apiSchema);
+            typeTree.putAll(collectTypeTree(mtprotoSchema));
 
             // prepare package-info.java file for types
 
@@ -188,17 +176,17 @@ public class SchemaGenerator extends AbstractProcessor {
             deserializeMethod.addStatement("int identifier = payload.readIntLE()");
             deserializeMethod.beginControlFlow("switch (identifier)");
 
-            Map<String, Set<TlParam>> sharedParams = typeTree.entrySet().stream()
-                    .filter(e -> e.getValue().size() > 1)
-                    .collect(Collectors.groupingBy(Map.Entry::getKey,
-                            flatMapping(e -> e.getValue().stream()
-                                            .flatMap(c -> c.params().stream())
-                                            .filter(p -> e.getValue().stream()
-                                                    .allMatch(c -> c.params().contains(p))),
-                                    Collectors.toCollection(LinkedHashSet::new))));
-
-            for (TlSchema currentSchema : Arrays.asList(apiSchema, mtprotoSchema)) {
+            for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors
+
+                Map<String, Set<TlParam>> sharedParams = collectTypeTree(schema).entrySet().stream()
+                        .filter(e -> e.getValue().size() > 1)
+                        .collect(Collectors.groupingBy(Map.Entry::getKey,
+                                flatMapping(e -> e.getValue().stream()
+                                                .flatMap(c -> c.params().stream())
+                                                .filter(p -> e.getValue().stream()
+                                                        .allMatch(c -> c.params().contains(p))),
+                                        Collectors.toCollection(LinkedHashSet::new))));
 
                 for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
                     String name = normalizeName(e.getKey());
@@ -217,7 +205,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             : TypeSpec.interfaceBuilder(name);
 
                     superType.addModifiers(Modifier.PUBLIC);
-                    superType.addSuperinterface(currentSchema.superType());
+                    superType.addSuperinterface(schema.superType());
 
                     if (canMakeEnum) {
 
@@ -241,7 +229,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
                             String packageNameRaw = getPackageName(constructor.name());
                             String enumPackageName = packageNameRaw.replace(packageNameRaw,
-                                    packageNameRaw + currentSchema.packagePrefix());
+                                    packageNameRaw + schema.packagePrefix());
                             computed.put(enumPackageName + "." + subtypeName, constructor);
                         }
 
@@ -271,7 +259,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                 continue;
                             }
 
-                            TypeName paramType = parseType(param.type(), currentSchema);
+                            TypeName paramType = parseType(param.type(), schema);
                             if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
                                 paramType = TypeName.OBJECT;
                             }
@@ -303,12 +291,12 @@ public class SchemaGenerator extends AbstractProcessor {
                             .build());
                 }
 
-                for (TlEntityObject constructor : currentSchema.constructors()) {
+                for (TlEntityObject constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
                     String name = normalizeName(constructor.name());
                     String packageNameRaw = getPackageName(constructor.type());
                     String packageName = packageNameRaw.replace(packageNameRaw,
-                            packageNameRaw + currentSchema.packagePrefix());
+                            packageNameRaw + schema.packagePrefix());
                     String qualifiedTypeName = packageName + "." + type;
 
                     boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
@@ -334,7 +322,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     if (multiple) {
                         builder.addSuperinterface(ClassName.get(packageName, type));
                     } else {
-                        builder.addSuperinterface(currentSchema.superType());
+                        builder.addSuperinterface(schema.superType());
                     }
 
                     builder.addField(FieldSpec.builder(TypeName.INT, "ID",
@@ -377,7 +365,7 @@ public class SchemaGenerator extends AbstractProcessor {
                         }
 
                         String paramName = formatFieldName(param.name());
-                        TypeName paramType = parseType(param.type(), currentSchema);
+                        TypeName paramType = parseType(param.type(), schema);
                         boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
                                 .flatMap(c -> c.params().stream())
                                 .anyMatch(p -> p.type().startsWith("flags.") &&
@@ -409,7 +397,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 // endregion
                 // region methods
 
-                for (TlEntityObject method : currentSchema.methods()) {
+                for (TlEntityObject method : schema.methods()) {
                     if (method.type().equals("HttpWait")) {
                         continue;
                     }
@@ -418,7 +406,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     String packageNameRaw = getPackageName();
                     String packageName = getPackageName(method.name())
                             .replace(packageNameRaw, packageNameRaw
-                                    + METHOD_PACKAGE_PREFIX + currentSchema.packagePrefix());
+                                    + METHOD_PACKAGE_PREFIX + schema.packagePrefix());
 
                     boolean generic = method.params().stream()
                             .anyMatch(p -> p.type().equals("!X"));
@@ -427,14 +415,18 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addModifiers(Modifier.PUBLIC);
 
                     if (generic) {
-                        typeSpec.addTypeVariable(TypeVariableName.get("T", currentSchema.superType()));
+                        typeSpec.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                     }
 
                     TypeName returnType = ParameterizedTypeName.get(
                             ClassName.get(TlMethod.class),
-                            parseType(method.type(), currentSchema).box());
+                            parseType(method.type(), schema).box());
 
                     typeSpec.addSuperinterface(returnType);
+
+                    if (schema.superType() != TlObject.class) {
+                        typeSpec.addSuperinterface(schema.superType());
+                    }
 
                     typeSpec.addField(FieldSpec.builder(TypeName.INT, "ID",
                                     Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
@@ -454,7 +446,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             .addCode("return $T.builder();", immutableTypeRaw);
 
                     if (generic) {
-                        builder.addTypeVariable(TypeVariableName.get("T", currentSchema.superType()));
+                        builder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                     }
 
                     typeSpec.addMethod(builder.build());
@@ -471,7 +463,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                 .addCode("return $T.of();", immutableTypeRaw);
 
                         if (generic) {
-                            instance.addTypeVariable(TypeVariableName.get("T", currentSchema.superType()));
+                            instance.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                         }
 
                         typeSpec.addMethod(instance.build());
@@ -491,7 +483,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             continue;
                         }
 
-                        TypeName paramType = parseType(param.type(), currentSchema);
+                        TypeName paramType = parseType(param.type(), schema);
 
                         MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
                                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
@@ -513,12 +505,12 @@ public class SchemaGenerator extends AbstractProcessor {
                 // endregion
                 // region serializer
 
-                for (TlEntityObject constructor : currentSchema.constructors()) {
+                for (TlEntityObject constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
                     String name = normalizeName(constructor.name());
                     String packageNameRaw = getPackageName(constructor.type());
                     String packageName = packageNameRaw.replace(packageNameRaw,
-                            packageNameRaw + currentSchema.packagePrefix());
+                            packageNameRaw + schema.packagePrefix());
                     String qualifiedTypeName = packageName + "." + type;
 
                     // Enums must be handled after types
@@ -543,12 +535,12 @@ public class SchemaGenerator extends AbstractProcessor {
                     String methodName0 = "serialize" + name;
                     String methodName = methodName0;
                     if (deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName0))) {
-                        if (currentSchema.packagePrefix().isEmpty()) {
+                        if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
-                        char up = currentSchema.packagePrefix().charAt(1);
+                        char up = schema.packagePrefix().charAt(1);
                         methodName = "serialize" + Character.toUpperCase(up)
-                                + currentSchema.packagePrefix().substring(2) + name;
+                                + schema.packagePrefix().substring(2) + name;
                     }
 
                     serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
@@ -585,7 +577,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             case "#":
                                 wrapping = attributes.stream()
                                         .filter(p -> p.type().startsWith("flags."))
-                                        .map(p -> parseFlag(p, currentSchema))
+                                        .map(p -> parseFlag(p, schema))
                                         .map(f -> "(payload." + formatFieldName(f.getName()) +
                                                 "() != null ? 1 : 0) << " + f.getPosition())
                                         .collect(Collectors.joining(" | "));
@@ -646,7 +638,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     serializer.addMethod(serializerBuilder.build());
                 }
 
-                for (TlEntityObject method : currentSchema.methods()) {
+                for (TlEntityObject method : schema.methods()) {
                     if (method.type().equals("HttpWait")) {
                         continue;
                     }
@@ -658,20 +650,20 @@ public class SchemaGenerator extends AbstractProcessor {
                     String packageNameRaw = getPackageName();
                     String packageName = getPackageName(method.name())
                             .replace(packageNameRaw, packageNameRaw
-                                    + METHOD_PACKAGE_PREFIX + currentSchema.packagePrefix());
+                                    + METHOD_PACKAGE_PREFIX + schema.packagePrefix());
 
                     ClassName typeRaw = ClassName.get(packageName, name);
-                    TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(currentSchema.superType())) : typeRaw;
+                    TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(schema.superType())) : typeRaw;
 
                     String methodName0 = "serialize" + name;
                     String methodName = methodName0;
                     if (deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName0))) {
-                        if (currentSchema.packagePrefix().isEmpty()) {
+                        if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
-                        char up = currentSchema.packagePrefix().charAt(1);
+                        char up = schema.packagePrefix().charAt(1);
                         methodName = "serialize" + Character.toUpperCase(up)
-                                + currentSchema.packagePrefix().substring(2) + name;
+                                + schema.packagePrefix().substring(2) + name;
                     }
 
                     serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
@@ -688,7 +680,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                     ParameterSpec.builder(payloadType, "payload").build()));
 
                     if (generic) {
-                        serializerBuilder.addTypeVariable(TypeVariableName.get("T", currentSchema.superType()));
+                        serializerBuilder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                     }
 
                     serializerBuilder.addCode("return allocator.buffer()\n");
@@ -711,7 +703,7 @@ public class SchemaGenerator extends AbstractProcessor {
                             case "#":
                                 wrapping = method.params().stream()
                                         .filter(p -> p.type().startsWith("flags."))
-                                        .map(s -> parseFlag(s, currentSchema))
+                                        .map(s -> parseFlag(s, schema))
                                         .map(f -> "(payload." + formatFieldName(f.getName()) +
                                                 "() != null ? 1 : 0) << " + f.getPosition())
                                         .collect(Collectors.joining(" | "));
@@ -781,12 +773,12 @@ public class SchemaGenerator extends AbstractProcessor {
                 // endregion
                 // region deserialization
 
-                for (TlEntityObject constructor : currentSchema.constructors()) {
+                for (TlEntityObject constructor : schema.constructors()) {
                     String type = normalizeName(constructor.type());
                     String name = normalizeName(constructor.name());
                     String packageNameRaw = getPackageName(constructor.type());
                     String packageName = packageNameRaw.replace(packageNameRaw,
-                            packageNameRaw + currentSchema.packagePrefix());
+                            packageNameRaw + schema.packagePrefix());
                     String qualifiedTypeName = packageName + "." + type;
 
                     // Enums must be handled after types
@@ -805,12 +797,12 @@ public class SchemaGenerator extends AbstractProcessor {
                     String methodName0 = "deserialize" + name;
                     String methodName = methodName0;
                     if (deserializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName0))) {
-                        if (currentSchema.packagePrefix().isEmpty()) {
+                        if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
-                        char up = currentSchema.packagePrefix().charAt(1);
+                        char up = schema.packagePrefix().charAt(1);
                         methodName = "deserialize" + Character.toUpperCase(up)
-                                + currentSchema.packagePrefix().substring(2) + name;
+                                + schema.packagePrefix().substring(2) + name;
                     }
 
                     if (ignoredTypes.contains(type.toLowerCase())) {
@@ -1168,6 +1160,19 @@ public class SchemaGenerator extends AbstractProcessor {
                 }
                 return "deserialize(payload)";
         }
+    }
+
+    private Map<String, List<TlEntityObject>> collectTypeTree(TlSchema schema) {
+        return schema.constructors().stream()
+                .filter(c -> !ignoredTypes.contains(normalizeName(c.type()).toLowerCase()))
+                .collect(Collectors.groupingBy(c -> {
+                    String packageNameRaw = getPackageName(c.type());
+                    if(schema.packagePrefix().isEmpty()){
+                        return packageNameRaw + "." + normalizeName(c.type());
+                    }
+                    return packageNameRaw.replace(packageNameRaw, packageNameRaw + schema.packagePrefix())
+                            + "." + normalizeName(c.type());
+                }));
     }
 
     // java 9

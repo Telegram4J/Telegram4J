@@ -8,14 +8,18 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import telegram4j.core.event.dispatcher.DefaultEventDispatcher;
+import telegram4j.core.event.dispatcher.EventDispatcher;
+import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.tl.TlMethod;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.Updates;
+import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.mtproto.FutureSalt;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
@@ -23,6 +27,7 @@ import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
 import telegram4j.tl.request.mtproto.Ping;
+import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -41,6 +46,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     private MTProtoResources mtProtoResources;
     private int acksSendThreshold = 3;
     private InitConnection<TlObject> initConnection;
+    private EventDispatcher eventDispatcher;
 
     MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authorizationResources) {
         this.optionsModifier = optionsModifier;
@@ -66,6 +72,11 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setEventDispatcher(EventDispatcher eventDispatcher) {
+        this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
+        return this;
+    }
+
     public Mono<MTProtoTelegramClient> connect() {
         return connect(DefaultMTProtoClient::new);
     }
@@ -85,41 +96,35 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                     Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
 
                     MTProtoOptions options = session.getClient().getOptions();
-                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(authorizationResources, onCloseSink.asMono(), session);
+                    MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
+                            authorizationResources, initEventDispatcher(),
+                            onCloseSink.asMono(), session);
 
-                    AuthorizationHandler authorizationHandler = new AuthorizationHandler(session, onAuthSink);
+                    AuthorizationHandler authorizationHandler = new AuthorizationHandler(session);
                     RpcHandler rpcHandler = new RpcHandler(session);
+                    UpdatesHandler updatesHandler = new UpdatesHandler(telegramClient, new UpdatesHandlers());
 
-                    composite.add(session.receiver()
+                    composite.add(session.rpcReceiver()
                             .takeUntilOther(onCloseSink.asMono())
-                            .takeUntilOther(onAuthSink.asMono())
-                            .checkpoint("Authorization key generation.")
-                            .flatMap(authorizationHandler::handle)
-                            .subscribe());
-
-                    composite.add(session.receiver()
-                            .takeUntilOther(onCloseSink.asMono())
-                            .filter(buf -> buf.getLongLE(buf.readerIndex()) != 0)
                             .checkpoint("RPC handler.")
                             .flatMap(rpcHandler::handle)
                             .then()
                             .subscribe());
 
-//                    composite.add(session.dispatch().asFlux()
-//                            .takeUntilOther(onCloseSink.asMono())
-//                            .ofType(Updates.class)
-//                            .checkpoint("Event dispatch handler.")
-//
-//                            .subscribe());
+                    composite.add(session.updates().asFlux()
+                            .takeUntilOther(onCloseSink.asMono())
+                            .ofType(Updates.class)
+                            .checkpoint("Event dispatch handler.")
+                            .flatMap(updatesHandler::handle)
+                            .doOnNext(telegramClient.getEventDispatcher()::publish)
+                            .subscribe());
 
                     ResettableInterval futureSalt = new ResettableInterval(Schedulers.boundedElastic());
 
                     composite.add(futureSalt.ticks()
                             .takeUntilOther(onCloseSink.asMono())
                             .checkpoint("Future salt loop.")
-                            .flatMap(tick -> session
-                                    .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                                    .send(GetFutureSalts.builder().num(1).build()))
+                            .flatMap(tick -> session.sendEncrypted(GetFutureSalts.builder().num(1).build()))
                             .doOnNext(futureSalts -> {
                                 FutureSalt salt = futureSalts.salts().get(0);
                                 int delaySeconds = salt.validUntil() - futureSalts.now() - 900;
@@ -134,23 +139,19 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                     Mono<Void> pingLoop = Flux.interval(PING_QUERY_PERIOD)
                             .takeUntilOther(onCloseSink.asMono())
                             .checkpoint("Ping loop.")
-                            .flatMap(tick -> session
-                                    .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                                    .send(Ping.builder().pingId(CryptoUtil.random.nextInt()).build()))
+                            .flatMap(tick -> session.sendEncrypted(Ping.builder().pingId(CryptoUtil.random.nextInt()).build()))
                             .then();
 
-                    Mono<Void> initializeConnection = session
-                            .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                            .send(InvokeWithLayer.builder()
+                    Mono<Void> initializeConnection = session.sendEncrypted(InvokeWithLayer.builder()
                                     .layer(MTProtoTelegramClient.LAYER)
                                     .query(initConnectionParams())
                                     .build())
-                            .then(session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                                    .send(InvokeWithLayer.builder()
-                                            .layer(MTProtoTelegramClient.LAYER)
-                                            .query(importAuthorization())
-                                            .build()))
+                            .then(session.sendEncrypted(InvokeWithLayer.builder()
+                                    .layer(MTProtoTelegramClient.LAYER)
+                                    .query(importAuthorization())
+                                    .build()))
                             .doOnNext(ignored -> futureSalt.start(FUTURE_SALT_QUERY_PERIOD))
+                            .then(session.sendEncrypted(GetState.instance()))
                             .then();
 
                     composite.add(options.getResources().getStoreLayout()
@@ -167,7 +168,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                 }));
     }
 
-    private TlObject importAuthorization() {
+    private TlMethod<Authorization> importAuthorization() {
         switch (authorizationResources.getType()) {
             case BOT:
                 return ImportBotAuthorization.builder()
@@ -203,5 +204,13 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                 .systemLangCode("en")
                 .query(GetConfig.instance())
                 .build();
+    }
+
+    private EventDispatcher initEventDispatcher() {
+        if (eventDispatcher != null) {
+            return eventDispatcher;
+        }
+        return new DefaultEventDispatcher(Schedulers.boundedElastic(),
+                Sinks.many().multicast().onBackpressureBuffer());
     }
 }

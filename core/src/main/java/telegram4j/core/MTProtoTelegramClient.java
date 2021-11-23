@@ -1,8 +1,17 @@
 package telegram4j.core;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.event.Event;
+import telegram4j.core.event.dispatcher.EventDispatcher;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.MTProtoSession;
+import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.tl.BaseUser;
+import telegram4j.tl.InputPeerUser;
+import telegram4j.tl.Message;
+import telegram4j.tl.request.contacts.ResolveUsername;
+import telegram4j.tl.request.messages.SendMessage;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -10,12 +19,15 @@ import java.util.function.Function;
 public final class MTProtoTelegramClient {
     public static final int LAYER = 133;
 
-    private final AuthorizationResources telegramResources;
+    private final AuthorizationResources authorizationResources;
+    private final EventDispatcher eventDispatcher;
     private final Mono<Void> onDisconnect;
     private final MTProtoSession session;
 
-    MTProtoTelegramClient(AuthorizationResources telegramResources, Mono<Void> onDisconnect, MTProtoSession session) {
-        this.telegramResources = telegramResources;
+    MTProtoTelegramClient(AuthorizationResources authorizationResources, EventDispatcher eventDispatcher,
+                          Mono<Void> onDisconnect, MTProtoSession session) {
+        this.authorizationResources = authorizationResources;
+        this.eventDispatcher = eventDispatcher;
         this.onDisconnect = onDisconnect;
         this.session = session;
     }
@@ -31,8 +43,12 @@ public final class MTProtoTelegramClient {
                 new AuthorizationResources(appId, appHash, null, AuthorizationResources.Type.USER));
     }
 
-    public AuthorizationResources getTelegramResources() {
-        return telegramResources;
+    public AuthorizationResources getAuthorizationResources() {
+        return authorizationResources;
+    }
+
+    public EventDispatcher getEventDispatcher() {
+        return eventDispatcher;
     }
 
     public MTProtoSession getSession() {
@@ -41,5 +57,28 @@ public final class MTProtoTelegramClient {
 
     public Mono<Void> onDisconnect() {
         return onDisconnect;
+    }
+
+    public <E extends Event> Flux<E> on(Class<E> type) {
+        return eventDispatcher.on(type);
+    }
+
+    public Mono<Message> sendMessage() {
+//        return session.sendEncrypted(ResolveUsername.builder().username("skat_ina").build())
+//                .map(peer -> peer.users().get(0))
+//                .ofType(BaseUser.class)
+//                .flatMap(user -> client.getSession()
+//                        .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
+//                        .send(SendMessage.builder()
+//                                .randomId(CryptoUtil.random.nextLong())
+//                                .message("sus")
+//                                .peer(InputPeerUser.builder()
+//                                        .userId(user.id())
+//                                        .accessHash(Objects.requireNonNull(user.accessHash()))
+//                                        .build())
+//                                .build()))
+//                .log()
+//                .block();
+        return Mono.empty();
     }
 }

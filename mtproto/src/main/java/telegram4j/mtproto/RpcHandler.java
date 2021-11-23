@@ -1,13 +1,11 @@
 package telegram4j.mtproto;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.mtproto.*;
@@ -24,10 +22,8 @@ public class RpcHandler {
         this.session = session;
     }
 
-    public Mono<Void> handle(ByteBuf payload) {
-        return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                .receive(payload)
-                .flatMap(obj -> handleServiceMessage(obj, session.getLastMessageId()));
+    public Mono<Void> handle(TlObject payload) {
+        return handleServiceMessage(payload, session.getLastMessageId());
     }
 
     private Mono<Void> handleServiceMessage(TlObject obj, long messageId) {
@@ -101,11 +97,7 @@ public class RpcHandler {
                     break;
             }
 
-            session.getResolvers().computeIfPresent(badMsgNotification.badMsgId(), (k, sink) -> {
-                sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                return null;
-            });
-
+            session.resolve(badMsgNotification.badMsgId(), null);
             return Mono.empty();
         }
 
@@ -133,13 +125,10 @@ public class RpcHandler {
             messageId = futureSalts.reqMsgId();
         }
 
-        if (!session.getResolvers().containsKey(messageId)) {
-            session.dispatch().emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+        if (!session.isAwaitResolve(messageId)) {
+            session.updates().emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
         } else {
-            session.getResolvers().computeIfPresent(messageId, (k, sink) -> {
-                sink.emitValue(obj, Sinks.EmitFailureHandler.FAIL_FAST);
-                return null;
-            });
+            session.resolve(messageId, obj);
         }
 
         return acknowledgmentMessage(messageId);
@@ -169,8 +158,7 @@ public class RpcHandler {
                 log.debug("Sending acknowledges for message(s): {}", acks);
             }
 
-            return session.withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-                    .send(MsgsAck.builder().msgIds(acks).build())
+            return session.sendEncrypted(MsgsAck.builder().msgIds(acks).build())
                     .and(Mono.fromRunnable(acks::clear));
         });
     }

@@ -12,7 +12,7 @@ public class AuthorizationResources {
     private final String botAuthToken;
     private final Type type;
 
-    public AuthorizationResources(int appId, String appHash, @Nullable String botAuthToken, Type type) {
+    AuthorizationResources(int appId, String appHash, @Nullable String botAuthToken, Type type) {
         this.appId = appId;
         this.appHash = Objects.requireNonNull(appHash, "appHash");
         this.botAuthToken = botAuthToken;

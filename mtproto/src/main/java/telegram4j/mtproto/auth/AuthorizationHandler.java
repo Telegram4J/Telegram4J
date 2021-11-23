@@ -4,14 +4,14 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.retry.Retry;
 import telegram4j.mtproto.MTProtoSession;
 import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.util.AES256IGECipher;
-import telegram4j.mtproto.payload.PayloadMapperStrategy;
 import telegram4j.tl.TlDeserializer;
+import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.ReqDHParams;
@@ -31,61 +31,49 @@ public final class AuthorizationHandler {
 
     private final MTProtoSession session;
     private final AuthorizationContext context;
-    private final Sinks.One<AuthorizationKeyHolder> onAuthSink;
 
-    public AuthorizationHandler(MTProtoSession session, Sinks.One<AuthorizationKeyHolder> onAuthSink) {
+    public AuthorizationHandler(MTProtoSession session) {
         this.session = session;
         this.context = session.getClient().getOptions().getAuthorizationContext();
-        this.onAuthSink = onAuthSink;
     }
 
-    public Mono<Void> start() {
+    public Mono<AuthorizationKeyHolder> start() {
         return Mono.defer(() -> {
-            log.debug("Auth key generation started!");
+                    log.debug("Auth key generation started!");
 
-            byte[] nonce = random.generateSeed(16);
-            context.setNonce(nonce);
+                    byte[] nonce = random.generateSeed(16);
+                    context.setNonce(nonce);
 
-            return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
-                    .send(ReqPqMulti.builder().nonce(nonce).build())
-                    .then();
-        });
+                    // First step. DH exchange initiation
+                    return session.sendUnencrypted(ReqPqMulti.builder()
+                                    .nonce(nonce)
+                                    .build())
+                            .flatMap(this::handleResPQ)
+                            .flatMap(this::handleServerDHParams) // Step 2. Presenting proof of work; Server authentication
+                            .retryWhen(Retry.indefinitely())
+                            .flatMap(this::handleDhGenRes); // Step 3. DH key exchange complete;
+                })
+                .checkpoint("Authorization key generation.");
     }
 
-    public Mono<Void> handle(ByteBuf payload) {
-        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
-                .receive(payload)
-                .flatMap(obj -> {
-                    // first step. DH exchange initiation
-                    if (obj instanceof ResPQ) {
-                        ResPQ resPQ = (ResPQ) obj;
-                        return handleResPQ(resPQ);
-                    }
+    private Mono<AuthorizationKeyHolder> handleDhGenRes(SetClientDHParamsAnswer obj) {
+        if (obj instanceof DhGenOk) {
+            DhGenOk dhGenOk = (DhGenOk) obj;
+            return handleDhGenOk(dhGenOk);
+        }
 
-                    // Step 2. Presenting proof of work; Server authentication
-                    if (obj instanceof ServerDHParams) {
-                        ServerDHParams serverDHParams = (ServerDHParams) obj;
-                        return handleServerDHParams(serverDHParams);
-                    }
+        if (obj instanceof DhGenRetry) {
+            DhGenRetry dhGenRetry = (DhGenRetry) obj;
+            return handleDhGenRetry(dhGenRetry)
+                    .then(Mono.error(new IllegalArgumentException()));
+        }
 
-                    // Step 3. DH key exchange complete
-                    if (obj instanceof DhGenOk) {
-                        DhGenOk dhGenOk = (DhGenOk) obj;
-                        return handleDhGenOk(dhGenOk);
-                    }
+        if (obj instanceof DhGenFail) {
+            DhGenFail dhGenFail = (DhGenFail) obj;
+            return handleDhGenFail(dhGenFail).then(Mono.empty());
+        }
 
-                    if (obj instanceof DhGenRetry) {
-                        DhGenRetry dhGenRetry = (DhGenRetry) obj;
-                        return handleDhGenRetry(dhGenRetry);
-                    }
-
-                    if (obj instanceof DhGenFail) {
-                        DhGenFail dhGenFail = (DhGenFail) obj;
-                        return handleDhGenFail(dhGenFail);
-                    }
-
-                    return Mono.error(() -> new IllegalStateException("Unexpected type: 0x" + Integer.toHexString(obj.identifier())));
-                });
+        return Mono.error(() -> new IllegalStateException("Unexpected type: 0x" + Integer.toHexString(obj.identifier())));
     }
 
     private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
@@ -100,7 +88,7 @@ public final class AuthorizationHandler {
         return Mono.error(new IllegalStateException("Failed to create an authorization key."));
     }
 
-    private Mono<Void> handleResPQ(ResPQ resPQ) {
+    private Mono<ServerDHParams> handleResPQ(ResPQ resPQ) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
         context.setServerNonce(resPQ.serverNonce());
         byte[] pqBytes = resPQ.pq();
@@ -134,19 +122,17 @@ public final class AuthorizationHandler {
         byte[] dataWithHash = concat(hash, pqInnerDataBytes, seed);
         byte[] encrypted = rsaEncrypt(dataWithHash, key);
 
-        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
-                .send(ReqDHParams.builder()
-                        .nonce(context.getNonce())
-                        .serverNonce(context.getServerNonce())
-                        .encryptedData(encrypted)
-                        .p(pBytes)
-                        .q(qBytes)
-                        .publicKeyFingerprint(fingerprint)
-                        .build())
-                .then();
+        return session.sendUnencrypted(ReqDHParams.builder()
+                .nonce(context.getNonce())
+                .serverNonce(context.getServerNonce())
+                .encryptedData(encrypted)
+                .p(pBytes)
+                .q(qBytes)
+                .publicKeyFingerprint(fingerprint)
+                .build());
     }
 
-    private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
+    private Mono<AuthorizationKeyHolder> handleDhGenOk(DhGenOk dhGenOk) {
         byte[] newNonceHash1 = dhGenOk.newNonceHash1();
         byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{1}, context.getAuthAuxHash()), 4, 16);
 
@@ -163,13 +149,13 @@ public final class AuthorizationHandler {
 
         log.debug("Auth key generation completed!");
         AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(context.getAuthKey());
-        onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
         return session.getClient().getOptions()
                 .getResources().getStoreLayout()
-                .updateAuthorizationKey(authKey);
+                .updateAuthorizationKey(authKey)
+                .thenReturn(authKey);
     }
 
-    private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {
+    private Mono<SetClientDHParamsAnswer> handleDhGenRetry(DhGenRetry dhGenRetry) {
         byte[] newNonceHash2 = dhGenRetry.newNonceHash2();
         byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{2}, context.getAuthAuxHash()), 4, 16);
 
@@ -183,7 +169,7 @@ public final class AuthorizationHandler {
         return handleServerDHParams(serverDHParams);
     }
 
-    private Mono<Void> handleServerDHParams(ServerDHParams serverDHParams) {
+    private Mono<SetClientDHParamsAnswer> handleServerDHParams(ServerDHParams serverDHParams) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
         context.setServerDHParams(serverDHParams); // for DhGenRetry
         byte[] encryptedAnswerB = serverDHParams.encryptedAnswer();
@@ -226,12 +212,10 @@ public final class AuthorizationHandler {
 
         session.updateTimeOffset(serverDHInnerData.serverTime());
 
-        return session.withPayloadMapper(PayloadMapperStrategy.UNENCRYPTED)
-                .send(SetClientDHParams.builder()
-                        .nonce(context.getNonce())
-                        .serverNonce(context.getServerNonce())
-                        .encryptedData(dataWithHashEnc)
-                        .build())
-                .then();
+        return session.sendUnencrypted(SetClientDHParams.builder()
+                .nonce(context.getNonce())
+                .serverNonce(context.getServerNonce())
+                .encryptedData(dataWithHashEnc)
+                .build());
     }
 }
