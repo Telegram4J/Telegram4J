@@ -12,10 +12,7 @@ import reactor.netty.FutureMono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.AES256IGECipher;
-import telegram4j.tl.MTProtoObject;
-import telegram4j.tl.TlMethod;
-import telegram4j.tl.TlObject;
-import telegram4j.tl.TlSerializer;
+import telegram4j.tl.*;
 import telegram4j.tl.mtproto.MessageContainer;
 import telegram4j.tl.mtproto.MsgsAck;
 import telegram4j.tl.request.mtproto.Ping;
@@ -35,7 +32,7 @@ public final class MTProtoSession {
     private final Connection connection;
     private final Sinks.Many<TlObject> authorizationReceiver;
     private final Sinks.Many<TlObject> rpcReceiver;
-    private final Sinks.Many<TlObject> updates;
+    private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
 
     private volatile AuthorizationKeyHolder authorizationKey;
@@ -72,7 +69,7 @@ public final class MTProtoSession {
         return rpcReceiver.asFlux();
     }
 
-    public Sinks.Many<TlObject> updates() {
+    public Sinks.Many<Updates> updates() {
         return updates;
     }
 

@@ -113,7 +113,6 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
 
                     composite.add(session.updates().asFlux()
                             .takeUntilOther(onCloseSink.asMono())
-                            .ofType(Updates.class)
                             .checkpoint("Event dispatch handler.")
                             .flatMap(updatesHandler::handle)
                             .doOnNext(telegramClient.getEventDispatcher()::publish)

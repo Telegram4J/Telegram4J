@@ -8,6 +8,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerialUtil;
+import telegram4j.tl.Updates;
 import telegram4j.tl.mtproto.*;
 
 import java.util.Queue;
@@ -126,7 +127,7 @@ public class RpcHandler {
         }
 
         if (!session.isAwaitResolve(messageId)) {
-            session.updates().emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+            session.updates().emitNext((Updates) obj, Sinks.EmitFailureHandler.FAIL_FAST);
         } else {
             session.resolve(messageId, obj);
         }
