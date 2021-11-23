@@ -212,7 +212,7 @@ public final class TlSerialUtil {
         return serializeUnknown(allocator, value);
     }
 
-    public static ByteBuf serializeUnknown(ByteBufAllocator allocator, Object value) {
+    private static ByteBuf serializeUnknown(ByteBufAllocator allocator, Object value) {
         if (value instanceof Byte) {
             return allocator.buffer(Byte.BYTES).writeByte((int) value);
         } else if (value instanceof Boolean) {
