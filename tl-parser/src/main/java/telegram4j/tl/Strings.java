@@ -44,4 +44,16 @@ final class Strings {
         }
         return buf.toString();
     }
+
+    static String findCommonPart(String s1, String s2) {
+        if (s1.equals(s2)) {
+            return s1;
+        }
+        for (int i = 0; i < Math.min(s1.length(), s2.length()); i++) {
+            if (s1.charAt(i) != s2.charAt(i)) {
+                return s1.substring(0, i);
+            }
+        }
+        return s1;
+    }
 }
