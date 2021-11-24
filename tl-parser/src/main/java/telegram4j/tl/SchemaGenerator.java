@@ -144,7 +144,6 @@ public class SchemaGenerator extends AbstractProcessor {
                             .sum() == 0)
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-            TypeVariableName serializableType = TypeVariableName.get("T", TlObject.class);
             MethodSpec privateConstructor = MethodSpec.constructorBuilder()
                     .addModifiers(Modifier.PRIVATE)
                     .build();
@@ -167,14 +166,27 @@ public class SchemaGenerator extends AbstractProcessor {
                     .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
                     .addMethod(privateConstructor);
 
+            TypeVariableName typeVarRef = TypeVariableName.get("T");
             MethodSpec.Builder deserializeMethod = MethodSpec.methodBuilder("deserialize")
-                    .returns(serializableType)
-                    .addTypeVariable(serializableType)
+                    .returns(typeVarRef)
+                    .addTypeVariable(typeVarRef)
                     .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                     .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
 
             deserializeMethod.addStatement("int identifier = payload.readIntLE()");
             deserializeMethod.beginControlFlow("switch (identifier)");
+
+            // This need because methods can return bool or vector objects
+            // region primitive types
+
+            deserializeMethod.addComment("Primitive types");
+            deserializeMethod.addCode("case BOOL_TRUE_ID: return (T) Boolean.TRUE;\n");
+            deserializeMethod.addCode("case BOOL_FALSE_ID: return (T) Boolean.FALSE;\n");
+            // NOTE: Returned vectors aren't (kind of like) bare,
+            // but we have to skip the identifier because we have already shifted the reader index.
+            deserializeMethod.addCode("case VECTOR_ID: return (T) deserializeVector0(payload, true, TlDeserializer::deserialize);\n");
+
+            // endregion
 
             for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors

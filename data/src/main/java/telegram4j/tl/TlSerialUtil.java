@@ -29,7 +29,6 @@ public final class TlSerialUtil {
     public static final int JSON_OBJECT_ID = 0x99c1d49d;
     public static final int JSON_ENTRY_ID = 0xc0de1bd9;
 
-
     private TlSerialUtil() {
     }
 
