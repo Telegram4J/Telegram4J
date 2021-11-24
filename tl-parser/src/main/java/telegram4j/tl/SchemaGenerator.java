@@ -3,6 +3,7 @@ package telegram4j.tl;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -46,7 +47,8 @@ public class SchemaGenerator extends AbstractProcessor {
 
     private static final List<String> ignoredTypes = Arrays.asList(
             "bool", "true", "false", "null", "int", "long",
-            "string", "flags", "vector", "#");
+            "string", "flags", "vector", "#",
+            "jsonvalue", "jsonobjectvalue");
 
     private static final List<String> rpcTypes = Arrays.asList(
             "MsgDetailedInfo", "MsgDetailedInfo", "MsgResendReq",
@@ -177,7 +179,7 @@ public class SchemaGenerator extends AbstractProcessor {
             for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors
 
-                Map<String, Set<TlParam>> sharedParams = collectTypeTree(schema).entrySet().stream()
+                Map<String, Set<TlParam>> superTypes = collectTypeTree(schema).entrySet().stream()
                         .filter(e -> e.getValue().size() > 1)
                         .collect(Collectors.groupingBy(Map.Entry::getKey,
                                 flatMapping(e -> e.getValue().stream()
@@ -186,7 +188,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                                         .allMatch(c -> c.params().contains(p))),
                                         Collectors.toCollection(LinkedHashSet::new))));
 
-                for (Map.Entry<String, Set<TlParam>> e : sharedParams.entrySet()) {
+                for (Map.Entry<String, Set<TlParam>> e : superTypes.entrySet()) {
                     String name = normalizeName(e.getKey());
                     Set<TlParam> params = e.getValue();
                     String packageName = getPackageName(e.getKey());
@@ -258,10 +260,6 @@ public class SchemaGenerator extends AbstractProcessor {
                             }
 
                             TypeName paramType = parseType(param.type(), schema);
-                            if (param.name().equals("value") && name.equals("JSONValue")) { // TODO: create tl-serializable Jackson' JsonNode subtype
-                                paramType = TypeName.OBJECT;
-                            }
-
                             boolean optionalInExt = typeTree.get(qualifiedName).stream()
                                     .flatMap(c -> c.params().stream())
                                     .anyMatch(p -> p.type().startsWith("flags.") &&
@@ -423,73 +421,9 @@ public class SchemaGenerator extends AbstractProcessor {
                             String paramTypeLower = param.type().toLowerCase();
 
                             // serialization
-                            String wrapping = "payload.$L()";
-                            String method;
-                            switch (paramTypeLower) {
-                                case "true":
-                                    method = null;
-                                    break;
-                                case "bool":
-                                    method = "writeIntLE";
-                                    wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
-                                    break;
-                                case "#":
-                                    wrapping = attributes.stream()
-                                            .filter(p -> p.type().startsWith("flags."))
-                                            .map(p -> parseFlag(p, schema))
-                                            .map(f -> "(payload." + formatFieldName(f.getName()) +
-                                                    "() != null ? 1 : 0) << " + f.getPosition())
-                                            .collect(Collectors.joining(" | "));
-                                case "int":
-                                    method = "writeIntLE";
-                                    break;
-                                case "long":
-                                    method = "writeLongLE";
-                                    break;
-                                case "double":
-                                    method = "writeDoubleLE";
-                                    break;
-                                case "int256":
-                                case "int128":
-                                    method = "writeBytes";
-                                    break;
-                                case "string":
-                                case "bytes":
-                                    wrapping = "writeString(allocator, payload.$L())";
-                                    method = "writeBytes";
-                                    break;
-                                default:
-                                    Matcher vector = VECTOR_PATTERN.matcher(paramTypeLower);
-                                    if (vector.matches()) {
-                                        String innerType = vector.group(1).toLowerCase();
-                                        String specific = "";
-                                        switch (innerType) {
-                                            case "int":
-                                            case "long":
-                                            case "bytes":
-                                            case "string":
-                                                specific = Character.toUpperCase(innerType.charAt(0)) + innerType.substring(1);
-                                                break;
-                                        }
-                                        wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
-                                    } else if (paramTypeLower.startsWith("flags.")) {
-                                        if (paramTypeLower.endsWith("true")) {
-                                            method = null;
-                                            break;
-                                        }
-                                        wrapping = "serializeFlags(allocator, payload.$L())";
-                                    } else {
-                                        wrapping = "serialize(allocator, payload.$L())";
-                                    }
-                                    method = "writeBytes";
-                            }
-
-                            if (method != null) {
-                                if (paramTypeLower.equals("#")) {
-                                    serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method);
-                                } else {
-                                    serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method, paramName);
-                                }
+                            String method0 = serializeMethod(schema, constructor, param);
+                            if (method0 != null) {
+                                serializerBuilder.addCode("\n\t\t." + method0, paramName);
                             }
 
                             // deserialization
@@ -664,82 +598,11 @@ public class SchemaGenerator extends AbstractProcessor {
                     serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
 
                     for (TlParam param : method.params()) {
-                        String paramTypeLower = param.type().toLowerCase();
                         String paramName = formatFieldName(param.name());
 
-                        String wrapping = "payload.$L()";
-                        String method0;
-                        switch (paramTypeLower) {
-                            case "true":
-                                method0 = null;
-                                break;
-                            case "bool":
-                                method0 = "writeIntLE";
-                                wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
-                                break;
-                            case "#":
-                                wrapping = method.params().stream()
-                                        .filter(p -> p.type().startsWith("flags."))
-                                        .map(s -> parseFlag(s, schema))
-                                        .map(f -> "(payload." + formatFieldName(f.getName()) +
-                                                "() != null ? 1 : 0) << " + f.getPosition())
-                                        .collect(Collectors.joining(" | "));
-                            case "int":
-                                method0 = "writeIntLE";
-                                break;
-                            case "int256":
-                            case "int128":
-                                method0 = "writeBytes";
-                                break;
-                            case "long":
-                                method0 = "writeLongLE";
-                                break;
-                            case "double":
-                                method0 = "writeDoubleLE";
-                                break;
-                            case "string":
-                            case "bytes":
-                                wrapping = "writeString(allocator, payload.$L())";
-                                method0 = "writeBytes";
-                                break;
-                            default:
-                                Matcher vector = VECTOR_PATTERN.matcher(paramTypeLower);
-                                if (vector.matches()) {
-                                    String innerType = vector.group(1);
-                                    String specific = "";
-                                    switch (innerType.toLowerCase()) {
-                                        case "int":
-                                            specific = "Int";
-                                            break;
-                                        case "long":
-                                            specific = "Long";
-                                            break;
-                                        case "bytes":
-                                            specific = "Bytes";
-                                            break;
-                                        case "string":
-                                            specific = "String";
-                                            break;
-                                    }
-                                    wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
-                                } else if (paramTypeLower.startsWith("flags.")) {
-                                    if (paramTypeLower.endsWith("true")) {
-                                        method0 = null;
-                                        break;
-                                    }
-                                    wrapping = "serializeFlags(allocator, payload.$L())";
-                                } else {
-                                    wrapping = "serialize(allocator, payload.$L())";
-                                }
-                                method0 = "writeBytes";
-                        }
-
+                        String method0 = serializeMethod(schema, method, param);
                         if (method0 != null) {
-                            if (paramTypeLower.equals("#")) {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0);
-                            } else {
-                                serializerBuilder.addCode("\n\t\t.$L(" + wrapping + ")", method0, paramName);
-                            }
+                            serializerBuilder.addCode("\n\t\t." + method0, paramName);
                         }
 
                         if (param.type().equals("#")) {
@@ -939,6 +802,7 @@ public class SchemaGenerator extends AbstractProcessor {
             case "int256": return TypeName.get(byte[].class);
             case "string": return TypeName.get(String.class);
             case "object": return ClassName.get(TlObject.class);
+            case "jsonvalue": return ClassName.get(JsonNode.class);
             default:
                 Matcher flag = FLAG_PATTERN.matcher(type);
                 if (flag.matches()) {
@@ -1025,11 +889,12 @@ public class SchemaGenerator extends AbstractProcessor {
             case "bool": return "payload.readIntLE() == BOOL_TRUE_ID";
             case "int": return "payload.readIntLE()";
             case "long": return "payload.readLongLE()";
-            case "double": return "payload.readDouble()";
-            case "bytes": return "readBytes(payload)";
-            case "string": return "readString(payload)";
+            case "double": return "payload.readDoubleLE()";
+            case "bytes": return "deserializeBytes(payload)";
+            case "string": return "deserializeString(payload)";
             case "int128": return "readInt128(payload)";
             case "int256": return "readInt256(payload)";
+            case "jsonvalue": return "deserializeJsonNode(payload)";
             default:
                 if (type.equals("#")) {
                     return null;
@@ -1057,9 +922,9 @@ public class SchemaGenerator extends AbstractProcessor {
                             break;
                     }
 
-                    // bare vectors (msg_container, future_salts)
+                    // NOTE: bare vectors (msg_container, future_salts)
                     if (type.contains("%")) {
-                       return "deserializeVector0(payload, true, TlDeserializer::deserializeMessage)";
+                        return "deserializeVector0(payload, true, TlDeserializer::deserializeMessage)";
                     } else if (type.contains("future_salt")) {
                         return "deserializeVector0(payload, true, TlDeserializer::deserializeFutureSalt)";
                     }
@@ -1067,6 +932,89 @@ public class SchemaGenerator extends AbstractProcessor {
                 }
                 return "deserialize(payload)";
         }
+    }
+
+    @Nullable
+    private String serializeMethod(TlSchema schema, TlEntityObject object, TlParam param) {
+        String wrapping = "payload.$L()";
+        String method0;
+        String paramTypeLower = param.type().toLowerCase();
+        switch (paramTypeLower) {
+            case "true":
+                method0 = null;
+                break;
+            case "bool":
+                method0 = "writeIntLE";
+                wrapping = "payload.$L() ? BOOL_TRUE_ID : BOOL_FALSE_ID";
+                break;
+            case "#":
+                wrapping = object.params().stream()
+                        .filter(p -> p.type().startsWith("flags."))
+                        .map(s -> parseFlag(s, schema))
+                        .map(f -> "(payload." + formatFieldName(f.getName()) +
+                                "() != null ? 1 : 0) << " + f.getPosition())
+                        .collect(Collectors.joining(" | "));
+            case "int":
+                method0 = "writeIntLE";
+                break;
+            case "int256":
+            case "int128":
+                method0 = "writeBytes";
+                break;
+            case "long":
+                method0 = "writeLongLE";
+                break;
+            case "double":
+                method0 = "writeDoubleLE";
+                break;
+            case "string":
+                wrapping = "serializeString(allocator, payload.$L())";
+                method0 = "writeBytes";
+                break;
+            case "bytes":
+                wrapping = "serializeBytes(allocator, payload.$L())";
+                method0 = "writeBytes";
+                break;
+            case "jsonvalue":
+                wrapping = "serializeJsonNode(allocator, payload.$L())";
+                method0 = "writeBytes";
+                break;
+            default:
+                Matcher vector = VECTOR_PATTERN.matcher(paramTypeLower);
+                if (vector.matches()) {
+                    String innerType = vector.group(1);
+                    String specific = "";
+                    switch (innerType.toLowerCase()) {
+                        case "int":
+                            specific = "Int";
+                            break;
+                        case "long":
+                            specific = "Long";
+                            break;
+                        case "bytes":
+                            specific = "Bytes";
+                            break;
+                        case "string":
+                            specific = "String";
+                            break;
+                    }
+                    wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
+                } else if (paramTypeLower.startsWith("flags.")) {
+                    if (paramTypeLower.endsWith("true")) {
+                        method0 = null;
+                        break;
+                    }
+                    wrapping = "serializeFlags(allocator, payload.$L())";
+                } else {
+                    wrapping = "serialize(allocator, payload.$L())";
+                }
+                method0 = "writeBytes";
+        }
+
+        if (method0 != null) {
+            return method0 + "(" + wrapping + ")";
+        }
+        return null;
     }
 
     private String applyNamingExceptions(String s) {

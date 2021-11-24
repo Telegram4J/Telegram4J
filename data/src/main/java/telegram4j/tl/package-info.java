@@ -1,5 +1,5 @@
 /**
- * Telegram MTProto requests created as immutable Jackson objects.
+ * Telegram objects created as immutable objects.
  */
 @GenerateSchema
 @Value.Style(

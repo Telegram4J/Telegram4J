@@ -12,6 +12,7 @@ import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
+import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.ReqDHParams;
@@ -23,7 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
-import static telegram4j.tl.TlSerialUtil.writeString;
+import static telegram4j.tl.TlSerialUtil.serializeBytes;
 
 public final class AuthorizationHandler {
 
@@ -120,9 +121,9 @@ public final class AuthorizationHandler {
 
         ByteBuf pqInnerData = alloc.buffer()
                 .writeIntLE(0x83c95aec)
-                .writeBytes(writeString(alloc, pqBytes))
-                .writeBytes(writeString(alloc, pBytes))
-                .writeBytes(writeString(alloc, qBytes))
+                .writeBytes(serializeBytes(alloc, pqBytes))
+                .writeBytes(serializeBytes(alloc, pBytes))
+                .writeBytes(serializeBytes(alloc, qBytes))
                 .writeBytes(context.getNonce())
                 .writeBytes(context.getServerNonce())
                 .writeBytes(context.getNewNonce());

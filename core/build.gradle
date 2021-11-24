@@ -2,4 +2,12 @@ dependencies {
     implementation project(":mtproto")
 
     testImplementation "ch.qos.logback:logback-classic:$logback_version"
+    compileOnly "org.immutables:value:$immutables_version"
+    annotationProcessor "org.immutables:value:$immutables_version"
+
+    if (JavaVersion.current().isJava8()) {
+        compileOnly "com.google.code.findbugs:annotations:$findbugs_version"
+    } else {
+        compileOnly "javax.annotation:javax.annotation-api:$javax_annotation"
+    }
 }
