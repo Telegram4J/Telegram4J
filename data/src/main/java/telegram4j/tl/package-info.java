@@ -5,7 +5,7 @@
 @Value.Style(
         depluralize = true,
         jdkOnly = true,
-        allParameters = true,
+        allMandatoryParameters = true,
         defaultAsDefault = true
 )
 @NonNullApi
