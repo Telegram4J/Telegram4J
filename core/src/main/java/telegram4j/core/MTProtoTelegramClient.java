@@ -6,12 +6,7 @@ import telegram4j.core.event.Event;
 import telegram4j.core.event.dispatcher.EventDispatcher;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.MTProtoSession;
-import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.tl.BaseUser;
-import telegram4j.tl.InputPeerUser;
 import telegram4j.tl.Message;
-import telegram4j.tl.request.contacts.ResolveUsername;
-import telegram4j.tl.request.messages.SendMessage;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -64,21 +59,6 @@ public final class MTProtoTelegramClient {
     }
 
     public Mono<Message> sendMessage() {
-//        return session.sendEncrypted(ResolveUsername.builder().username("skat_ina").build())
-//                .map(peer -> peer.users().get(0))
-//                .ofType(BaseUser.class)
-//                .flatMap(user -> client.getSession()
-//                        .withPayloadMapper(PayloadMapperStrategy.ENCRYPTED)
-//                        .send(SendMessage.builder()
-//                                .randomId(CryptoUtil.random.nextLong())
-//                                .message("sus")
-//                                .peer(InputPeerUser.builder()
-//                                        .userId(user.id())
-//                                        .accessHash(Objects.requireNonNull(user.accessHash()))
-//                                        .build())
-//                                .build()))
-//                .log()
-//                .block();
         return Mono.empty();
     }
 }

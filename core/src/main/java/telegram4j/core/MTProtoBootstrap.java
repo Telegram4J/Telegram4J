@@ -18,7 +18,6 @@ import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlMethod;
 import telegram4j.tl.TlObject;
-import telegram4j.tl.Updates;
 import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.mtproto.FutureSalt;
 import telegram4j.tl.request.InitConnection;
@@ -100,9 +99,16 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             authorizationResources, initEventDispatcher(),
                             onCloseSink.asMono(), session);
 
-                    AuthorizationHandler authorizationHandler = new AuthorizationHandler(session);
+                    AuthorizationHandler authorizationHandler = new AuthorizationHandler(session, onAuthSink);
                     RpcHandler rpcHandler = new RpcHandler(session);
                     UpdatesHandler updatesHandler = new UpdatesHandler(telegramClient, new UpdatesHandlers());
+
+                    composite.add(session.authReceiver()
+                            .takeUntilOther(onCloseSink.asMono())
+                            .checkpoint("Authorization handler.")
+                            .flatMap(authorizationHandler::handle)
+                            .then()
+                            .subscribe());
 
                     composite.add(session.rpcReceiver()
                             .takeUntilOther(onCloseSink.asMono())

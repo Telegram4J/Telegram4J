@@ -10,6 +10,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.AES256IGECipher;
+import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlObject;
 
@@ -65,7 +66,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private Mono<MTProtoSession> createSession(DataCenter dc) {
         return Mono.defer(() -> {
-            Sinks.Many<TlObject> authorizationReceiver = Sinks.many().multicast().onBackpressureBuffer();
+            Sinks.Many<MTProtoObject> authReceiver = Sinks.many().multicast().onBackpressureBuffer();
             Sinks.Many<TlObject> rpcReceiver = Sinks.many().multicast().onBackpressureBuffer();
 
             return options.getResources().getTcpClient()
@@ -82,10 +83,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .doOnDisconnected(con -> log.debug("Disconnected from the datacenter №{} ({}:{})",
                             dc.getId(), dc.getAddress(), dc.getPort()))
                     .connect()
-                    .flatMap(con -> {
-                        MTProtoSession session = new MTProtoSession(this, con, authorizationReceiver, rpcReceiver, dc);
+                    .flatMap(con -> Mono.<MTProtoSession>create(sink -> {
+                        MTProtoSession session = new MTProtoSession(this, con, authReceiver, rpcReceiver, dc);
 
-                        return con.inbound().receive()
+                        sink.onCancel(con.inbound().receive()
                                 .map(ByteBuf::retain)
                                 .map(options.getResources().getTransport()::decode)
                                 .flatMap(buf -> {
@@ -96,13 +97,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     return Mono.just(buf);
                                 })
                                 .doOnNext(buf -> {
-                                    long authKeyId = buf.getLongLE(buf.readerIndex());
+                                    long authKeyId = buf.readLongLE();
 
                                     if (authKeyId == 0) { // unencrypted message
                                         buf.skipBytes(12); // message id (8) + payload length (4)
 
-                                        TlObject obj = TlDeserializer.deserialize(buf);
-                                        authorizationReceiver.emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
+                                        MTProtoObject obj = TlDeserializer.deserialize(buf);
+                                        authReceiver.emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
                                         return;
                                     }
 
@@ -154,8 +155,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     rpcReceiver.emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
                                 })
                                 .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
-                                .then(Mono.just(session));
-                    })
+                                .subscribe());
+
+                        sink.success(session);
+                    }))
                     .doOnNext(session -> {
                         currentSession = session;
                         sessions.put(dc, session);

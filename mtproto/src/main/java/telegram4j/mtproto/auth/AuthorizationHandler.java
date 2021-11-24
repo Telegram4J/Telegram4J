@@ -4,14 +4,14 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import reactor.util.retry.Retry;
 import telegram4j.mtproto.MTProtoSession;
 import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.util.AES256IGECipher;
+import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
-import telegram4j.tl.TlObject;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.ReqDHParams;
@@ -31,10 +31,13 @@ public final class AuthorizationHandler {
 
     private final MTProtoSession session;
     private final AuthorizationContext context;
+    private final Sinks.One<AuthorizationKeyHolder> onAuthSink;
 
-    public AuthorizationHandler(MTProtoSession session) {
+    public AuthorizationHandler(MTProtoSession session, Sinks.One<AuthorizationKeyHolder> onAuthSink) {
         this.session = session;
         this.context = session.getClient().getOptions().getAuthorizationContext();
+
+        this.onAuthSink = onAuthSink;
     }
 
     public Mono<AuthorizationKeyHolder> start() {
@@ -44,19 +47,27 @@ public final class AuthorizationHandler {
                     byte[] nonce = random.generateSeed(16);
                     context.setNonce(nonce);
 
-                    // First step. DH exchange initiation
                     return session.sendUnencrypted(ReqPqMulti.builder()
                                     .nonce(nonce)
                                     .build())
-                            .flatMap(this::handleResPQ)
-                            .flatMap(this::handleServerDHParams) // Step 2. Presenting proof of work; Server authentication
-                            .retryWhen(Retry.indefinitely())
-                            .flatMap(this::handleDhGenRes); // Step 3. DH key exchange complete;
+                            .then(onAuthSink.asMono());
                 })
                 .checkpoint("Authorization key generation.");
     }
 
-    private Mono<AuthorizationKeyHolder> handleDhGenRes(SetClientDHParamsAnswer obj) {
+    public Mono<Void> handle(MTProtoObject obj) {
+        if (obj instanceof ResPQ) {
+            ResPQ resPQ = (ResPQ) obj;
+
+            return handleResPQ(resPQ);
+        }
+
+        if (obj instanceof ServerDHParams) {
+            ServerDHParams serverDHParams = (ServerDHParams) obj;
+
+            return handleServerDHParams(serverDHParams);
+        }
+
         if (obj instanceof DhGenOk) {
             DhGenOk dhGenOk = (DhGenOk) obj;
             return handleDhGenOk(dhGenOk);
@@ -73,7 +84,7 @@ public final class AuthorizationHandler {
             return handleDhGenFail(dhGenFail).then(Mono.empty());
         }
 
-        return Mono.error(() -> new IllegalStateException("Unexpected type: 0x" + Integer.toHexString(obj.identifier())));
+        return Mono.error(new IllegalStateException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())));
     }
 
     private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
@@ -88,7 +99,7 @@ public final class AuthorizationHandler {
         return Mono.error(new IllegalStateException("Failed to create an authorization key."));
     }
 
-    private Mono<ServerDHParams> handleResPQ(ResPQ resPQ) {
+    private Mono<Void> handleResPQ(ResPQ resPQ) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
         context.setServerNonce(resPQ.serverNonce());
         byte[] pqBytes = resPQ.pq();
@@ -132,7 +143,7 @@ public final class AuthorizationHandler {
                 .build());
     }
 
-    private Mono<AuthorizationKeyHolder> handleDhGenOk(DhGenOk dhGenOk) {
+    private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
         byte[] newNonceHash1 = dhGenOk.newNonceHash1();
         byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{1}, context.getAuthAuxHash()), 4, 16);
 
@@ -149,13 +160,14 @@ public final class AuthorizationHandler {
 
         log.debug("Auth key generation completed!");
         AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(context.getAuthKey());
+        onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
+
         return session.getClient().getOptions()
                 .getResources().getStoreLayout()
-                .updateAuthorizationKey(authKey)
-                .thenReturn(authKey);
+                .updateAuthorizationKey(authKey);
     }
 
-    private Mono<SetClientDHParamsAnswer> handleDhGenRetry(DhGenRetry dhGenRetry) {
+    private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {
         byte[] newNonceHash2 = dhGenRetry.newNonceHash2();
         byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{2}, context.getAuthAuxHash()), 4, 16);
 
@@ -169,7 +181,7 @@ public final class AuthorizationHandler {
         return handleServerDHParams(serverDHParams);
     }
 
-    private Mono<SetClientDHParamsAnswer> handleServerDHParams(ServerDHParams serverDHParams) {
+    private Mono<Void> handleServerDHParams(ServerDHParams serverDHParams) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
         context.setServerDHParams(serverDHParams); // for DhGenRetry
         byte[] encryptedAnswerB = serverDHParams.encryptedAnswer();

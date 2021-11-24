@@ -30,7 +30,7 @@ import static telegram4j.mtproto.util.CryptoUtil.*;
 public final class MTProtoSession {
     private final MTProtoClient client;
     private final Connection connection;
-    private final Sinks.Many<TlObject> authorizationReceiver;
+    private final Sinks.Many<MTProtoObject> authReceiver;
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
@@ -45,12 +45,11 @@ public final class MTProtoSession {
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentMap<Long, Sinks.One<?>> resolvers = new ConcurrentHashMap<>();
 
-    MTProtoSession(MTProtoClient client, Connection connection,
-                   Sinks.Many<TlObject> authorizationReceiver, Sinks.Many<TlObject> rpcReceiver,
-                   DataCenter dataCenter) {
+    MTProtoSession(MTProtoClient client, Connection connection, Sinks.Many<MTProtoObject> authReceiver,
+                   Sinks.Many<TlObject> rpcReceiver, DataCenter dataCenter) {
         this.client = client;
         this.connection = connection;
-        this.authorizationReceiver = authorizationReceiver;
+        this.authReceiver = authReceiver;
         this.rpcReceiver = rpcReceiver;
         this.dataCenter = dataCenter;
 
@@ -67,6 +66,10 @@ public final class MTProtoSession {
 
     public Flux<TlObject> rpcReceiver() {
         return rpcReceiver.asFlux();
+    }
+
+    public Flux<MTProtoObject> authReceiver() {
+        return authReceiver.asFlux();
     }
 
     public Sinks.Many<Updates> updates() {
@@ -186,7 +189,7 @@ public final class MTProtoSession {
         });
     }
 
-    public <R extends MTProtoObject, T extends TlMethod<R> & MTProtoObject> Mono<R> sendUnencrypted(T object) {
+    public <R extends MTProtoObject, T extends TlMethod<R> & MTProtoObject> Mono<Void> sendUnencrypted(T object) {
         return Mono.defer(() -> {
             Channel channel = connection.channel();
             ByteBufAllocator alloc = channel.alloc();
@@ -199,12 +202,9 @@ public final class MTProtoSession {
                     .writeIntLE(data.readableBytes())
                     .writeBytes(data);
 
-            Sinks.One<R> sink = Sinks.one();
-            resolvers.put(messageId, sink);
-
             return FutureMono.from(channel.writeAndFlush(
-                    client.getOptions().getResources().getTransport().encode(payload)))
-                    .then(sink.asMono());
+                    client.getOptions().getResources()
+                            .getTransport().encode(payload)));
         });
     }
 
