@@ -46,6 +46,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     private int acksSendThreshold = 3;
     private InitConnection<TlObject> initConnection;
     private EventDispatcher eventDispatcher;
+    private DataCenter dataCenter;
 
     MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authorizationResources) {
         this.optionsModifier = optionsModifier;
@@ -76,16 +77,22 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setDataCenter(DataCenter dataCenter) {
+        this.dataCenter = Objects.requireNonNull(dataCenter, "dataCenter");
+        return this;
+    }
+
     public Mono<MTProtoTelegramClient> connect() {
         return connect(DefaultMTProtoClient::new);
     }
 
     public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MTProtoClient> clientFactory) {
         AuthorizationContext ctx = new AuthorizationContext();
+        DataCenter dc = initDataCenter();
 
         return Mono.fromSupplier(() -> clientFactory.apply(
                 optionsModifier.apply(new MTProtoOptions(initMTProtoResources(), ctx, acksSendThreshold))))
-                .flatMap(MTProtoClient::openSession)
+                .flatMap(c -> c.getSession(dc))
                 .publishOn(Schedulers.boundedElastic())
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMap(session -> Mono.create(sink -> {
@@ -160,7 +167,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             .then();
 
                     composite.add(options.getResources().getStoreLayout()
-                            .getAuthorizationKey()
+                            .getAuthorizationKey(dc)
                             .doOnNext(key -> onAuthSink.emitValue(key, Sinks.EmitFailureHandler.FAIL_FAST))
                             .switchIfEmpty(authorizationHandler.start().then(onAuthSink.asMono()))
                             .doOnNext(session::setAuthorizationKey)
@@ -217,5 +224,12 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
         }
         return new DefaultEventDispatcher(Schedulers.boundedElastic(),
                 Sinks.many().multicast().onBackpressureBuffer());
+    }
+
+    private DataCenter initDataCenter() {
+        if (dataCenter != null) {
+            return dataCenter;
+        }
+        return DataCenter.productionDataCenters.get(1); // dc#2
     }
 }

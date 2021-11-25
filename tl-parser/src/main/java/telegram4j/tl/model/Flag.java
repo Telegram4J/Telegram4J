@@ -6,12 +6,12 @@ import java.util.Objects;
 
 public class Flag {
     private final int position;
-    private final String name;
+    private final TlParam param;
     private final TypeName type;
 
-    public Flag(int position, String name, TypeName type) {
+    public Flag(int position, TlParam param, TypeName type) {
         this.position = position;
-        this.name = name;
+        this.param = param;
         this.type = type;
     }
 
@@ -19,8 +19,8 @@ public class Flag {
         return position;
     }
 
-    public String getName() {
-        return name;
+    public TlParam getParam() {
+        return param;
     }
 
     public TypeName getType() {
@@ -33,20 +33,20 @@ public class Flag {
         if (o == null || getClass() != o.getClass()) return false;
         Flag flag = (Flag) o;
         return position == flag.position
-                && name.equals(flag.name)
+                && param.equals(flag.param)
                 && type.equals(flag.type);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(position, name, type);
+        return Objects.hash(position, param, type);
     }
 
     @Override
     public String toString() {
         return "Flag{" +
                 "position=" + position +
-                ", name='" + name + '\'' +
+                ", param=" + param +
                 ", type=" + type +
                 '}';
     }

@@ -1,19 +1,111 @@
 package telegram4j.mtproto.store;
 
 import reactor.core.publisher.Mono;
+import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.tl.*;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class StoreLayoutImpl implements StoreLayout {
 
-    private volatile AuthorizationKeyHolder authorizationKey;
+    private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, Chat> chats = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, User> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
     @Override
-    public Mono<AuthorizationKeyHolder> getAuthorizationKey() {
-        return Mono.justOrEmpty(authorizationKey);
+    public Mono<Message> getMessageById(long chatId, int messageId) {
+        return Mono.fromSupplier(() -> messages.get(new MessageId(messageId, chatId)));
+    }
+
+    @Override
+    public Mono<Chat> getChatById(long chatId) {
+        return Mono.fromSupplier(() -> chats.get(chatId));
+    }
+
+    @Override
+    public Mono<User> getUserById(long userId) {
+        return Mono.fromSupplier(() -> users.get(userId));
+    }
+
+    @Override
+    public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
+        return Mono.fromSupplier(() -> authorizationKeys.get(dc));
     }
 
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
-        return Mono.fromRunnable(() -> this.authorizationKey = authorizationKey);
+        return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
+    }
+
+    @Override
+    public Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            messages.put(create(update.message()), update.message());
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            for (User user : users) {
+                this.users.put(user.id(), user);
+            }
+        });
+    }
+
+    static MessageId create(Message message) {
+        if (message instanceof BaseMessage) {
+            BaseMessage baseMessage = (BaseMessage) message;
+
+            return new MessageId(baseMessage.id(), peerId(baseMessage.peerId()));
+        }
+
+        if (message instanceof MessageService) {
+            MessageService messageService = (MessageService) message;
+
+            return new MessageId(messageService.id(), peerId(messageService.peerId()));
+        }
+
+        throw new IllegalArgumentException("Unknown message: " + message);
+    }
+
+    // TODO: improve tl parser and pull id field to supertype
+    static long peerId(Peer peer) {
+        if (peer instanceof PeerChat) {
+            PeerChat peerChat = (PeerChat) peer;
+            return peerChat.chatId();
+        } else if (peer instanceof PeerChannel) {
+            PeerChannel peerChannel = (PeerChannel) peer;
+            return peerChannel.channelId();
+        } else {
+            return ((PeerUser) peer).userId();
+        }
+    }
+
+    static class MessageId {
+        private final int messageId;
+        private final long chatId;
+
+        MessageId(int messageId, long chatId) {
+            this.messageId = messageId;
+            this.chatId = chatId;
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MessageId messageId1 = (MessageId) o;
+            return messageId == messageId1.messageId && chatId == messageId1.chatId;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(messageId, chatId);
+        }
     }
 }

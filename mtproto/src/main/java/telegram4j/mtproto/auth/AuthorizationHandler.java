@@ -12,7 +12,6 @@ import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
-import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.ReqDHParams;
@@ -160,7 +159,7 @@ public final class AuthorizationHandler {
         session.setServerSalt(serverSalt);
 
         log.debug("Auth key generation completed!");
-        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(context.getAuthKey());
+        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(session.getDataCenter(), context.getAuthKey());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
 
         return session.getClient().getOptions()

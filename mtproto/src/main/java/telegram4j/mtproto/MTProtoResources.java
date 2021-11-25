@@ -15,17 +15,15 @@ public class MTProtoResources {
 
     private final StoreLayout storeLayout;
     private final TcpClient tcpClient;
-    private final boolean test;
     private final Transport transport;
 
     public MTProtoResources() {
-        this(DEFAULT_STORE_LAYOUT.get(), DEFAULT_TCP_CLIENT.get(), false, DEFAULT_TRANSPORT.get());
+        this(DEFAULT_STORE_LAYOUT.get(), DEFAULT_TCP_CLIENT.get(), DEFAULT_TRANSPORT.get());
     }
 
-    public MTProtoResources(StoreLayout storeLayout, TcpClient tcpClient, boolean test, Transport transport) {
+    public MTProtoResources(StoreLayout storeLayout, TcpClient tcpClient, Transport transport) {
         this.storeLayout = storeLayout;
         this.tcpClient = tcpClient;
-        this.test = test;
         this.transport = transport;
     }
 
@@ -35,10 +33,6 @@ public class MTProtoResources {
 
     public TcpClient getTcpClient() {
         return tcpClient;
-    }
-
-    public boolean isTest() {
-        return test;
     }
 
     public Transport getTransport() {

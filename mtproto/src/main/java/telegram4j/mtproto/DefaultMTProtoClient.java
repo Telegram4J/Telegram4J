@@ -16,7 +16,6 @@ import telegram4j.tl.TlObject;
 
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -30,38 +29,26 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final MTProtoOptions options;
     private final ConcurrentMap<DataCenter, MTProtoSession> sessions = new ConcurrentHashMap<>();
 
-    private volatile MTProtoSession currentSession;
-
     public DefaultMTProtoClient(MTProtoOptions options) {
         this.options = options;
     }
 
     @Override
-    public Mono<MTProtoSession> openSession() {
-        return Mono.defer(() -> {
-            MTProtoSession currentSession = this.currentSession;
-            if (currentSession != null && currentSession.getConnection().channel().isActive()) {
-                return Mono.just(currentSession);
-            }
-
-            List<DataCenter> dataCenters = options.getResources().isTest()
-                    ? DataCenter.testDataCenters
-                    : DataCenter.productionDataCenters;
-
-            return Mono.just(dataCenters.get(1))
-                    .flatMap(dc -> Mono.justOrEmpty(sessions.get(dc))
-                            .switchIfEmpty(createSession(dc)));
-        });
-    }
-
-    @Override
     public Mono<MTProtoSession> getSession(DataCenter dc) {
-        return Mono.fromSupplier(() -> sessions.get(dc));
+        return Mono.fromSupplier(() -> sessions.get(dc))
+                .switchIfEmpty(createSession(dc));
     }
 
     @Override
     public MTProtoOptions getOptions() {
         return options;
+    }
+
+    @Override
+    public Mono<Void> close() {
+        return Flux.fromIterable(sessions.values())
+                .doOnNext(session -> session.getConnection().dispose())
+                .then();
     }
 
     private Mono<MTProtoSession> createSession(DataCenter dc) {
@@ -85,6 +72,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .connect()
                     .flatMap(con -> Mono.<MTProtoSession>create(sink -> {
                         MTProtoSession session = new MTProtoSession(this, con, authReceiver, rpcReceiver, dc);
+
+                        sessions.put(dc, session);
 
                         sink.onCancel(con.inbound().receive()
                                 .map(ByteBuf::retain)
@@ -158,18 +147,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 .subscribe());
 
                         sink.success(session);
-                    }))
-                    .doOnNext(session -> {
-                        currentSession = session;
-                        sessions.put(dc, session);
-                    });
+                    }));
         });
-    }
-
-    @Override
-    public Mono<Void> close() {
-        return Flux.fromIterable(sessions.values())
-                .doOnNext(session -> session.getConnection().dispose())
-                .then();
     }
 }

@@ -184,6 +184,7 @@ public class SchemaGenerator extends AbstractProcessor {
             deserializeMethod.addCode("case BOOL_FALSE_ID: return (T) Boolean.FALSE;\n");
             // NOTE: Returned vectors aren't (kind of like) bare,
             // but we have to skip the identifier because we have already shifted the reader index.
+            // TODO: support vector<int> deserialization
             deserializeMethod.addCode("case VECTOR_ID: return (T) deserializeVector0(payload, true, TlDeserializer::deserialize);\n");
 
             // endregion
@@ -281,7 +282,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                 paramType = paramType.box();
                             }
 
-                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param.name()))
+                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param))
                                     .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                                     .returns(paramType);
 
@@ -323,7 +324,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC);
 
-                    if (rpcTypes.contains(type)) { // rpc messages aren't methods
+                    if (rpcTypes.contains(type)) { // rpc messages aren't marked as methods, but they are
                         spec.addSuperinterface(ParameterizedTypeName.get(TlMethod.class, Void.class));
                     }
 
@@ -409,8 +410,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     TypeName typeName = ClassName.get(packageName, "Immutable" + name);
                     if (attributes.isEmpty()) {
                         deserializeMethod.addCode("case $L: return (T) $T.of();\n",
-                                "0x" + Integer.toHexString(constructor.id()),
-                                typeName);
+                                "0x" + Integer.toHexString(constructor.id()), typeName);
                     } else {
                         deserializeMethod.addCode("case $L: return (T) $L(payload);\n",
                                 "0x" + Integer.toHexString(constructor.id()), deserializeMethodName);
@@ -423,36 +423,31 @@ public class SchemaGenerator extends AbstractProcessor {
                         boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
                         if (withFlags) {
                             ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
-                            deserializerBuilder.addCode("$T builder = $T.builder()", builder, typeName);
+                            deserializerBuilder.addCode("$T builder = $T.builder();\n", builder, typeName);
+                            deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
+                            deserializerBuilder.addCode("return builder");
                         } else {
                             deserializerBuilder.addCode("return $T.builder()", typeName);
                         }
 
                         for (TlParam param : attributes) {
-                            String paramName = formatFieldName(param.name());
+                            String paramName = formatFieldName(param);
                             String paramTypeLower = param.type().toLowerCase();
 
                             // serialization
+                            // TODO: '#' flags field always is top-leveled, maybe should move it higher?
                             String method0 = serializeMethod(schema, constructor, param);
                             if (method0 != null) {
                                 serializerBuilder.addCode("\n\t\t." + method0, paramName);
                             }
 
                             // deserialization
-                            if (paramTypeLower.equals("#")) {
-                                deserializerBuilder.addCode(";\n");
-                                deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
-                                deserializerBuilder.addCode("return builder");
-                            }
-
-                            String unwrapping = deserializeMethod(paramTypeLower);
-                            if (unwrapping != null) {
-                                deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
-                            }
-
                             if (param.type().equals("#")) {
                                 continue;
                             }
+
+                            String unwrapping = deserializeMethod(paramTypeLower);
+                            deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
 
                             TypeName paramType = parseType(param.type(), schema);
                             boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
@@ -610,7 +605,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
 
                     for (TlParam param : method.params()) {
-                        String paramName = formatFieldName(param.name());
+                        String paramName = formatFieldName(param);
 
                         String method0 = serializeMethod(schema, method, param);
                         if (method0 != null) {
@@ -783,21 +778,21 @@ public class SchemaGenerator extends AbstractProcessor {
         return camelize(type);
     }
 
-    private static String formatFieldName(String type) {
-        type = camelize(type);
+    private static String formatFieldName(TlParam param) {
+        String name = camelize(param.name());
 
-        char f = type.charAt(0);
+        char f = name.charAt(0);
         if (Character.isUpperCase(f)) {
-            type = Character.toLowerCase(f) + type.substring(1);
+            name = Character.toLowerCase(f) + name.substring(1);
         }
 
         // This is a strange and in some places illogical problem
         // solution of matching attribute names with java keywords
-        if (!SourceVersion.isName(type)) {
-            type += "State";
+        if (!SourceVersion.isName(name)) {
+            name += "State";
         }
 
-        return type;
+        return name;
     }
 
     private TypeName parseType(String type, TlSchema schema) {
@@ -877,7 +872,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
         int position = Integer.parseInt(matcher.group(1));
         TypeName type = parseType(matcher.group(2), schema);
-        return new Flag(position, param.name(), type);
+        return new Flag(position, param, type);
     }
 
     private void writeTo(JavaFile file) {
@@ -894,7 +889,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 .orElseGet(() -> normalizeName(type));
     }
 
-    @Nullable
     private String deserializeMethod(String type) {
         switch (type.toLowerCase()) {
             case "true": return "TlTrue.INSTANCE";
@@ -908,10 +902,6 @@ public class SchemaGenerator extends AbstractProcessor {
             case "int256": return "readInt256(payload)";
             case "jsonvalue": return "deserializeJsonNode(payload)";
             default:
-                if (type.equals("#")) {
-                    return null;
-                }
-
                 Matcher flag = FLAG_PATTERN.matcher(type);
                 if (flag.matches()) {
                     int position = Integer.parseInt(flag.group(1));
@@ -963,7 +953,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 wrapping = object.params().stream()
                         .filter(p -> p.type().startsWith("flags."))
                         .map(s -> parseFlag(s, schema))
-                        .map(f -> "(payload." + formatFieldName(f.getName()) +
+                        .map(f -> "(payload." + formatFieldName(f.getParam()) +
                                 "() != null ? 1 : 0) << " + f.getPosition())
                         .collect(Collectors.joining(" | "));
             case "int":
