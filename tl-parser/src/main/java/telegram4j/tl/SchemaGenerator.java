@@ -46,9 +46,8 @@ import static telegram4j.tl.Strings.*;
 public class SchemaGenerator extends AbstractProcessor {
 
     private static final List<String> ignoredTypes = Arrays.asList(
-            "bool", "true", "false", "null", "int", "long",
-            "string", "flags", "vector", "#",
-            "jsonvalue", "jsonobjectvalue");
+            "bool", "true", "false", "null", "vector",
+            "jsonvalue", "jsonobjectvalue", "httpwait");
 
     private static final List<String> rpcTypes = Arrays.asList(
             "MsgDetailedInfo", "MsgDetailedInfo", "MsgResendReq",
@@ -420,7 +419,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                                 .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
 
-                        boolean withFlags = attributes.stream().anyMatch(p -> p.type().equals("#"));
+                        boolean withFlags = attributes.contains(FLAG_PARAMETER);
                         if (withFlags) {
                             ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
                             deserializerBuilder.addCode("$T builder = $T.builder();\n", builder, typeName);
@@ -455,7 +454,7 @@ public class SchemaGenerator extends AbstractProcessor {
                                     .anyMatch(p -> p.type().startsWith("flags.") &&
                                             p.name().equals(param.name()));
 
-                            if (optionalInExt || type.equals("JSONValue") && paramName.equals("value")) {
+                            if (optionalInExt) {
                                 paramType = paramType.box();
                             }
 
@@ -489,7 +488,7 @@ public class SchemaGenerator extends AbstractProcessor {
                 // region methods
 
                 for (TlEntityObject method : schema.methods()) {
-                    if (method.type().equals("HttpWait")) {
+                    if (ignoredTypes.contains(method.type().toLowerCase())) {
                         continue;
                     }
 
@@ -643,13 +642,13 @@ public class SchemaGenerator extends AbstractProcessor {
             }
 
             // Enums serialization
-            for (Iterator<List<TlEntityObject>> iterator = enumTypes.values().iterator(); iterator.hasNext(); ) {
-                List<TlEntityObject> chunk = iterator.next();
+            for (Iterator<List<TlEntityObject>> it = enumTypes.values().iterator(); it.hasNext(); ) {
+                List<TlEntityObject> chunk = it.next();
                 for (int i = 0; i < chunk.size(); i++) {
                     int id = chunk.get(i).id();
 
                     String sep = "\n";
-                    if (i + 1 == chunk.size() && !iterator.hasNext()) {
+                    if (i + 1 == chunk.size() && !it.hasNext()) {
                         sep = " return allocator.buffer().writeIntLE(payload.identifier());\n";
                     }
                     serializeMethod.addCode("case $L:" + sep, "0x" + Integer.toHexString(id));
