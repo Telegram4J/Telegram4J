@@ -29,6 +29,7 @@ public class UpdatesHandler {
                             client, baseUpdates.chats(), baseUpdates.users(), update)));
         }
 
+        // TODO: retrieve from api
         if (updates instanceof UpdatesTooLong) {
             UpdatesTooLong updatesTooLong = (UpdatesTooLong) updates;
 

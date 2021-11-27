@@ -49,10 +49,6 @@ public class SchemaGenerator extends AbstractProcessor {
             "bool", "true", "false", "null", "vector",
             "jsonvalue", "jsonobjectvalue", "httpwait");
 
-    private static final List<String> rpcTypes = Arrays.asList(
-            "MsgDetailedInfo", "MsgDetailedInfo", "MsgResendReq",
-            "MsgsAck", "MsgsAllInfo", "MsgsStateInfo", "MsgsStateReq");
-
     private static final String METHOD_PACKAGE_PREFIX = ".request";
     private static final String MTPROTO_PACKAGE_PREFIX = ".mtproto";
     private static final String TEMPLATE_PACKAGE_INFO = "package-info.template";
@@ -191,7 +187,11 @@ public class SchemaGenerator extends AbstractProcessor {
             for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors
 
-                Map<String, Set<TlParam>> superTypes = collectTypeTree(schema).entrySet().stream()
+                Set<String> computedSerializers = new HashSet<>();
+                Set<String> computedDeserializers = new HashSet<>();
+                Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
+
+                Map<String, Set<TlParam>> superTypes = currTypeTree.entrySet().stream()
                         .filter(e -> e.getValue().size() > 1)
                         .collect(Collectors.groupingBy(Map.Entry::getKey,
                                 flatMapping(e -> e.getValue().stream()
@@ -323,8 +323,9 @@ public class SchemaGenerator extends AbstractProcessor {
                     TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC);
 
-                    if (rpcTypes.contains(type)) { // rpc messages aren't marked as methods, but they are
-                        spec.addSuperinterface(ParameterizedTypeName.get(TlMethod.class, Void.class));
+                    ClassName customType = awareSuperType(name);
+                    if (customType != null) {
+                        spec.addSuperinterface(customType);
                     }
 
                     if (multiple) {
@@ -347,9 +348,9 @@ public class SchemaGenerator extends AbstractProcessor {
                     Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
                     collectAttributesRecursive(type, attributes);
 
-                    boolean optional = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
+                    boolean singleton = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
                     AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
-                    if (optional) {
+                    if (singleton) {
                         value.addMember("singleton", "true");
 
                         spec.addMethod(MethodSpec.methodBuilder("instance")
@@ -370,7 +371,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     // serialization
                     String serializeMethodName0 = "serialize" + name;
                     String serializeMethodName = serializeMethodName0;
-                    if (serializer.methodSpecs.stream().anyMatch(s -> s.name.equals(serializeMethodName0))) {
+                    if (computedSerializers.contains(serializeMethodName0)) {
                         if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
@@ -378,6 +379,8 @@ public class SchemaGenerator extends AbstractProcessor {
                         serializeMethodName = "serialize" + Character.toUpperCase(up)
                                 + schema.packagePrefix().substring(1) + name;
                     }
+
+                    computedSerializers.add(serializeMethodName);
 
                     TypeName payloadType = ClassName.get(packageName, name);
                     serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
@@ -397,7 +400,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     // deserialization
                     String deserializeMethodName0 = "deserialize" + name;
                     String deserializeMethodName = deserializeMethodName0;
-                    if (deserializer.methodSpecs.stream().anyMatch(s -> s.name.equals(deserializeMethodName0))) {
+                    if (computedDeserializers.contains(deserializeMethodName0)) {
                         if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
@@ -405,6 +408,8 @@ public class SchemaGenerator extends AbstractProcessor {
                         deserializeMethodName = "deserialize" + Character.toUpperCase(up)
                                 + schema.packagePrefix().substring(1) + name;
                     }
+
+                    computedDeserializers.add(deserializeMethodName);
 
                     TypeName typeName = ClassName.get(packageName, "Immutable" + name);
                     if (attributes.isEmpty()) {
@@ -434,7 +439,6 @@ public class SchemaGenerator extends AbstractProcessor {
                             String paramTypeLower = param.type().toLowerCase();
 
                             // serialization
-                            // TODO: '#' flags field always is top-leveled, maybe should move it higher?
                             String method0 = serializeMethod(schema, constructor, param);
                             if (method0 != null) {
                                 serializerBuilder.addCode("\n\t\t." + method0, paramName);
@@ -487,12 +491,13 @@ public class SchemaGenerator extends AbstractProcessor {
                 // endregion
                 // region methods
 
+                Set<String> computedMethodSerializers = new HashSet<>();
                 for (TlEntityObject method : schema.methods()) {
-                    if (ignoredTypes.contains(method.type().toLowerCase())) {
+                    String name = normalizeName(method.name());
+                    if (ignoredTypes.contains(name.toLowerCase())) {
                         continue;
                     }
 
-                    String name = normalizeName(method.name());
                     String packageNameRaw = getBasePackageName();
                     String packageName = getPackageName(method.name())
                             .replace(packageNameRaw, packageNameRaw
@@ -501,24 +506,28 @@ public class SchemaGenerator extends AbstractProcessor {
                     boolean generic = method.params().stream()
                             .anyMatch(p -> p.type().equals("!X"));
 
-                    TypeSpec.Builder typeSpec = TypeSpec.interfaceBuilder(name)
+                    TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
                             .addModifiers(Modifier.PUBLIC);
 
                     if (generic) {
-                        typeSpec.addTypeVariable(TypeVariableName.get("T", schema.superType()));
+                        spec.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                     }
 
                     TypeName returnType = ParameterizedTypeName.get(
                             ClassName.get(TlMethod.class),
                             parseType(method.type(), schema).box());
 
-                    typeSpec.addSuperinterface(returnType);
-
-                    if (schema.superType() != TlObject.class) {
-                        typeSpec.addSuperinterface(schema.superType());
+                    ClassName customType = awareSuperType(name);
+                    if (customType != null) {
+                        spec.addSuperinterface(customType);
                     }
 
-                    typeSpec.addField(FieldSpec.builder(TypeName.INT, "ID",
+                    spec.addSuperinterface(returnType);
+                    if (schema.superType() != TlObject.class) {
+                        spec.addSuperinterface(schema.superType());
+                    }
+
+                    spec.addField(FieldSpec.builder(TypeName.INT, "ID",
                                     Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
                             .initializer("0x" + Integer.toHexString(method.id()))
                             .build());
@@ -539,12 +548,12 @@ public class SchemaGenerator extends AbstractProcessor {
                         builder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                     }
 
-                    typeSpec.addMethod(builder.build());
+                    spec.addMethod(builder.build());
 
                     AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
 
-                    boolean allOptional = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
-                    if (allOptional) {
+                    boolean singleton = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
+                    if (singleton) {
                         value.addMember("singleton", "true");
 
                         MethodSpec.Builder instance = MethodSpec.methodBuilder("instance")
@@ -556,12 +565,12 @@ public class SchemaGenerator extends AbstractProcessor {
                             instance.addTypeVariable(TypeVariableName.get("T", schema.superType()));
                         }
 
-                        typeSpec.addMethod(instance.build());
+                        spec.addMethod(instance.build());
                     }
 
-                    typeSpec.addAnnotation(value.build());
+                    spec.addAnnotation(value.build());
 
-                    typeSpec.addMethod(MethodSpec.methodBuilder("identifier")
+                    spec.addMethod(MethodSpec.methodBuilder("identifier")
                             .addAnnotation(Override.class)
                             .returns(TypeName.INT)
                             .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
@@ -571,7 +580,7 @@ public class SchemaGenerator extends AbstractProcessor {
                     // serialization
                     String methodName0 = "serialize" + name;
                     String methodName = methodName0;
-                    if (serializer.methodSpecs.stream().anyMatch(spec -> spec.name.equals(methodName0))) {
+                    if (computedMethodSerializers.contains(methodName0)) {
                         if (schema.packagePrefix().isEmpty()) {
                             continue;
                         }
@@ -579,6 +588,8 @@ public class SchemaGenerator extends AbstractProcessor {
                         methodName = "serialize" + Character.toUpperCase(up)
                                 + schema.packagePrefix().substring(1) + name;
                     }
+
+                    computedMethodSerializers.add(methodName);
 
                     ClassName typeRaw = ClassName.get(packageName, name);
                     TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(schema.superType())) : typeRaw;
@@ -625,14 +636,14 @@ public class SchemaGenerator extends AbstractProcessor {
                             attribute.addAnnotation(Nullable.class);
                         }
 
-                        typeSpec.addMethod(attribute.build());
+                        spec.addMethod(attribute.build());
                     }
 
                     serializerBuilder.addCode(";");
 
                     serializer.addMethod(serializerBuilder.build());
 
-                    writeTo(JavaFile.builder(packageName, typeSpec.build())
+                    writeTo(JavaFile.builder(packageName, spec.build())
                             .indent(INDENT)
                             .skipJavaLangImports(true)
                             .build());
@@ -991,16 +1002,10 @@ public class SchemaGenerator extends AbstractProcessor {
                     String specific = "";
                     switch (innerType.toLowerCase()) {
                         case "int":
-                            specific = "Int";
-                            break;
                         case "long":
-                            specific = "Long";
-                            break;
                         case "bytes":
-                            specific = "Bytes";
-                            break;
                         case "string":
-                            specific = "String";
+                            specific = Character.toUpperCase(innerType.charAt(0)) + innerType.substring(1);
                             break;
                     }
                     wrapping = "serialize" + specific + "Vector(allocator, payload.$L())";
@@ -1041,6 +1046,29 @@ public class SchemaGenerator extends AbstractProcessor {
                     return packageNameRaw.replace(packageNameRaw, packageNameRaw + schema.packagePrefix())
                             + "." + normalizeName(c.type());
                 }));
+    }
+
+    @Nullable
+    private ClassName awareSuperType(String type) {
+        switch (type) {
+            case "SendMessage":
+            case "SendMedia":
+                return ClassName.get(UTIL_PACKAGE, "BaseSendMessageRequest");
+
+            case "MsgDetailedInfo":
+            case "MsgResendReq":
+            case "MsgsAck":
+            case "MsgsAllInfo":
+            case "MsgsStateInfo":
+            case "MsgsStateReq":
+                return ClassName.get(RpcMethod.class);
+            default:
+                if (type.endsWith("Empty")) {
+                    return ClassName.get(EmptyObject.class);
+                }
+
+                return null;
+        }
     }
 
     // java 9
