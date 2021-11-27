@@ -16,7 +16,20 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Chat> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, User> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
+
+    private volatile long selfId;
+
+    @Override
+    public Mono<Long> getSelfId() {
+        return Mono.justOrEmpty(selfId);
+    }
+
+    @Override
+    public Mono<InputPeer> resolvePeer(String username) {
+        return Mono.fromSupplier(() -> usernames.get(stripUsername(username)));
+    }
 
     @Override
     public Mono<Message> getMessageById(long chatId, int messageId) {
@@ -39,6 +52,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateSelfId(long userId) {
+        return Mono.fromRunnable(() -> selfId = userId);
+    }
+
+    @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
         return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
     }
@@ -51,10 +69,21 @@ public class StoreLayoutImpl implements StoreLayout {
                 this.chats.put(chat.id(), chat);
             }
 
-            for (User user : users) {
-                this.users.put(user.id(), user);
-            }
+            users.forEach(this::saveUser);
         });
+    }
+
+    private void saveUser(User user) {
+        if (user instanceof BaseUser) {
+            BaseUser user0 = (BaseUser) user;
+            users.put(user0.id(), user0);
+
+            String username = user0.username();
+            Long accessHash = user0.accessHash();
+            if (username != null && accessHash != null) {
+                usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user0.id(), accessHash));
+            }
+        }
     }
 
     static MessageId create(Message message) {
@@ -84,6 +113,16 @@ public class StoreLayoutImpl implements StoreLayout {
         } else {
             return ((PeerUser) peer).userId();
         }
+    }
+
+    static String stripUsername(String username) {
+        String corrected = username.toLowerCase()
+                .trim().replace(".", "");
+
+        if (corrected.startsWith("@")) {
+            return corrected.substring(1);
+        }
+        return corrected;
     }
 
     static class MessageId {

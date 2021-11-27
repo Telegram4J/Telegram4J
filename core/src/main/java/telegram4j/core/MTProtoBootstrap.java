@@ -15,7 +15,9 @@ import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlMethod;
 import telegram4j.tl.TlObject;
 import telegram4j.tl.auth.Authorization;
@@ -27,6 +29,7 @@ import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
 import telegram4j.tl.request.mtproto.Ping;
 import telegram4j.tl.request.updates.GetState;
+import telegram4j.tl.request.users.GetUsers;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -154,6 +157,18 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             .flatMap(tick -> session.sendEncrypted(Ping.builder().pingId(CryptoUtil.random.nextInt()).build()))
                             .then();
 
+                    StoreLayout storeLayout = session.getClient().getOptions()
+                            .getResources().getStoreLayout();
+
+                    Mono<Void> fetchSelfId = storeLayout.getSelfId()
+                            .filter(l -> l != 0)
+                            .switchIfEmpty(session.sendEncrypted(GetUsers.builder()
+                                            .addId(InputUserSelf.instance())
+                                            .build())
+                                    .flatMap(users -> storeLayout.updateSelfId(users.get(0).id()))
+                                    .then(Mono.empty()))
+                            .then();
+
                     Mono<Void> initializeConnection = session.sendEncrypted(InvokeWithLayer.builder()
                                     .layer(MTProtoTelegramClient.LAYER)
                                     .query(initConnectionParams())
@@ -164,12 +179,15 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                                     .build()))
                             .doOnNext(ignored -> futureSalt.start(FUTURE_SALT_QUERY_PERIOD))
                             .then(session.sendEncrypted(GetState.instance()))
+                            .then(fetchSelfId)
                             .then();
 
                     composite.add(options.getResources().getStoreLayout()
                             .getAuthorizationKey(dc)
                             .doOnNext(key -> onAuthSink.emitValue(key, Sinks.EmitFailureHandler.FAIL_FAST))
-                            .switchIfEmpty(authorizationHandler.start().then(onAuthSink.asMono()))
+                            .switchIfEmpty(authorizationHandler.start()
+                                    .checkpoint("Authorization key generation.")
+                                    .then(onAuthSink.asMono()))
                             .doOnNext(session::setAuthorizationKey)
                             .delayUntil(ignored -> initializeConnection)
                             .doOnNext(ignored -> sink.success(telegramClient))

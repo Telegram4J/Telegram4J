@@ -9,6 +9,10 @@ import java.util.List;
 
 public interface StoreLayout {
 
+    Mono<Long> getSelfId();
+
+    Mono<InputPeer> resolvePeer(String username);
+
     Mono<Message> getMessageById(long chatId, int messageId);
 
     Mono<Chat> getChatById(long chatId);
@@ -16,6 +20,8 @@ public interface StoreLayout {
     Mono<User> getUserById(long userId);
 
     Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
+
+    Mono<Void> updateSelfId(long userId);
 
     Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
 

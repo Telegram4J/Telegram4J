@@ -6,7 +6,6 @@ import telegram4j.core.event.Event;
 import telegram4j.core.event.dispatcher.EventDispatcher;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.MTProtoSession;
-import telegram4j.tl.Message;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -56,9 +55,5 @@ public final class MTProtoTelegramClient {
 
     public <E extends Event> Flux<E> on(Class<E> type) {
         return eventDispatcher.on(type);
-    }
-
-    public Mono<Message> sendMessage() {
-        return Mono.empty();
     }
 }

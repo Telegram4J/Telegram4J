@@ -10,10 +10,7 @@ import reactor.util.Loggers;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.tl.Chat;
-import telegram4j.tl.Message;
-import telegram4j.tl.UpdateNewMessage;
-import telegram4j.tl.User;
+import telegram4j.tl.*;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -86,6 +83,16 @@ public class FileStoreLayout implements StoreLayout {
     // =====================
 
     @Override
+    public Mono<Long> getSelfId() {
+        return delegate.getSelfId();
+    }
+
+    @Override
+    public Mono<InputPeer> resolvePeer(String username) {
+        return delegate.resolvePeer(username);
+    }
+
+    @Override
     public Mono<Message> getMessageById(long chatId, int messageId) {
         return delegate.getMessageById(chatId, messageId);
     }
@@ -98,6 +105,11 @@ public class FileStoreLayout implements StoreLayout {
     @Override
     public Mono<User> getUserById(long userId) {
         return delegate.getUserById(userId);
+    }
+
+    @Override
+    public Mono<Void> updateSelfId(long userId) {
+        return delegate.updateSelfId(userId);
     }
 
     @Override
