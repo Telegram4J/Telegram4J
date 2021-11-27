@@ -2,4 +2,4 @@
 .gradle
 build
 
-/core/src/test/resources/authkey.bin
+/core/src/test/resources/authkey-*.bin
