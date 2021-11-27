@@ -14,20 +14,11 @@ import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import static telegram4j.tl.TlPrimitives.*;
+
 public final class TlSerialUtil {
 
     private static final ByteBuf EMPTY_BUFFER = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
-
-    public static final int VECTOR_ID = 0x1cb5c415;
-    public static final int BOOL_TRUE_ID = 0x997275b5;
-    public static final int BOOL_FALSE_ID = 0xbc799737;
-    public static final int JSON_NULL_ID = 0x3f6d7b68;
-    public static final int JSON_STRING_ID = 0xb71e767a;
-    public static final int JSON_NUMBER_ID = 0x2be0dfa4;
-    public static final int JSON_BOOLEAN_ID = 0xc7345e6a;
-    public static final int JSON_ARRAY_ID = 0xf7444763;
-    public static final int JSON_OBJECT_ID = 0x99c1d49d;
-    public static final int JSON_ENTRY_ID = 0xc0de1bd9;
 
     private TlSerialUtil() {
     }
@@ -257,6 +248,29 @@ public final class TlSerialUtil {
         }
     }
 
+    protected static Object deserializeUnknownVector(ByteBuf buf) {
+        // vector id skipped.
+        int size = buf.readIntLE();
+        List<Object> list = new ArrayList<>(size);
+        boolean longVec = size * Long.BYTES == buf.readableBytes();
+        boolean intVec = size * Integer.BYTES == buf.readableBytes();
+
+        for (int i = 0; i < size; i++) {
+            Object val;
+
+            if (longVec) {
+                val = buf.readLongLE();
+            } else if (intVec) {
+                val = buf.readIntLE();
+            } else {
+                val = TlDeserializer.deserialize(buf);
+            }
+
+            list.add(val);
+        }
+        return list;
+    }
+
     public static ByteBuf serializeJsonNode(ByteBufAllocator allocator, JsonNode node) {
         ByteBuf buf = allocator.buffer();
         switch (node.getNodeType()) {
@@ -265,7 +279,7 @@ public final class TlSerialUtil {
                     .writeBytes(serializeString(allocator, node.asText()));
             case NUMBER: return buf.writeIntLE(JSON_NUMBER_ID)
                     .writeDoubleLE(node.asDouble());
-            case BOOLEAN: return buf.writeIntLE(JSON_BOOLEAN_ID)
+            case BOOLEAN: return buf.writeIntLE(JSON_BOOL_ID)
                     .writeIntLE(node.asBoolean() ? BOOL_TRUE_ID : BOOL_FALSE_ID);
             case ARRAY:
                 buf.writeIntLE(JSON_ARRAY_ID);
@@ -277,7 +291,7 @@ public final class TlSerialUtil {
                 buf.writeIntLE(JSON_OBJECT_ID);
                 buf.writeIntLE(VECTOR_ID);
                 buf.writeIntLE(node.size());
-                node.fields().forEachRemaining(f -> buf.writeIntLE(JSON_ENTRY_ID)
+                node.fields().forEachRemaining(f -> buf.writeIntLE(JSON_OBJECT_VALUE_ID)
                         .writeBytes(serializeString(allocator, f.getKey()))
                         .writeBytes(serializeJsonNode(allocator, f.getValue())));
                 return buf;
@@ -289,7 +303,7 @@ public final class TlSerialUtil {
         int identifier = buf.readIntLE();
         switch (identifier) {
             case JSON_NULL_ID: return NullNode.instance;
-            case JSON_BOOLEAN_ID: return BooleanNode.valueOf(buf.readIntLE() == BOOL_TRUE_ID);
+            case JSON_BOOL_ID: return BooleanNode.valueOf(buf.readIntLE() == BOOL_TRUE_ID);
             case JSON_STRING_ID: return TextNode.valueOf(deserializeString(buf));
             case JSON_NUMBER_ID: return DoubleNode.valueOf(buf.readDoubleLE());
             case JSON_ARRAY_ID:

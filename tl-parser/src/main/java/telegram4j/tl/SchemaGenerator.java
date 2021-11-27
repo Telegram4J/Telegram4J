@@ -49,6 +49,9 @@ public class SchemaGenerator extends AbstractProcessor {
             "bool", "true", "false", "null", "vector",
             "jsonvalue", "jsonobjectvalue", "httpwait");
 
+    private static final List<String> primitiveTypes = Arrays.asList(
+            "bool", "true", "vector", "jsonvalue", "jsonobjectvalue");
+
     private static final String METHOD_PACKAGE_PREFIX = ".request";
     private static final String MTPROTO_PACKAGE_PREFIX = ".mtproto";
     private static final String TEMPLATE_PACKAGE_INFO = "package-info.template";
@@ -171,6 +174,29 @@ public class SchemaGenerator extends AbstractProcessor {
             deserializeMethod.addStatement("int identifier = payload.readIntLE()");
             deserializeMethod.beginControlFlow("switch (identifier)");
 
+            // region primitive identifiers
+
+            TypeSpec.Builder primitiveIdentifiers = TypeSpec.classBuilder("TlPrimitives")
+                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                    .addMethod(privateConstructor);
+
+            apiSchema.constructors().stream()
+                    .filter(e -> primitiveTypes.contains(normalizeName(e.type()).toLowerCase()))
+                    .forEach(e -> {
+                        String name = screamilize(e.name()) + "_ID";
+
+                        primitiveIdentifiers.addField(FieldSpec.builder(int.class, name, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                                .initializer("0x" + Integer.toHexString(e.id()))
+                                .build());
+                    });
+
+            writeTo(JavaFile.builder(UTIL_PACKAGE, primitiveIdentifiers.build())
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+
+            // endregion
+
             // This need because methods can return bool or vector objects
             // region primitive types
 
@@ -179,16 +205,15 @@ public class SchemaGenerator extends AbstractProcessor {
             deserializeMethod.addCode("case BOOL_FALSE_ID: return (T) Boolean.FALSE;\n");
             // NOTE: Returned vectors aren't (kind of like) bare,
             // but we have to skip the identifier because we have already shifted the reader index.
-            // TODO: support vector<int> deserialization
-            deserializeMethod.addCode("case VECTOR_ID: return (T) deserializeVector0(payload, true, TlDeserializer::deserialize);\n");
+            deserializeMethod.addCode("case VECTOR_ID: return (T) deserializeUnknownVector(payload);\n");
 
             // endregion
 
+            Set<String> computedSerializers = new HashSet<>();
+            Set<String> computedDeserializers = new HashSet<>();
             for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors
 
-                Set<String> computedSerializers = new HashSet<>();
-                Set<String> computedDeserializers = new HashSet<>();
                 Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
 
                 Map<String, Set<TlParam>> superTypes = currTypeTree.entrySet().stream()
@@ -673,6 +698,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
             writeTo(JavaFile.builder(getBasePackageName(), serializer.build())
                     .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
+                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlPrimitives"), "*")
                     .indent(INDENT)
                     .skipJavaLangImports(true)
                     .build());
@@ -701,6 +727,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
             writeTo(JavaFile.builder(getBasePackageName(), deserializer.build())
                     .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
+                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlPrimitives"), "*")
                     .indent(INDENT)
                     .skipJavaLangImports(true)
                     .build());
@@ -810,7 +837,7 @@ public class SchemaGenerator extends AbstractProcessor {
             case "!x":
             case "x": return GENERIC_TYPE;
             case "int": return TypeName.INT;
-            case "true": return ClassName.get(TlTrue.class);
+            case "true": return ClassName.get(UTIL_PACKAGE, "TlTrue");
             case "bool": return TypeName.BOOLEAN;
             case "long": return TypeName.LONG;
             case "double": return TypeName.DOUBLE;

@@ -3,7 +3,6 @@ package telegram4j.mtproto;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
-import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -11,6 +10,7 @@ import reactor.netty.Connection;
 import reactor.netty.FutureMono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.service.MessageService;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.*;
 import telegram4j.tl.mtproto.MessageContainer;
@@ -34,6 +34,8 @@ public final class MTProtoSession {
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
+
+    private final MessageService messageService = new MessageService(this);
 
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile long sessionId = random.nextLong();
@@ -80,6 +82,10 @@ public final class MTProtoSession {
         return dataCenter;
     }
 
+    public MessageService getMessageService() {
+        return messageService;
+    }
+
     public AuthorizationKeyHolder getAuthorizationKey() {
         return authorizationKey;
     }
@@ -100,10 +106,6 @@ public final class MTProtoSession {
         }
 
         return no;
-    }
-
-    private static boolean isContentRelated(TlObject object) {
-        return !(object instanceof MsgsAck) && !(object instanceof Ping) && !(object instanceof MessageContainer);
     }
 
     public long getMessageId() {
@@ -245,5 +247,9 @@ public final class MTProtoSession {
         timeOffset = 0;
         lastGeneratedMessageId = 0;
         seqNo.set(0);
+    }
+
+    private static boolean isContentRelated(TlObject object) {
+        return !(object instanceof MsgsAck) && !(object instanceof Ping) && !(object instanceof MessageContainer);
     }
 }

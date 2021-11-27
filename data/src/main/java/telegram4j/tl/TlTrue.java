@@ -1,7 +1,7 @@
 package telegram4j.tl;
 
 public final class TlTrue implements TlObject {
-    public static final int ID = 0x3fedd339;
+    public static final int ID = TlPrimitives.TRUE_ID;
     public static final TlTrue INSTANCE = new TlTrue();
 
     private TlTrue() {}
@@ -17,6 +17,6 @@ public final class TlTrue implements TlObject {
 
     @Override
     public String toString() {
-        return "TlTrue{}";
+        return "true";
     }
 }
