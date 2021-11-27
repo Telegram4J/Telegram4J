@@ -146,7 +146,10 @@ public final class TlSerialUtil {
     }
 
     public static <T> List<T> deserializeVector0(ByteBuf buf, boolean bare, Function<? super ByteBuf, ? extends T> parser) {
-        assert bare || buf.readIntLE() == VECTOR_ID;
+        int vectorId;
+        if (!bare && (vectorId = buf.readIntLE()) != VECTOR_ID) {
+            throw new IllegalStateException("Incorrect vector identifier: " + vectorId);
+        }
         int size = buf.readIntLE();
         List<T> list = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
@@ -220,13 +223,15 @@ public final class TlSerialUtil {
         return serializeUnknown(allocator, value);
     }
 
-    private static ByteBuf serializeUnknown(ByteBufAllocator allocator, Object value) {
+    public static ByteBuf serializeUnknown(ByteBufAllocator allocator, Object value) {
         if (value instanceof Byte) {
             return allocator.buffer(Byte.BYTES).writeByte((int) value);
         } else if (value instanceof Integer) {
             return allocator.buffer(Integer.BYTES).writeIntLE((int) value);
         } else if (value instanceof Long) {
             return allocator.buffer(Long.BYTES).writeLongLE((long) value);
+        } else if (value instanceof Boolean) {
+            return allocator.buffer(Integer.BYTES).writeIntLE((boolean) value ? BOOL_TRUE_ID : BOOL_FALSE_ID);
         } else if (value instanceof Double) {
             return allocator.buffer(Double.BYTES).writeDoubleLE((long) value);
         } else if (value instanceof byte[]) {
@@ -288,7 +293,10 @@ public final class TlSerialUtil {
             case JSON_STRING_ID: return TextNode.valueOf(deserializeString(buf));
             case JSON_NUMBER_ID: return DoubleNode.valueOf(buf.readDoubleLE());
             case JSON_ARRAY_ID:
-                assert buf.readIntLE() == VECTOR_ID;
+                int vectorId;
+                if ((vectorId = buf.readIntLE()) != VECTOR_ID) {
+                    throw new IllegalStateException("Incorrect vector identifier: " + vectorId);
+                }
                 int size = buf.readIntLE();
                 ArrayNode node = JsonNodeFactory.instance.arrayNode(size);
                 for (int i = 0; i < size; i++) {
@@ -296,7 +304,10 @@ public final class TlSerialUtil {
                 }
                 return node;
             case JSON_OBJECT_ID:
-                assert buf.readIntLE() == VECTOR_ID;
+                int vectorId0;
+                if ((vectorId0 = buf.readIntLE()) != VECTOR_ID) {
+                    throw new IllegalStateException("Incorrect vector identifier: " + vectorId0);
+                }
                 int size0 = buf.readIntLE();
                 ObjectNode node0 = JsonNodeFactory.instance.objectNode();
                 for (int i = 0; i < size0; i++) {

@@ -70,7 +70,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .doOnDisconnected(con -> log.debug("Disconnected from the datacenter №{} ({}:{})",
                             dc.getId(), dc.getAddress(), dc.getPort()))
                     .connect()
-                    .flatMap(con -> Mono.<MTProtoSession>create(sink -> {
+                    .flatMap(con -> Mono.create(sink -> {
                         MTProtoSession session = new MTProtoSession(this, con, authReceiver, rpcReceiver, dc);
 
                         sessions.put(dc, session);

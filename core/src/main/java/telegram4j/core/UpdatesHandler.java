@@ -21,20 +21,12 @@ public class UpdatesHandler {
     }
 
     public Flux<Event> handle(Updates updates) {
-        log.debug(updates.toString());
-
         if (updates instanceof BaseUpdates) {
             BaseUpdates baseUpdates = (BaseUpdates) updates;
 
             return Flux.fromIterable(baseUpdates.updates())
                     .flatMap(update -> updatesHandlers.handle(new UpdateContext<>(
                             client, baseUpdates.chats(), baseUpdates.users(), update)));
-        }
-
-        if (updates instanceof UpdateShortMessage) {
-            UpdateShortMessage updateShortMessage = (UpdateShortMessage) updates;
-
-            // TODO
         }
 
         if (updates instanceof UpdatesTooLong) {

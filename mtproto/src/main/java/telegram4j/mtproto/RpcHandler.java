@@ -27,7 +27,7 @@ public class RpcHandler {
         return handleServiceMessage(payload, session.getLastMessageId());
     }
 
-    private Mono<Void> handleServiceMessage(TlObject obj, long messageId) {
+    private Mono<Void> handleServiceMessage(Object obj, long messageId) {
         if (isAwaitAcknowledge(messageId)) {
             return sendAcknowledgments();
         }
@@ -44,8 +44,7 @@ public class RpcHandler {
                 log.debug("Handling rpc result for message: {}", rpcResult.reqMsgId());
             }
 
-            TlObject unpacked = rpcResult.result();
-
+            Object unpacked = rpcResult.result();
             if (unpacked instanceof GzipPacked) {
                 GzipPacked gzipPacked = (GzipPacked) unpacked;
                 ByteBufAllocator alloc = session.getConnection().channel().alloc();
@@ -126,10 +125,11 @@ public class RpcHandler {
             messageId = futureSalts.reqMsgId();
         }
 
-        if (!session.isAwaitResolve(messageId)) {
-            session.updates().emitNext((Updates) obj, Sinks.EmitFailureHandler.FAIL_FAST);
-        } else {
-            session.resolve(messageId, obj);
+        session.resolve(messageId, obj);
+
+        if (obj instanceof Updates) {
+            Updates updates = (Updates) obj;
+            session.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
         }
 
         return acknowledgmentMessage(messageId);
@@ -151,7 +151,7 @@ public class RpcHandler {
         return Mono.defer(() -> {
             Queue<Long> acks = session.getAcknowledgments();
             int threshold = session.getClient().getOptions().getAcksSendThreshold();
-            if (acks.isEmpty() || acks.size() < threshold) {
+            if (acks.size() < threshold) {
                 return Mono.empty();
             }
 

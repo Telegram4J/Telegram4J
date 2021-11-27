@@ -807,7 +807,7 @@ public class SchemaGenerator extends AbstractProcessor {
             case "int128":
             case "int256": return TypeName.get(byte[].class);
             case "string": return TypeName.get(String.class);
-            case "object": return ClassName.get(TlObject.class);
+            case "object": return ClassName.OBJECT;
             case "jsonvalue": return ClassName.get(JsonNode.class);
             default:
                 Matcher flag = FLAG_PATTERN.matcher(type);
@@ -978,6 +978,10 @@ public class SchemaGenerator extends AbstractProcessor {
                 break;
             case "jsonvalue":
                 wrapping = "serializeJsonNode(allocator, payload.$L())";
+                method0 = "writeBytes";
+                break;
+            case "object":
+                wrapping = "serializeUnknown(allocator, payload.$L())";
                 method0 = "writeBytes";
                 break;
             default:

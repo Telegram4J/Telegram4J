@@ -40,19 +40,15 @@ public final class AuthorizationHandler {
         this.onAuthSink = onAuthSink;
     }
 
-    public Mono<AuthorizationKeyHolder> start() {
+    public Mono<Void> start() {
         return Mono.defer(() -> {
-                    log.debug("Auth key generation started!");
+            log.debug("Auth key generation started!");
 
-                    byte[] nonce = random.generateSeed(16);
-                    context.setNonce(nonce);
+            byte[] nonce = random.generateSeed(16);
+            context.setNonce(nonce);
 
-                    return session.sendUnencrypted(ReqPqMulti.builder()
-                                    .nonce(nonce)
-                                    .build())
-                            .then(onAuthSink.asMono());
-                })
-                .checkpoint("Authorization key generation.");
+            return session.sendUnencrypted(ReqPqMulti.builder().nonce(nonce).build());
+        });
     }
 
     public Mono<Void> handle(MTProtoObject obj) {
@@ -116,7 +112,9 @@ public final class AuthorizationHandler {
 
         context.setNewNonce(random.generateSeed(32));
 
-        assert p.longValueExact() < q.longValueExact();
+        if (p.longValueExact() > q.longValueExact()) {
+            throw new IllegalStateException("Incorrect prime factorization. p: " + p + ", q: " + q + ", pq: " + pq);
+        }
 
         ByteBuf pqInnerData = alloc.buffer()
                 .writeIntLE(0x83c95aec)
