@@ -77,8 +77,4 @@ public final class AuthorizationContext {
     public AtomicInteger getRetry() {
         return retry;
     }
-
-    public boolean isAuthorized() {
-        return authKey != null && serverSalt != 0;
-    }
 }

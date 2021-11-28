@@ -10,4 +10,6 @@ public interface Transport {
     ByteBuf encode(ByteBuf payload);
 
     ByteBuf decode(ByteBuf payload);
+
+    boolean canDecode(ByteBuf buf);
 }

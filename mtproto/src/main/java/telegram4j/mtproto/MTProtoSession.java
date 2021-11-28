@@ -3,6 +3,7 @@ package telegram4j.mtproto;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -10,6 +11,7 @@ import reactor.netty.Connection;
 import reactor.netty.FutureMono;
 import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
+import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.service.MessageService;
 import telegram4j.mtproto.util.AES256IGECipher;
@@ -31,6 +33,7 @@ import static telegram4j.mtproto.util.CryptoUtil.*;
 public final class MTProtoSession {
     private final MTProtoClient client;
     private final Connection connection;
+    private final AuthorizationContext authContext;
     private final Sinks.Many<MTProtoObject> authReceiver;
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
@@ -56,6 +59,7 @@ public final class MTProtoSession {
         this.rpcReceiver = rpcReceiver;
         this.dataCenter = dataCenter;
 
+        this.authContext = new AuthorizationContext();
         this.updates = Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
     }
 
@@ -162,6 +166,7 @@ public final class MTProtoSession {
                     .writeIntLE(data.readableBytes())
                     .writeBytes(data)
                     .writeBytes(random.generateSeed(padding));
+            ReferenceCountUtil.safeRelease(data);
 
             byte[] authKey = authorizationKey.getAuthKey();
             byte[] authKeyId = authorizationKey.getAuthKeyId();
@@ -178,17 +183,17 @@ public final class MTProtoSession {
                     .writeBytes(messageKey)
                     .writeBytes(cipher.encrypt(plainDataB));
 
-            Sinks.One<R> sink = Sinks.one();
+            Sinks.One<R> res = Sinks.one();
             if (object instanceof MsgsAck) {
-                sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                res.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
             } else {
-                resolvers.put(messageId, sink);
+                resolvers.put(messageId, res);
             }
 
-            return FutureMono.from(channel.writeAndFlush(getClient()
+            return FutureMono.from(channel.writeAndFlush(client
                     .getOptions().getResources().getTransport()
                     .encode(payload)))
-                    .then(sink.asMono());
+                    .then(res.asMono());
         });
     }
 
@@ -196,27 +201,24 @@ public final class MTProtoSession {
         return Mono.defer(() -> {
             Channel channel = connection.channel();
             ByteBufAllocator alloc = channel.alloc();
-            ByteBuf data = TlSerializer.serialize(alloc, object);
             long messageId = getMessageId();
+            ByteBuf data = TlSerializer.serialize(alloc, object);
 
             ByteBuf payload = alloc.buffer()
                     .writeLongLE(0) // auth key id
                     .writeLongLE(messageId)
                     .writeIntLE(data.readableBytes())
                     .writeBytes(data);
+            ReferenceCountUtil.safeRelease(data);
 
             return FutureMono.from(channel.writeAndFlush(
                     client.getOptions().getResources()
-                            .getTransport().encode(payload)));
+                    .getTransport().encode(payload)));
         });
     }
 
     public Queue<Long> getAcknowledgments() {
         return acknowledgments;
-    }
-
-    public boolean isAwaitResolve(long messageId) {
-        return resolvers.containsKey(messageId);
     }
 
     @SuppressWarnings("unchecked")
@@ -248,6 +250,10 @@ public final class MTProtoSession {
         timeOffset = 0;
         lastGeneratedMessageId = 0;
         seqNo.set(0);
+    }
+
+    public AuthorizationContext getAuthContext() {
+        return authContext;
     }
 
     private static boolean isContentRelated(TlObject object) {

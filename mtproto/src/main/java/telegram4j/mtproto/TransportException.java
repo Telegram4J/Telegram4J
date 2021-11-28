@@ -11,7 +11,7 @@ public class TransportException extends RuntimeException {
         this.code = code;
     }
 
-    static TransportException create(int code) {
+    public static TransportException create(int code) {
         String message = null;
 
         switch (code) {
@@ -24,9 +24,8 @@ public class TransportException extends RuntimeException {
                 break;
         }
 
-        message = "code: " + code + ", message: " + message;
-
-        return new TransportException(message, code);
+        String format = "code: " + code + ", message: " + message;
+        return new TransportException(format, code);
     }
 
     public int getCode() {

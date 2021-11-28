@@ -91,11 +91,10 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MTProtoClient> clientFactory) {
-        AuthorizationContext ctx = new AuthorizationContext();
         DataCenter dc = initDataCenter();
 
         return Mono.fromSupplier(() -> clientFactory.apply(
-                optionsModifier.apply(new MTProtoOptions(initMTProtoResources(), ctx, acksSendThreshold))))
+                optionsModifier.apply(new MTProtoOptions(initMTProtoResources(), acksSendThreshold))))
                 .flatMap(c -> c.getSession(dc))
                 .publishOn(Schedulers.boundedElastic())
                 .subscribeOn(Schedulers.boundedElastic())

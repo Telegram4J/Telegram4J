@@ -70,18 +70,18 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         dc.getId(), dc.getAddress(), dc.getPort()))
                 .connect()
                 .flatMap(con -> Mono.create(sink -> {
-                    Sinks.Many<MTProtoObject> authReceiver = Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-                    Sinks.Many<TlObject> rpcReceiver = Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+                    Sinks.Many<MTProtoObject> authReceiver = Sinks.many().multicast()
+                            .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+
+                    Sinks.Many<TlObject> rpcReceiver = Sinks.many().multicast()
+                            .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+
                     MTProtoSession session = new MTProtoSession(this, con, authReceiver, rpcReceiver, dc);
-                    AtomicInteger lastSize = new AtomicInteger(-1);
 
                     sessions.put(dc, session);
 
                     sink.onCancel(con.inbound().receive().retain()
-                            .bufferUntil(buf -> {
-                                int l = buf.getIntLE(buf.readerIndex());
-                                return buf.readableBytes() - Integer.BYTES == lastSize.updateAndGet(i -> i == -1 ? l : i);
-                            })
+                            .bufferUntil(options.getResources().getTransport()::canDecode)
                             .map(bufs -> con.channel().alloc().compositeBuffer(bufs.size())
                                     .addComponents(true, bufs))
                             .map(options.getResources().getTransport()::decode)
@@ -100,7 +100,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                                     MTProtoObject obj = TlDeserializer.deserialize(buf);
                                     authReceiver.emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
-                                    lastSize.set(-1);
                                     return;
                                 }
 
@@ -150,7 +149,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 TlObject obj = TlDeserializer.deserialize(decryptedBuf.readBytes(length));
 
                                 rpcReceiver.emitNext(obj, Sinks.EmitFailureHandler.FAIL_FAST);
-                                lastSize.set(-1);
                             })
                             .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                             .subscribe());

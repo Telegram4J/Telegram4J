@@ -12,7 +12,7 @@ public class RpcException extends RuntimeException {
         this.error = error;
     }
 
-    static RpcException create(RpcError error) {
+    public static RpcException create(RpcError error) {
         String orig = error.errorMessage();
         int argIdx = orig.indexOf("_X");
         String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;

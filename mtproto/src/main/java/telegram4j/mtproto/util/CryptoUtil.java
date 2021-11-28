@@ -2,6 +2,7 @@ package telegram4j.mtproto.util;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
 
@@ -46,11 +47,13 @@ public final class CryptoUtil {
     }
 
     public static byte[] toByteArray(ByteBuf buf) {
-        byte[] data = new byte[buf.readableBytes()];
-        buf.markReaderIndex();
-        buf.readBytes(data);
-        buf.resetReaderIndex();
-        return data;
+        try {
+            byte[] data = new byte[buf.readableBytes()];
+            buf.readBytes(data);
+            return data;
+        } finally {
+            ReferenceCountUtil.safeRelease(buf);
+        }
     }
 
     public static byte[] toByteArray(BigInteger val) {
@@ -216,20 +219,20 @@ public final class CryptoUtil {
         int x = server ? 8 : 0;
 
         ByteBuf sha256a = alloc.buffer().writeBytes(sha256Digest(
-                concat(messageKey, toByteArray(authKeyBuf.slice(x, 36)))));
+                concat(messageKey, toByteArray(authKeyBuf.retainedSlice(x, 36)))));
 
         ByteBuf sha256b = alloc.buffer().writeBytes(sha256Digest(
-                concat(toByteArray(authKeyBuf.slice(x + 40, 36)), messageKey)));
+                concat(toByteArray(authKeyBuf.retainedSlice(x + 40, 36)), messageKey)));
 
         byte[] aesKey = concat(
-                toByteArray(sha256a.slice(0, 8)),
-                toByteArray(sha256b.slice(8, 16)),
-                toByteArray(sha256a.slice(24, 8)));
+                toByteArray(sha256a.retainedSlice(0, 8)),
+                toByteArray(sha256b.retainedSlice(8, 16)),
+                toByteArray(sha256a.retainedSlice(24, 8)));
 
         byte[] aesIV = concat(
-                toByteArray(sha256b.slice(0, 8)),
-                toByteArray(sha256a.slice(8, 16)),
-                toByteArray(sha256b.slice(24, 8)));
+                toByteArray(sha256b.retainedSlice(0, 8)),
+                toByteArray(sha256a.retainedSlice(8, 16)),
+                toByteArray(sha256b.retainedSlice(24, 8)));
 
         return new AES256IGECipher(aesKey, aesIV);
     }

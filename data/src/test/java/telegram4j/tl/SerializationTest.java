@@ -58,7 +58,5 @@ public class SerializationTest {
         JsonNode n0 = TlSerialUtil.deserializeJsonNode(buf);
 
         assertEquals(n, n0);
-
-
     }
 }

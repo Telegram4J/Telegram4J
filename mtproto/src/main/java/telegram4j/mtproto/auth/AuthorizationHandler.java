@@ -23,20 +23,16 @@ import java.util.Arrays;
 import java.util.List;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
-import static telegram4j.tl.TlSerialUtil.serializeBytes;
 
 public final class AuthorizationHandler {
 
     private static final Logger log = Loggers.getLogger(AuthorizationHandler.class);
 
     private final MTProtoSession session;
-    private final AuthorizationContext context;
     private final Sinks.One<AuthorizationKeyHolder> onAuthSink;
 
     public AuthorizationHandler(MTProtoSession session, Sinks.One<AuthorizationKeyHolder> onAuthSink) {
         this.session = session;
-        this.context = session.getClient().getOptions().getAuthorizationContext();
-
         this.onAuthSink = onAuthSink;
     }
 
@@ -45,7 +41,7 @@ public final class AuthorizationHandler {
             log.debug("Auth key generation started!");
 
             byte[] nonce = random.generateSeed(16);
-            context.setNonce(nonce);
+            session.getAuthContext().setNonce(nonce);
 
             return session.sendUnencrypted(ReqPqMulti.builder().nonce(nonce).build());
         });
@@ -85,7 +81,8 @@ public final class AuthorizationHandler {
 
     private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
         byte[] newNonceHash3 = dhGenFail.newNonceHash3();
-        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{3}, context.getAuthAuxHash()), 4, 16);
+        byte[] newNonceHash = substring(sha1Digest(session.getAuthContext().getNewNonce(), new byte[]{3},
+                session.getAuthContext().getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash3, newNonceHash)) {
             return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
@@ -97,7 +94,7 @@ public final class AuthorizationHandler {
 
     private Mono<Void> handleResPQ(ResPQ resPQ) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
-        context.setServerNonce(resPQ.serverNonce());
+        session.getAuthContext().setServerNonce(resPQ.serverNonce());
         byte[] pqBytes = resPQ.pq();
 
         List<Long> fingerprints = resPQ.serverPublicKeyFingerprints();
@@ -110,30 +107,32 @@ public final class AuthorizationHandler {
         BigInteger q = pq.divide(p);
         byte[] qBytes = toByteArray(q);
 
-        context.setNewNonce(random.generateSeed(32));
+        session.getAuthContext().setNewNonce(random.generateSeed(32));
 
         if (p.longValueExact() > q.longValueExact()) {
             throw new IllegalStateException("Incorrect prime factorization. p: " + p + ", q: " + q + ", pq: " + pq);
         }
 
-        ByteBuf pqInnerData = alloc.buffer()
-                .writeIntLE(0x83c95aec)
-                .writeBytes(serializeBytes(alloc, pqBytes))
-                .writeBytes(serializeBytes(alloc, pBytes))
-                .writeBytes(serializeBytes(alloc, qBytes))
-                .writeBytes(context.getNonce())
-                .writeBytes(context.getServerNonce())
-                .writeBytes(context.getNewNonce());
+        PQInnerData pqInnerData = PQInnerDataDc.builder()
+                .pq(pqBytes)
+                .p(pBytes)
+                .q(qBytes)
+                .nonce(session.getAuthContext().getNonce())
+                .serverNonce(session.getAuthContext().getServerNonce())
+                .newNonce(session.getAuthContext().getNewNonce())
+                .dc(session.getDataCenter().getId())
+                .build();
 
-        byte[] pqInnerDataBytes = toByteArray(pqInnerData);
+        ByteBuf pqInnderDataBuf = TlSerializer.serialize(alloc, pqInnerData);
+        byte[] pqInnerDataBytes = toByteArray(pqInnderDataBuf);
         byte[] hash = sha1Digest(pqInnerDataBytes);
         byte[] seed = random.generateSeed(255 - hash.length - pqInnerDataBytes.length);
         byte[] dataWithHash = concat(hash, pqInnerDataBytes, seed);
         byte[] encrypted = rsaEncrypt(dataWithHash, key);
 
         return session.sendUnencrypted(ReqDHParams.builder()
-                .nonce(context.getNonce())
-                .serverNonce(context.getServerNonce())
+                .nonce(session.getAuthContext().getNonce())
+                .serverNonce(session.getAuthContext().getServerNonce())
                 .encryptedData(encrypted)
                 .p(pBytes)
                 .q(qBytes)
@@ -143,21 +142,22 @@ public final class AuthorizationHandler {
 
     private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
         byte[] newNonceHash1 = dhGenOk.newNonceHash1();
-        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{1}, context.getAuthAuxHash()), 4, 16);
+        byte[] newNonceHash = substring(sha1Digest(session.getAuthContext().getNewNonce(), new byte[]{1},
+                session.getAuthContext().getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash1, newNonceHash)) {
             return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
                     + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash1)));
         }
 
-        long serverSalt = readLongLE(xor(substring(context.getNewNonce(), 0, 8),
-                substring(context.getServerNonce(), 0, 8)));
+        long serverSalt = readLongLE(xor(substring(session.getAuthContext().getNewNonce(), 0, 8),
+                substring(session.getAuthContext().getServerNonce(), 0, 8)));
 
-        context.setServerSalt(serverSalt);
+        session.getAuthContext().setServerSalt(serverSalt);
         session.setServerSalt(serverSalt);
 
         log.debug("Auth key generation completed!");
-        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(session.getDataCenter(), context.getAuthKey());
+        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(session.getDataCenter(), session.getAuthContext().getAuthKey());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
 
         return session.getClient().getOptions()
@@ -167,31 +167,32 @@ public final class AuthorizationHandler {
 
     private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {
         byte[] newNonceHash2 = dhGenRetry.newNonceHash2();
-        byte[] newNonceHash = substring(sha1Digest(context.getNewNonce(), new byte[]{2}, context.getAuthAuxHash()), 4, 16);
+        byte[] newNonceHash = substring(sha1Digest(session.getAuthContext().getNewNonce(), new byte[]{2},
+                session.getAuthContext().getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash2, newNonceHash)) {
             return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
                     + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash2)));
         }
 
-        ServerDHParams serverDHParams = context.getServerDHParams();
-        log.debug("Retrying dh params extending, attempt: {}.", context.getRetry());
+        ServerDHParams serverDHParams = session.getAuthContext().getServerDHParams();
+        log.debug("Retrying dh params extending, attempt: {}.", session.getAuthContext().getRetry());
         return handleServerDHParams(serverDHParams);
     }
 
     private Mono<Void> handleServerDHParams(ServerDHParams serverDHParams) {
         ByteBufAllocator alloc = session.getConnection().channel().alloc();
-        context.setServerDHParams(serverDHParams); // for DhGenRetry
+        session.getAuthContext().setServerDHParams(serverDHParams); // for DhGenRetry
         byte[] encryptedAnswerB = serverDHParams.encryptedAnswer();
 
         byte[] tmpAesKey = concat(
-                sha1Digest(context.getNewNonce(), context.getServerNonce()),
-                substring(sha1Digest(context.getServerNonce(), context.getNewNonce()), 0, 12));
+                sha1Digest(session.getAuthContext().getNewNonce(), session.getAuthContext().getServerNonce()),
+                substring(sha1Digest(session.getAuthContext().getServerNonce(), session.getAuthContext().getNewNonce()), 0, 12));
 
         byte[] tmpAesIv = concat(concat(substring(
-                sha1Digest(context.getServerNonce(), context.getNewNonce()), 12, 8),
-                sha1Digest(context.getNewNonce(), context.getNewNonce())),
-                substring(context.getNewNonce(), 0, 4));
+                sha1Digest(session.getAuthContext().getServerNonce(), session.getAuthContext().getNewNonce()), 12, 8),
+                sha1Digest(session.getAuthContext().getNewNonce(), session.getAuthContext().getNewNonce())),
+                substring(session.getAuthContext().getNewNonce(), 0, 4));
 
         AES256IGECipher cipher = new AES256IGECipher(tmpAesKey, tmpAesIv);
         ByteBuf answer = alloc.buffer()
@@ -206,13 +207,13 @@ public final class AuthorizationHandler {
         BigInteger gb = g.modPow(b, dhPrime);
 
         BigInteger authKeyVal = fromByteArray(serverDHInnerData.gA()).modPow(b, dhPrime);
-        context.setAuthKey(alignKeyZero(toByteArray(authKeyVal), 256));
-        context.setAuthAuxHash(substring(sha1Digest(context.getAuthKey()), 0, 8));
+        session.getAuthContext().setAuthKey(alignKeyZero(toByteArray(authKeyVal), 256));
+        session.getAuthContext().setAuthAuxHash(substring(sha1Digest(session.getAuthContext().getAuthKey()), 0, 8));
 
         ClientDHInnerData clientDHInnerData = ClientDHInnerData.builder()
-                .retryId(context.getRetry().getAndIncrement())
-                .nonce(context.getNonce())
-                .serverNonce(context.getServerNonce())
+                .retryId(session.getAuthContext().getRetry().getAndIncrement())
+                .nonce(session.getAuthContext().getNonce())
+                .serverNonce(session.getAuthContext().getServerNonce())
                 .gB(toByteArray(gb))
                 .build();
 
@@ -223,8 +224,8 @@ public final class AuthorizationHandler {
         session.updateTimeOffset(serverDHInnerData.serverTime());
 
         return session.sendUnencrypted(SetClientDHParams.builder()
-                .nonce(context.getNonce())
-                .serverNonce(context.getServerNonce())
+                .nonce(session.getAuthContext().getNonce())
+                .serverNonce(session.getAuthContext().getServerNonce())
                 .encryptedData(dataWithHashEnc)
                 .build());
     }
