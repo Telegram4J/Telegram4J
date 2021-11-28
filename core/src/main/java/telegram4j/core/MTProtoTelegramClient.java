@@ -15,14 +15,12 @@ public final class MTProtoTelegramClient {
 
     private final AuthorizationResources authorizationResources;
     private final EventDispatcher eventDispatcher;
-    private final Mono<Void> onDisconnect;
     private final MTProtoSession session;
 
-    MTProtoTelegramClient(AuthorizationResources authorizationResources, EventDispatcher eventDispatcher,
-                          Mono<Void> onDisconnect, MTProtoSession session) {
+    MTProtoTelegramClient(AuthorizationResources authorizationResources,
+                          EventDispatcher eventDispatcher, MTProtoSession session) {
         this.authorizationResources = authorizationResources;
         this.eventDispatcher = eventDispatcher;
-        this.onDisconnect = onDisconnect;
         this.session = session;
     }
 
@@ -49,8 +47,12 @@ public final class MTProtoTelegramClient {
         return session;
     }
 
+    public Mono<Void> disconnect() {
+        return session.getClient().close();
+    }
+
     public Mono<Void> onDisconnect() {
-        return onDisconnect;
+        return session.getConnection().onDispose();
     }
 
     public <E extends Event> Flux<E> on(Class<E> type) {

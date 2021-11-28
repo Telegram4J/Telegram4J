@@ -8,6 +8,7 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.concurrent.Queues;
 import telegram4j.core.event.dispatcher.DefaultEventDispatcher;
 import telegram4j.core.event.dispatcher.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
@@ -101,34 +102,32 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                 .flatMap(session -> Mono.create(sink -> {
                     Disposable.Composite composite = Disposables.composite();
 
-                    Sinks.Empty<Void> onCloseSink = Sinks.empty();
                     Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
 
                     MTProtoOptions options = session.getClient().getOptions();
                     MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
-                            authorizationResources, initEventDispatcher(),
-                            onCloseSink.asMono(), session);
+                            authorizationResources, initEventDispatcher(), session);
 
                     AuthorizationHandler authorizationHandler = new AuthorizationHandler(session, onAuthSink);
                     RpcHandler rpcHandler = new RpcHandler(session);
-                    UpdatesHandler updatesHandler = new UpdatesHandler(telegramClient, new UpdatesHandlers());
+                    UpdatesHandler updatesHandler = new UpdatesHandler(telegramClient, UpdatesHandlers.instance);
 
                     composite.add(session.authReceiver()
-                            .takeUntilOther(onCloseSink.asMono())
+                            .takeUntilOther(session.getConnection().onDispose())
                             .checkpoint("Authorization handler.")
                             .flatMap(authorizationHandler::handle)
                             .then()
                             .subscribe());
 
                     composite.add(session.rpcReceiver()
-                            .takeUntilOther(onCloseSink.asMono())
+                            .takeUntilOther(session.getConnection().onDispose())
                             .checkpoint("RPC handler.")
                             .flatMap(rpcHandler::handle)
                             .then()
                             .subscribe());
 
                     composite.add(session.updates().asFlux()
-                            .takeUntilOther(onCloseSink.asMono())
+                            .takeUntilOther(session.getConnection().onDispose())
                             .checkpoint("Event dispatch handler.")
                             .flatMap(updatesHandler::handle)
                             .doOnNext(telegramClient.getEventDispatcher()::publish)
@@ -137,7 +136,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                     ResettableInterval futureSalt = new ResettableInterval(Schedulers.boundedElastic());
 
                     composite.add(futureSalt.ticks()
-                            .takeUntilOther(onCloseSink.asMono())
+                            .takeUntilOther(session.getConnection().onDispose())
                             .checkpoint("Future salt loop.")
                             .flatMap(tick -> session.sendEncrypted(GetFutureSalts.builder().num(1).build()))
                             .doOnNext(futureSalts -> {
@@ -152,7 +151,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                             .subscribe());
 
                     Mono<Void> pingLoop = Flux.interval(PING_QUERY_PERIOD)
-                            .takeUntilOther(onCloseSink.asMono())
+                            .takeUntilOther(session.getConnection().onDispose())
                             .checkpoint("Ping loop.")
                             .flatMap(tick -> session.sendEncrypted(Ping.builder().pingId(CryptoUtil.random.nextInt()).build()))
                             .then();
@@ -241,7 +240,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
             return eventDispatcher;
         }
         return new DefaultEventDispatcher(Schedulers.boundedElastic(),
-                Sinks.many().multicast().onBackpressureBuffer());
+                Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false));
     }
 
     private DataCenter initDataCenter() {

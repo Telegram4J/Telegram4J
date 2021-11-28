@@ -15,6 +15,8 @@ import java.util.List;
 public final class UpdatesHandlers {
     private static final List<Tuple2<Class<? extends Update>, UpdateHandler<?>>> handlers = new ArrayList<>();
 
+    public static final UpdatesHandlers instance = new UpdatesHandlers();
+
     static {
 
         addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleUpdateNewMessage);
@@ -23,6 +25,8 @@ public final class UpdatesHandlers {
     static <U extends Update> void addHandler(Class<? extends U> type, UpdateHandler<U> handler) {
         handlers.add(Tuples.of(type, handler));
     }
+
+    protected UpdatesHandlers() {}
 
     @SuppressWarnings("unchecked")
     public <E extends Event, U extends Update> Flux<E> handle(UpdateContext<U> context) {

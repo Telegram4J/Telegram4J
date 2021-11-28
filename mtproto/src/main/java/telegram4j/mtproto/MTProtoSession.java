@@ -9,6 +9,7 @@ import reactor.core.publisher.Sinks;
 import reactor.netty.Connection;
 import reactor.netty.FutureMono;
 import reactor.util.annotation.Nullable;
+import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.service.MessageService;
 import telegram4j.mtproto.util.AES256IGECipher;
@@ -55,7 +56,7 @@ public final class MTProtoSession {
         this.rpcReceiver = rpcReceiver;
         this.dataCenter = dataCenter;
 
-        this.updates = Sinks.many().multicast().onBackpressureBuffer();
+        this.updates = Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
     }
 
     public MTProtoClient getClient() {

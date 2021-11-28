@@ -3,6 +3,7 @@ package telegram4j.core;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
@@ -41,13 +42,12 @@ public class FileStoreLayout implements StoreLayout {
         return Mono.justOrEmpty(authorizationKey)
                 .subscribeOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromCallable(() -> {
-                    log.info("Loading auth key from the file store for dc №{}.", dc.getId());
-
                     Path fileName = Paths.get(String.format(AUTH_KEY_FILE, dc.getId()));
                     if (!Files.exists(fileName)) {
                         return null;
                     }
 
+                    log.info("Loading auth key from the file store for dc №{}.", dc.getId());
                     String lines = String.join("", Files.readAllLines(fileName));
                     ByteBuf buf = allocator.buffer()
                             .writeBytes(ByteBufUtil.decodeHexDump(lines));
@@ -56,6 +56,7 @@ public class FileStoreLayout implements StoreLayout {
                     byte[] authKey = readBytes(buf, l);
                     int l1 = buf.readIntLE();
                     byte[] authKeyId = readBytes(buf, l1);
+                    ReferenceCountUtil.safeRelease(buf);
 
                     return new AuthorizationKeyHolder(dc, authKey, authKeyId);
                 }));
@@ -75,7 +76,11 @@ public class FileStoreLayout implements StoreLayout {
                             .writeBytes(authorizationKey.getAuthKeyId());
 
                     Path fileName = Paths.get(String.format(AUTH_KEY_FILE, authorizationKey.getDc().getId()));
-                    return Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
+                    try {
+                        return Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
+                    } finally {
+                        ReferenceCountUtil.safeRelease(buf);
+                    }
                 }));
     }
 

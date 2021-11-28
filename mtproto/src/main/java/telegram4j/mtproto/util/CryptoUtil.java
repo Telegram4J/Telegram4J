@@ -33,6 +33,14 @@ public final class CryptoUtil {
         }
     });
 
+    public static ThreadLocal<MessageDigest> MD5 = ThreadLocal.withInitial(() -> {
+        try {
+            return MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw Exceptions.propagate(e);
+        }
+    });
+
     public static BigInteger fromByteArray(byte[] data) {
         return new BigInteger(1, data);
     }
