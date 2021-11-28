@@ -5,14 +5,14 @@ final class Strings {
     private Strings() {}
 
     static String camelize(String type) {
-        if (!type.contains("_")) {
+        if (!type.contains("_") && !type.contains(".")) {
             return type;
         }
 
         StringBuilder builder = new StringBuilder(type.length());
         for (int i = 0; i < type.length(); i++) {
             char c = type.charAt(i);
-            if (c == '_') {
+            if (c == '_' || c == '.') {
                 char n = Character.toUpperCase(type.charAt(i++ + 1));
                 builder.append(n);
             } else {

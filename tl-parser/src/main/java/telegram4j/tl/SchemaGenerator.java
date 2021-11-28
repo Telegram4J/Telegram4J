@@ -211,6 +211,8 @@ public class SchemaGenerator extends AbstractProcessor {
 
             Set<String> computedSerializers = new HashSet<>();
             Set<String> computedDeserializers = new HashSet<>();
+            Set<String> computedMethodSerializers = new HashSet<>();
+
             for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
                 // region constructors
 
@@ -516,7 +518,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 // endregion
                 // region methods
 
-                Set<String> computedMethodSerializers = new HashSet<>();
                 for (TlEntityObject method : schema.methods()) {
                     String name = normalizeName(method.name());
                     if (ignoredTypes.contains(name.toLowerCase())) {
@@ -606,12 +607,13 @@ public class SchemaGenerator extends AbstractProcessor {
                     String methodName0 = "serialize" + name;
                     String methodName = methodName0;
                     if (computedMethodSerializers.contains(methodName0)) {
-                        if (schema.packagePrefix().isEmpty()) {
-                            continue;
+                        String prx = schema.packagePrefix();
+                        if (prx.isEmpty()) {
+                            String mname = method.name();
+                            prx = camelize(mname.substring(0, mname.lastIndexOf('.')));
                         }
-                        char up = schema.packagePrefix().charAt(0);
-                        methodName = "serialize" + Character.toUpperCase(up)
-                                + schema.packagePrefix().substring(1) + name;
+                        char up = prx.charAt(0);
+                        methodName = "serialize" + Character.toUpperCase(up) + prx.substring(1) + name;
                     }
 
                     computedMethodSerializers.add(methodName);
