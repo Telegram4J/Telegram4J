@@ -18,16 +18,20 @@ public class AbridgedTransport implements Transport {
 
     @Override
     public ByteBuf encode(ByteBuf payload) {
-        int length = payload.readableBytes() / 4;
-        ByteBuf buf = payload.alloc().buffer();
-        if (length >= 0x7f) {
-            buf.writeByte(0x7f);
-            buf.writeMediumLE(length);
-        } else {
-            buf.writeByte(length);
+        try {
+            int length = payload.readableBytes() / 4;
+            ByteBuf buf = payload.alloc().buffer();
+            if (length >= 0x7f) {
+                buf.writeByte(0x7f);
+                buf.writeMediumLE(length);
+            } else {
+                buf.writeByte(length);
+            }
+            buf.writeBytes(payload);
+            return buf;
+        } finally {
+            ReferenceCountUtil.safeRelease(payload);
         }
-        buf.writeBytes(payload);
-        return buf;
     }
 
     @Override
@@ -41,7 +45,6 @@ public class AbridgedTransport implements Transport {
             int payloadLength = partialLength * 4;
             return payload.readBytes(payloadLength);
         } finally {
-            ReferenceCountUtil.safeRelease(payload);
             lastSize.set(-1);
         }
     }
