@@ -31,13 +31,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
 public final class MTProtoSession {
-    private final MTProtoClient client;
     private final Connection connection;
     private final AuthorizationContext authContext;
     private final Sinks.Many<MTProtoObject> authReceiver;
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
+    private final MTProtoResources mtProtoResources;
 
     private final MessageService messageService = new MessageService(this);
 
@@ -51,24 +51,25 @@ public final class MTProtoSession {
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentMap<Long, Sinks.One<?>> resolvers = new ConcurrentHashMap<>();
 
-    MTProtoSession(MTProtoClient client, Connection connection, Sinks.Many<MTProtoObject> authReceiver,
-                   Sinks.Many<TlObject> rpcReceiver, DataCenter dataCenter) {
-        this.client = client;
+    MTProtoSession(Connection connection, Sinks.Many<MTProtoObject> authReceiver,
+                   Sinks.Many<TlObject> rpcReceiver, DataCenter dataCenter,
+                   MTProtoResources mtProtoResources) {
         this.connection = connection;
         this.authReceiver = authReceiver;
         this.rpcReceiver = rpcReceiver;
         this.dataCenter = dataCenter;
+        this.mtProtoResources = mtProtoResources;
 
         this.authContext = new AuthorizationContext();
         this.updates = Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
     }
 
-    public MTProtoClient getClient() {
-        return client;
-    }
-
     public Connection getConnection() {
         return connection;
+    }
+
+    public MTProtoResources getMtProtoResources() {
+        return mtProtoResources;
     }
 
     public Flux<TlObject> rpcReceiver() {
@@ -190,9 +191,8 @@ public final class MTProtoSession {
                 resolvers.put(messageId, res);
             }
 
-            return FutureMono.from(channel.writeAndFlush(client
-                    .getOptions().getResources().getTransport()
-                    .encode(payload)))
+            return FutureMono.from(channel.writeAndFlush(
+                    mtProtoResources.getTransport().encode(payload)))
                     .then(res.asMono());
         });
     }
@@ -212,8 +212,7 @@ public final class MTProtoSession {
             ReferenceCountUtil.safeRelease(data);
 
             return FutureMono.from(channel.writeAndFlush(
-                    client.getOptions().getResources()
-                    .getTransport().encode(payload)));
+                    mtProtoResources.getTransport().encode(payload)));
         });
     }
 

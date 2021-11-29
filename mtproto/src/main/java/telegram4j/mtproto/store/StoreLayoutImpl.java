@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static telegram4j.mtproto.util.TlEntityUtil.peerId;
+
 public class StoreLayoutImpl implements StoreLayout {
 
     private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
@@ -73,6 +75,19 @@ public class StoreLayoutImpl implements StoreLayout {
         });
     }
 
+    @Override
+    public Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users) {
+        return Mono.fromSupplier(() -> {
+            Message old = messages.put(create(update.message()), update.message());
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+            return old;
+        });
+    }
+
     private void saveUser(User user) {
         if (user instanceof BaseUser) {
             BaseUser user0 = (BaseUser) user;
@@ -80,6 +95,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
             String username = user0.username();
             Long accessHash = user0.accessHash();
+            // TODO: if access hash is null we must remove peer from cache?
             if (username != null && accessHash != null) {
                 usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user0.id(), accessHash));
             }
@@ -100,19 +116,6 @@ public class StoreLayoutImpl implements StoreLayout {
         }
 
         throw new IllegalArgumentException("Unknown message: " + message);
-    }
-
-    // TODO: improve tl parser and pull id field to supertype
-    static long peerId(Peer peer) {
-        if (peer instanceof PeerChat) {
-            PeerChat peerChat = (PeerChat) peer;
-            return peerChat.chatId();
-        } else if (peer instanceof PeerChannel) {
-            PeerChannel peerChannel = (PeerChannel) peer;
-            return peerChannel.channelId();
-        } else {
-            return ((PeerUser) peer).userId();
-        }
     }
 
     static String stripUsername(String username) {

@@ -6,7 +6,5 @@ public interface MTProtoClient {
 
     Mono<MTProtoSession> getSession(DataCenter dc);
 
-    MTProtoOptions getOptions();
-
     Mono<Void> close();
 }

@@ -2,15 +2,16 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.ChannelOption;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.netty.tcp.TcpClient;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
@@ -20,7 +21,6 @@ import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 import static telegram4j.tl.TlSerialUtil.readInt128;
@@ -29,22 +29,19 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
 
-    private final MTProtoOptions options;
+    private final TcpClient tcpClient;
+    private final MTProtoResources mtProtoResources;
     private final ConcurrentMap<DataCenter, MTProtoSession> sessions = new ConcurrentHashMap<>();
 
     public DefaultMTProtoClient(MTProtoOptions options) {
-        this.options = options;
+        this.tcpClient = options.getTcpClient();
+        this.mtProtoResources = options.getMtProtoResources();
     }
 
     @Override
     public Mono<MTProtoSession> getSession(DataCenter dc) {
         return Mono.fromSupplier(() -> sessions.get(dc))
                 .switchIfEmpty(createSession(dc));
-    }
-
-    @Override
-    public MTProtoOptions getOptions() {
-        return options;
     }
 
     @Override
@@ -55,13 +52,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private Mono<MTProtoSession> createSession(DataCenter dc) {
-        return options.getResources().getTcpClient()
-                .remoteAddress(() -> new InetSocketAddress(dc.getAddress(), dc.getPort()))
+        return tcpClient.remoteAddress(() -> new InetSocketAddress(dc.getAddress(), dc.getPort()))
                 .doOnConnected(con -> {
                     log.debug("Connected to datacenter №{} ({}:{})", dc.getId(), dc.getAddress(), dc.getPort());
                     log.debug("Sending header identifier to the server.");
 
-                    ByteBuf identifier = options.getResources().getTransport()
+                    ByteBuf identifier = mtProtoResources.getTransport()
                             .identifier(con.channel().alloc());
 
                     con.channel().writeAndFlush(identifier);
@@ -76,15 +72,16 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     Sinks.Many<TlObject> rpcReceiver = Sinks.many().multicast()
                             .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
 
-                    MTProtoSession session = new MTProtoSession(this, con, authReceiver, rpcReceiver, dc);
+                    MTProtoSession session = new MTProtoSession(con, authReceiver,
+                            rpcReceiver, dc, mtProtoResources);
 
                     sessions.put(dc, session);
 
                     sink.onCancel(con.inbound().receive().retain()
-                            .bufferUntil(options.getResources().getTransport()::canDecode)
+                            .bufferUntil(mtProtoResources.getTransport()::canDecode)
                             .map(bufs -> con.channel().alloc().compositeBuffer(bufs.size())
                                     .addComponents(true, bufs))
-                            .map(options.getResources().getTransport()::decode)
+                            .map(mtProtoResources.getTransport()::decode)
                             .flatMap(buf -> {
                                 if (buf.readableBytes() == Integer.BYTES) { // The error code writes as negative int32
                                     int code = buf.readIntLE() * -1;

@@ -1,7 +1,7 @@
 package telegram4j.core.event.domain.message;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.event.Event;
+import telegram4j.core.event.domain.Event;
 
 public abstract class MessageEvent extends Event {
 

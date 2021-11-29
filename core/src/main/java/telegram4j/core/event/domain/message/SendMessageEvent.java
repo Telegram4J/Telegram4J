@@ -8,7 +8,7 @@ import telegram4j.tl.User;
 
 import java.util.Optional;
 
-public class MessageCreateEvent extends MessageEvent {
+public class SendMessageEvent extends MessageEvent {
 
     private final Message message;
     @Nullable
@@ -16,7 +16,7 @@ public class MessageCreateEvent extends MessageEvent {
     @Nullable
     private final User user;
 
-    public MessageCreateEvent(MTProtoTelegramClient client, Message message, @Nullable Chat chat, @Nullable User user) {
+    public SendMessageEvent(MTProtoTelegramClient client, Message message, @Nullable Chat chat, @Nullable User user) {
         super(client);
         this.message = message;
         this.chat = chat;
@@ -37,7 +37,7 @@ public class MessageCreateEvent extends MessageEvent {
 
     @Override
     public String toString() {
-        return "MessageCreateEvent{" +
+        return "SendMessageEvent{" +
                 "message=" + message +
                 ", chat=" + chat +
                 ", user=" + user +

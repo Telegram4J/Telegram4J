@@ -160,8 +160,7 @@ public final class AuthorizationHandler {
         AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(session.getDataCenter(), session.getAuthContext().getAuthKey());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
 
-        return session.getClient().getOptions()
-                .getResources().getStoreLayout()
+        return session.getMtProtoResources().getStoreLayout()
                 .updateAuthorizationKey(authKey);
     }
 

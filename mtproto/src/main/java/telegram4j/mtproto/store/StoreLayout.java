@@ -27,4 +27,5 @@ public interface StoreLayout {
 
     Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users);
 
+    Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users);
 }

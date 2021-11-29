@@ -21,18 +21,18 @@ import java.util.List;
 
 import static telegram4j.tl.TlSerialUtil.readBytes;
 
-public class FileStoreLayout implements StoreLayout {
+public class TestFileStoreLayout implements StoreLayout {
 
     private static final String AUTH_KEY_FILE = "core/src/test/resources/authkey-%s.bin";
 
-    private static final Logger log = Loggers.getLogger(FileStoreLayout.class);
+    private static final Logger log = Loggers.getLogger(TestFileStoreLayout.class);
 
     private final ByteBufAllocator allocator;
     private final StoreLayout delegate;
 
     private volatile AuthorizationKeyHolder authorizationKey;
 
-    public FileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
+    public TestFileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
         this.allocator = allocator;
         this.delegate = delegate;
     }
@@ -120,5 +120,10 @@ public class FileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users) {
         return delegate.onNewMessage(update, chats, users);
+    }
+
+    @Override
+    public Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users) {
+        return delegate.onEditMessage(update, chats, users);
     }
 }

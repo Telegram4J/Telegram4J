@@ -142,7 +142,7 @@ public class RpcHandler {
     }
 
     private boolean isAwaitAcknowledge(long messageId) {
-        int threshold = session.getClient().getOptions().getAcksSendThreshold();
+        int threshold = session.getMtProtoResources().getAcksSendThreshold();
         Queue<Long> acks = session.getAcknowledgments();
         return acks.contains(messageId) && acks.size() + 1 > threshold;
     }
@@ -150,7 +150,7 @@ public class RpcHandler {
     private Mono<Void> sendAcknowledgments() {
         return Mono.defer(() -> {
             Queue<Long> acks = session.getAcknowledgments();
-            int threshold = session.getClient().getOptions().getAcksSendThreshold();
+            int threshold = session.getMtProtoResources().getAcksSendThreshold();
             if (acks.size() < threshold) {
                 return Mono.empty();
             }

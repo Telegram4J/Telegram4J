@@ -1,19 +1,21 @@
 package telegram4j.mtproto;
 
+import reactor.netty.tcp.TcpClient;
+
 public class MTProtoOptions {
-    private final MTProtoResources resources;
-    private final int acksSendThreshold;
+    private final TcpClient tcpClient;
+    private final MTProtoResources mtProtoResources;
 
-    public MTProtoOptions(MTProtoResources resources, int acksSendThreshold) {
-        this.resources = resources;
-        this.acksSendThreshold = acksSendThreshold;
+    public MTProtoOptions(TcpClient tcpClient, MTProtoResources mtProtoResources) {
+        this.tcpClient = tcpClient;
+        this.mtProtoResources = mtProtoResources;
     }
 
-    public MTProtoResources getResources() {
-        return resources;
+    public TcpClient getTcpClient() {
+        return tcpClient;
     }
 
-    public int getAcksSendThreshold() {
-        return acksSendThreshold;
+    public MTProtoResources getMtProtoResources() {
+        return mtProtoResources;
     }
 }

@@ -2,46 +2,69 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.function.TupleUtils;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
-import telegram4j.core.event.Event;
+import telegram4j.core.event.domain.Event;
 import telegram4j.tl.Update;
+import telegram4j.tl.UpdateEditMessage;
 import telegram4j.tl.UpdateNewMessage;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class UpdatesHandlers {
-    private static final List<Tuple2<Class<? extends Update>, UpdateHandler<?>>> handlers = new ArrayList<>();
-
-    public static final UpdatesHandlers instance = new UpdatesHandlers();
+    private static final List<HandlerTuple<?, ?>> handlers = new ArrayList<>();
 
     static {
 
-        addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleUpdateNewMessage);
+        addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
+                MessageUpdateHandlers::handleUpdateNewMessage);
+        addHandler(UpdateEditMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
+                MessageUpdateHandlers::handleUpdateEditMessage);
     }
 
-    static <U extends Update> void addHandler(Class<? extends U> type, UpdateHandler<U> handler) {
-        handlers.add(Tuples.of(type, handler));
+    public static final UpdatesHandlers instance = new UpdatesHandlers();
+
+    private UpdatesHandlers() {
     }
 
-    protected UpdatesHandlers() {}
+    static <U extends Update, O> void addHandler(Class<? extends U> type,
+                                                 StateUpdateHandler<U, O> updateHandler,
+                                                 UpdateHandler<U, O> handler) {
+        handlers.add(new HandlerTuple<>(type, updateHandler, handler));
+    }
 
     @SuppressWarnings("unchecked")
-    public <E extends Event, U extends Update> Flux<E> handle(UpdateContext<U> context) {
+    public <U extends Update> Flux<? extends Event> handle(UpdateContext<U> context) {
         return Mono.justOrEmpty(handlers.stream()
-                        .filter(TupleUtils.predicate((type, handler) -> type.isAssignableFrom(context.getUpdate().getClass())))
-                        .map(Tuple2::getT2)
+                        .filter(t -> t.type.isAssignableFrom(context.getUpdate().getClass()))
                         .findFirst())
-                .map(handler -> (UpdateHandler<U>) handler)
-                .flatMapMany(handler -> handler.handle(context))
-                .map(event -> (E) event);
+                .map(t -> (HandlerTuple<U, Object>) t)
+                .flatMapMany(t -> t.updateHandler.handle(context)
+                        .map(obj -> StatefulUpdateContext.from(context, obj))
+                        .defaultIfEmpty(StatefulUpdateContext.from(context, null))
+                        .flatMapMany(t.handler::handle));
+    }
+
+    static class HandlerTuple<U extends Update, O> {
+        private final Class<? extends U> type;
+        private final StateUpdateHandler<U, O> updateHandler;
+        private final UpdateHandler<U, O> handler;
+
+        HandlerTuple(Class<? extends U> type, StateUpdateHandler<U, O> updateHandler, UpdateHandler<U, O> handler) {
+            this.type = type;
+            this.updateHandler = updateHandler;
+            this.handler = handler;
+        }
     }
 
     @FunctionalInterface
-    interface UpdateHandler<U extends Update> {
+    interface UpdateHandler<U extends Update, O> {
 
-        Flux<? extends Event> handle(UpdateContext<U> context);
+        Flux<? extends Event> handle(StatefulUpdateContext<U, O> context);
+    }
+
+    @FunctionalInterface
+    interface StateUpdateHandler<U extends Update, O> {
+
+        Mono<O> handle(UpdateContext<U> context);
     }
 }

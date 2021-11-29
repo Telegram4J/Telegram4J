@@ -13,7 +13,7 @@ final class Strings {
         for (int i = 0; i < type.length(); i++) {
             char c = type.charAt(i);
             if (c == '_' || c == '.') {
-                char n = Character.toUpperCase(type.charAt(i++ + 1));
+                char n = Character.toUpperCase(type.charAt(++i));
                 builder.append(n);
             } else {
                 builder.append(c);
