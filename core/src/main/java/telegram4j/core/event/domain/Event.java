@@ -1,4 +1,4 @@
-package telegram4j.core.event;
+package telegram4j.core.event.domain;
 
 import telegram4j.core.MTProtoTelegramClient;
 

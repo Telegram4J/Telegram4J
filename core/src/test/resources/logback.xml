@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true">
-    <logger name="telegram4j.mtproto.auth" level="TRACE"/>
-    <logger name="telegram4j.mtproto" level="TRACE"/>
-    <logger name="telegram4j.mtproto.payload" level="TRACE"/>
+<!--    <logger name="telegram4j.mtproto.auth" level="TRACE"/>-->
+<!--    <logger name="telegram4j.mtproto" level="TRACE"/>-->
+<!--    <logger name="telegram4j.mtproto.payload" level="TRACE"/>-->
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>

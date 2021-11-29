@@ -1,7 +1,7 @@
-package telegram4j.core.event.dispatcher;
+package telegram4j.core.event;
 
 import reactor.core.publisher.Flux;
-import telegram4j.core.event.Event;
+import telegram4j.core.event.domain.Event;
 
 public interface EventDispatcher {
 
