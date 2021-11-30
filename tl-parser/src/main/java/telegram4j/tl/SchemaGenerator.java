@@ -299,24 +299,27 @@ public class SchemaGenerator extends AbstractProcessor {
                             }
 
                             TypeName paramType = parseType(param.type(), schema);
-                            boolean optionalInExt = param.type().startsWith("flags.") &&
-                                    !param.type().endsWith("true") &&
-                                    typeTree.get(qualifiedName).stream()
-                                            .flatMap(c -> c.params().stream())
-                                            .anyMatch(p -> !p.type().endsWith("true") &&
-                                                    p.type().startsWith("flags.") &&
-                                                    p.name().equals(param.name()));
+                            boolean optionalInExt = typeTree.get(qualifiedName).stream()
+                                    .flatMap(c -> c.params().stream())
+                                    .anyMatch(p -> p.type().startsWith("flags.") &&
+                                            p.name().equals(param.name()));
 
                             MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param))
                                     .addModifiers(Modifier.PUBLIC);
 
-                            if (optionalInExt) {
+                            if (param.type().startsWith("flags.")) {
+                                if (param.type().endsWith("true")) {
+                                    attribute.addModifiers(Modifier.DEFAULT);
+                                    attribute.addCode("return false;");
+                                } else {
+                                    paramType = paramType.box();
+                                    attribute.addAnnotation(Nullable.class);
+                                    attribute.addModifiers(Modifier.ABSTRACT);
+                                }
+                            } else if (optionalInExt) {
                                 paramType = paramType.box();
                                 attribute.addAnnotation(Nullable.class);
                                 attribute.addModifiers(Modifier.ABSTRACT);
-                            } else if (param.type().startsWith("flags.") && param.type().endsWith("true")) {
-                                attribute.addModifiers(Modifier.DEFAULT);
-                                attribute.addCode("return false;");
                             } else {
                                 attribute.addModifiers(Modifier.ABSTRACT);
                             }
@@ -486,26 +489,29 @@ public class SchemaGenerator extends AbstractProcessor {
                             deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
 
                             TypeName paramType = parseType(param.type(), schema);
-                            String type2 = param.type();
-                            boolean optionalInExt = type2.startsWith("flags.") &&
-                                    !type2.endsWith("true") &&
-                                    typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                                            .filter(c -> normalizeName(c.name()).equals(normalizeName(c.type())))
-                                            .flatMap(c -> c.params().stream())
-                                            .anyMatch(p -> !p.type().endsWith("true") &&
-                                                    p.type().startsWith("flags.") &&
-                                                    p.name().equals(param.name()));
 
                             MethodSpec.Builder attribute = MethodSpec.methodBuilder(paramName)
                                     .addModifiers(Modifier.PUBLIC);
 
-                            if (optionalInExt) {
+                            boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                                    .filter(c -> normalizeName(c.name()).equals(normalizeName(c.type())))
+                                    .flatMap(c -> c.params().stream())
+                                    .anyMatch(p -> p.type().startsWith("flags.") &&
+                                            p.name().equals(param.name()));
+
+                            if (param.type().startsWith("flags.")) {
+                                if (param.type().endsWith("true")) {
+                                    attribute.addModifiers(Modifier.DEFAULT);
+                                    attribute.addCode("return false;");
+                                } else {
+                                    paramType = paramType.box();
+                                    attribute.addAnnotation(Nullable.class);
+                                    attribute.addModifiers(Modifier.ABSTRACT);
+                                }
+                            } else if (optionalInExt) {
                                 paramType = paramType.box();
                                 attribute.addAnnotation(Nullable.class);
                                 attribute.addModifiers(Modifier.ABSTRACT);
-                            } else if (param.type().startsWith("flags.") && param.type().endsWith("true")) {
-                                attribute.addModifiers(Modifier.DEFAULT);
-                                attribute.addCode("return false;");
                             } else {
                                 attribute.addModifiers(Modifier.ABSTRACT);
                             }
