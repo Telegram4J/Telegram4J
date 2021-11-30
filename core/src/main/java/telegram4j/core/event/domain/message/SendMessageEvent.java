@@ -16,7 +16,9 @@ public class SendMessageEvent extends MessageEvent {
     @Nullable
     private final User user;
 
-    public SendMessageEvent(MTProtoTelegramClient client, Message message, @Nullable Chat chat, @Nullable User user) {
+    public SendMessageEvent(MTProtoTelegramClient client,
+                            Message message, @Nullable Chat chat,
+                            @Nullable User user) {
         super(client);
         this.message = message;
         this.chat = chat;

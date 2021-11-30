@@ -32,6 +32,14 @@ public class RpcHandler {
             return sendAcknowledgments();
         }
 
+        // For updates
+        if (obj instanceof GzipPacked) {
+            GzipPacked gzipPacked = (GzipPacked) obj;
+            ByteBufAllocator alloc = session.getConnection().channel().alloc();
+            obj = TlSerialUtil.decompressGzip(alloc.buffer()
+                    .writeBytes(gzipPacked.packedData()));
+        }
+
         if (obj instanceof RpcError) {
             RpcError rpcError = (RpcError) obj;
             return Mono.error(() -> RpcException.create(rpcError));

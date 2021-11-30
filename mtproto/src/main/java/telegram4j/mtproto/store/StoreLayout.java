@@ -4,10 +4,13 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.updates.State;
 
 import java.util.List;
 
 public interface StoreLayout {
+
+    Mono<State> getCurrentState();
 
     Mono<Long> getSelfId();
 
@@ -23,9 +26,11 @@ public interface StoreLayout {
 
     Mono<Void> updateSelfId(long userId);
 
+    Mono<Void> updateState(State state);
+
     Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
 
-    Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users);
+    Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users);
 
-    Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users);
+    Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users);
 }

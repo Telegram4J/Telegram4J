@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import org.reactivestreams.Publisher;
 import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
@@ -32,7 +33,6 @@ import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
 import telegram4j.tl.request.mtproto.Ping;
-import telegram4j.tl.request.updates.GetState;
 import telegram4j.tl.request.users.GetUsers;
 
 import java.time.Duration;
@@ -52,6 +52,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
     private TcpClient tcpClient;
     private Transport transport;
     private int acksSendThreshold = 3;
+    private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
 
     private InitConnection<TlObject> initConnection;
     private StoreLayout storeLayout;
@@ -102,6 +103,16 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setUpdatesHandlers(UpdatesHandlers updatesHandlers) {
+        this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
+        return this;
+    }
+
+    public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
+        return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
+                MTProtoTelegramClient::disconnect);
+    }
+
     public Mono<MTProtoTelegramClient> connect() {
         return connect(DefaultMTProtoClient::new);
     }
@@ -112,7 +123,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
             DataCenter dc = initDataCenter();
             EventDispatcher eventDispatcher = initEventDispatcher();
             TcpClient tcpClient = initTcpClient();
-            MTProtoResources mtProtoResources = new MTProtoResources(initTransport(), storeLayout, acksSendThreshold);
+            SessionResources mtProtoResources = new SessionResources(initTransport(), storeLayout, acksSendThreshold);
 
             return Mono.fromSupplier(() -> clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(tcpClient, mtProtoResources))))
@@ -125,11 +136,11 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                         Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
 
                         MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
-                                authorizationResources, session, eventDispatcher);
+                                authorizationResources, session, eventDispatcher,
+                                updatesHandlers);
 
                         AuthorizationHandler authorizationHandler = new AuthorizationHandler(session, onAuthSink);
                         RpcHandler rpcHandler = new RpcHandler(session);
-                        UpdatesHandler updatesHandler = new UpdatesHandler(telegramClient, UpdatesHandlers.instance);
 
                         composite.add(session.authReceiver()
                                 .takeUntilOther(session.getConnection().onDispose())
@@ -148,7 +159,7 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                         composite.add(session.updates().asFlux()
                                 .takeUntilOther(session.getConnection().onDispose())
                                 .checkpoint("Event dispatch handler.")
-                                .flatMap(updatesHandler::handle)
+                                .flatMap(telegramClient.getUpdatesManager()::handle)
                                 .doOnNext(eventDispatcher::publish)
                                 .subscribe());
 
@@ -188,12 +199,9 @@ public class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .layer(MTProtoTelegramClient.LAYER)
                                         .query(initConnectionParams())
                                         .build())
-                                .then(session.sendEncrypted(InvokeWithLayer.builder()
-                                        .layer(MTProtoTelegramClient.LAYER)
-                                        .query(importAuthorization())
-                                        .build()))
+                                .then(session.sendEncrypted(importAuthorization()))
                                 .doOnNext(ignored -> futureSalt.start(FUTURE_SALT_QUERY_PERIOD))
-                                .then(session.sendEncrypted(GetState.instance()))
+                                .then(telegramClient.getUpdatesManager().fillGap())
                                 .then(fetchSelfId)
                                 .then();
 

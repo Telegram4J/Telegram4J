@@ -4,9 +4,9 @@ import reactor.netty.tcp.TcpClient;
 
 public class MTProtoOptions {
     private final TcpClient tcpClient;
-    private final MTProtoResources mtProtoResources;
+    private final SessionResources mtProtoResources;
 
-    public MTProtoOptions(TcpClient tcpClient, MTProtoResources mtProtoResources) {
+    public MTProtoOptions(TcpClient tcpClient, SessionResources mtProtoResources) {
         this.tcpClient = tcpClient;
         this.mtProtoResources = mtProtoResources;
     }
@@ -15,7 +15,7 @@ public class MTProtoOptions {
         return tcpClient;
     }
 
-    public MTProtoResources getMtProtoResources() {
+    public SessionResources getMtProtoResources() {
         return mtProtoResources;
     }
 }

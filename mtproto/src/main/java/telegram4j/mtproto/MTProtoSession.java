@@ -37,7 +37,7 @@ public final class MTProtoSession {
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
-    private final MTProtoResources mtProtoResources;
+    private final SessionResources mtProtoResources;
 
     private final MessageService messageService = new MessageService(this);
 
@@ -53,7 +53,7 @@ public final class MTProtoSession {
 
     MTProtoSession(Connection connection, Sinks.Many<MTProtoObject> authReceiver,
                    Sinks.Many<TlObject> rpcReceiver, DataCenter dataCenter,
-                   MTProtoResources mtProtoResources) {
+                   SessionResources mtProtoResources) {
         this.connection = connection;
         this.authReceiver = authReceiver;
         this.rpcReceiver = rpcReceiver;
@@ -68,7 +68,7 @@ public final class MTProtoSession {
         return connection;
     }
 
-    public MTProtoResources getMtProtoResources() {
+    public SessionResources getMtProtoResources() {
         return mtProtoResources;
     }
 

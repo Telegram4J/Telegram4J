@@ -12,6 +12,7 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
+import telegram4j.tl.updates.State;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -88,6 +89,11 @@ public class TestFileStoreLayout implements StoreLayout {
     // =====================
 
     @Override
+    public Mono<State> getCurrentState() {
+        return delegate.getCurrentState();
+    }
+
+    @Override
     public Mono<Long> getSelfId() {
         return delegate.getSelfId();
     }
@@ -118,12 +124,17 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users) {
-        return delegate.onNewMessage(update, chats, users);
+    public Mono<Void> updateState(State state) {
+        return delegate.updateState(state);
     }
 
     @Override
-    public Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users) {
-        return delegate.onEditMessage(update, chats, users);
+    public Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users) {
+        return delegate.onNewMessage(message, chats, users);
+    }
+
+    @Override
+    public Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users) {
+        return delegate.onEditMessage(message, chats, users);
     }
 }

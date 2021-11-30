@@ -481,6 +481,7 @@ public class SchemaGenerator extends AbstractProcessor {
 
                             TypeName paramType = parseType(param.type(), schema);
                             boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                                    .filter(c -> normalizeName(c.name()).equals(normalizeName(c.type())))
                                     .flatMap(c -> c.params().stream())
                                     .anyMatch(p -> p.type().startsWith("flags.") &&
                                             p.name().equals(param.name()));
@@ -1083,6 +1084,10 @@ public class SchemaGenerator extends AbstractProcessor {
             case "SendMessage":
             case "SendMedia":
                 return ClassName.get(UTIL_PACKAGE, "BaseSendMessageRequest");
+            case "UpdateNewMessage":
+            case "UpdateEditMessage":
+            case "UpdateNewChannelMessage":
+                return ClassName.get(UTIL_PACKAGE, "PtsUpdate");
 
             case "MsgDetailedInfo":
             case "MsgResendReq":

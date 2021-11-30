@@ -3,12 +3,12 @@ package telegram4j.mtproto;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
-public class MTProtoResources {
+public class SessionResources {
     private final Transport transport;
     private final StoreLayout storeLayout;
     private final int acksSendThreshold;
 
-    public MTProtoResources(Transport transport, StoreLayout storeLayout, int acksSendThreshold) {
+    public SessionResources(Transport transport, StoreLayout storeLayout, int acksSendThreshold) {
         this.transport = transport;
         this.storeLayout = storeLayout;
         this.acksSendThreshold = acksSendThreshold;

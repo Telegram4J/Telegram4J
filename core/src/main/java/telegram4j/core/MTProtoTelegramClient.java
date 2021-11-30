@@ -2,10 +2,10 @@ package telegram4j.core;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.mtproto.MTProtoOptions;
-import telegram4j.mtproto.MTProtoResources;
 import telegram4j.mtproto.MTProtoSession;
 
 import java.util.Objects;
@@ -17,12 +17,15 @@ public final class MTProtoTelegramClient {
     private final AuthorizationResources authorizationResources;
     private final MTProtoSession session;
     private final EventDispatcher eventDispatcher;
+    private final UpdatesManager updatesManager;
 
     MTProtoTelegramClient(AuthorizationResources authorizationResources,
-                          MTProtoSession session, EventDispatcher eventDispatcher) {
+                          MTProtoSession session, EventDispatcher eventDispatcher,
+                          UpdatesHandlers updatesHandlers) {
         this.authorizationResources = authorizationResources;
         this.session = session;
         this.eventDispatcher = eventDispatcher;
+        this.updatesManager = new UpdatesManager(this, updatesHandlers);
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
@@ -38,6 +41,10 @@ public final class MTProtoTelegramClient {
 
     public EventDispatcher getEventDispatcher() {
         return eventDispatcher;
+    }
+
+    public UpdatesManager getUpdatesManager() {
+        return updatesManager;
     }
 
     public AuthorizationResources getAuthorizationResources() {

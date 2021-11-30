@@ -5,6 +5,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.Event;
 import telegram4j.tl.Update;
 import telegram4j.tl.UpdateEditMessage;
+import telegram4j.tl.UpdateNewChannelMessage;
 import telegram4j.tl.UpdateNewMessage;
 
 import java.util.ArrayList;
@@ -14,7 +15,8 @@ public final class UpdatesHandlers {
     private static final List<HandlerTuple<?, ?>> handlers = new ArrayList<>();
 
     static {
-
+        addHandler(UpdateNewChannelMessage.class, MessageUpdateHandlers::handleStateUpdateNewChannelMessage,
+                MessageUpdateHandlers::handleUpdateNewChannelMessage);
         addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
                 MessageUpdateHandlers::handleUpdateNewMessage);
         addHandler(UpdateEditMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
@@ -33,7 +35,7 @@ public final class UpdatesHandlers {
     }
 
     @SuppressWarnings("unchecked")
-    public <U extends Update> Flux<? extends Event> handle(UpdateContext<U> context) {
+    public <U extends Update> Flux<Event> handle(UpdateContext<U> context) {
         return Mono.justOrEmpty(handlers.stream()
                         .filter(t -> t.type.isAssignableFrom(context.getUpdate().getClass()))
                         .findFirst())

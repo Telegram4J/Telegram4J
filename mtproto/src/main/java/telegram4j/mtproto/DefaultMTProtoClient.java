@@ -11,7 +11,6 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.MTProtoObject;
 import telegram4j.tl.TlDeserializer;
@@ -30,7 +29,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
 
     private final TcpClient tcpClient;
-    private final MTProtoResources mtProtoResources;
+    private final SessionResources mtProtoResources;
     private final ConcurrentMap<DataCenter, MTProtoSession> sessions = new ConcurrentHashMap<>();
 
     public DefaultMTProtoClient(MTProtoOptions options) {

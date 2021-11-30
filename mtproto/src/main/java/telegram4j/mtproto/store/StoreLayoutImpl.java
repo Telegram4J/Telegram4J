@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.updates.State;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,6 +23,12 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
     private volatile long selfId;
+    private volatile State state;
+
+    @Override
+    public Mono<State> getCurrentState() {
+        return Mono.justOrEmpty(state);
+    }
 
     @Override
     public Mono<Long> getSelfId() {
@@ -59,14 +66,19 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateState(State state) {
+        return Mono.fromRunnable(() -> this.state = state);
+    }
+
+    @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
         return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
     }
 
     @Override
-    public Mono<Void> onNewMessage(UpdateNewMessage update, List<Chat> chats, List<User> users) {
+    public Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            messages.put(create(update.message()), update.message());
+            messages.put(create(message), message);
             for (Chat chat : chats) {
                 this.chats.put(chat.id(), chat);
             }
@@ -76,9 +88,9 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> onEditMessage(UpdateEditMessage update, List<Chat> chats, List<User> users) {
+    public Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
-            Message old = messages.put(create(update.message()), update.message());
+            Message old = messages.put(create(message), message);
             for (Chat chat : chats) {
                 this.chats.put(chat.id(), chat);
             }

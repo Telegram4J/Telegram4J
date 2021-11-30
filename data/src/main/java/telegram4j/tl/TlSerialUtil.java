@@ -34,7 +34,7 @@ public final class TlSerialUtil {
         }
     }
 
-    public static <T extends TlObject> T decompressGzip(ByteBuf packed) {
+    public static <T> T decompressGzip(ByteBuf packed) {
         try (GZIPInputStream in = new GZIPInputStream(new ByteBufInputStream(packed))) {
             ByteBuf result = packed.alloc().buffer();
             int remaining = Integer.MAX_VALUE;
