@@ -7,9 +7,9 @@ import java.util.Objects;
 public class Flag {
     private final int position;
     private final TlParam param;
-    private final TypeName type;
+    private final String type;
 
-    public Flag(int position, TlParam param, TypeName type) {
+    public Flag(int position, TlParam param, String type) {
         this.position = position;
         this.param = param;
         this.type = type;
@@ -23,7 +23,7 @@ public class Flag {
         return param;
     }
 
-    public TypeName getType() {
+    public String getType() {
         return type;
     }
 

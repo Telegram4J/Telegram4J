@@ -2,7 +2,6 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.tl.*;

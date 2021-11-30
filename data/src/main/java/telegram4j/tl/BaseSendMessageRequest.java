@@ -6,17 +6,21 @@ import java.util.List;
 
 public interface BaseSendMessageRequest extends TlMethod<Updates> {
 
-    @Nullable
-    TlTrue noWebpage();
+    default boolean noWebpage() {
+        return false;
+    }
 
-    @Nullable
-    TlTrue silent();
+    default boolean silent() {
+        return false;
+    }
 
-    @Nullable
-    TlTrue background();
+    default boolean background() {
+        return false;
+    }
 
-    @Nullable
-    TlTrue clearDraft();
+    default boolean clearDraft() {
+        return false;
+    }
 
     InputPeer peer();
 

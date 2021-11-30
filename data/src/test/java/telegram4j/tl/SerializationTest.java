@@ -25,8 +25,8 @@ public class SerializationTest {
                 .id(10)
                 .photo(ChatPhotoEmpty.instance())
                 .participantsCount(99)
-                .left(TlTrue.INSTANCE)
-                .callNotEmpty(TlTrue.INSTANCE)
+                .left(true)
+                .callNotEmpty(true)
                 .build();
 
         ByteBuf bytes = TlSerializer.serialize(alloc, expected);
