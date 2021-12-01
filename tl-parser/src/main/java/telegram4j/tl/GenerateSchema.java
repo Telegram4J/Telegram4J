@@ -11,20 +11,4 @@ import java.lang.annotation.*;
 @Target(ElementType.PACKAGE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface GenerateSchema {
-
-    Configuration[] value() default {};
-
-    @Documented
-    @Target(ElementType.PACKAGE)
-    @Retention(RetentionPolicy.SOURCE)
-    @interface Configuration {
-
-        String name();
-
-        String packagePrefix() default "";
-
-        String methodPackagePrefix() default "";
-
-        Class<? extends TlObject> superType() default TlObject.class;
-    }
 }

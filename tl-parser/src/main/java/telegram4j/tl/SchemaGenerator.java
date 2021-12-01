@@ -195,6 +195,15 @@ public class SchemaGenerator extends AbstractProcessor {
         return true;
     }
 
+    @Override
+    public SourceVersion getSupportedSourceVersion() {
+        SupportedSourceVersion sourceVersion = getClass().getAnnotation(SupportedSourceVersion.class);
+        if (sourceVersion != null) {
+            return sourceVersion.value();
+        }
+        return SourceVersion.latestSupported();
+    }
+
     private void finalizeSerialization() {
         Map<String, List<TlEntityObject>> enumTypes = typeTree.entrySet().stream()
                 .filter(e -> e.getValue().stream()
@@ -251,8 +260,6 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     private void generateMethods() {
-        TlSchema schema = schemas.get(schemaIteration);
-
         for (TlEntityObject method : schema.methods()) {
             String name = normalizeName(method.name());
             if (ignoredTypes.contains(name.toLowerCase())) {
@@ -420,7 +427,6 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     private void generateConstructors() {
-        TlSchema schema = schemas.get(schemaIteration);
         Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
 
         for (TlEntityObject constructor : schema.constructors()) {
@@ -621,9 +627,6 @@ public class SchemaGenerator extends AbstractProcessor {
     }
 
     private void generateSuperTypes() {
-
-        TlSchema schema = schemas.get(schemaIteration);
-
         Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
 
         Map<String, Set<TlParam>> superTypes = currTypeTree.entrySet().stream()
@@ -761,15 +764,6 @@ public class SchemaGenerator extends AbstractProcessor {
                 .indent(INDENT)
                 .skipJavaLangImports(true)
                 .build());
-    }
-
-    @Override
-    public SourceVersion getSupportedSourceVersion() {
-        SupportedSourceVersion sourceVersion = getClass().getAnnotation(SupportedSourceVersion.class);
-        if (sourceVersion != null) {
-            return sourceVersion.value();
-        }
-        return SourceVersion.latestSupported();
     }
 
     private void preparePackages() {
