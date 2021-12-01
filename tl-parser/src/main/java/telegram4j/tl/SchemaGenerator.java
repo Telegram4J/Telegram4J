@@ -1,17 +1,18 @@
 package telegram4j.tl;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.squareup.javapoet.*;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.model.JavacElements;
+import com.sun.tools.javac.model.JavacTypes;
+import com.sun.tools.javac.processing.JavacFiler;
+import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
@@ -23,8 +24,6 @@ import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
 import java.io.IOException;
@@ -34,69 +33,95 @@ import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static telegram4j.tl.SchemaGeneratorConsts.*;
-import static telegram4j.tl.Strings.*;
+import static telegram4j.tl.SourceNames.*;
+import static telegram4j.tl.Strings.camelize;
+import static telegram4j.tl.Strings.screamilize;
 
 @SupportedAnnotationTypes("telegram4j.tl.GenerateSchema")
 public class SchemaGenerator extends AbstractProcessor {
 
-    private static final List<String> ignoredTypes = Arrays.asList(
-            "bool", "true", "false", "null", "vector",
-            "jsonvalue", "jsonobjectvalue", "httpwait");
-
-    private static final List<String> primitiveTypes = Arrays.asList(
-            "bool", "true", "vector", "jsonvalue", "jsonobjectvalue");
-
-    private static final String METHOD_PACKAGE_PREFIX = ".request";
-    private static final String MTPROTO_PACKAGE_PREFIX = ".mtproto";
+    private static final String METHOD_PACKAGE_PREFIX = "request";
+    private static final String MTPROTO_PACKAGE_PREFIX = "mtproto";
     private static final String TEMPLATE_PACKAGE_INFO = "package-info.template";
     private static final String UTIL_PACKAGE = "telegram4j.tl";
     private static final String API_SCHEMA = "api.json";
     private static final String MTPROTO_SCHEMA = "mtproto.json";
     private static final String INDENT = "\t";
-    private static final Pattern FLAG_PATTERN = Pattern.compile("^flags\\.(\\d+)\\?(.+)$");
-    private static final Pattern VECTOR_PATTERN = Pattern.compile("^[vV]ector<%?([A-Za-z0-9._<>]+)>$");
-
-    private final List<NameTransformer> namingExceptions = Arrays.asList(
-            NameTransformer.create("messages.StickerSet", "messages.StickerSetWithDocuments"));
 
     private final Map<String, TlEntityObject> computed = new HashMap<>();
 
-    private Filer filer;
+    private JavacFiler filer;
     private Messager messager;
-    private Elements elements;
-    private Types types;
+    private JavacElements elements;
+    private JavacTypes types;
     private Trees trees;
-    private Symbol.PackageSymbol currentElement;
 
-    // api and mtproto schemas
+    private Symbol.PackageSymbol currentElement;
     private TlSchema apiSchema;
     private TlSchema mtprotoSchema;
+    private List<TlSchema> schemas;
     private Map<String, List<TlEntityObject>> typeTree;
+
+    private int iteration;
+    private int schemaIteration;
+    private TlSchema schema;
+
+    // processing resources
+
+    private final Set<String> computedSerializers = new HashSet<>();
+    private final Set<String> computedDeserializers = new HashSet<>();
+    private final Set<String> computedMethodSerializers = new HashSet<>();
+
+    private final TypeSpec.Builder serializer = TypeSpec.classBuilder("TlSerializer")
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addMethod(privateConstructor);
+
+    private final MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
+            .returns(ByteBuf.class)
+            .addTypeVariable(genericType)
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            .addParameter(ByteBufAllocator.class, "allocator")
+            .addParameter(genericType, "payload")
+            .beginControlFlow("switch (payload.identifier())");
+
+    private final TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addMethod(privateConstructor);
+
+    private final MethodSpec.Builder deserializeMethod = MethodSpec.methodBuilder("deserialize")
+            .returns(genericTypeRef)
+            .addTypeVariable(genericTypeRef)
+            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+            .addParameter(ByteBuf.class, "payload")
+            .addStatement("int identifier = payload.readIntLE()")
+            .beginControlFlow("switch (identifier)")
+            // This need because methods can return bool or vector objects
+            .addComment("Primitive types")
+            .addCode("case BOOL_TRUE_ID: return (T) Boolean.TRUE;\n")
+            .addCode("case BOOL_FALSE_ID: return (T) Boolean.FALSE;\n")
+            .addCode("case VECTOR_ID: return (T) deserializeUnknownVector(payload);\n");
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
 
-        this.filer = processingEnv.getFiler();
-        this.messager = processingEnv.getMessager();
-        this.elements = processingEnv.getElementUtils();
-        this.types = processingEnv.getTypeUtils();
-        this.trees = Trees.instance(processingEnv);
+        JavacProcessingEnvironment casted = (JavacProcessingEnvironment) processingEnv;
+        this.filer = casted.getFiler();
+        this.messager = casted.getMessager();
+        this.elements = casted.getElementUtils();
+        this.types = casted.getTypeUtils();
+        this.trees = Trees.instance(casted);
 
         ObjectMapper mapper = JsonMapper.builder()
                 .addModules(new Jdk8Module())
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
                 .visibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.NONE)
                 .visibility(PropertyAccessor.GETTER, JsonAutoDetect.Visibility.PUBLIC_ONLY)
                 .visibility(PropertyAccessor.CREATOR, JsonAutoDetect.Visibility.ANY)
-                .serializationInclusion(JsonInclude.Include.NON_ABSENT)
                 .build();
 
         try {
@@ -108,6 +133,8 @@ public class SchemaGenerator extends AbstractProcessor {
             mtprotoSchema = ImmutableTlSchema.copyOf(mapper.readValue(mtproto, TlSchema.class))
                     .withPackagePrefix(MTPROTO_PACKAGE_PREFIX)
                     .withSuperType(MTProtoObject.class);
+
+            schemas = Arrays.asList(apiSchema, mtprotoSchema);
         } catch (Throwable t) {
             throw Exceptions.propagate(t);
         }
@@ -115,6 +142,10 @@ public class SchemaGenerator extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (roundEnv.processingOver()) {
+            return true;
+        }
+
         if (annotations.size() > 1) {
             messager.printMessage(Diagnostic.Kind.ERROR, "[TL parser] Generation package must be specified once!", currentElement);
             return true;
@@ -133,642 +164,603 @@ public class SchemaGenerator extends AbstractProcessor {
             preparePackages();
         }
 
-        try {
-            // de/serialization methods specs
-
-            Map<String, List<TlEntityObject>> enumTypes = typeTree.entrySet().stream()
-                    .filter(e -> e.getValue().stream()
-                            .mapToInt(c -> c.params().size())
-                            .sum() == 0)
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-            MethodSpec privateConstructor = MethodSpec.constructorBuilder()
-                    .addModifiers(Modifier.PRIVATE)
-                    .build();
-
-            TypeSpec.Builder serializer = TypeSpec.classBuilder("TlSerializer")
-                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                    .addMethod(privateConstructor);
-
-            MethodSpec.Builder serializeMethod = MethodSpec.methodBuilder("serialize")
-                    .returns(ByteBuf.class)
-                    .addTypeVariable(GENERIC_TYPE)
-                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                    .addParameters(Arrays.asList(
-                            ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                            ParameterSpec.builder(GENERIC_TYPE, "payload").build()));
-
-            serializeMethod.beginControlFlow("switch (payload.identifier())");
-
-            TypeSpec.Builder deserializer = TypeSpec.classBuilder("TlDeserializer")
-                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                    .addMethod(privateConstructor);
-
-            TypeVariableName typeVarRef = TypeVariableName.get("T");
-            MethodSpec.Builder deserializeMethod = MethodSpec.methodBuilder("deserialize")
-                    .returns(typeVarRef)
-                    .addTypeVariable(typeVarRef)
-                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                    .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
-
-            deserializeMethod.addStatement("int identifier = payload.readIntLE()");
-            deserializeMethod.beginControlFlow("switch (identifier)");
-
-            // region primitive identifiers
-
-            TypeSpec.Builder primitiveIdentifiers = TypeSpec.classBuilder("TlPrimitives")
-                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                    .addMethod(privateConstructor);
-
-            apiSchema.constructors().stream()
-                    .filter(e -> primitiveTypes.contains(normalizeName(e.type()).toLowerCase()))
-                    .forEach(e -> {
-                        String name = screamilize(e.name()) + "_ID";
-
-                        primitiveIdentifiers.addField(FieldSpec.builder(int.class, name, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                                .initializer("0x" + Integer.toHexString(e.id()))
-                                .build());
-                    });
-
-            writeTo(JavaFile.builder(UTIL_PACKAGE, primitiveIdentifiers.build())
-                    .indent(INDENT)
-                    .skipJavaLangImports(true)
-                    .build());
-
-            // endregion
-
-            // This need because methods can return bool or vector objects
-            // region primitive types
-
-            deserializeMethod.addComment("Primitive types");
-            deserializeMethod.addCode("case BOOL_TRUE_ID: return (T) Boolean.TRUE;\n");
-            deserializeMethod.addCode("case BOOL_FALSE_ID: return (T) Boolean.FALSE;\n");
-            // NOTE: Returned vectors aren't (kind of like) bare,
-            // but we have to skip the identifier because we have already shifted the reader index.
-            deserializeMethod.addCode("case VECTOR_ID: return (T) deserializeUnknownVector(payload);\n");
-
-            // endregion
-
-            Set<String> computedSerializers = new HashSet<>();
-            Set<String> computedDeserializers = new HashSet<>();
-            Set<String> computedMethodSerializers = new HashSet<>();
-
-            for (TlSchema schema : Arrays.asList(apiSchema, mtprotoSchema)) {
-                // region constructors
-
-                Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
-
-                Map<String, Set<TlParam>> superTypes = currTypeTree.entrySet().stream()
-                        .filter(e -> e.getValue().size() > 1)
-                        .collect(Collectors.groupingBy(Map.Entry::getKey,
-                                flatMapping(e -> e.getValue().stream()
-                                                .flatMap(c -> c.params().stream())
-                                                .filter(p -> e.getValue().stream()
-                                                        .allMatch(c -> c.params().contains(p))),
-                                        Collectors.toCollection(LinkedHashSet::new))));
-
-                for (Map.Entry<String, Set<TlParam>> e : superTypes.entrySet()) {
-                    String name = normalizeName(e.getKey());
-                    Set<TlParam> params = e.getValue();
-                    String packageName = getPackageName(e.getKey());
-                    String qualifiedName = e.getKey();
-
-                    boolean canMakeEnum = typeTree.get(qualifiedName).stream()
-                            .mapToInt(c -> c.params().size()).sum() == 0 &&
-                            !name.equals("Object");
-
-                    String shortenName = extractEnumName(qualifiedName);
-
-                    TypeSpec.Builder spec = canMakeEnum
-                            ? TypeSpec.enumBuilder(name)
-                            : TypeSpec.interfaceBuilder(name);
-
-                    spec.addModifiers(Modifier.PUBLIC);
-                    spec.addSuperinterface(schema.superType());
-
-                    if (canMakeEnum) {
-
-                        MethodSpec.Builder ofMethod = MethodSpec.methodBuilder("of")
-                                .addParameter(int.class, "identifier")
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(ClassName.get(packageName, name))
-                                .beginControlFlow("switch (identifier)");
-
-                        for (TlEntityObject constructor : typeTree.get(qualifiedName)) {
-                            String subtypeName = normalizeName(constructor.name());
-                            String constName = screamilize(subtypeName.substring(shortenName.length()));
-
-                            spec.addEnumConstant(constName, TypeSpec.anonymousClassBuilder(
-                                            "$L", "0x" + Integer.toHexString(constructor.id()))
-                                    .build());
-
-                            ofMethod.addCode("case $L: return $L;\n",
-                                    "0x" + Integer.toHexString(constructor.id()),
-                                    constName);
-
-                            String packageNameRaw = getPackageName(constructor.name());
-                            String enumPackageName = packageNameRaw.replace(packageNameRaw,
-                                    packageNameRaw + schema.packagePrefix());
-                            computed.put(enumPackageName + "." + subtypeName, constructor);
-                        }
-
-                        spec.addField(int.class, "identifier", Modifier.PRIVATE, Modifier.FINAL);
-
-                        spec.addMethod(MethodSpec.constructorBuilder()
-                                .addParameter(int.class, "identifier")
-                                .addStatement("this.identifier = identifier")
-                                .build());
-
-                        ofMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
-                                "Incorrect type identifier: 0x");
-                        ofMethod.endControlFlow();
-
-                        spec.addMethod(MethodSpec.methodBuilder("identifier")
-                                .addAnnotation(Override.class)
-                                .returns(TypeName.INT)
-                                .addModifiers(Modifier.PUBLIC)
-                                .addCode("return identifier;")
-                                .build());
-
-                        spec.addMethod(ofMethod.build());
-                    } else {
-
-                        for (TlParam param : params) {
-                            if (param.type().equals("#")) {
-                                continue;
-                            }
-
-                            TypeName paramType = parseType(param.type(), schema);
-                            boolean optionalInExt = typeTree.get(qualifiedName).stream()
-                                    .flatMap(c -> c.params().stream())
-                                    .anyMatch(p -> p.type().startsWith("flags.") &&
-                                            p.name().equals(param.name()));
-
-                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param))
-                                    .addModifiers(Modifier.PUBLIC);
-
-                            if (param.type().startsWith("flags.")) {
-                                if (param.type().endsWith("true")) {
-                                    attribute.addModifiers(Modifier.DEFAULT);
-                                    attribute.addCode("return false;");
-                                } else {
-                                    paramType = paramType.box();
-                                    attribute.addAnnotation(Nullable.class);
-                                    attribute.addModifiers(Modifier.ABSTRACT);
-                                }
-                            } else if (optionalInExt) {
-                                paramType = paramType.box();
-                                attribute.addAnnotation(Nullable.class);
-                                attribute.addModifiers(Modifier.ABSTRACT);
-                            } else {
-                                attribute.addModifiers(Modifier.ABSTRACT);
-                            }
-
-                            spec.addMethod(attribute.returns(paramType)
-                                    .build());
-                        }
-                    }
-
-                    writeTo(JavaFile.builder(packageName, spec.build())
-                            .indent(INDENT)
-                            .skipJavaLangImports(true)
-                            .build());
+        switch (iteration) {
+            case 0:
+                generatePrimitives();
+                iteration++;
+                break;
+            case 1:
+                generateSuperTypes();
+                iteration++;
+                break;
+            case 2:
+                generateConstructors();
+                iteration++;
+                break;
+            case 3:
+                generateMethods();
+                if (++schemaIteration >= schemas.size()) {
+                    iteration = 4;
+                } else { // *new* generation round
+                    schema = schemas.get(schemaIteration);
+                    iteration = 1;
                 }
-
-                for (TlEntityObject constructor : schema.constructors()) {
-                    String type = normalizeName(constructor.type());
-                    String name = normalizeName(constructor.name());
-                    String packageNameRaw = getPackageName(constructor.type());
-                    String packageName = packageNameRaw.replace(packageNameRaw,
-                            packageNameRaw + schema.packagePrefix());
-                    String qualifiedTypeName = packageName + "." + type;
-
-                    boolean multiple = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
-
-                    // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
-                    if (type.equalsIgnoreCase(name) && multiple) {
-                        name = "Base" + name;
-                    } else if (!multiple && !type.equals("Object")) { // use type name if this object type is singleton
-                        name = type;
-                    }
-
-                    if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(packageName + "." + name)) {
-                        continue;
-                    }
-
-                    TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
-                            .addModifiers(Modifier.PUBLIC);
-
-                    ClassName customType = awareSuperType(name);
-                    if (customType != null) {
-                        spec.addSuperinterface(customType);
-                    }
-
-                    if (multiple) {
-                        spec.addSuperinterface(ClassName.get(packageName, type));
-                    } else {
-                        spec.addSuperinterface(schema.superType());
-                    }
-
-                    spec.addField(FieldSpec.builder(TypeName.INT, "ID",
-                                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .initializer("0x" + Integer.toHexString(constructor.id()))
-                            .build());
-
-                    spec.addMethod(MethodSpec.methodBuilder("builder")
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .returns(ClassName.get(packageName, "Immutable" + name, "Builder"))
-                            .addCode("return Immutable$L.builder();", name)
-                            .build());
-
-                    Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
-                    collectAttributesRecursive(type, attributes);
-
-                    boolean singleton = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
-                    AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
-                    if (singleton) {
-                        value.addMember("singleton", "true");
-
-                        spec.addMethod(MethodSpec.methodBuilder("instance")
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(ClassName.get(packageName, "Immutable" + name))
-                                .addCode("return Immutable$L.of();", name)
-                                .build());
-                    }
-                    spec.addAnnotation(value.build());
-
-                    spec.addMethod(MethodSpec.methodBuilder("identifier")
-                            .addAnnotation(Override.class)
-                            .returns(TypeName.INT)
-                            .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                            .addCode("return ID;")
-                            .build());
-
-                    // serialization
-                    String serializeMethodName0 = "serialize" + name;
-                    String serializeMethodName = serializeMethodName0;
-                    if (computedSerializers.contains(serializeMethodName0)) {
-                        if (schema.packagePrefix().isEmpty()) {
-                            continue;
-                        }
-                        char up = schema.packagePrefix().charAt(0);
-                        serializeMethodName = "serialize" + Character.toUpperCase(up)
-                                + schema.packagePrefix().substring(1) + name;
-                    }
-
-                    computedSerializers.add(serializeMethodName);
-
-                    TypeName payloadType = ClassName.get(packageName, name);
-                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
-                            "0x" + Integer.toHexString(constructor.id()),
-                            serializeMethodName, payloadType);
-
-                    MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(serializeMethodName)
-                            .returns(ByteBuf.class)
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .addParameters(Arrays.asList(
-                                    ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(payloadType, "payload").build()));
-
-                    serializerBuilder.addCode("return allocator.buffer()\n");
-                    serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
-
-                    // deserialization
-                    String deserializeMethodName0 = "deserialize" + name;
-                    String deserializeMethodName = deserializeMethodName0;
-                    if (computedDeserializers.contains(deserializeMethodName0)) {
-                        if (schema.packagePrefix().isEmpty()) {
-                            continue;
-                        }
-                        char up = schema.packagePrefix().charAt(0);
-                        deserializeMethodName = "deserialize" + Character.toUpperCase(up)
-                                + schema.packagePrefix().substring(1) + name;
-                    }
-
-                    computedDeserializers.add(deserializeMethodName);
-
-                    TypeName typeName = ClassName.get(packageName, "Immutable" + name);
-                    if (attributes.isEmpty()) {
-                        deserializeMethod.addCode("case $L: return (T) $T.of();\n",
-                                "0x" + Integer.toHexString(constructor.id()), typeName);
-                    } else {
-                        deserializeMethod.addCode("case $L: return (T) $L(payload);\n",
-                                "0x" + Integer.toHexString(constructor.id()), deserializeMethodName);
-
-                        MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(deserializeMethodName)
-                                .returns(typeName)
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
-
-                        boolean withFlags = attributes.contains(FLAG_PARAMETER);
-                        if (withFlags) {
-                            ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
-                            deserializerBuilder.addCode("$T builder = $T.builder();\n", builder, typeName);
-                            deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
-                            deserializerBuilder.addCode("return builder");
-                        } else {
-                            deserializerBuilder.addCode("return $T.builder()", typeName);
-                        }
-
-                        for (TlParam param : attributes) {
-                            String paramName = formatFieldName(param);
-                            String paramTypeLower = param.type().toLowerCase();
-
-                            // serialization
-                            String method0 = serializeMethod(constructor, param);
-                            if (method0 != null) {
-                                serializerBuilder.addCode("\n\t\t." + method0, paramName);
-                            }
-
-                            // deserialization
-                            if (param.type().equals("#")) {
-                                continue;
-                            }
-
-                            String unwrapping = deserializeMethod(paramTypeLower);
-                            deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
-
-                            TypeName paramType = parseType(param.type(), schema);
-
-                            MethodSpec.Builder attribute = MethodSpec.methodBuilder(paramName)
-                                    .addModifiers(Modifier.PUBLIC);
-
-                            boolean optionalInExt = typeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
-                                    .filter(c -> normalizeName(c.name()).equals(normalizeName(c.type())))
-                                    .flatMap(c -> c.params().stream())
-                                    .anyMatch(p -> p.type().startsWith("flags.") &&
-                                            p.name().equals(param.name()));
-
-                            if (param.type().startsWith("flags.")) {
-                                if (param.type().endsWith("true")) {
-                                    attribute.addModifiers(Modifier.DEFAULT);
-                                    attribute.addCode("return false;");
-                                } else {
-                                    paramType = paramType.box();
-                                    attribute.addAnnotation(Nullable.class);
-                                    attribute.addModifiers(Modifier.ABSTRACT);
-                                }
-                            } else if (optionalInExt) {
-                                paramType = paramType.box();
-                                attribute.addAnnotation(Nullable.class);
-                                attribute.addModifiers(Modifier.ABSTRACT);
-                            } else {
-                                attribute.addModifiers(Modifier.ABSTRACT);
-                            }
-
-                            spec.addMethod(attribute.returns(paramType)
-                                    .build());
-                        }
-
-                        deserializerBuilder.addCode("\n\t\t.build();");
-                        deserializer.addMethod(deserializerBuilder.build());
-                    }
-
-                    serializerBuilder.addCode(";");
-                    serializer.addMethod(serializerBuilder.build());
-
-                    writeTo(JavaFile.builder(packageName, spec.build())
-                            .indent(INDENT)
-                            .skipJavaLangImports(true)
-                            .build());
-
-                    computed.put(packageName + "." + name, constructor);
-                }
-
-                // endregion
-                // region methods
-
-                for (TlEntityObject method : schema.methods()) {
-                    String name = normalizeName(method.name());
-                    if (ignoredTypes.contains(name.toLowerCase())) {
-                        continue;
-                    }
-
-                    String packageNameRaw = getBasePackageName();
-                    String packageName = getPackageName(method.name())
-                            .replace(packageNameRaw, packageNameRaw
-                                    + METHOD_PACKAGE_PREFIX + schema.packagePrefix());
-
-                    boolean generic = method.params().stream()
-                            .anyMatch(p -> p.type().equals("!X"));
-
-                    TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
-                            .addModifiers(Modifier.PUBLIC);
-
-                    if (generic) {
-                        spec.addTypeVariable(TypeVariableName.get("T", schema.superType()));
-                    }
-
-                    TypeName returnType = ParameterizedTypeName.get(
-                            ClassName.get(TlMethod.class),
-                            parseType(method.type(), schema).box());
-
-                    ClassName customType = awareSuperType(name);
-                    if (customType != null) {
-                        spec.addSuperinterface(customType);
-                    }
-
-                    spec.addSuperinterface(returnType);
-                    if (schema.superType() != TlObject.class) {
-                        spec.addSuperinterface(schema.superType());
-                    }
-
-                    spec.addField(FieldSpec.builder(TypeName.INT, "ID",
-                                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
-                            .initializer("0x" + Integer.toHexString(method.id()))
-                            .build());
-
-                    ClassName immutableTypeRaw = ClassName.get(packageName, "Immutable" + name);
-                    ClassName immutableTypeBuilderRaw = ClassName.get(packageName, "Immutable" + name, "Builder");
-                    TypeName immutableType = generic ? ParameterizedTypeName.get(immutableTypeRaw, GENERIC_TYPE_REF) : immutableTypeRaw;
-                    TypeName immutableBuilderType = generic
-                            ? ParameterizedTypeName.get(immutableTypeBuilderRaw, GENERIC_TYPE_REF)
-                            : immutableTypeBuilderRaw;
-
-                    MethodSpec.Builder builder = MethodSpec.methodBuilder("builder")
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .returns(immutableBuilderType)
-                            .addCode("return $T.builder();", immutableTypeRaw);
-
-                    if (generic) {
-                        builder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
-                    }
-
-                    spec.addMethod(builder.build());
-
-                    AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
-
-                    boolean singleton = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
-                    if (singleton) {
-                        value.addMember("singleton", "true");
-
-                        MethodSpec.Builder instance = MethodSpec.methodBuilder("instance")
-                                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                                .returns(immutableType)
-                                .addCode("return $T.of();", immutableTypeRaw);
-
-                        if (generic) {
-                            instance.addTypeVariable(TypeVariableName.get("T", schema.superType()));
-                        }
-
-                        spec.addMethod(instance.build());
-                    }
-
-                    spec.addAnnotation(value.build());
-
-                    spec.addMethod(MethodSpec.methodBuilder("identifier")
-                            .addAnnotation(Override.class)
-                            .returns(TypeName.INT)
-                            .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
-                            .addCode("return ID;")
-                            .build());
-
-                    // serialization
-                    String methodName0 = "serialize" + name;
-                    String methodName = methodName0;
-                    if (computedMethodSerializers.contains(methodName0)) {
-                        String prx = schema.packagePrefix();
-                        if (prx.isEmpty()) {
-                            String mname = method.name();
-                            prx = camelize(mname.substring(0, mname.lastIndexOf('.')));
-                        }
-                        char up = prx.charAt(0);
-                        methodName = "serialize" + Character.toUpperCase(up) + prx.substring(1) + name;
-                    }
-
-                    computedMethodSerializers.add(methodName);
-
-                    ClassName typeRaw = ClassName.get(packageName, name);
-                    TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(schema.superType())) : typeRaw;
-
-                    serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
-                            "0x" + Integer.toHexString(method.id()),
-                            methodName, type);
-
-                    TypeName payloadType = generic ? ParameterizedTypeName.get(typeRaw, GENERIC_TYPE_REF) : typeRaw;
-
-                    MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
-                            .returns(ByteBuf.class)
-                            .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                            .addParameters(Arrays.asList(
-                                    ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
-                                    ParameterSpec.builder(payloadType, "payload").build()));
-
-                    if (generic) {
-                        serializerBuilder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
-                    }
-
-                    serializerBuilder.addCode("return allocator.buffer()\n");
-                    serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
-
-                    for (TlParam param : method.params()) {
-                        String paramName = formatFieldName(param);
-
-                        String method0 = serializeMethod(method, param);
-                        if (method0 != null) {
-                            serializerBuilder.addCode("\n\t\t." + method0, paramName);
-                        }
-
-                        if (param.type().equals("#")) {
-                            continue;
-                        }
-
-                        TypeName paramType = parseType(param.type(), schema);
-
-                        MethodSpec.Builder attribute = MethodSpec.methodBuilder(paramName)
-                                .addModifiers(Modifier.PUBLIC);
-
-                        if (param.type().startsWith("flags.")) {
-                            if (param.type().endsWith("true")) {
-                                attribute.addModifiers(Modifier.DEFAULT);
-                                attribute.addCode("return false;");
-                            } else {
-                                paramType = paramType.box();
-                                attribute.addAnnotation(Nullable.class);
-                                attribute.addModifiers(Modifier.ABSTRACT);
-                            }
-                        } else {
-                            attribute.addModifiers(Modifier.ABSTRACT);
-                        }
-
-                        spec.addMethod(attribute
-                                .returns(paramType)
-                                .build());
-                    }
-
-                    serializerBuilder.addCode(";");
-
-                    serializer.addMethod(serializerBuilder.build());
-
-                    writeTo(JavaFile.builder(packageName, spec.build())
-                            .indent(INDENT)
-                            .skipJavaLangImports(true)
-                            .build());
-                }
-
-                // endregion
-            }
-
-            // Enums serialization
-            for (Iterator<List<TlEntityObject>> it = enumTypes.values().iterator(); it.hasNext(); ) {
-                List<TlEntityObject> chunk = it.next();
-                for (int i = 0; i < chunk.size(); i++) {
-                    int id = chunk.get(i).id();
-
-                    String sep = "\n";
-                    if (i + 1 == chunk.size() && !it.hasNext()) {
-                        sep = " return allocator.buffer().writeIntLE(payload.identifier());\n";
-                    }
-                    serializeMethod.addCode("case $L:" + sep, "0x" + Integer.toHexString(id));
-                }
-            }
-
-            serializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(payload.identifier()));\n",
-                    "Incorrect TlObject identifier: 0x");
-            serializeMethod.endControlFlow();
-            serializer.addMethod(serializeMethod.build());
-
-            writeTo(JavaFile.builder(getBasePackageName(), serializer.build())
-                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
-                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlPrimitives"), "*")
-                    .indent(INDENT)
-                    .skipJavaLangImports(true)
-                    .build());
-
-            // Enums deserialization
-            for (Map.Entry<String, List<TlEntityObject>> entry : enumTypes.entrySet()) {
-                String enumType = entry.getKey();
-                List<TlEntityObject> chunk = entry.getValue();
-
-                for (int i = 0; i < chunk.size(); i++) {
-                    TlEntityObject obj = chunk.get(i);
-                    if (i + 1 == chunk.size()) {
-                        String type = normalizeName(obj.type());
-                        deserializeMethod.addCode("case $L: return (T) $T.of(identifier);\n", "0x" + Integer.toHexString(obj.id()),
-                                ClassName.get(getPackageName(enumType), type));
-                    } else {
-                        deserializeMethod.addCode("case $L:\n", "0x" + Integer.toHexString(obj.id()));
-                    }
-                }
-            }
-
-            deserializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
-                    "Incorrect TlObject identifier: 0x");
-            deserializeMethod.endControlFlow();
-            deserializer.addMethod(deserializeMethod.build());
-
-            writeTo(JavaFile.builder(getBasePackageName(), deserializer.build())
-                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
-                    .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlPrimitives"), "*")
-                    .indent(INDENT)
-                    .skipJavaLangImports(true)
-                    .build());
-
-        } catch (Throwable t) {
-            throw Exceptions.propagate(t);
+                break;
+            case 4:
+                finalizeSerialization();
+                iteration++; // end
+                break;
         }
 
         return true;
+    }
+
+    private void finalizeSerialization() {
+        Map<String, List<TlEntityObject>> enumTypes = typeTree.entrySet().stream()
+                .filter(e -> e.getValue().stream()
+                        .mapToInt(c -> c.params().size())
+                        .sum() == 0)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        for (Iterator<Map.Entry<String, List<TlEntityObject>>> it = enumTypes.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<String, List<TlEntityObject>> e = it.next();
+            String packageName = parentPackageName(e.getKey());
+
+            List<TlEntityObject> chunk = e.getValue();
+            for (int i = 0; i < chunk.size(); i++) {
+                TlEntityObject obj = chunk.get(i);
+
+                String idStr = "0x" + Integer.toHexString(obj.id());
+                if (i + 1 == chunk.size()) {
+                    if (!it.hasNext()) {
+                        serializeMethod.addCode("case $L: return allocator.buffer().writeIntLE(payload.identifier());\n", idStr);
+                    }
+                    String type = normalizeName(obj.type());
+                    deserializeMethod.addCode("case $L: return (T) $T.of(identifier);\n", idStr,
+                            ClassName.get(packageName, type));
+                } else {
+                    deserializeMethod.addCode("case $L:\n", idStr);
+                    serializeMethod.addCode("case $L:\n", idStr);
+                }
+            }
+        }
+
+        serializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(payload.identifier()));\n",
+                "Incorrect TlObject identifier: 0x");
+        serializeMethod.endControlFlow();
+        serializer.addMethod(serializeMethod.build());
+
+        writeTo(JavaFile.builder(getBasePackageName(), serializer.build())
+                .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
+                .addStaticImport(ClassName.get(getBasePackageName(), "TlPrimitives"), "*")
+                .indent(INDENT)
+                .skipJavaLangImports(true)
+                .build());
+
+        deserializeMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
+                "Incorrect TlObject identifier: 0x");
+        deserializeMethod.endControlFlow();
+        deserializer.addMethod(deserializeMethod.build());
+
+        writeTo(JavaFile.builder(getBasePackageName(), deserializer.build())
+                .addStaticImport(ClassName.get(UTIL_PACKAGE, "TlSerialUtil"), "*")
+                .addStaticImport(ClassName.get(getBasePackageName(), "TlPrimitives"), "*")
+                .indent(INDENT)
+                .skipJavaLangImports(true)
+                .build());
+    }
+
+    private void generateMethods() {
+        TlSchema schema = schemas.get(schemaIteration);
+
+        for (TlEntityObject method : schema.methods()) {
+            String name = normalizeName(method.name());
+            if (ignoredTypes.contains(name.toLowerCase())) {
+                continue;
+            }
+
+            String packageName = getPackageName(schema, method.name(), true);
+
+            boolean generic = method.params().stream()
+                    .anyMatch(p -> p.type().equals("!X"));
+
+            TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
+                    .addModifiers(Modifier.PUBLIC);
+
+            if (generic) {
+                spec.addTypeVariable(TypeVariableName.get("T", schema.superType()));
+            }
+
+            TypeName returnType = ParameterizedTypeName.get(
+                    ClassName.get(TlMethod.class),
+                    parseType(method.type(), schema).box());
+
+            ClassName customType = awareSuperType(name);
+            if (customType != null) {
+                spec.addSuperinterface(customType);
+            }
+
+            spec.addSuperinterface(returnType);
+            if (schema.superType() != TlObject.class) {
+                spec.addSuperinterface(schema.superType());
+            }
+
+            spec.addField(FieldSpec.builder(TypeName.INT, "ID",
+                            Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                    .initializer("0x" + Integer.toHexString(method.id()))
+                    .build());
+
+            ClassName immutableTypeRaw = ClassName.get(packageName, "Immutable" + name);
+            ClassName immutableTypeBuilderRaw = ClassName.get(packageName, "Immutable" + name, "Builder");
+            TypeName immutableType = generic ? ParameterizedTypeName.get(immutableTypeRaw, genericTypeRef) : immutableTypeRaw;
+            TypeName immutableBuilderType = generic
+                    ? ParameterizedTypeName.get(immutableTypeBuilderRaw, genericTypeRef)
+                    : immutableTypeBuilderRaw;
+
+            MethodSpec.Builder builder = MethodSpec.methodBuilder("builder")
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .returns(immutableBuilderType)
+                    .addCode("return $T.builder();", immutableTypeRaw);
+
+            if (generic) {
+                builder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
+            }
+
+            spec.addMethod(builder.build());
+
+            AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
+
+            boolean singleton = method.params().stream().allMatch(p -> p.type().startsWith("flags."));
+            if (singleton) {
+                value.addMember("singleton", "true");
+
+                MethodSpec.Builder instance = MethodSpec.methodBuilder("instance")
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .returns(immutableType)
+                        .addCode("return $T.of();", immutableTypeRaw);
+
+                if (generic) {
+                    instance.addTypeVariable(TypeVariableName.get("T", schema.superType()));
+                }
+
+                spec.addMethod(instance.build());
+            }
+
+            spec.addAnnotation(value.build());
+
+            spec.addMethod(MethodSpec.methodBuilder("identifier")
+                    .addAnnotation(Override.class)
+                    .returns(TypeName.INT)
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .addCode("return ID;")
+                    .build());
+
+            // serialization
+            String methodName0 = "serialize" + name;
+            String methodName = methodName0;
+            if (computedMethodSerializers.contains(methodName0)) {
+                String prx = schema.packagePrefix();
+                if (prx.isEmpty()) {
+                    String mname = method.name();
+                    prx = camelize(mname.substring(0, mname.lastIndexOf('.')));
+                }
+                char up = prx.charAt(0);
+                methodName = "serialize" + Character.toUpperCase(up) + prx.substring(1) + name;
+            }
+
+            computedMethodSerializers.add(methodName);
+
+            ClassName typeRaw = ClassName.get(packageName, name);
+            TypeName type = generic ? ParameterizedTypeName.get(typeRaw, ClassName.get(schema.superType())) : typeRaw;
+
+            serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
+                    "0x" + Integer.toHexString(method.id()),
+                    methodName, type);
+
+            TypeName payloadType = generic ? ParameterizedTypeName.get(typeRaw, genericTypeRef) : typeRaw;
+
+            MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(methodName)
+                    .returns(ByteBuf.class)
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .addParameters(Arrays.asList(
+                            ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                            ParameterSpec.builder(payloadType, "payload").build()));
+
+            if (generic) {
+                serializerBuilder.addTypeVariable(TypeVariableName.get("T", schema.superType()));
+            }
+
+            serializerBuilder.addCode("return allocator.buffer()\n");
+            serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
+
+            for (TlParam param : method.params()) {
+                String paramName = formatFieldName(param);
+
+                String method0 = serializeMethod(method, param);
+                if (method0 != null) {
+                    serializerBuilder.addCode("\n\t\t." + method0, paramName);
+                }
+
+                if (param.type().equals("#")) {
+                    continue;
+                }
+
+                TypeName paramType = parseType(param.type(), schema);
+
+                MethodSpec.Builder attribute = MethodSpec.methodBuilder(paramName)
+                        .addModifiers(Modifier.PUBLIC);
+
+                if (param.type().startsWith("flags.")) {
+                    if (param.type().endsWith("true")) {
+                        attribute.addModifiers(Modifier.DEFAULT);
+                        attribute.addCode("return false;");
+                    } else {
+                        paramType = paramType.box();
+                        attribute.addAnnotation(Nullable.class);
+                        attribute.addModifiers(Modifier.ABSTRACT);
+                    }
+                } else {
+                    attribute.addModifiers(Modifier.ABSTRACT);
+                }
+
+                spec.addMethod(attribute
+                        .returns(paramType)
+                        .build());
+            }
+
+            serializerBuilder.addCode(";");
+
+            serializer.addMethod(serializerBuilder.build());
+
+            writeTo(JavaFile.builder(packageName, spec.build())
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+        }
+    }
+
+    private void generateConstructors() {
+        TlSchema schema = schemas.get(schemaIteration);
+        Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
+
+        for (TlEntityObject constructor : schema.constructors()) {
+            String type = normalizeName(constructor.type());
+            String name = normalizeName(constructor.name());
+            String packageName = getPackageName(schema, constructor.type(), false);
+            String qualifiedTypeName = packageName + "." + type;
+
+            boolean multiple = currTypeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).size() > 1;
+
+            // add Base* prefix to prevent matching with supertype name, e.g. SecureValueError
+            if (type.equalsIgnoreCase(name) && multiple) {
+                name = "Base" + name;
+            } else if (!multiple && !type.equals("Object")) { // use type name if this object type is singleton
+                name = type;
+            }
+
+            if (ignoredTypes.contains(type.toLowerCase()) || computed.containsKey(packageName + "." + name)) {
+                continue;
+            }
+
+            TypeSpec.Builder spec = TypeSpec.interfaceBuilder(name)
+                    .addModifiers(Modifier.PUBLIC);
+
+            ClassName customType = awareSuperType(name);
+            if (customType != null) {
+                spec.addSuperinterface(customType);
+            }
+
+            if (multiple) {
+                spec.addSuperinterface(ClassName.get(packageName, type));
+            } else {
+                spec.addSuperinterface(schema.superType());
+            }
+
+            spec.addField(FieldSpec.builder(TypeName.INT, "ID",
+                            Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                    .initializer("0x" + Integer.toHexString(constructor.id()))
+                    .build());
+
+            spec.addMethod(MethodSpec.methodBuilder("builder")
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .returns(ClassName.get(packageName, "Immutable" + name, "Builder"))
+                    .addCode("return Immutable$L.builder();", name)
+                    .build());
+
+            Set<TlParam> attributes = new LinkedHashSet<>(constructor.params());
+            collectAttributesRecursive(type, attributes);
+
+            boolean singleton = attributes.stream().allMatch(p -> p.type().startsWith("flags."));
+            AnnotationSpec.Builder value = AnnotationSpec.builder(Value.Immutable.class);
+            if (singleton) {
+                value.addMember("singleton", "true");
+
+                spec.addMethod(MethodSpec.methodBuilder("instance")
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .returns(ClassName.get(packageName, "Immutable" + name))
+                        .addCode("return Immutable$L.of();", name)
+                        .build());
+            }
+            spec.addAnnotation(value.build());
+
+            spec.addMethod(MethodSpec.methodBuilder("identifier")
+                    .addAnnotation(Override.class)
+                    .returns(TypeName.INT)
+                    .addModifiers(Modifier.PUBLIC, Modifier.DEFAULT)
+                    .addCode("return ID;")
+                    .build());
+
+            // serialization
+            String serializeMethodName = "serialize" + name;
+            if (computedSerializers.contains(serializeMethodName)) {
+                String prx = schema.packagePrefix();
+                if (prx.isEmpty()) {
+                    prx = camelize(parentPackageName(constructor.name()));
+                }
+                char up = prx.charAt(0);
+                serializeMethodName = "serialize" + Character.toUpperCase(up) + prx.substring(1) + name;
+            }
+
+            computedSerializers.add(serializeMethodName);
+
+            TypeName payloadType = ClassName.get(packageName, name);
+            serializeMethod.addCode("case $L: return $L(allocator, ($T) payload);\n",
+                    "0x" + Integer.toHexString(constructor.id()),
+                    serializeMethodName, payloadType);
+
+            MethodSpec.Builder serializerBuilder = MethodSpec.methodBuilder(serializeMethodName)
+                    .returns(ByteBuf.class)
+                    .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                    .addParameters(Arrays.asList(
+                            ParameterSpec.builder(ByteBufAllocator.class, "allocator").build(),
+                            ParameterSpec.builder(payloadType, "payload").build()));
+
+            serializerBuilder.addCode("return allocator.buffer()\n");
+            serializerBuilder.addCode("\t\t.writeIntLE(payload.identifier())");
+
+            // deserialization
+            String deserializeMethodName = "deserialize" + name;
+            if (computedDeserializers.contains(deserializeMethodName)) {
+                String prx = schema.packagePrefix();
+                if (prx.isEmpty()) {
+                    prx = camelize(parentPackageName(constructor.name()));
+                }
+                char up = prx.charAt(0);
+                deserializeMethodName = "deserialize" + Character.toUpperCase(up) + prx.substring(1) + name;
+            }
+
+            computedDeserializers.add(deserializeMethodName);
+
+            TypeName typeName = ClassName.get(packageName, "Immutable" + name);
+            if (attributes.isEmpty()) {
+                deserializeMethod.addCode("case $L: return (T) $T.of();\n",
+                        "0x" + Integer.toHexString(constructor.id()), typeName);
+            } else {
+                deserializeMethod.addCode("case $L: return (T) $L(payload);\n",
+                        "0x" + Integer.toHexString(constructor.id()), deserializeMethodName);
+
+                MethodSpec.Builder deserializerBuilder = MethodSpec.methodBuilder(deserializeMethodName)
+                        .returns(typeName)
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .addParameter(ParameterSpec.builder(ByteBuf.class, "payload").build());
+
+                boolean withFlags = attributes.contains(flagParameter);
+                if (withFlags) {
+                    ClassName builder = ClassName.get(packageName, "Immutable" + name, "Builder");
+                    deserializerBuilder.addCode("$T builder = $T.builder();\n", builder, typeName);
+                    deserializerBuilder.addCode("int flags = payload.readIntLE();\n");
+                    deserializerBuilder.addCode("return builder");
+                } else {
+                    deserializerBuilder.addCode("return $T.builder()", typeName);
+                }
+
+                for (TlParam param : attributes) {
+                    String paramName = formatFieldName(param);
+                    String paramTypeLower = param.type().toLowerCase();
+
+                    // serialization
+                    String method0 = serializeMethod(constructor, param);
+                    if (method0 != null) {
+                        serializerBuilder.addCode("\n\t\t." + method0, paramName);
+                    }
+
+                    // deserialization
+                    if (param.type().equals("#")) {
+                        continue;
+                    }
+
+                    String unwrapping = deserializeMethod(paramTypeLower);
+                    deserializerBuilder.addCode("\n\t\t.$L(" + unwrapping + ")", paramName);
+
+                    TypeName paramType = parseType(param.type(), schema);
+
+                    MethodSpec.Builder attribute = MethodSpec.methodBuilder(paramName)
+                            .addModifiers(Modifier.PUBLIC);
+
+                    boolean optionalInExt = currTypeTree.getOrDefault(qualifiedTypeName, Collections.emptyList()).stream()
+                            .filter(c -> normalizeName(c.name()).equals(normalizeName(c.type())))
+                            .flatMap(c -> c.params().stream())
+                            .anyMatch(p -> p.type().startsWith("flags.") &&
+                                    p.name().equals(param.name()));
+
+                    if (param.type().startsWith("flags.")) {
+                        if (param.type().endsWith("true")) {
+                            attribute.addModifiers(Modifier.DEFAULT);
+                            attribute.addCode("return false;");
+                        } else {
+                            paramType = paramType.box();
+                            attribute.addAnnotation(Nullable.class);
+                            attribute.addModifiers(Modifier.ABSTRACT);
+                        }
+                    } else if (optionalInExt) {
+                        paramType = paramType.box();
+                        attribute.addAnnotation(Nullable.class);
+                        attribute.addModifiers(Modifier.ABSTRACT);
+                    } else {
+                        attribute.addModifiers(Modifier.ABSTRACT);
+                    }
+
+                    spec.addMethod(attribute.returns(paramType)
+                            .build());
+                }
+
+                deserializerBuilder.addCode("\n\t\t.build();");
+                deserializer.addMethod(deserializerBuilder.build());
+            }
+
+            serializerBuilder.addCode(";");
+            serializer.addMethod(serializerBuilder.build());
+
+            writeTo(JavaFile.builder(packageName, spec.build())
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+
+            computed.put(packageName + "." + name, constructor);
+        }
+    }
+
+    private void generateSuperTypes() {
+
+        TlSchema schema = schemas.get(schemaIteration);
+
+        Map<String, List<TlEntityObject>> currTypeTree = collectTypeTree(schema);
+
+        Map<String, Set<TlParam>> superTypes = currTypeTree.entrySet().stream()
+                .filter(e -> e.getValue().size() > 1)
+                .collect(Collectors.groupingBy(Map.Entry::getKey,
+                        flatMapping(e -> e.getValue().stream()
+                                        .flatMap(c -> c.params().stream())
+                                        .filter(p -> e.getValue().stream()
+                                                .allMatch(c -> c.params().contains(p))),
+                                Collectors.toCollection(LinkedHashSet::new))));
+
+        for (Map.Entry<String, Set<TlParam>> e : superTypes.entrySet()) {
+            String name = normalizeName(e.getKey());
+            Set<TlParam> params = e.getValue();
+            String packageName = parentPackageName(e.getKey());
+            String qualifiedName = e.getKey();
+
+            boolean canMakeEnum = currTypeTree.get(qualifiedName).stream()
+                    .mapToInt(c -> c.params().size()).sum() == 0 &&
+                    !name.equals("Object");
+
+            String shortenName = extractEnumName(qualifiedName);
+
+            TypeSpec.Builder spec = canMakeEnum
+                    ? TypeSpec.enumBuilder(name)
+                    : TypeSpec.interfaceBuilder(name);
+
+            spec.addModifiers(Modifier.PUBLIC);
+            spec.addSuperinterface(schema.superType());
+
+            if (canMakeEnum) {
+
+                MethodSpec.Builder ofMethod = MethodSpec.methodBuilder("of")
+                        .addParameter(int.class, "identifier")
+                        .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
+                        .returns(ClassName.get(packageName, name))
+                        .beginControlFlow("switch (identifier)");
+
+                for (TlEntityObject constructor : currTypeTree.get(qualifiedName)) {
+                    String subtypeName = normalizeName(constructor.name());
+                    String constName = screamilize(subtypeName.substring(shortenName.length()));
+
+                    spec.addEnumConstant(constName, TypeSpec.anonymousClassBuilder(
+                                    "$L", "0x" + Integer.toHexString(constructor.id()))
+                            .build());
+
+                    ofMethod.addCode("case $L: return $L;\n",
+                            "0x" + Integer.toHexString(constructor.id()),
+                            constName);
+
+                    computed.put(packageName + "." + subtypeName, constructor);
+                }
+
+                spec.addField(int.class, "identifier", Modifier.PRIVATE, Modifier.FINAL);
+
+                spec.addMethod(MethodSpec.constructorBuilder()
+                        .addParameter(int.class, "identifier")
+                        .addStatement("this.identifier = identifier")
+                        .build());
+
+                ofMethod.addCode("default: throw new IllegalArgumentException($S + Integer.toHexString(identifier));\n",
+                        "Incorrect type identifier: 0x");
+                ofMethod.endControlFlow();
+
+                spec.addMethod(MethodSpec.methodBuilder("identifier")
+                        .addAnnotation(Override.class)
+                        .returns(TypeName.INT)
+                        .addModifiers(Modifier.PUBLIC)
+                        .addCode("return identifier;")
+                        .build());
+
+                spec.addMethod(ofMethod.build());
+            } else {
+
+                for (TlParam param : params) {
+                    if (param.type().equals("#")) {
+                        continue;
+                    }
+
+                    TypeName paramType = parseType(param.type(), schema);
+                    boolean optionalInExt = currTypeTree.get(qualifiedName).stream()
+                            .flatMap(c -> c.params().stream())
+                            .anyMatch(p -> p.type().startsWith("flags.") &&
+                                    p.name().equals(param.name()));
+
+                    MethodSpec.Builder attribute = MethodSpec.methodBuilder(formatFieldName(param))
+                            .addModifiers(Modifier.PUBLIC);
+
+                    if (param.type().startsWith("flags.")) {
+                        if (param.type().endsWith("true")) {
+                            attribute.addModifiers(Modifier.DEFAULT);
+                            attribute.addCode("return false;");
+                        } else {
+                            paramType = paramType.box();
+                            attribute.addAnnotation(Nullable.class);
+                            attribute.addModifiers(Modifier.ABSTRACT);
+                        }
+                    } else if (optionalInExt) {
+                        paramType = paramType.box();
+                        attribute.addAnnotation(Nullable.class);
+                        attribute.addModifiers(Modifier.ABSTRACT);
+                    } else {
+                        attribute.addModifiers(Modifier.ABSTRACT);
+                    }
+
+                    spec.addMethod(attribute.returns(paramType)
+                            .build());
+                }
+            }
+
+            writeTo(JavaFile.builder(packageName, spec.build())
+                    .indent(INDENT)
+                    .skipJavaLangImports(true)
+                    .build());
+        }
+    }
+
+    private void generatePrimitives() {
+
+        TypeSpec.Builder spec = TypeSpec.classBuilder("TlPrimitives")
+                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                .addMethod(privateConstructor);
+
+        for (TlEntityObject e : apiSchema.constructors()) {
+            if (primitiveTypes.contains(normalizeName(e.type()).toLowerCase())) {
+                String name = screamilize(e.name()) + "_ID";
+
+                spec.addField(FieldSpec.builder(int.class, name, Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                        .initializer("0x" + Integer.toHexString(e.id()))
+                        .build());
+            }
+        }
+
+        writeTo(JavaFile.builder(getBasePackageName(), spec.build())
+                .indent(INDENT)
+                .skipJavaLangImports(true)
+                .build());
     }
 
     @Override
@@ -785,19 +777,16 @@ public class SchemaGenerator extends AbstractProcessor {
 
             String processingPackageName = getBasePackageName();
             String template = filer.getResource(StandardLocation.ANNOTATION_PROCESSOR_PATH,
-                    "", TEMPLATE_PACKAGE_INFO).getCharContent(true)
+                            "", TEMPLATE_PACKAGE_INFO).getCharContent(true)
                     .toString();
 
             Set<String> packages = typeTree.keySet().stream()
-                    .map(this::getPackageName)
+                    .map(SourceNames::parentPackageName)
                     .filter(s -> !s.equals(processingPackageName))
                     .collect(Collectors.toSet());
 
-            // collect methods packages with prefix 'request'
             Function<TlSchema, Set<String>> methodPackagesCollector = schema -> schema.methods().stream()
-                    .map(e -> getPackageName(e.name()))
-                    .map(s -> s.replace(getBasePackageName(), getBasePackageName()
-                            + METHOD_PACKAGE_PREFIX + schema.packagePrefix()))
+                    .map(e -> getPackageName(schema, e.name(), true))
                     .collect(Collectors.toSet());
 
             packages.addAll(methodPackagesCollector.apply(apiSchema));
@@ -816,58 +805,10 @@ public class SchemaGenerator extends AbstractProcessor {
         }
     }
 
-    private String normalizeName(String type) {
-        type = applyNamingExceptions(type);
-
-        Matcher vector = VECTOR_PATTERN.matcher(type);
-        if (vector.matches()) {
-            type = vector.group(1);
-        }
-
-        Matcher flag = FLAG_PATTERN.matcher(type);
-        if (flag.matches()) {
-            type = flag.group(2);
-        }
-
-        int dotIdx = type.lastIndexOf('.');
-        if (dotIdx != -1) {
-            type = type.substring(dotIdx + 1);
-        }
-
-        int spaceIdx = type.indexOf(' ');
-        if (spaceIdx != -1) {
-            type = type.substring(0, spaceIdx);
-        }
-
-        char first = type.charAt(0);
-        if (Character.isLowerCase(first)) {
-            type = Character.toUpperCase(first) + type.substring(1);
-        }
-
-        return camelize(type);
-    }
-
-    private static String formatFieldName(TlParam param) {
-        String name = camelize(param.name());
-
-        char f = name.charAt(0);
-        if (Character.isUpperCase(f)) {
-            name = Character.toLowerCase(f) + name.substring(1);
-        }
-
-        // This is a strange and in some places illogical problem
-        // solution of matching attribute names with java keywords
-        if (!SourceVersion.isName(name)) {
-            name += "State";
-        }
-
-        return name;
-    }
-
     private TypeName parseType(String type, TlSchema schema) {
         switch (type.toLowerCase()) {
             case "!x":
-            case "x": return GENERIC_TYPE;
+            case "x": return genericType;
             case "int": return TypeName.INT;
             case "true":
             case "bool": return TypeName.BOOLEAN;
@@ -893,9 +834,8 @@ public class SchemaGenerator extends AbstractProcessor {
                     return ParameterizedTypeName.get(ClassName.get(List.class), templateType.box());
                 }
 
-                String packageNameRaw = getPackageName(type);
-                return ClassName.get(packageNameRaw.replace(packageNameRaw,
-                        packageNameRaw + schema.packagePrefix()), normalizeName(type));
+                String packageName = getPackageName(schema, type, false);
+                return ClassName.get(packageName, normalizeName(type));
         }
     }
 
@@ -906,28 +846,6 @@ public class SchemaGenerator extends AbstractProcessor {
         }
         params.addAll(constructor.params());
         collectAttributesRecursive(constructor.name(), params);
-    }
-
-    private String getPackageName(String type) {
-        Matcher vector = VECTOR_PATTERN.matcher(type);
-        if (vector.matches()) {
-            type = vector.group(1);
-        }
-
-        Matcher flag = FLAG_PATTERN.matcher(type);
-        if (flag.matches()) {
-            type = flag.group(2);
-        }
-
-        int ldotidx = type.lastIndexOf('.');
-        String packageName = getBasePackageName();
-        if (ldotidx == -1) {
-            return packageName;
-        }
-        if (type.startsWith(packageName)) {
-            return type.substring(0, ldotidx);
-        }
-        return packageName + "." + type.substring(0, ldotidx);
     }
 
     private String getBasePackageName() {
@@ -948,7 +866,8 @@ public class SchemaGenerator extends AbstractProcessor {
     private void writeTo(JavaFile file) {
         try {
             file.writeTo(filer);
-        } catch (Throwable ignored) {
+        } catch (Throwable t) {
+            throw Exceptions.propagate(t);
         }
     }
 
@@ -1091,25 +1010,31 @@ public class SchemaGenerator extends AbstractProcessor {
         return null;
     }
 
-    private String applyNamingExceptions(String s) {
-        String l = s;
-        for (NameTransformer t : namingExceptions) {
-            l = t.apply(l);
+    private String getPackageName(TlSchema schema, String type, boolean method) {
+        StringJoiner pckg = new StringJoiner(".");
+        pckg.add(getBasePackageName());
+
+        if (method) {
+            pckg.add(METHOD_PACKAGE_PREFIX);
         }
-        return l;
+
+        if (!schema.packagePrefix().isEmpty()) {
+            pckg.add(schema.packagePrefix());
+        }
+
+        int dot = type.lastIndexOf('.');
+        if (dot != -1) {
+            pckg.add(type.substring(0, dot));
+        }
+
+        return pckg.toString();
     }
 
     private Map<String, List<TlEntityObject>> collectTypeTree(TlSchema schema) {
         return schema.constructors().stream()
                 .filter(c -> !ignoredTypes.contains(normalizeName(c.type()).toLowerCase()))
-                .collect(Collectors.groupingBy(c -> {
-                    String packageNameRaw = getPackageName(c.type());
-                    if(schema.packagePrefix().isEmpty()){
-                        return packageNameRaw + "." + normalizeName(c.type());
-                    }
-                    return packageNameRaw.replace(packageNameRaw, packageNameRaw + schema.packagePrefix())
-                            + "." + normalizeName(c.type());
-                }));
+                .collect(Collectors.groupingBy(c -> getPackageName(schema, c.type(), false)
+                        + "." + normalizeName(c.type())));
     }
 
     @Nullable
