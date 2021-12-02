@@ -167,6 +167,7 @@ public class SchemaGenerator extends AbstractProcessor {
         switch (iteration) {
             case 0:
                 generatePrimitives();
+                schema = schemas.get(schemaIteration);
                 iteration++;
                 break;
             case 1:
