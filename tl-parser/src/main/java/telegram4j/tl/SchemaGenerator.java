@@ -7,12 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.squareup.javapoet.*;
-import com.sun.source.util.Trees;
-import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.model.JavacElements;
-import com.sun.tools.javac.model.JavacTypes;
-import com.sun.tools.javac.processing.JavacFiler;
-import com.sun.tools.javac.processing.JavacProcessingEnvironment;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.immutables.value.Value;
@@ -23,7 +17,10 @@ import telegram4j.tl.model.*;
 import javax.annotation.processing.*;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.StandardLocation;
 import java.io.IOException;
@@ -55,13 +52,12 @@ public class SchemaGenerator extends AbstractProcessor {
 
     private final Map<String, TlEntityObject> computed = new HashMap<>();
 
-    private JavacFiler filer;
+    private Filer filer;
     private Messager messager;
-    private JavacElements elements;
-    private JavacTypes types;
-    private Trees trees;
+    private Elements elements;
+    private Types types;
 
-    private Symbol.PackageSymbol currentElement;
+    private PackageElement currentElement;
     private TlSchema apiSchema;
     private TlSchema mtprotoSchema;
     private List<TlSchema> schemas;
@@ -110,12 +106,10 @@ public class SchemaGenerator extends AbstractProcessor {
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
 
-        JavacProcessingEnvironment casted = (JavacProcessingEnvironment) processingEnv;
-        this.filer = casted.getFiler();
-        this.messager = casted.getMessager();
-        this.elements = casted.getElementUtils();
-        this.types = casted.getTypeUtils();
-        this.trees = Trees.instance(casted);
+        this.filer = processingEnv.getFiler();
+        this.messager = processingEnv.getMessager();
+        this.elements = processingEnv.getElementUtils();
+        this.types = processingEnv.getTypeUtils();
 
         ObjectMapper mapper = JsonMapper.builder()
                 .addModules(new Jdk8Module())
@@ -152,7 +146,7 @@ public class SchemaGenerator extends AbstractProcessor {
         }
 
         if (currentElement == null) {
-            currentElement = (Symbol.PackageSymbol) roundEnv
+            currentElement = (PackageElement) roundEnv
                     .getElementsAnnotatedWith(GenerateSchema.class)
                     .iterator().next();
         }
