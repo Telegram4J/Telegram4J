@@ -13,7 +13,6 @@ import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.service.MessageService;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.*;
 import telegram4j.tl.mtproto.MessageContainer;
@@ -38,8 +37,6 @@ public final class MTProtoSession {
     private final Sinks.Many<Updates> updates;
     private final DataCenter dataCenter;
     private final SessionResources mtProtoResources;
-
-    private final MessageService messageService = new MessageService(this);
 
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile long sessionId = random.nextLong();
@@ -86,10 +83,6 @@ public final class MTProtoSession {
 
     public DataCenter getDataCenter() {
         return dataCenter;
-    }
-
-    public MessageService getMessageService() {
-        return messageService;
     }
 
     public AuthorizationKeyHolder getAuthorizationKey() {
