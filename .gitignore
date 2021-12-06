@@ -1,3 +1,5 @@
 .idea
 .gradle
 build
+
+/core/src/test/resources/authkey-*.bin

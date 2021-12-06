@@ -1,6 +1,3 @@
-/**
- * Core utilities used across module.
- */
 @NonNullApi
 package telegram4j.core.util;
 
