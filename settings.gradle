@@ -1,7 +1,4 @@
 rootProject.name = 'Telegram4J'
 
 include 'core'
-include 'data'
-include 'data-api'
 include 'mtproto'
-include 'tl-parser'

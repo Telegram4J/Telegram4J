@@ -5,13 +5,13 @@ plugins {
 
 ext {
     reactor_bom_version = '2020.0.13'
-    jackson_version = '2.13.0-rc1'
     immutables_version = '2.9.0-beta3'
     findbugs_version = '3.0.1'
     javax_annotation = '1.3.2'
     junit_version = '5.7.2'
-    javapoet_version = '1.13.0'
     logback_version = '1.2.3'
+
+    tl_parser_version = 'master-SNAPSHOT'
 }
 
 allprojects {
@@ -28,18 +28,18 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
 
     dependencies {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
 
-        api "io.projectreactor.netty:reactor-netty"
-        api "io.projectreactor.addons:reactor-extra"
+        api "com.github.telegram4j:tl-parser:$tl_parser_version"
+        api "com.github.telegram4j.tl-parser:api:$tl_parser_version"
+    }
 
-        api "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
-        api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jackson_version"
-
-        testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
     }
 
     tasks.withType(JavaCompile) {
@@ -85,6 +85,21 @@ subprojects {
                     name = 'Telegram4J'
                     description = 'A java REST wrapper for the Telegram Bot API'
                     url = 'https://github.com/Telegram4J/Telegram4J'
+                    inceptionYear = '2021'
+
+                    developers {
+                        developer {
+                            name = 'The Telegram4J'
+                        }
+                    }
+
+                    licenses {
+                        license {
+                            name = 'GPL-3.0'
+                            url = 'https://github.com/Telegram4J/Telegram4J/LICENSE'
+                            distribution = 'repo'
+                        }
+                    }
 
                     scm {
                         url = 'https://github.com/Telegram4J/Telegram4J'
