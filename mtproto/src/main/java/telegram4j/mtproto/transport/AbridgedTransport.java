@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AbridgedTransport implements Transport {
     public static final int ID = 0xef;
 
-    private final AtomicInteger lastSize = new AtomicInteger(-1);
+    private final AtomicInteger size = new AtomicInteger(-1);
 
     @Override
     public ByteBuf identifier(ByteBufAllocator allocator) {
@@ -45,7 +45,7 @@ public class AbridgedTransport implements Transport {
             int payloadLength = partialLength * 4;
             return payload.readBytes(payloadLength);
         } finally {
-            lastSize.set(-1);
+            size.set(-1);
         }
     }
 
@@ -59,7 +59,7 @@ public class AbridgedTransport implements Transport {
             }
 
             int payloadLength = partialLength * 4;
-            return payload.readableBytes() == lastSize.updateAndGet(i -> i == -1 ? payloadLength : i);
+            return payload.readableBytes() == size.updateAndGet(i -> i == -1 ? payloadLength : i);
         } finally {
             payload.resetReaderIndex();
         }
