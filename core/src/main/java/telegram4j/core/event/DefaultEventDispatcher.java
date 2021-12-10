@@ -8,10 +8,12 @@ import telegram4j.core.event.domain.Event;
 public class DefaultEventDispatcher implements EventDispatcher {
     private final Scheduler eventScheduler;
     private final Sinks.Many<Event> sink;
+    private final Sinks.EmitFailureHandler emissionHandler;
 
-    public DefaultEventDispatcher(Scheduler eventScheduler, Sinks.Many<Event> sink) {
+    public DefaultEventDispatcher(Scheduler eventScheduler, Sinks.Many<Event> sink, Sinks.EmitFailureHandler emissionHandler) {
         this.eventScheduler = eventScheduler;
         this.sink = sink;
+        this.emissionHandler = emissionHandler;
     }
 
     @Override
@@ -23,6 +25,11 @@ public class DefaultEventDispatcher implements EventDispatcher {
 
     @Override
     public void publish(Event event) {
-        sink.emitNext(event, Sinks.EmitFailureHandler.FAIL_FAST);
+        sink.emitNext(event, emissionHandler);
+    }
+
+    @Override
+    public void shutdown() {
+        sink.emitComplete(emissionHandler);
     }
 }

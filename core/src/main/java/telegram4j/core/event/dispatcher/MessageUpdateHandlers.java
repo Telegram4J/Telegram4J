@@ -13,19 +13,19 @@ class MessageUpdateHandlers {
 
     // why?!
     static Mono<Void> handleStateUpdateNewChannelMessage(UpdateContext<UpdateNewChannelMessage> context) {
-        return context.getClient().getSession()
+        return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
     }
 
     static Mono<Void> handleStateUpdateNewMessage(UpdateContext<UpdateNewMessage> context) {
-        return context.getClient().getSession()
+        return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
     }
 
     static Mono<Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessage> context) {
-        return context.getClient().getSession()
+        return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onEditMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
     }

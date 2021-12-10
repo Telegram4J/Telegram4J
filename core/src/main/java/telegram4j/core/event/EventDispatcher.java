@@ -8,4 +8,6 @@ public interface EventDispatcher {
     <E extends Event> Flux<E> on(Class<E> type);
 
     void publish(Event event);
+
+    void shutdown();
 }

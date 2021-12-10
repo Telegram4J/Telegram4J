@@ -4,12 +4,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
-import telegram4j.mtproto.MTProtoSession;
 import telegram4j.tl.*;
 import telegram4j.tl.request.updates.GetDifference;
 import telegram4j.tl.request.updates.GetState;
@@ -71,21 +69,21 @@ public class UpdatesManager {
     }
 
     public Mono<Void> fillGap() {
-        return client.getSession().sendEncrypted(GetState.instance())
-                .flatMap(state -> client.getSession().getMtProtoResources()
+        return client.getMtProtoClient().sendAwait(GetState.instance())
+                .flatMap(state -> client.getMtProtoResources()
                         .getStoreLayout().getCurrentState()
-                        .switchIfEmpty(client.getSession()
-                                .getMtProtoResources()
+                        .switchIfEmpty(client.getMtProtoResources()
                                 .getStoreLayout().updateState(state)
                                 .thenReturn(state))
                         .doOnNext(this::applyStateLocal)
                         .thenMany(getDifference())
-                        .doOnNext(client.getEventDispatcher()::publish)
+                        .doOnNext(client.getMtProtoResources()
+                                .getEventDispatcher()::publish)
                         .then());
     }
 
     public Flux<Event> handle(Updates updates) {
-        log.info("updates: {}", updates);
+        // *embedded* message updates must be handled not here.
         switch (updates.identifier()) {
             case UpdatesTooLong.ID:
                 return getDifference();
@@ -150,8 +148,7 @@ public class UpdatesManager {
         return Mono.defer(() -> {
             applyStateLocal(state);
 
-            return client.getSession()
-                    .getMtProtoResources()
+            return client.getMtProtoResources()
                     .getStoreLayout()
                     .updateState(state);
         });
@@ -162,8 +159,8 @@ public class UpdatesManager {
     }
 
     private Flux<Event> getDifference(int pts, int qts, int date) {
-        return client.getSession()
-                .sendEncrypted(GetDifference.builder()
+        return client.getMtProtoClient()
+                .sendAwait(GetDifference.builder()
                         .pts(pts)
                         .qts(qts)
                         .date(date)
@@ -250,7 +247,7 @@ public class UpdatesManager {
                                     .concatWith(messageCreateEvents0)
                                     .transform(f -> getDifference(intermediateState.pts(),
                                             intermediateState.qts(), intermediateState.date())
-                                            .thenMany(f));
+                                            .concatWith(f));
                         default:
                             return Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
                     }

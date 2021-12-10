@@ -2,11 +2,12 @@ package telegram4j.core;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
-import telegram4j.core.event.EventDispatcher;
+import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
-import telegram4j.mtproto.MTProtoSession;
+import telegram4j.mtproto.service.MessageService;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -15,17 +16,22 @@ public final class MTProtoTelegramClient {
     public static final int LAYER = 133;
 
     private final AuthorizationResources authorizationResources;
-    private final MTProtoSession session;
-    private final EventDispatcher eventDispatcher;
+    private final MTProtoClient mtProtoClient;
+    private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
+    private final MessageService messageService;
+    private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authorizationResources,
-                          MTProtoSession session, EventDispatcher eventDispatcher,
-                          UpdatesHandlers updatesHandlers) {
+                          MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
+                          UpdatesHandlers updatesHandlers, Mono<Void> onDisconnect) {
         this.authorizationResources = authorizationResources;
-        this.session = session;
-        this.eventDispatcher = eventDispatcher;
+        this.mtProtoClient = mtProtoClient;
+        this.mtProtoResources = mtProtoResources;
+        this.onDisconnect = onDisconnect;
+
         this.updatesManager = new UpdatesManager(this, updatesHandlers);
+        this.messageService = new MessageService(mtProtoClient, mtProtoResources.getStoreLayout());
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
@@ -39,10 +45,6 @@ public final class MTProtoTelegramClient {
                 new AuthorizationResources(appId, appHash, null, AuthorizationResources.Type.USER));
     }
 
-    public EventDispatcher getEventDispatcher() {
-        return eventDispatcher;
-    }
-
     public UpdatesManager getUpdatesManager() {
         return updatesManager;
     }
@@ -51,19 +53,27 @@ public final class MTProtoTelegramClient {
         return authorizationResources;
     }
 
-    public MTProtoSession getSession() {
-        return session;
+    public MTProtoResources getMtProtoResources() {
+        return mtProtoResources;
+    }
+
+    public MTProtoClient getMtProtoClient() {
+        return mtProtoClient;
+    }
+
+    public MessageService getMessageService() {
+        return messageService;
     }
 
     public Mono<Void> disconnect() {
-        return Mono.fromRunnable(session.getConnection()::dispose);
+        return mtProtoResources.getClientManager().close();
     }
 
     public Mono<Void> onDisconnect() {
-        return session.getConnection().onDispose();
+        return onDisconnect;
     }
 
     public <E extends Event> Flux<E> on(Class<E> type) {
-        return eventDispatcher.on(type);
+        return mtProtoResources.getEventDispatcher().on(type);
     }
 }
