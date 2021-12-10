@@ -20,7 +20,7 @@ public final class CryptoUtil {
 
     static ThreadLocal<MessageDigest> SHA1 = ThreadLocal.withInitial(() -> {
         try {
-            return MessageDigest.getInstance("SHA1");
+            return MessageDigest.getInstance("SHA-1");
         } catch (NoSuchAlgorithmException e) {
             throw Exceptions.propagate(e);
         }
@@ -28,7 +28,7 @@ public final class CryptoUtil {
 
     static ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> {
         try {
-            return MessageDigest.getInstance("SHA256");
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
             throw Exceptions.propagate(e);
         }

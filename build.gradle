@@ -35,7 +35,6 @@ allprojects {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
 
         api "com.github.telegram4j:tl-parser:$tl_parser_version"
-        api "com.github.telegram4j.tl-parser:api:$tl_parser_version"
     }
 
     configurations.all {
