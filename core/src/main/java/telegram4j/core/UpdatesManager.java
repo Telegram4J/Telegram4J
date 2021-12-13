@@ -97,13 +97,12 @@ public class UpdatesManager {
                 BaseUpdates baseUpdates = (BaseUpdates) updates;
 
                 Flux<?> preApply = Flux.empty();
-                if (seq + 1 > baseUpdates.seq()) {
-                    return Flux.empty();
-                } else if (seq + 1 < baseUpdates.seq()) {
+                int updSeq = baseUpdates.seq();
+                if (updSeq != 0 && seq + 1 < updSeq) {
                     preApply = getDifference();
                 }
 
-                seq = baseUpdates.seq();
+                seq = updSeq;
                 date = baseUpdates.date();
 
                 Flux<Event> events = Flux.fromIterable(baseUpdates.updates())
@@ -115,9 +114,8 @@ public class UpdatesManager {
                 UpdatesCombined updatesCombined = (UpdatesCombined) updates;
 
                 Flux<?> preApply0 = Flux.empty();
-                if (seq + 1 > updatesCombined.seqStart()) {
-                    return Flux.empty();
-                } else if (seq + 1 < updatesCombined.seqStart()) {
+                int seqBegin = updatesCombined.seqStart();
+                if (seqBegin != 0 && seq + 1 < seqBegin) {
                     preApply0 = getDifference();
                 }
 

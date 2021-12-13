@@ -3,9 +3,9 @@ package telegram4j.mtproto;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import telegram4j.tl.TlMethod;
-import telegram4j.tl.TlObject;
 import telegram4j.tl.Updates;
+import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.api.TlObject;
 
 public interface MTProtoClient {
 

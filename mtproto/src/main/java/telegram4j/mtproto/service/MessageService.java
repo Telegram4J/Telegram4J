@@ -114,15 +114,14 @@ public class MessageService extends RpcService {
         Updates update;
         if (updates instanceof UpdateShortSentMessage) {
             UpdateShortSentMessage updates0 = (UpdateShortSentMessage) updates;
+
             message = BaseMessage.builder()
-                    .silent(request.silent())
+                    .flags(request.flags() & updates0.flags())
                     .peerId(peer)
                     .replyTo(mapNullable(request.replyToMsgId(), ImmutableMessageReplyHeader::of))
                     .message(request.message())
                     .id(updates0.id())
                     .replyMarkup(request.replyMarkup())
-                    .out(updates0.out())
-                    .fromScheduled(request.scheduleDate() != null)
                     .media(updates0.media())
                     .entities(updates0.entities())
                     .date(updates0.date())
@@ -141,22 +140,17 @@ public class MessageService extends RpcService {
             UpdateShortMessage updates0 = (UpdateShortMessage) updates;
 
             message = BaseMessage.builder()
-                    .silent(request.silent())
+                    .flags(request.flags() & updates0.flags())
                     .peerId(peer)
                     .replyTo(updates0.replyTo())
                     .message(request.message())
                     .id(updates0.id())
                     .replyMarkup(request.replyMarkup())
-                    .out(updates0.out())
-                    .fromScheduled(request.scheduleDate() != null)
                     .fwdFrom(updates0.fwdFrom())
                     .entities(updates0.entities())
                     .date(updates0.date())
                     .viaBotId(updates0.viaBotId())
                     .ttlPeriod(updates0.ttlPeriod())
-                    .mentioned(updates0.mentioned())
-                    .mediaUnread(updates0.mediaUnread())
-                    .silent(updates0.silent())
                     .build();
 
             update = ImmutableUpdateShort.builder()
@@ -169,8 +163,9 @@ public class MessageService extends RpcService {
                     .build();
         } else if (updates instanceof UpdateShortChatMessage) {
             UpdateShortChatMessage updates0 = (UpdateShortChatMessage) updates;
+
             message = BaseMessage.builder()
-                    .silent(request.silent())
+                    .flags(request.flags() & updates0.flags())
                     .peerId(peer)
                     .viaBotId(updates0.viaBotId())
                     .replyTo(updates0.replyTo())
@@ -178,13 +173,9 @@ public class MessageService extends RpcService {
                     .message(request.message())
                     .id(updates0.id())
                     .replyMarkup(request.replyMarkup())
-                    .fromScheduled(request.scheduleDate() != null)
                     .entities(updates0.entities())
                     .date(updates0.date())
                     .ttlPeriod(updates0.ttlPeriod())
-                    .mentioned(updates0.mentioned())
-                    .mediaUnread(updates0.mediaUnread())
-                    .silent(updates0.silent())
                     .build();
 
             update = ImmutableUpdateShort.builder()
@@ -210,7 +201,7 @@ public class MessageService extends RpcService {
             }
 
             message = updates0.updates().stream()
-                    .filter(updates1 -> updates1 instanceof UpdateNewMessage)
+                    .filter(updates1 -> updates1 instanceof UpdateNewMessageFields)
                     .map(updates1 -> (UpdateNewMessage) updates1)
                     .filter(updates1 -> updates1.message() instanceof BaseMessage) // TODO: what is MessageService type??
                     .map(updates1 -> (BaseMessage) updates1.message())

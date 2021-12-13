@@ -21,6 +21,9 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.*;
+import telegram4j.tl.api.MTProtoObject;
+import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
 import telegram4j.tl.request.mtproto.Ping;
@@ -380,7 +383,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         long messageId = seconds + timeOffset << 32 | mod << 22 | random.nextInt(524288) << 2;
 
         if (lastGeneratedMessageId >= messageId) {
-            messageId = lastMessageId + 4;
+            messageId = lastGeneratedMessageId + 4;
         }
 
         lastGeneratedMessageId = messageId;
