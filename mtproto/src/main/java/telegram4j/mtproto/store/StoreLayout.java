@@ -33,4 +33,18 @@ public interface StoreLayout {
     Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users);
 
     Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users);
 }
