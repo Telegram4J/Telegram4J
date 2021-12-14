@@ -3,10 +3,7 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.Event;
-import telegram4j.tl.Update;
-import telegram4j.tl.UpdateEditMessage;
-import telegram4j.tl.UpdateNewChannelMessage;
-import telegram4j.tl.UpdateNewMessage;
+import telegram4j.tl.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +18,20 @@ public final class UpdatesHandlers {
                 MessageUpdateHandlers::handleUpdateNewMessage);
         addHandler(UpdateEditMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
                 MessageUpdateHandlers::handleUpdateEditMessage);
+        addHandler(UpdateChannelUserTyping.class, UserUpdateHandlers::handleStateUpdateChannelUserTyping,
+                UserUpdateHandlers::handleUpdateChannelUserTyping);
+        addHandler(UpdateChatUserTyping.class, UserUpdateHandlers::handleStateUpdateChatUserTyping,
+                UserUpdateHandlers::handleUpdateChatUserTyping);
+        addHandler(UpdateUserName.class, UserUpdateHandlers::handleStateUpdateUserName,
+                UserUpdateHandlers::handleUpdateUserName);
+        addHandler(UpdateUserPhone.class, UserUpdateHandlers::handleStateUpdateUserPhone,
+                UserUpdateHandlers::handleUpdateUserPhone);
+        addHandler(UpdateUserPhoto.class, UserUpdateHandlers::handleStateUpdateUserPhoto,
+                UserUpdateHandlers::handleUpdateUserPhoto);
+        addHandler(UpdateUserStatus.class, UserUpdateHandlers::handleStateUpdateUserStatus,
+                UserUpdateHandlers::handleUpdateUserStatus);
+        addHandler(UpdateUserTyping.class, UserUpdateHandlers::handleStateUpdateUserTyping,
+                UserUpdateHandlers::handleUpdateUserTyping);
     }
 
     public static final UpdatesHandlers instance = new UpdatesHandlers();
