@@ -3,29 +3,29 @@ package telegram4j.core.event.domain.user;
 import telegram4j.core.MTProtoTelegramClient;
 
 public class UpdateUserNameEvent extends UserEvent {
-    private final long user_id;
-    private final String first_name;
-    private final String last_name;
+    private final long userId;
+    private final String firstName;
+    private final String lastName;
     private final String username;
 
-    public UpdateUserNameEvent(MTProtoTelegramClient client, long user_id, String first_name, String last_name, String username) {
+    public UpdateUserNameEvent(MTProtoTelegramClient client, long userId, String firstName, String lastName, String username) {
         super(client);
-        this.user_id = user_id;
-        this.first_name = first_name;
-        this.last_name = last_name;
+        this.userId = userId;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.username = username;
     }
 
-    public long getUser_id() {
-        return user_id;
+    public long getUserId() {
+        return userId;
     }
 
-    public String getFirst_name() {
-        return first_name;
+    public String getFirstName() {
+        return firstName;
     }
 
-    public String getLast_name() {
-        return last_name;
+    public String getLastName() {
+        return lastName;
     }
 
     public String getUsername() {
@@ -35,9 +35,9 @@ public class UpdateUserNameEvent extends UserEvent {
     @Override
     public String toString() {
         return "UpdateUserTypingEvent{" +
-                "user_id=" + user_id +
-                ", first_name=" + first_name +
-                ", last_name=" + last_name +
+                "user_id=" + userId +
+                ", first_name=" + firstName +
+                ", last_name=" + lastName +
                 ", username=" + username +
                 "} " + super.toString();
     }

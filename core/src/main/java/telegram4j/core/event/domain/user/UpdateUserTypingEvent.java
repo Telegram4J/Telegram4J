@@ -4,17 +4,17 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.SendMessageAction;
 
 public class UpdateUserTypingEvent extends UserEvent {
-    private final long user_id;
+    private final long userId;
     private final SendMessageAction action;
 
-    public UpdateUserTypingEvent(MTProtoTelegramClient client, long user_id, SendMessageAction action) {
+    public UpdateUserTypingEvent(MTProtoTelegramClient client, long userId, SendMessageAction action) {
         super(client);
-        this.user_id = user_id;
+        this.userId = userId;
         this.action = action;
     }
 
-    public long getUser_id() {
-        return user_id;
+    public long getUserId() {
+        return userId;
     }
 
     public SendMessageAction getAction() {
@@ -24,7 +24,7 @@ public class UpdateUserTypingEvent extends UserEvent {
     @Override
     public String toString() {
         return "UpdateUserTypingEvent{" +
-                "user_id=" + user_id +
+                "user_id=" + userId +
                 ", action=" + action +
                 "} " + super.toString();
     }

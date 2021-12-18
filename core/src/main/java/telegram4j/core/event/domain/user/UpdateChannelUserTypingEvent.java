@@ -10,44 +10,44 @@ import java.util.Optional;
 
 public class UpdateChannelUserTypingEvent extends UserEvent {
 
-    private final long channel_id;
-    private final long from_id;
+    private final long channelId;
+    private final long fromId;
     private final SendMessageAction action;
 
     @Nullable
-    private final Integer top_msg_id;
+    private final Integer topMsgId;
 
-    public UpdateChannelUserTypingEvent(MTProtoTelegramClient client, long user_id, Peer from_id, SendMessageAction action, @Nullable Integer top_msg_id) {
+    public UpdateChannelUserTypingEvent(MTProtoTelegramClient client, long user_id, Peer fromId, SendMessageAction action, @Nullable Integer topMsgId) {
         super(client);
-        this.channel_id = user_id;
-        this.from_id = TlEntityUtil.peerId(from_id);
+        this.channelId = user_id;
+        this.fromId = TlEntityUtil.peerId(fromId);
         this.action = action;
-        this.top_msg_id = top_msg_id;
+        this.topMsgId = topMsgId;
     }
 
-    public long getChannel_id() {
-        return channel_id;
+    public long getChannelId() {
+        return channelId;
     }
 
-    public long getFrom_id() {
-        return from_id;
+    public long getFromId() {
+        return fromId;
     }
 
     public SendMessageAction getAction() {
         return action;
     }
 
-    public Optional<Integer> getTop_msg_id() {
-        return Optional.ofNullable(top_msg_id);
+    public Optional<Integer> getTopMsgId() {
+        return Optional.ofNullable(topMsgId);
     }
 
     @Override
     public String toString() {
         return "UpdateUserTypingEvent{" +
-                "channel_id=" + channel_id +
-                ", from_id=" + from_id +
+                "channel_id=" + channelId +
+                ", from_id=" + fromId +
                 ", action=" + action +
-                ", top_msg_id=" + top_msg_id +
+                ", top_msg_id=" + topMsgId +
                 "} " + super.toString();
     }
 }

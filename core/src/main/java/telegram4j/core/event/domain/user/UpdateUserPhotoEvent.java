@@ -3,25 +3,27 @@ package telegram4j.core.event.domain.user;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.UserProfilePhoto;
 
+import java.time.Instant;
+
 public class UpdateUserPhotoEvent extends UserEvent {
-    private final long user_id;
-    private final int date;
+    private final long userId;
+    private final Instant date;
     private final UserProfilePhoto photo;
     private final boolean previous;
 
-    public UpdateUserPhotoEvent(MTProtoTelegramClient client, long user_id, int date, UserProfilePhoto photo, boolean previous) {
+    public UpdateUserPhotoEvent(MTProtoTelegramClient client, long userId, int date, UserProfilePhoto photo, boolean previous) {
         super(client);
-        this.user_id = user_id;
-        this.date = date;
+        this.userId = userId;
+        this.date = Instant.ofEpochSecond(date);
         this.photo = photo;
         this.previous = previous;
     }
 
-    public long getUser_id() {
-        return user_id;
+    public long getUserId() {
+        return userId;
     }
 
-    public int date() {
+    public Instant getDate() {
         return date;
     }
 
@@ -36,7 +38,7 @@ public class UpdateUserPhotoEvent extends UserEvent {
     @Override
     public String toString() {
         return "UpdateUserTypingEvent{" +
-                "user_id=" + user_id +
+                "user_id=" + userId +
                 ", date=" + date +
                 ", photo=" + photo +
                 ", previous=" + previous +
