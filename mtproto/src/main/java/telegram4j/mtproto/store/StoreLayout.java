@@ -38,7 +38,7 @@ public interface StoreLayout {
 
     Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users);
 
-    Mono<StoreLayoutImpl.UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
+    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
 
     Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
 

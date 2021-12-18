@@ -3,7 +3,7 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.user.*;
-import telegram4j.mtproto.store.StoreLayoutImpl;
+import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 
 public class UserUpdateHandlers {
@@ -22,7 +22,7 @@ public class UserUpdateHandlers {
                 .onChatUserTyping(context.getUpdate(), context.getChats(), context.getUsers());
     }
 
-    static Mono<StoreLayoutImpl.UserNameFields> handleStateUpdateUserName(UpdateContext<UpdateUserName> context) {
+    static Mono<UserNameFields> handleStateUpdateUserName(UpdateContext<UpdateUserName> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onUserNameUpdate(context.getUpdate(), context.getChats(), context.getUsers());
