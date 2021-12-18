@@ -22,8 +22,8 @@ allprojects {
     description = 'Java library for the Telegram API'
     version = '0.1.0'
 
-    targetCompatibility = JavaVersion.VERSION_1_8
-    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_11
 
     repositories {
         mavenLocal()
