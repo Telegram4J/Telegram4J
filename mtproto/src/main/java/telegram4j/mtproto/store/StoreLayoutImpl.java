@@ -18,7 +18,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Chat> chats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, User> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, BaseUser> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
@@ -123,13 +123,18 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
-        return Mono.fromRunnable(() -> {
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
+        return Mono.fromSupplier(() -> {
+            BaseUser u = this.users.get(action.userId());
+            UserNameFields f = new UserNameFields(u.username(), u.firstName(), u.lastName());
+            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(u).withUsername(u.username()).withFirstName(u.firstName()).withLastName(u.lastName()));
             for (Chat chat : chats) {
                 this.chats.put(chat.id(), chat);
             }
 
             users.forEach(this::saveUser);
+
+            return f;
         });
     }
 
@@ -215,6 +220,30 @@ public class StoreLayoutImpl implements StoreLayout {
             return corrected.substring(1);
         }
         return corrected;
+    }
+
+    public static class UserNameFields {
+        private final String userName;
+        private final String firstName;
+        private final String lastName;
+
+        public UserNameFields(String user_name, String first_name, String last_name) {
+            userName = user_name;
+            firstName = first_name;
+            lastName = last_name;
+        }
+
+        public String getUserName() {
+            return userName;
+        }
+
+        public String getFirstName() {
+            return firstName;
+        }
+
+        public String getLastName() {
+            return lastName;
+        }
     }
 
     static class MessageId {
