@@ -100,6 +100,83 @@ public class StoreLayoutImpl implements StoreLayout {
         });
     }
 
+    @Override
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
+    @Override
+    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            for (Chat chat : chats) {
+                this.chats.put(chat.id(), chat);
+            }
+
+            users.forEach(this::saveUser);
+        });
+    }
+
     private void saveUser(User user) {
         if (user instanceof BaseUser) {
             BaseUser user0 = (BaseUser) user;
