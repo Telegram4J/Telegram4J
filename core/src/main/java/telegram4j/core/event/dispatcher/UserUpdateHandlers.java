@@ -65,7 +65,7 @@ public class UserUpdateHandlers {
         });
     }
 
-    static Flux<UpdateUserNameEvent> handleUpdateUserName(StatefulUpdateContext<UpdateUserName, Void> context) {
+    static Flux<UpdateUserNameEvent> handleUpdateUserName(StatefulUpdateContext<UpdateUserName, UserNameFields> context) {
         return Flux.just(new UpdateUserNameEvent(context.getClient(), context.getUpdate().userId(), context.getUpdate().firstName(), context.getUpdate().lastName(), context.getUpdate().username()) {
         });
     }
