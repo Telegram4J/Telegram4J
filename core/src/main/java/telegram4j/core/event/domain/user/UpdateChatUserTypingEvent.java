@@ -31,10 +31,10 @@ public class UpdateChatUserTypingEvent extends UserEvent {
 
     @Override
     public String toString() {
-        return "UpdateUserTypingEvent{" +
-                "chat_id=" + chatId +
-                "from_id=" + fromId +
+        return "UpdateChatUserTypingEvent{" +
+                "chatId=" + chatId +
                 ", action=" + action +
+                ", fromId=" + fromId +
                 "} " + super.toString();
     }
 }

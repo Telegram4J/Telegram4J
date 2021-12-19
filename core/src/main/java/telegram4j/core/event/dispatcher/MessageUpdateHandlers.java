@@ -11,20 +11,13 @@ class MessageUpdateHandlers {
     // State handler
     // =====================
 
-    // why?!
-    static Mono<Void> handleStateUpdateNewChannelMessage(UpdateContext<UpdateNewChannelMessage> context) {
+    static Mono<Void> handleStateUpdateNewMessage(UpdateContext<UpdateNewMessageFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
     }
 
-    static Mono<Void> handleStateUpdateNewMessage(UpdateContext<UpdateNewMessage> context) {
-        return context.getClient()
-                .getMtProtoResources().getStoreLayout()
-                .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
-    }
-
-    static Mono<Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessage> context) {
+    static Mono<Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessageFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onEditMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
@@ -33,21 +26,14 @@ class MessageUpdateHandlers {
     // Update handler
     // =====================
 
-    static Flux<SendMessageEvent> handleUpdateNewMessage(StatefulUpdateContext<UpdateNewMessage, Void> context) {
+    static Flux<SendMessageEvent> handleUpdateNewMessage(StatefulUpdateContext<UpdateNewMessageFields, Void> context) {
         Chat chat = context.getChats().isEmpty() ? null : context.getChats().get(0);
         User user = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
 
         return Flux.just(new SendMessageEvent(context.getClient(), context.getUpdate().message(), chat, user));
     }
 
-    static Flux<SendMessageEvent> handleUpdateNewChannelMessage(StatefulUpdateContext<UpdateNewChannelMessage, Void> context) {
-        Chat chat = context.getChats().isEmpty() ? null : context.getChats().get(0);
-        User user = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
-
-        return Flux.just(new SendMessageEvent(context.getClient(), context.getUpdate().message(), chat, user));
-    }
-
-    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessage, Message> context) {
+    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, Message> context) {
         Chat chat = context.getChats().isEmpty() ? null : context.getChats().get(0);
         User user = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
 

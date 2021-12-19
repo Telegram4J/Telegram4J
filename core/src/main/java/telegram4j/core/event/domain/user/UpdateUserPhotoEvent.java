@@ -7,14 +7,14 @@ import java.time.Instant;
 
 public class UpdateUserPhotoEvent extends UserEvent {
     private final long userId;
-    private final Instant date;
+    private final Instant timestamp;
     private final UserProfilePhoto photo;
     private final boolean previous;
 
-    public UpdateUserPhotoEvent(MTProtoTelegramClient client, long userId, int date, UserProfilePhoto photo, boolean previous) {
+    public UpdateUserPhotoEvent(MTProtoTelegramClient client, long userId, int timestamp, UserProfilePhoto photo, boolean previous) {
         super(client);
         this.userId = userId;
-        this.date = Instant.ofEpochSecond(date);
+        this.timestamp = Instant.ofEpochSecond(timestamp);
         this.photo = photo;
         this.previous = previous;
     }
@@ -23,8 +23,8 @@ public class UpdateUserPhotoEvent extends UserEvent {
         return userId;
     }
 
-    public Instant getDate() {
-        return date;
+    public Instant getTimestamp() {
+        return timestamp;
     }
 
     public UserProfilePhoto getPhoto() {
@@ -37,9 +37,9 @@ public class UpdateUserPhotoEvent extends UserEvent {
 
     @Override
     public String toString() {
-        return "UpdateUserTypingEvent{" +
-                "user_id=" + userId +
-                ", date=" + date +
+        return "UpdateUserPhotoEvent{" +
+                "userId=" + userId +
+                ", timestamp=" + timestamp +
                 ", photo=" + photo +
                 ", previous=" + previous +
                 "} " + super.toString();

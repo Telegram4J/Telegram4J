@@ -23,8 +23,8 @@ public class UpdateUserStatusEvent extends UserEvent {
 
     @Override
     public String toString() {
-        return "UpdateUserTypingEvent{" +
-                "user_id=" + userId +
+        return "UpdateUserStatusEvent{" +
+                "userId=" + userId +
                 ", status=" + status +
                 "} " + super.toString();
     }

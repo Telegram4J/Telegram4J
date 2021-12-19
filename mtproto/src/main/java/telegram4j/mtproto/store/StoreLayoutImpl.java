@@ -78,107 +78,78 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            messages.put(create(message), message);
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
+            messages.put(createMessageId(message), message);
         });
     }
 
     @Override
     public Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
-            Message old = messages.put(create(message), message);
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
-            return old;
+            saveContacts(chats, users);
+            return messages.put(createMessageId(message), message);
         });
     }
 
     @Override
     public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
         });
     }
 
     @Override
     public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
         });
     }
 
     @Override
     public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
-            BaseUser u = this.users.get(action.userId());
-            UserNameFields f = new UserNameFields(u.username(), u.firstName(), u.lastName());
-            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(u).withUsername(u.username()).withFirstName(u.firstName()).withLastName(u.lastName()));
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
+            saveContacts(chats, users);
+            BaseUser old = this.users.get(action.userId());
+            UserNameFields fields = old != null ? new UserNameFields(old.username(), old.firstName(), old.lastName()) : null;
+            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(v)
+                    .withUsername(action.username())
+                    .withFirstName(action.firstName())
+                    .withLastName(action.lastName()));
 
-            users.forEach(this::saveUser);
-
-            return f;
+            return fields;
         });
     }
 
     @Override
-    public Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
-        return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
+        return Mono.fromSupplier(() -> {
+            saveContacts(chats, users);
+            BaseUser old = this.users.get(action.userId());
+            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(v)
+                    .withPhone(action.phone()));
 
-            users.forEach(this::saveUser);
+            return old != null ? old.phone() : null;
         });
     }
 
     @Override
     public Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
         });
     }
 
     @Override
     public Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
         });
     }
 
     @Override
     public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
         return Mono.fromRunnable(() -> {
-            for (Chat chat : chats) {
-                this.chats.put(chat.id(), chat);
-            }
-
-            users.forEach(this::saveUser);
+            saveContacts(chats, users);
         });
     }
 
@@ -196,20 +167,29 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static MessageId create(Message message) {
-        if (message instanceof BaseMessage) {
-            BaseMessage baseMessage = (BaseMessage) message;
-
-            return new MessageId(baseMessage.id(), peerId(baseMessage.peerId()));
+    private void saveContacts(List<Chat> chats, List<User> users) {
+        for (Chat chat : chats) {
+            this.chats.put(chat.id(), chat);
         }
 
-        if (message instanceof MessageService) {
-            MessageService messageService = (MessageService) message;
-
-            return new MessageId(messageService.id(), peerId(messageService.peerId()));
+        for (User user : users) {
+            saveUser(user);
         }
+    }
 
-        throw new IllegalArgumentException("Unknown message: " + message);
+    static MessageId createMessageId(Message message) {
+        switch (message.identifier()) {
+            case BaseMessage.ID:
+                BaseMessage baseMessage = (BaseMessage) message;
+
+                return new MessageId(baseMessage.id(), peerId(baseMessage.peerId()));
+            case MessageService.ID:
+                MessageService messageService = (MessageService) message;
+
+                return new MessageId(messageService.id(), peerId(messageService.peerId()));
+            default:
+                throw new IllegalArgumentException("Unknown message: " + message);
+        }
     }
 
     static String stripUsername(String username) {

@@ -12,12 +12,16 @@ public final class UpdatesHandlers {
     private static final List<HandlerTuple<?, ?>> handlers = new ArrayList<>();
 
     static {
-        addHandler(UpdateNewChannelMessage.class, MessageUpdateHandlers::handleStateUpdateNewChannelMessage,
-                MessageUpdateHandlers::handleUpdateNewChannelMessage);
+        // message updates
+        addHandler(UpdateNewChannelMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
+                MessageUpdateHandlers::handleUpdateNewMessage);
         addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
                 MessageUpdateHandlers::handleUpdateNewMessage);
         addHandler(UpdateEditMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
                 MessageUpdateHandlers::handleUpdateEditMessage);
+        addHandler(UpdateEditChannelMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
+                MessageUpdateHandlers::handleUpdateEditMessage);
+        // user updates
         addHandler(UpdateChannelUserTyping.class, UserUpdateHandlers::handleStateUpdateChannelUserTyping,
                 UserUpdateHandlers::handleUpdateChannelUserTyping);
         addHandler(UpdateChatUserTyping.class, UserUpdateHandlers::handleStateUpdateChatUserTyping,

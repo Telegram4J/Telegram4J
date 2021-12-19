@@ -155,7 +155,7 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
         return delegate.onUserPhoneUpdate(action, chats, users);
     }
 

@@ -24,7 +24,7 @@ public class UpdateUserTypingEvent extends UserEvent {
     @Override
     public String toString() {
         return "UpdateUserTypingEvent{" +
-                "user_id=" + userId +
+                "userId=" + userId +
                 ", action=" + action +
                 "} " + super.toString();
     }

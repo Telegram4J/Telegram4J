@@ -40,7 +40,7 @@ public interface StoreLayout {
 
     Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
 
-    Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
+    Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
 
     Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
 
