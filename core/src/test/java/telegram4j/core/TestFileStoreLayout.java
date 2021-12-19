@@ -11,6 +11,7 @@ import reactor.util.Loggers;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 import telegram4j.tl.updates.State;
 
@@ -136,5 +137,40 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users) {
         return delegate.onEditMessage(message, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users) {
+        return delegate.onChannelUserTyping(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users) {
+        return delegate.onChatUserTyping(action, chats, users);
+    }
+
+    @Override
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
+        return delegate.onUserNameUpdate(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
+        return delegate.onUserPhoneUpdate(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
+        return delegate.onUserPhotoUpdate(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
+        return delegate.onUserStatusUpdate(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
+        return delegate.onUserTyping(action, chats, users);
     }
 }
