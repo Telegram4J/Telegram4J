@@ -15,21 +15,18 @@ public final class DataCenter {
     public static final List<DataCenter> mediaDataCenters;
 
     static {
-        productionDataCenters = Collections.unmodifiableList(Arrays.asList(
-                create(1, "149.154.175.53", 443),
+        productionDataCenters = List.of(create(1, "149.154.175.53", 443),
                 create(2, "149.154.167.50", 443),
                 create(3, "149.154.175.100", 443),
                 create(4, "149.154.167.92", 443),
-                create(5, "91.108.56.128", 443)));
+                create(5, "91.108.56.128", 443));
 
-        testDataCenters = Collections.unmodifiableList(Arrays.asList(
-                create(1, "149.154.175.10", 443),
+        testDataCenters = List.of(create(1, "149.154.175.10", 443),
                 create(2, "149.154.167.40", 443),
-                create(3, "149.154.175.117", 443)));
+                create(3, "149.154.175.117", 443));
 
-        mediaDataCenters = Collections.unmodifiableList(Arrays.asList(
-                create(2, "149.154.167.151", 443),
-                create(4, "149.154.164.250", 443)));
+        mediaDataCenters = List.of(create(2, "149.154.167.151", 443),
+                create(4, "149.154.164.250", 443));
     }
 
     DataCenter(int id, String address, int port) {
