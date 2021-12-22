@@ -2,6 +2,7 @@ package telegram4j.core.util;
 
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import telegram4j.core.object.MessageEntity.Type;
 import telegram4j.tl.*;
 
 import java.util.ArrayDeque;
@@ -258,27 +259,5 @@ public final class EntityParser {
     public enum Mode {
         MARKDOWN_V2,
         HTML
-    }
-
-    private enum Type {
-        MENTION,
-        HASHTAG,
-        BOT_COMMAND,
-        URL,
-        EMAIL_ADDRESS,
-        BOLD,
-        ITALIC,
-        CODE,
-        PRE,
-        TEXT_URL,
-        MENTION_NAME,
-        CASHTAG,
-        PHONE_NUMBER,
-        UNDERLINE,
-        STRIKETHROUGH,
-        BLOCK_QUOTE,
-        BANK_CARD_NUMBER,
-        MEDIA_TIMESTAMP,
-        UNKNOWN
     }
 }

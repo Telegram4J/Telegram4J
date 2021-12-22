@@ -30,9 +30,13 @@ public interface StoreLayout {
 
     Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
 
+    // message updates
+
     Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users);
 
     Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users);
+
+    // user updates
 
     Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users);
 

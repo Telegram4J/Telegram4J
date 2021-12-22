@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static telegram4j.mtproto.util.TlEntityUtil.peerId;
+import static telegram4j.mtproto.util.TlEntityUtil.getPeerId;
 
 public class StoreLayoutImpl implements StoreLayout {
 
@@ -182,11 +182,11 @@ public class StoreLayoutImpl implements StoreLayout {
             case BaseMessage.ID:
                 BaseMessage baseMessage = (BaseMessage) message;
 
-                return new MessageId(baseMessage.id(), peerId(baseMessage.peerId()));
+                return new MessageId(baseMessage.id(), getPeerId(baseMessage.peerId()));
             case MessageService.ID:
                 MessageService messageService = (MessageService) message;
 
-                return new MessageId(messageService.id(), peerId(messageService.peerId()));
+                return new MessageId(messageService.id(), getPeerId(messageService.peerId()));
             default:
                 throw new IllegalArgumentException("Unknown message: " + message);
         }

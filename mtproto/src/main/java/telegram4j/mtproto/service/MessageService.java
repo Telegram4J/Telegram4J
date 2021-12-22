@@ -83,11 +83,11 @@ public class MessageService extends RpcService {
                         parts, name, ByteBufUtil.hexDump(md5.digest()))));
     }
 
-    public Mono<BaseMessage> sendMessage(SendMessage request) {
+    public Mono<Message> sendMessage(SendMessage request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
                 .map(TupleUtils.function((updates, peer) -> {
-                    Tuple2<BaseMessage, Updates> upd = transformMessageUpdate(request, updates, peer);
+                    var upd = transformMessageUpdate(request, updates, peer);
 
                     client.updates().emitNext(upd.getT2(), Sinks.EmitFailureHandler.FAIL_FAST);
 
@@ -95,124 +95,149 @@ public class MessageService extends RpcService {
                 }));
     }
 
-    public Mono<BaseMessage> sendMedia(SendMedia request) {
+    public Mono<Message> sendMedia(SendMedia request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
                 .map(TupleUtils.function((updates, peer) -> {
-                    Tuple2<BaseMessage, Updates> upd = transformMessageUpdate(request, updates, peer);
+                    var upd = transformMessageUpdate(request, updates, peer);
 
                     client.updates().emitNext(upd.getT2(), Sinks.EmitFailureHandler.FAIL_FAST);
 
                     return upd.getT1();
                 }));
+    }
+
+    public Mono<Message> editMessage(EditMessage request) {
+        return client.sendAwait(request)
+                .map(updates -> {
+                    switch (updates.identifier()) {
+                        case BaseUpdates.ID:
+                            BaseUpdates casted = (BaseUpdates) updates;
+
+                            UpdateEditMessageFields update = casted.updates().stream()
+                                    .filter(upd -> upd instanceof UpdateEditMessageFields)
+                                    .map(upd -> (UpdateEditMessageFields) upd)
+                                    .findFirst()
+                                    .orElseThrow();
+
+                            client.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
+
+                            return update.message();
+                        default:
+                            throw new IllegalArgumentException("Unknown updates type: " + updates);
+                    }
+                });
     }
 
     // Short-send related updates object should be transformed to the updateShort.
     // https://core.telegram.org/api/updates#updates-sequence
-    protected static Tuple2<BaseMessage, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
-        BaseMessage message;
-        Updates update;
-        if (updates instanceof UpdateShortSentMessage) {
-            UpdateShortSentMessage updates0 = (UpdateShortSentMessage) updates;
+    static Tuple2<Message, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
+        switch (updates.identifier()) {
+            case UpdateShortSentMessage.ID: {
+                UpdateShortSentMessage casted = (UpdateShortSentMessage) updates;
+                Message message = BaseMessage.builder()
+                        .flags(request.flags() | casted.flags())
+                        .peerId(peer)
+                        .replyTo(mapNullable(request.replyToMsgId(), ImmutableMessageReplyHeader::of))
+                        .message(request.message())
+                        .id(casted.id())
+                        .replyMarkup(request.replyMarkup())
+                        .media(casted.media())
+                        .entities(casted.entities())
+                        .date(casted.date())
+                        .ttlPeriod(casted.ttlPeriod())
+                        .build();
 
-            message = BaseMessage.builder()
-                    .flags(request.flags() & updates0.flags())
-                    .peerId(peer)
-                    .replyTo(mapNullable(request.replyToMsgId(), ImmutableMessageReplyHeader::of))
-                    .message(request.message())
-                    .id(updates0.id())
-                    .replyMarkup(request.replyMarkup())
-                    .media(updates0.media())
-                    .entities(updates0.entities())
-                    .date(updates0.date())
-                    .ttlPeriod(updates0.ttlPeriod())
-                    .build();
+                Updates upds = UpdateShort.builder()
+                        .date(casted.date())
+                        .update(UpdateNewMessage.builder()
+                                .message(message)
+                                .pts(casted.pts())
+                                .ptsCount(casted.ptsCount())
+                                .build())
+                        .build();
 
-            update = ImmutableUpdateShort.builder()
-                    .date(updates0.date())
-                    .update(UpdateNewMessage.builder()
-                            .message(message)
-                            .pts(updates0.pts())
-                            .ptsCount(updates0.ptsCount())
-                            .build())
-                    .build();
-        } else if (updates instanceof UpdateShortMessage) {
-            UpdateShortMessage updates0 = (UpdateShortMessage) updates;
-
-            message = BaseMessage.builder()
-                    .flags(request.flags() & updates0.flags())
-                    .peerId(peer)
-                    .replyTo(updates0.replyTo())
-                    .message(request.message())
-                    .id(updates0.id())
-                    .replyMarkup(request.replyMarkup())
-                    .fwdFrom(updates0.fwdFrom())
-                    .entities(updates0.entities())
-                    .date(updates0.date())
-                    .viaBotId(updates0.viaBotId())
-                    .ttlPeriod(updates0.ttlPeriod())
-                    .build();
-
-            update = ImmutableUpdateShort.builder()
-                    .date(updates0.date())
-                    .update(UpdateNewMessage.builder()
-                            .message(message)
-                            .pts(updates0.pts())
-                            .ptsCount(updates0.ptsCount())
-                            .build())
-                    .build();
-        } else if (updates instanceof UpdateShortChatMessage) {
-            UpdateShortChatMessage updates0 = (UpdateShortChatMessage) updates;
-
-            message = BaseMessage.builder()
-                    .flags(request.flags() & updates0.flags())
-                    .peerId(peer)
-                    .viaBotId(updates0.viaBotId())
-                    .replyTo(updates0.replyTo())
-                    .fwdFrom(updates0.fwdFrom())
-                    .message(request.message())
-                    .id(updates0.id())
-                    .replyMarkup(request.replyMarkup())
-                    .entities(updates0.entities())
-                    .date(updates0.date())
-                    .ttlPeriod(updates0.ttlPeriod())
-                    .build();
-
-            update = ImmutableUpdateShort.builder()
-                    .date(updates0.date())
-                    .update(UpdateNewMessage.builder()
-                            .message(message)
-                            .pts(updates0.pts())
-                            .ptsCount(updates0.ptsCount())
-                            .build())
-                    .build();
-        } else if (updates instanceof BaseUpdates) {
-            BaseUpdates updates0 = (BaseUpdates) updates;
-
-            UpdateMessageID updateMessageID = updates0.updates().stream()
-                    .filter(updates1 -> updates1 instanceof UpdateMessageID)
-                    .map(updates1 -> (UpdateMessageID) updates1)
-                    .findFirst()
-                    .orElseThrow(IllegalStateException::new);
-
-            if (updateMessageID.randomId() != request.randomId()) {
-                throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
-                        + ", received: " + updateMessageID.randomId());
+                return Tuples.of(message, upds);
             }
+            case UpdateShortMessage.ID: {
+                UpdateShortMessage casted = (UpdateShortMessage) updates;
 
-            message = updates0.updates().stream()
-                    .filter(updates1 -> updates1 instanceof UpdateNewMessageFields)
-                    .map(updates1 -> (UpdateNewMessage) updates1)
-                    .filter(updates1 -> updates1.message() instanceof BaseMessage) // TODO: what is MessageService type??
-                    .map(updates1 -> (BaseMessage) updates1.message())
-                    .findFirst()
-                    .orElseThrow(IllegalStateException::new);
+                Message message = BaseMessage.builder()
+                        .flags(request.flags() | casted.flags())
+                        .peerId(peer)
+                        .replyTo(casted.replyTo())
+                        .message(request.message())
+                        .id(casted.id())
+                        .replyMarkup(request.replyMarkup())
+                        .fwdFrom(casted.fwdFrom())
+                        .entities(casted.entities())
+                        .date(casted.date())
+                        .viaBotId(casted.viaBotId())
+                        .ttlPeriod(casted.ttlPeriod())
+                        .build();
 
-            update = updates0;
-        } else {
-            throw new IllegalStateException("Unknown updates type: " + updates);
+                Updates upds = UpdateShort.builder()
+                        .date(casted.date())
+                        .update(UpdateNewMessage.builder()
+                                .message(message)
+                                .pts(casted.pts())
+                                .ptsCount(casted.ptsCount())
+                                .build())
+                        .build();
+
+                return Tuples.of(message, upds);
+            }
+            case UpdateShortChatMessage.ID: {
+                UpdateShortChatMessage casted = (UpdateShortChatMessage) updates;
+
+                Message message = BaseMessage.builder()
+                        .flags(request.flags() | casted.flags())
+                        .peerId(peer)
+                        .viaBotId(casted.viaBotId())
+                        .replyTo(casted.replyTo())
+                        .fwdFrom(casted.fwdFrom())
+                        .message(request.message())
+                        .id(casted.id())
+                        .replyMarkup(request.replyMarkup())
+                        .entities(casted.entities())
+                        .date(casted.date())
+                        .ttlPeriod(casted.ttlPeriod())
+                        .build();
+
+                Updates upds = ImmutableUpdateShort.builder()
+                        .date(casted.date())
+                        .update(UpdateNewMessage.builder()
+                                .message(message)
+                                .pts(casted.pts())
+                                .ptsCount(casted.ptsCount())
+                                .build())
+                        .build();
+
+                return Tuples.of(message, upds);
+            }
+            case BaseUpdates.ID: {
+                BaseUpdates casted = (BaseUpdates) updates;
+
+                UpdateMessageID updateMessageID = casted.updates().stream()
+                        .filter(upd -> upd instanceof UpdateMessageID)
+                        .map(upd -> (UpdateMessageID) upd)
+                        .findFirst()
+                        .orElseThrow(IllegalStateException::new);
+
+                if (updateMessageID.randomId() != request.randomId()) {
+                    throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
+                            + ", received: " + updateMessageID.randomId());
+                }
+
+                Message message = casted.updates().stream()
+                        .filter(upd -> upd instanceof UpdateNewMessageFields)
+                        .map(upd -> ((UpdateNewMessageFields) upd).message())
+                        .findFirst()
+                        .orElseThrow(IllegalStateException::new);
+
+                return Tuples.of(message, casted);
+            }
+            default: throw new IllegalArgumentException("Unknown updates type: " + updates);
         }
-
-        return Tuples.of(message, update);
     }
 }

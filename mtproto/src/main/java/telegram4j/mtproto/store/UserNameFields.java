@@ -1,7 +1,6 @@
 package telegram4j.mtproto.store;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.tl.BaseUser;
 
 import java.util.Objects;
 

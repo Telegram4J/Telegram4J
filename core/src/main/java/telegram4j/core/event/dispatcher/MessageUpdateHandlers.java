@@ -2,9 +2,17 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
+import telegram4j.core.object.Id;
+import telegram4j.core.object.Message;
+import telegram4j.core.object.chat.Chat;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.*;
+import telegram4j.tl.api.TlObject;
+
+import java.util.Optional;
 
 class MessageUpdateHandlers {
 
@@ -17,7 +25,7 @@ class MessageUpdateHandlers {
                 .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
     }
 
-    static Mono<Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessageFields> context) {
+    static Mono<telegram4j.tl.Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessageFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onEditMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
@@ -27,17 +35,54 @@ class MessageUpdateHandlers {
     // =====================
 
     static Flux<SendMessageEvent> handleUpdateNewMessage(StatefulUpdateContext<UpdateNewMessageFields, Void> context) {
-        Chat chat = context.getChats().isEmpty() ? null : context.getChats().get(0);
-        User user = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
+        MTProtoTelegramClient client = context.getClient();
+        UpdateNewMessageFields upd = context.getUpdate();
 
-        return Flux.just(new SendMessageEvent(context.getClient(), context.getUpdate().message(), chat, user));
+        var chatData = context.getChats().isEmpty() ? null : context.getChats().get(0);
+        var userData = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
+
+        Chat chat = Optional.<TlObject>ofNullable(chatData)
+                .or(() -> Optional.ofNullable(userData))
+                .map(c -> EntityFactory.createChat(client, c))
+                .orElse(null);
+
+        Peer peerId = upd.message() instanceof BaseMessage
+                ? ((BaseMessage) upd.message()).peerId()
+                : ((MessageService) upd.message()).peerId();
+
+        Message newMessage = EntityFactory.createMessage(client, upd.message(), Optional.ofNullable(chat)
+                .map(Chat::getId)
+                .orElseGet(() -> Id.of(peerId)));
+
+        return Flux.just(new SendMessageEvent(client, newMessage, chat));
     }
 
-    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, Message> context) {
-        Chat chat = context.getChats().isEmpty() ? null : context.getChats().get(0);
-        User user = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
+    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
+        MTProtoTelegramClient client = context.getClient();
+        UpdateEditMessageFields upd = context.getUpdate();
 
-        return Flux.just(new EditMessageEvent(context.getClient(), context.getUpdate().message(),
-                context.getOld(), chat, user));
+        var chatData = context.getChats().isEmpty() ? null : context.getChats().get(0);
+        var userData = context.getUsers().isEmpty() ? null : context.getUsers().get(0);
+
+        Chat chat = Optional.<TlObject>ofNullable(chatData)
+                .or(() -> Optional.ofNullable(userData))
+                .map(c -> EntityFactory.createChat(client, c))
+                .orElse(null);
+
+        Peer peerId = upd.message() instanceof BaseMessage
+                ? ((BaseMessage) upd.message()).peerId()
+                : ((MessageService) upd.message()).peerId();
+
+        Id resolvedId = Optional.ofNullable(chat)
+                .map(Chat::getId)
+                .orElseGet(() -> Id.of(peerId));
+
+        Message oldMessage = Optional.ofNullable(context.getOld())
+                .map(d -> EntityFactory.createMessage(client, d, resolvedId))
+                .orElse(null);
+
+        Message newMessage = EntityFactory.createMessage(client, upd.message(), resolvedId);
+
+        return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat));
     }
 }

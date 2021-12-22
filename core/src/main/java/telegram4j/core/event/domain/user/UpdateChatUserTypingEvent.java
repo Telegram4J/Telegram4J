@@ -13,7 +13,7 @@ public class UpdateChatUserTypingEvent extends UserEvent {
     public UpdateChatUserTypingEvent(MTProtoTelegramClient client, long chatId, Peer fromId, SendMessageAction action) {
         super(client);
         this.chatId = chatId;
-        this.fromId = TlEntityUtil.peerId(fromId);
+        this.fromId = TlEntityUtil.getRawPeerId(fromId);
         this.action = action;
     }
 
