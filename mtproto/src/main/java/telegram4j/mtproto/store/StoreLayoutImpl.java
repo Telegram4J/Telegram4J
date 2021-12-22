@@ -12,13 +12,13 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import static telegram4j.mtproto.util.TlEntityUtil.getPeerId;
+import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 public class StoreLayoutImpl implements StoreLayout {
 
     private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, Chat> chats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, BaseUser> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, UserFields> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
@@ -52,7 +52,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<User> getUserById(long userId) {
-        return Mono.fromSupplier(() -> users.get(userId));
+        return Mono.fromSupplier(() -> users.get(userId)).map(UserFields::getMin);
     }
 
     @Override
@@ -106,15 +106,22 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
     public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            BaseUser old = this.users.get(action.userId());
-            UserNameFields fields = old != null ? new UserNameFields(old.username(), old.firstName(), old.lastName()) : null;
-            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(v)
+            UserFields old = this.users.get(action.userId());
+            UserNameFields fields = old != null ? new UserNameFields(old.min.username(), old.min.firstName(), old.min.lastName()) : null;
+            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min
                     .withUsername(action.username())
                     .withFirstName(action.firstName())
-                    .withLastName(action.lastName()));
+                    .withLastName(action.lastName())));
 
             return fields;
         });
@@ -124,39 +131,39 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            BaseUser old = this.users.get(action.userId());
-            this.users.computeIfPresent(action.userId(), (k, v) -> ImmutableBaseUser.copyOf(v)
-                    .withPhone(action.phone()));
+            UserFields old = this.users.get(action.userId());
+            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhone(action.phone())));
 
-            return old != null ? old.phone() : null;
+            return old != null ? old.min.phone() : null;
         });
     }
 
     @Override
-    public Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
-        return Mono.fromRunnable(() -> {
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
+        return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
+            UserFields old = this.users.get(action.userId());
+            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhoto(action.photo())));
+
+            return old != null ? old.min.photo() : null;
         });
     }
 
     @Override
-    public Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
-        return Mono.fromRunnable(() -> {
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
+        return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-        });
-    }
+            UserFields old = this.users.get(action.userId());
+            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withStatus(action.status())));
 
-    @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
+            return old != null ? old.min.status() : null;
         });
     }
 
     private void saveUser(User user) {
         if (user instanceof BaseUser) {
-            BaseUser user0 = (BaseUser) user;
-            users.put(user0.id(), user0);
+            ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
+            users.put(user0.id(), new UserFields(user0));
 
             String username = user0.username();
             Long accessHash = user0.accessHash();
@@ -182,11 +189,11 @@ public class StoreLayoutImpl implements StoreLayout {
             case BaseMessage.ID:
                 BaseMessage baseMessage = (BaseMessage) message;
 
-                return new MessageId(baseMessage.id(), getPeerId(baseMessage.peerId()));
+                return new MessageId(baseMessage.id(), getRawPeerId(baseMessage.peerId()));
             case MessageService.ID:
                 MessageService messageService = (MessageService) message;
 
-                return new MessageId(messageService.id(), getPeerId(messageService.peerId()));
+                return new MessageId(messageService.id(), getRawPeerId(messageService.peerId()));
             default:
                 throw new IllegalArgumentException("Unknown message: " + message);
         }
@@ -222,6 +229,57 @@ public class StoreLayoutImpl implements StoreLayout {
         @Override
         public int hashCode() {
             return Objects.hash(messageId, chatId);
+        }
+    }
+
+    static class UserFields {
+        private final ImmutableBaseUser min;
+        @Nullable
+        private final ImmutableUserFull full;
+
+        UserFields(ImmutableBaseUser min) {
+            this(min, null);
+        }
+
+        UserFields(ImmutableBaseUser min, @Nullable ImmutableUserFull full) {
+            this.min = min;
+            this.full = full;
+        }
+
+        public BaseUser getMin() {
+            return min;
+        }
+
+        @Nullable
+        public UserFull getFull() {
+            return full;
+        }
+
+        public UserFields withMin(ImmutableBaseUser min) {
+            if (Objects.equals(this.min, min)) {
+                return this;
+            }
+            return new UserFields(min, full);
+        }
+
+        public UserFields withFull(@Nullable ImmutableUserFull full) {
+            if (Objects.equals(this.full, full)) {
+                return this;
+            }
+            return new UserFields(min, full);
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            UserFields that = (UserFields) o;
+            return min.equals(that.min) && Objects.equals(full, that.full);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(min, full);
         }
     }
 }

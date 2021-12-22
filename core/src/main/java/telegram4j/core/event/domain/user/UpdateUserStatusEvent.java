@@ -1,31 +1,44 @@
 package telegram4j.core.event.domain.user;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.tl.UserStatus;
+import telegram4j.core.object.Id;
+import telegram4j.core.object.UserStatus;
+
+import java.util.Optional;
 
 public class UpdateUserStatusEvent extends UserEvent {
-    private final long userId;
-    private final UserStatus status;
+    private final Id userId;
+    private final UserStatus currentStatus;
+    @Nullable
+    private final UserStatus oldStatus;
 
-    public UpdateUserStatusEvent(MTProtoTelegramClient client, long userId, UserStatus status) {
+    public UpdateUserStatusEvent(MTProtoTelegramClient client, Id userId,
+                                 UserStatus currentStatus, @Nullable UserStatus oldStatus) {
         super(client);
         this.userId = userId;
-        this.status = status;
+        this.currentStatus = currentStatus;
+        this.oldStatus = oldStatus;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
-    public UserStatus getStatus() {
-        return status;
+    public UserStatus getCurrentStatus() {
+        return currentStatus;
+    }
+
+    public Optional<UserStatus> getOldStatus() {
+        return Optional.ofNullable(oldStatus);
     }
 
     @Override
     public String toString() {
         return "UpdateUserStatusEvent{" +
                 "userId=" + userId +
-                ", status=" + status +
+                ", currentStatus=" + currentStatus +
+                ", oldStatus=" + oldStatus +
                 "} " + super.toString();
     }
 }

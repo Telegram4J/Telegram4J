@@ -42,13 +42,13 @@ public interface StoreLayout {
 
     Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users);
 
+    Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users);
+
     Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
 
     Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
 
-    Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
+    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
 
-    Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
-
-    Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users);
+    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
 }

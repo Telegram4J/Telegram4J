@@ -1,27 +1,26 @@
 package telegram4j.core.event.domain.user;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.Peer;
+import telegram4j.core.object.Id;
 import telegram4j.tl.SendMessageAction;
 
 public class UpdateChatUserTypingEvent extends UserEvent {
-    private final long chatId;
+    private final Id chatId;
+    private final Id fromId;
     private final SendMessageAction action;
-    private final long fromId;
 
-    public UpdateChatUserTypingEvent(MTProtoTelegramClient client, long chatId, Peer fromId, SendMessageAction action) {
+    public UpdateChatUserTypingEvent(MTProtoTelegramClient client, Id chatId, Id fromId, SendMessageAction action) {
         super(client);
         this.chatId = chatId;
-        this.fromId = TlEntityUtil.getRawPeerId(fromId);
+        this.fromId = fromId;
         this.action = action;
     }
 
-    public long getChatId() {
+    public Id getChatId() {
         return chatId;
     }
 
-    public long getFromId() {
+    public Id getFromId() {
         return fromId;
     }
 

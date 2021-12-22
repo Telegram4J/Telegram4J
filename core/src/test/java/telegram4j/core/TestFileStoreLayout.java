@@ -150,6 +150,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
+        return delegate.onUserTyping(action, chats, users);
+    }
+
+    @Override
     public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
         return delegate.onUserNameUpdate(action, chats, users);
     }
@@ -160,17 +165,12 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
         return delegate.onUserPhotoUpdate(action, chats, users);
     }
 
     @Override
-    public Mono<Void> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
         return delegate.onUserStatusUpdate(action, chats, users);
-    }
-
-    @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
-        return delegate.onUserTyping(action, chats, users);
     }
 }

@@ -2,19 +2,20 @@ package telegram4j.core.event.domain.user;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 import telegram4j.mtproto.store.UserNameFields;
 
 import java.util.Optional;
 
 public class UpdateUserNameEvent extends UserEvent {
-    private final long userId;
+    private final Id userId;
     private final String currentFirstName;
     private final String currentLastName;
     private final String currentUsername;
     @Nullable
     private final UserNameFields oldFields;
 
-    public UpdateUserNameEvent(MTProtoTelegramClient client, long userId,
+    public UpdateUserNameEvent(MTProtoTelegramClient client, Id userId,
                                String currentFirstName, String currentLastName, String currentUsername,
                                @Nullable UserNameFields oldFields) {
         super(client);
@@ -25,7 +26,7 @@ public class UpdateUserNameEvent extends UserEvent {
         this.oldFields = oldFields;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
