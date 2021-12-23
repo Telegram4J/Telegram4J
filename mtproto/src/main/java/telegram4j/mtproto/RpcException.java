@@ -12,13 +12,20 @@ public class RpcException extends RuntimeException {
         this.error = error;
     }
 
-    public static RpcException create(RpcError error) {
+    static RpcException create(RpcError error, DefaultMTProtoClient.RequestTuple request) {
         String orig = error.errorMessage();
         int argIdx = orig.indexOf("_X");
         String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
         String arg = argIdx != -1 ? orig.substring(argIdx) : null;
+        String methodDomainName = request.method.getClass().getPackageName()
+                .replace("telegram4j.tl.request", "");
+        String methodName = request.method.getClass().getSimpleName()
+                .replace("Immutable", "");
 
-        String format = "code: " + error.errorCode() + ", message: " + message + (arg != null ? ", param: " + arg : "");
+        String format = String.format("%s.%s returned code: %d, message: %s%s",
+                methodDomainName, methodName, error.errorCode(),
+                message, arg != null ? ", param: " + arg : "");
+
         return new RpcException(format, error);
     }
 

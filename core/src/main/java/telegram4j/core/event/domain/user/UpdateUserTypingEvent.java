@@ -27,6 +27,6 @@ public class UpdateUserTypingEvent extends UserEvent {
         return "UpdateUserTypingEvent{" +
                 "userId=" + userId +
                 ", action=" + action +
-                "} " + super.toString();
+                '}';
     }
 }

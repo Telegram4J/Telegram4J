@@ -17,8 +17,8 @@ import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 public class StoreLayoutImpl implements StoreLayout {
 
     private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, Chat> chats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, UserFields> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, PartialFields<Chat, ChatFull>> chats = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
@@ -46,33 +46,28 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Chat> getChatById(long chatId) {
-        return Mono.fromSupplier(() -> chats.get(chatId));
+    public Mono<Chat> getChatMinById(long chatId) {
+        return Mono.fromSupplier(() -> chats.get(chatId)).map(PartialFields::getMin);
     }
 
     @Override
-    public Mono<User> getUserById(long userId) {
-        return Mono.fromSupplier(() -> users.get(userId)).map(UserFields::getMin);
+    public Mono<ChatFull> getChatFullById(long chatId) {
+        return Mono.fromSupplier(() -> chats.get(chatId)).mapNotNull(PartialFields::getFull);
+    }
+
+    @Override
+    public Mono<User> getUserMinById(long userId) {
+        return Mono.fromSupplier(() -> users.get(userId)).map(PartialFields::getMin);
+    }
+
+    @Override
+    public Mono<UserFull> getUserFullById(long userId) {
+        return Mono.fromSupplier(() -> users.get(userId)).mapNotNull(PartialFields::getFull);
     }
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authorizationKeys.get(dc));
-    }
-
-    @Override
-    public Mono<Void> updateSelfId(long userId) {
-        return Mono.fromRunnable(() -> selfId = userId);
-    }
-
-    @Override
-    public Mono<Void> updateState(State state) {
-        return Mono.fromRunnable(() -> this.state = state);
-    }
-
-    @Override
-    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
-        return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
     }
 
     @Override
@@ -116,7 +111,7 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            UserFields old = this.users.get(action.userId());
+            var old = this.users.get(action.userId());
             UserNameFields fields = old != null ? new UserNameFields(old.min.username(), old.min.firstName(), old.min.lastName()) : null;
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min
                     .withUsername(action.username())
@@ -131,7 +126,7 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            UserFields old = this.users.get(action.userId());
+            var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhone(action.phone())));
 
             return old != null ? old.min.phone() : null;
@@ -142,7 +137,7 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            UserFields old = this.users.get(action.userId());
+            var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhoto(action.photo())));
 
             return old != null ? old.min.photo() : null;
@@ -153,17 +148,40 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
-            UserFields old = this.users.get(action.userId());
+            var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withStatus(action.status())));
 
             return old != null ? old.min.status() : null;
         });
     }
 
+    @Override
+    public Mono<Void> updateSelfId(long userId) {
+        return Mono.fromRunnable(() -> selfId = userId);
+    }
+
+    @Override
+    public Mono<Void> updateState(State state) {
+        return Mono.fromRunnable(() -> this.state = state);
+    }
+
+    @Override
+    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
+        return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
+    }
+
+    @Override
+    public Mono<UserFull> onUserUpdate(UserFull payload) {
+        return Mono.fromSupplier(() -> users.put(payload.user().id(),
+                new PartialFields<>(ImmutableBaseUser.copyOf((BaseUser) payload.user()),
+                        ImmutableUserFull.copyOf(payload))))
+                .mapNotNull(PartialFields::getFull);
+    }
+
     private void saveUser(User user) {
-        if (user instanceof BaseUser) {
+        if (user.identifier() == BaseUser.ID) {
             ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
-            users.put(user0.id(), new UserFields(user0));
+            users.put(user0.id(), new PartialFields<>(user0));
 
             String username = user0.username();
             Long accessHash = user0.accessHash();
@@ -174,9 +192,25 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
+    private void saveChat(Chat chat) {
+        Chat cpy;
+        switch (chat.identifier()) {
+            case BaseChat.ID:
+                cpy = ImmutableBaseChat.copyOf((BaseChat) chat);
+                break;
+            case Channel.ID:
+                cpy = ImmutableChannel.copyOf((Channel) chat);
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown chat type: " + chat);
+        }
+
+        chats.put(chat.id(), new PartialFields<>(cpy));
+    }
+
     private void saveContacts(List<Chat> chats, List<User> users) {
         for (Chat chat : chats) {
-            this.chats.put(chat.id(), chat);
+            saveChat(chat);
         }
 
         for (User user : users) {
@@ -200,13 +234,9 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     static String stripUsername(String username) {
-        String corrected = username.toLowerCase()
-                .trim().replace(".", "");
-
-        if (corrected.startsWith("@")) {
-            return corrected.substring(1);
-        }
-        return corrected;
+        return username.toLowerCase().trim()
+                .replace(".", "")
+                .replace("@", "");
     }
 
     static class MessageId {
@@ -232,48 +262,48 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class UserFields {
-        private final ImmutableBaseUser min;
+    static class PartialFields<M, F> {
+        private final M min;
         @Nullable
-        private final ImmutableUserFull full;
+        private final F full;
 
-        UserFields(ImmutableBaseUser min) {
+        PartialFields(M min) {
             this(min, null);
         }
 
-        UserFields(ImmutableBaseUser min, @Nullable ImmutableUserFull full) {
+        PartialFields(M min, @Nullable F full) {
             this.min = min;
             this.full = full;
         }
 
-        public BaseUser getMin() {
+        public M getMin() {
             return min;
         }
 
         @Nullable
-        public UserFull getFull() {
+        public F getFull() {
             return full;
         }
 
-        public UserFields withMin(ImmutableBaseUser min) {
+        public PartialFields<M, F> withMin(M min) {
             if (Objects.equals(this.min, min)) {
                 return this;
             }
-            return new UserFields(min, full);
+            return new PartialFields<>(min, full);
         }
 
-        public UserFields withFull(@Nullable ImmutableUserFull full) {
+        public PartialFields<M, F> withFull(@Nullable F full) {
             if (Objects.equals(this.full, full)) {
                 return this;
             }
-            return new UserFields(min, full);
+            return new PartialFields<>(min, full);
         }
 
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            UserFields that = (UserFields) o;
+            PartialFields<?, ?> that = (PartialFields<?, ?>) o;
             return min.equals(that.min) && Objects.equals(full, that.full);
         }
 

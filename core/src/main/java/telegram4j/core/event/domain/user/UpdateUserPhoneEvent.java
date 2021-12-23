@@ -37,6 +37,6 @@ public class UpdateUserPhoneEvent extends UserEvent {
                 "userId=" + userId +
                 ", phone='" + phone + '\'' +
                 ", oldPhone='" + oldPhone + '\'' +
-                "} " + super.toString();
+                '}';
     }
 }

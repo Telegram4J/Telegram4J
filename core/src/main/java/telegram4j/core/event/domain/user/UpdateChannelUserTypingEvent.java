@@ -49,6 +49,6 @@ public class UpdateChannelUserTypingEvent extends UserEvent {
                 ", fromId=" + fromId +
                 ", action=" + action +
                 ", topMessageId=" + topMessageId +
-                "} " + super.toString();
+                '}';
     }
 }

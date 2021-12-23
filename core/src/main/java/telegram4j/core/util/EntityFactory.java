@@ -1,8 +1,9 @@
 package telegram4j.core.util;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
+import telegram4j.core.object.*;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.PhotoSize;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.action.MessageAction;
@@ -61,6 +62,12 @@ public final class EntityFactory {
 
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat) {
         switch (possibleChat.identifier()) {
+            case UserFull.ID:
+                UserFull userFull = (UserFull) possibleChat;
+
+                User mappedFullUser = new User(client, userFull);
+
+                return new PrivateChat(client, mappedFullUser);
             case BaseUser.ID:
                 BaseUser baseUser = (BaseUser) possibleChat;
 
@@ -195,6 +202,20 @@ public final class EntityFactory {
 
             default:
                 throw new IllegalArgumentException("Unknown keyboard button type: " + data);
+        }
+    }
+
+    public static PhotoSize createPhotoSize(MTProtoTelegramClient client, telegram4j.tl.PhotoSize data) {
+        switch (data.identifier()) {
+            case BasePhotoSize.ID:
+            case PhotoCachedSize.ID:
+            case PhotoPathSize.ID:
+            case PhotoSizeEmpty.ID:
+            case PhotoSizeProgressive.ID:
+            case PhotoStrippedSize.ID:
+                // TODO
+            default:
+                throw new IllegalArgumentException("Unknown photo size type: " + data);
         }
     }
 }

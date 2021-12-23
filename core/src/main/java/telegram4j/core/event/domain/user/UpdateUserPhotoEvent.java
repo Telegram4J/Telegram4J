@@ -53,7 +53,8 @@ public class UpdateUserPhotoEvent extends UserEvent {
                 "userId=" + userId +
                 ", timestamp=" + timestamp +
                 ", currentPhoto=" + currentPhoto +
+                ", oldPhoto=" + oldPhoto +
                 ", previous=" + previous +
-                "} " + super.toString();
+                '}';
     }
 }

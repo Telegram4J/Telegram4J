@@ -13,9 +13,4 @@ public abstract class Event {
     public MTProtoTelegramClient getClient() {
         return client;
     }
-
-    @Override
-    public String toString() {
-        return "Event{}";
-    }
 }

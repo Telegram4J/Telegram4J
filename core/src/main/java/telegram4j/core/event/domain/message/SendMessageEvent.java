@@ -33,6 +33,6 @@ public class SendMessageEvent extends MessageEvent {
         return "SendMessageEvent{" +
                 "message=" + message +
                 ", chat=" + chat +
-                "} " + super.toString();
+                '}';
     }
 }

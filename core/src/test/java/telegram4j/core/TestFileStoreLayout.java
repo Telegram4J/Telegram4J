@@ -110,23 +110,23 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Chat> getChatById(long chatId) {
-        return delegate.getChatById(chatId);
+    public Mono<Chat> getChatMinById(long chatId) {
+        return delegate.getChatMinById(chatId);
     }
 
     @Override
-    public Mono<User> getUserById(long userId) {
-        return delegate.getUserById(userId);
+    public Mono<ChatFull> getChatFullById(long chatId) {
+        return delegate.getChatFullById(chatId);
     }
 
     @Override
-    public Mono<Void> updateSelfId(long userId) {
-        return delegate.updateSelfId(userId);
+    public Mono<User> getUserMinById(long userId) {
+        return delegate.getUserMinById(userId);
     }
 
     @Override
-    public Mono<Void> updateState(State state) {
-        return delegate.updateState(state);
+    public Mono<UserFull> getUserFullById(long userId) {
+        return delegate.getUserFullById(userId);
     }
 
     @Override
@@ -172,5 +172,20 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
         return delegate.onUserStatusUpdate(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> updateSelfId(long userId) {
+        return delegate.updateSelfId(userId);
+    }
+
+    @Override
+    public Mono<Void> updateState(State state) {
+        return delegate.updateState(state);
+    }
+
+    @Override
+    public Mono<UserFull> onUserUpdate(UserFull payload) {
+        return delegate.onUserUpdate(payload);
     }
 }

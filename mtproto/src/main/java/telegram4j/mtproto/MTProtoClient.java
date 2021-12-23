@@ -29,6 +29,7 @@ public interface MTProtoClient {
 
     enum State {
         DISCONNECTED,
+        CLOSED,
         CONNECTED,
         RECONNECT
     }

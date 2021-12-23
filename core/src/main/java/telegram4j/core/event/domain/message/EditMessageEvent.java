@@ -42,6 +42,6 @@ public class EditMessageEvent extends MessageEvent {
                 "newMessage=" + newMessage +
                 ", oldMessage=" + oldMessage +
                 ", chat=" + chat +
-                "} " + super.toString();
+                '}';
     }
 }

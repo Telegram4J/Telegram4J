@@ -2,6 +2,7 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.ChannelException;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -14,6 +15,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
+import reactor.util.retry.Retry;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
@@ -26,6 +28,8 @@ import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.mtproto.GetFutureSalts;
+import telegram4j.tl.request.mtproto.ImmutableGetFutureSalts;
+import telegram4j.tl.request.mtproto.ImmutablePing;
 import telegram4j.tl.request.mtproto.Ping;
 
 import java.net.InetSocketAddress;
@@ -106,8 +110,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                     con.channel().writeAndFlush(transport.identifier(con.channel().alloc()));
                 })
-                .doOnDisconnected(con -> log.debug("Disconnected from the datacenter №{} ({}:{})",
-                        dataCenter.getId(), dataCenter.getAddress(), dataCenter.getPort()));
+                .doOnDisconnected(con -> state.emitNext(State.DISCONNECTED, Sinks.EmitFailureHandler.FAIL_FAST));
     }
 
     @Override
@@ -120,11 +123,20 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             ByteBufAllocator alloc = connection.channel().alloc();
 
+            Mono<Void> stateHandler = state.asFlux()
+                    .flatMap(state -> {
+                        if (state == State.DISCONNECTED) {
+                            // Trigger reconnect
+                            return Mono.error(new ChannelException());
+                        }
+                        return Mono.empty();
+                    })
+                    .then();
+
             Mono<Void> onConnect = state.asFlux().filter(state -> state == State.CONNECTED).next().then();
 
             Mono<Void> inboundHandler = connection.inbound()
-                    .receive()
-                    .retain()
+                    .receive().retain()
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
                             .addComponents(true, bufs))
@@ -261,7 +273,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> futureSaltSchedule = futureSaltEmitter.ticks()
-                    .flatMap(tick -> sendAwait(GetFutureSalts.builder().num(1).build()))
+                    .flatMap(tick -> sendAwait(ImmutableGetFutureSalts.of(1)))
                     .doOnNext(futureSalts -> {
                         FutureSalt salt = futureSalts.salts().get(0);
                         int delaySeconds = salt.validUntil() - futureSalts.now() - 900;
@@ -274,7 +286,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> ping = pingEmitter.ticks()
-                    .flatMap(tick -> sendAwait(Ping.builder().pingId(random.nextInt()).build()))
+                    .flatMap(tick -> sendAwait(ImmutablePing.of(random.nextInt())))
                     .then();
 
             Mono<Void> awaitKey = storeLayout.getAuthorizationKey(dataCenter)
@@ -297,10 +309,16 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 return Mono.when(futureSaltSchedule, ping);
             });
 
-            return Mono.zip(inboundHandler, outboundHandler, authHandlerFuture,
+            return Mono.zip(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
                             rpcHandler, awaitKey.then(startSchedule))
                     .then();
         })
+        .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
+                .filter(t -> t instanceof ChannelException)
+                .doBeforeRetry(signal -> {
+                    state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);
+                    log.debug("Reconnecting to the dc (attempts: {}).", signal.totalRetries());
+                }))
         .then(Mono.defer(() -> connection.onDispose()));
     }
 
@@ -363,17 +381,20 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public Mono<Void> close() {
-        return Mono.defer(() -> {
-            if (connection == null) {
-                return Mono.error(new IllegalStateException("MTProto client isn't connected."));
-            }
+        return Mono.justOrEmpty(connection)
+                .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected.")))
+                .doOnNext(con -> {
+                    resetSession();
+                    futureSaltEmitter.dispose();
+                    pingEmitter.dispose();
 
-            resetSession();
-            futureSaltEmitter.dispose();
-            pingEmitter.dispose();
-            state.emitNext(State.DISCONNECTED, Sinks.EmitFailureHandler.FAIL_FAST);
-            return Mono.fromRunnable(connection::dispose);
-        });
+                    connection.dispose();
+                    log.debug("Disconnected from the datacenter №{} ({}:{})",
+                            dataCenter.getId(), dataCenter.getAddress(), dataCenter.getPort());
+
+                    state.emitNext(State.CLOSED, Sinks.EmitFailureHandler.FAIL_FAST);
+                })
+                .then();
     }
 
     private long getMessageId() {
@@ -454,6 +475,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 messageId = futureSalts.reqMsgId();
             }
 
+            RequestTuple req = resolvers.get(messageId);
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
                 if (rpcError.errorCode() == 420) { // FLOOD_WAIT_X
@@ -473,7 +495,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             .then();
                 }
 
-                obj = RpcException.create(rpcError);
+                obj = RpcException.create(rpcError, req);
             }
 
             resolve(messageId, obj);
@@ -532,6 +554,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
         if (isNotPartialUpdates(obj)) {
             Updates updates = (Updates) obj;
+            if (rpcLog.isTraceEnabled()) {
+                rpcLog.trace("Receiving updates: {}", updates);
+            }
+
             this.updates.emitNext(updates, emissionHandler);
         }
 

@@ -28,7 +28,9 @@ import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
+import telegram4j.tl.request.users.GetFullUser;
 import telegram4j.tl.request.users.GetUsers;
+import telegram4j.tl.request.users.ImmutableGetFullUser;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -137,10 +139,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             Mono<Void> fetchSelfId = storeLayout.getSelfId()
                     .filter(l -> l != 0)
-                    .switchIfEmpty(mtProtoClient.sendAwait(GetUsers.builder()
-                            .addId(InputUserSelf.instance())
-                            .build())
-                            .flatMap(users -> storeLayout.updateSelfId(users.get(0).id()))
+                    .switchIfEmpty(mtProtoClient.sendAwait(ImmutableGetFullUser.of(InputUserSelf.instance()))
+                            .flatMap(user -> storeLayout.updateSelfId(user.user().id())
+                                    .and(storeLayout.onUserUpdate(user)))
                             .then(Mono.empty()))
                     .then();
 
@@ -179,7 +180,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
                         switch (state) {
-                            case DISCONNECTED:
+                            case CLOSED:
                                 mtProtoClientManager.remove(mtProtoClient.getDatacenter());
                                 return Mono.just(mtProtoClientManager.activeCount())
                                         .filter(i -> i == 0)

@@ -39,6 +39,6 @@ public class UpdateUserStatusEvent extends UserEvent {
                 "userId=" + userId +
                 ", currentStatus=" + currentStatus +
                 ", oldStatus=" + oldStatus +
-                "} " + super.toString();
+                '}';
     }
 }

@@ -32,8 +32,8 @@ public class UpdateChatUserTypingEvent extends UserEvent {
     public String toString() {
         return "UpdateChatUserTypingEvent{" +
                 "chatId=" + chatId +
-                ", action=" + action +
                 ", fromId=" + fromId +
-                "} " + super.toString();
+                ", action=" + action +
+                '}';
     }
 }

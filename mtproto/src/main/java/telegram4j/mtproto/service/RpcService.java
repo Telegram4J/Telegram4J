@@ -75,20 +75,20 @@ public abstract class RpcService {
         return storeLayout.getSelfId()
                 .filter(selfId -> selfId == id)
                 .<InputPeer>map(selfId -> InputPeerSelf.instance())
-                .switchIfEmpty(storeLayout.getUserById(id)
+                .switchIfEmpty(storeLayout.getUserMinById(id)
                         .ofType(BaseUser.class)
                         .flatMap(user -> Mono.justOrEmpty(user.accessHash())
                                 .map(accessHash -> ImmutableInputPeerUser.of(user.id(), accessHash))));
     }
 
     protected Mono<InputPeerChat> getInputPeerChat(long id) {
-        return storeLayout.getChatById(id)
+        return storeLayout.getChatMinById(id)
                 .ofType(BaseChat.class)
                 .map(chat -> ImmutableInputPeerChat.of(chat.id()));
     }
 
     protected Mono<InputPeerChannel> getInputPeerChannel(long id) {
-        return storeLayout.getChatById(id)
+        return storeLayout.getChatMinById(id)
                 .ofType(Channel.class)
                 .flatMap(user -> Mono.justOrEmpty(user.accessHash())
                         .map(accessHash -> ImmutableInputPeerChannel.of(user.id(), accessHash)));

@@ -18,17 +18,15 @@ public interface StoreLayout {
 
     Mono<Message> getMessageById(long chatId, int messageId);
 
-    Mono<Chat> getChatById(long chatId);
+    Mono<Chat> getChatMinById(long chatId);
 
-    Mono<User> getUserById(long userId);
+    Mono<ChatFull> getChatFullById(long chatId);
+
+    Mono<User> getUserMinById(long userId);
+
+    Mono<UserFull> getUserFullById(long userId);
 
     Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
-
-    Mono<Void> updateSelfId(long userId);
-
-    Mono<Void> updateState(State state);
-
-    Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
 
     // message updates
 
@@ -51,4 +49,16 @@ public interface StoreLayout {
     Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
 
     Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
+
+    // not an update-related methods
+
+    Mono<Void> updateSelfId(long userId);
+
+    Mono<Void> updateState(State state);
+
+    Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
+
+    // common update methods
+
+    Mono<UserFull> onUserUpdate(UserFull payload);
 }

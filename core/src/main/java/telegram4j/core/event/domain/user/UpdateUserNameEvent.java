@@ -62,6 +62,6 @@ public class UpdateUserNameEvent extends UserEvent {
                 ", currentLastName='" + currentLastName + '\'' +
                 ", currentUsername='" + currentUsername + '\'' +
                 ", oldFields=" + oldFields +
-                "} " + super.toString();
+                '}';
     }
 }

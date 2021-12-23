@@ -3,6 +3,7 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.BaseUserProfilePhoto;
 import telegram4j.tl.UserEmpty;
@@ -40,6 +41,10 @@ public class User implements TelegramObject {
         return client;
     }
 
+    public EnumSet<Flag> getFlags() {
+        return fullData != null ? Flag.fromUserFull(fullData) : Flag.fromUserMin(minData);
+    }
+
     // MinUser fields
 
     public Optional<String> getFirstName() {
@@ -61,8 +66,7 @@ public class User implements TelegramObject {
     public Optional<ChatPhoto> getPhoto() {
         return Optional.ofNullable(minData)
                 .map(BaseUser::photo)
-                .filter(u -> u.identifier() != BaseUserProfilePhoto.ID)
-                .map(u -> (BaseUserProfilePhoto) u)
+                .map(u -> TlEntityUtil.unmapEmpty(u, BaseUserProfilePhoto.class))
                 .map(c -> new ChatPhoto(client, c));
     }
 
@@ -77,7 +81,7 @@ public class User implements TelegramObject {
     }
 
 
-    public Optional<List<RestrictionReason>> restrictionReason() {
+    public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(minData)
                 .map(BaseUser::restrictionReason)
                 .map(list -> list.stream()
@@ -85,7 +89,7 @@ public class User implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
-    public Optional<Integer> botInlinePlaceholder() {
+    public Optional<Integer> getBotInlinePlaceholder() {
         return Optional.ofNullable(minData).map(BaseUser::botInfoVersion);
     }
 
@@ -191,7 +195,7 @@ public class User implements TelegramObject {
 
         // MinUser flags
 
-        /** Whether this user indicates the currently logged in user. */
+        /** Whether this user indicates the currently logged-in user. */
         SELF(10),
 
         /** Whether this user is a contact. */
