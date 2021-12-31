@@ -2,18 +2,13 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.BaseUser;
-import telegram4j.tl.BaseUserProfilePhoto;
-import telegram4j.tl.UserEmpty;
-import telegram4j.tl.UserFull;
+import telegram4j.tl.*;
 
 import java.time.Duration;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class User implements TelegramObject {
@@ -22,18 +17,26 @@ public class User implements TelegramObject {
     private final BaseUser minData;
     @Nullable
     private final UserFull fullData;
+    @Nullable
+    private final List<Chat> chats;
+    @Nullable
+    private final List<User> users;
 
-    public User(MTProtoTelegramClient client, UserFull fullData) {
+    public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData,
+                List<User> users, List<Chat> chats) {
         this.client = client;
-        // Must be safe.
-        this.minData = (BaseUser) fullData.user();
+        this.minData = minData;
         this.fullData = fullData;
+        this.chats = Collections.unmodifiableList(chats);
+        this.users = Collections.unmodifiableList(users);
     }
 
     public User(MTProtoTelegramClient client, BaseUser minData) {
         this.client = client;
         this.minData = minData;
         this.fullData = null;
+        this.chats = null;
+        this.users = null;
     }
 
     @Override
@@ -42,7 +45,7 @@ public class User implements TelegramObject {
     }
 
     public EnumSet<Flag> getFlags() {
-        return fullData != null ? Flag.fromUserFull(fullData) : Flag.fromUserMin(minData);
+        return fullData != null ? Flag.fromUserFull(fullData, minData) : Flag.fromUserMin(minData);
     }
 
     // MinUser fields
@@ -150,17 +153,26 @@ public class User implements TelegramObject {
         return Optional.ofNullable(fullData).map(UserFull::themeEmoticon);
     }
 
+    public Optional<List<Chat>> getChats() {
+        return Optional.ofNullable(chats);
+    }
+
+    public Optional<List<User>> getUsers() {
+        return Optional.ofNullable(users);
+    }
+
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         User user = (User) o;
-        return minData.equals(user.minData) && Objects.equals(fullData, user.fullData);
+        return minData.equals(user.minData) && Objects.equals(fullData, user.fullData) &&
+                Objects.equals(chats, user.chats) && Objects.equals(users, user.users);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minData, fullData);
+        return Objects.hash(minData, fullData, chats, users);
     }
 
     @Override
@@ -168,6 +180,8 @@ public class User implements TelegramObject {
         return "User{" +
                 "minData=" + minData +
                 ", fullData=" + fullData +
+                ", chats=" + chats +
+                ", users=" + users +
                 '}';
     }
 
@@ -256,7 +270,7 @@ public class User implements TelegramObject {
             return flag;
         }
 
-        public static EnumSet<Flag> fromUserFull(UserFull userFull) {
+        public static EnumSet<Flag> fromUserFull(telegram4j.tl.UserFull userFull, telegram4j.tl.User userMin) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
 
             int flags = userFull.flags();
@@ -268,7 +282,7 @@ public class User implements TelegramObject {
             }
 
             // Add min user flags
-            set.addAll(fromUserMin(userFull.user()));
+            set.addAll(fromUserMin(userMin));
 
             return set;
         }

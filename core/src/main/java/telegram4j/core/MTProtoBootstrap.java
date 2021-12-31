@@ -15,6 +15,7 @@ import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.mtproto.*;
+import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.mtproto.transport.IntermediateTransport;
@@ -28,9 +29,6 @@ import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
-import telegram4j.tl.request.users.GetFullUser;
-import telegram4j.tl.request.users.GetUsers;
-import telegram4j.tl.request.users.ImmutableGetFullUser;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -131,31 +129,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             mtProtoClientManager.add(mtProtoClient);
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
+            ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authorizationResources, mtProtoClient,
                     mtProtoResources, updatesHandlers,
-                    onDisconnect.asMono());
-
-            Mono<Void> fetchSelfId = storeLayout.getSelfId()
-                    .filter(l -> l != 0)
-                    .switchIfEmpty(mtProtoClient.sendAwait(ImmutableGetFullUser.of(InputUserSelf.instance()))
-                            .flatMap(user -> storeLayout.updateSelfId(user.user().id())
-                                    .and(storeLayout.onUserUpdate(user)))
-                            .then(Mono.empty()))
-                    .then();
-
-            Mono<Void> initializeConnection =
-                    mtProtoClient.sendAwait(InvokeWithLayer.builder()
-                            .layer(MTProtoTelegramClient.LAYER)
-                            .query(initConnectionParams())
-                            .build())
-                    .then(mtProtoClient.sendAwait(importAuthorization()))
-                    .then(fetchSelfId)
-                    .then(telegramClient.getUpdatesManager().fillGap())
-                    .thenReturn(telegramClient)
-                    .doOnNext(sink::success)
-                    .then();
+                    serviceHolder, onDisconnect.asMono());
 
             Mono<Void> disconnect = Mono.fromRunnable(() -> {
                 eventDispatcher.shutdown();
@@ -166,8 +145,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             Disposable.Composite composite = Disposables.composite();
 
             composite.add(mtProtoClient.connect().subscribe());
-
-            composite.add(initializeConnection.subscribe());
 
             composite.add(mtProtoClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
@@ -185,6 +162,23 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                 return Mono.just(mtProtoClientManager.activeCount())
                                         .filter(i -> i == 0)
                                         .flatMap(ig -> disconnect);
+                            case CONNECTED:
+                                Mono<Void> fetchSelfId = storeLayout.getSelfId()
+                                        .filter(l -> l != 0)
+                                        .switchIfEmpty(serviceHolder.getUserService().getFullUser(InputUserSelf.instance())
+                                                .flatMap(user -> storeLayout.updateSelfId(user.fullUser().id()))
+                                                .then(Mono.empty()))
+                                        .then();
+
+                                return mtProtoClient.sendAwait(InvokeWithLayer.builder()
+                                                .layer(MTProtoTelegramClient.LAYER)
+                                                .query(initConnectionParams())
+                                                .build())
+                                        .then(mtProtoClient.sendAwait(importAuthorization()))
+                                        .then(fetchSelfId)
+                                        .then(telegramClient.getUpdatesManager().fillGap())
+                                        .thenReturn(telegramClient)
+                                        .doOnNext(sink::success);
                             default:
                                 return Mono.empty();
                         }

@@ -13,12 +13,12 @@ import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
+import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.State;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 
 import static telegram4j.tl.TlSerialUtil.readBytes;
@@ -44,7 +44,7 @@ public class TestFileStoreLayout implements StoreLayout {
         return Mono.justOrEmpty(authorizationKey)
                 .subscribeOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromCallable(() -> {
-                    Path fileName = Paths.get(String.format(AUTH_KEY_FILE, dc.getId()));
+                    Path fileName = Path.of(String.format(AUTH_KEY_FILE, dc.getId()));
                     if (!Files.exists(fileName)) {
                         return null;
                     }
@@ -77,7 +77,7 @@ public class TestFileStoreLayout implements StoreLayout {
                             .writeIntLE(authorizationKey.getAuthKeyId().length)
                             .writeBytes(authorizationKey.getAuthKeyId());
 
-                    Path fileName = Paths.get(String.format(AUTH_KEY_FILE, authorizationKey.getDc().getId()));
+                    Path fileName = Path.of(String.format(AUTH_KEY_FILE, authorizationKey.getDc().getId()));
                     try {
                         return Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
                     } finally {
@@ -185,7 +185,27 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<UserFull> onUserUpdate(UserFull payload) {
+    public Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload) {
         return delegate.onUserUpdate(payload);
+    }
+
+    @Override
+    public Mono<User> onUserUpdate(User payload) {
+        return delegate.onUserUpdate(payload);
+    }
+
+    @Override
+    public Mono<UserInfo> onUserInfoUpdate(UserInfo payload) {
+        return delegate.onUserInfoUpdate(payload);
+    }
+
+    @Override
+    public Mono<Chat> onChatUpdate(Chat payload) {
+        return delegate.onChatUpdate(payload);
+    }
+
+    @Override
+    public Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
+        return delegate.onChatUpdate(payload);
     }
 }

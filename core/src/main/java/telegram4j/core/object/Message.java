@@ -176,7 +176,8 @@ public class Message implements TelegramObject {
                     .or(() -> spec.message().map(s -> Tuples.of(s, List.of())))
                     .orElse(null);
 
-            return client.getMessageService().editMessage(EditMessage.builder()
+            return client.getServiceHolder().getMessageService()
+                    .editMessage(EditMessage.builder()
                             .message(tuple != null ? tuple.getT1() : null)
                             .entities(tuple != null ? tuple.getT2() : null)
                             .noWebpage(spec.noWebpage())

@@ -13,8 +13,7 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
-import telegram4j.tl.request.updates.GetDifference;
-import telegram4j.tl.request.updates.GetState;
+import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.BaseDifference;
 import telegram4j.tl.updates.DifferenceEmpty;
 import telegram4j.tl.updates.DifferenceSlice;
@@ -76,30 +75,43 @@ public class UpdatesManager {
     }
 
     public Mono<Void> fillGap() {
-        return client.getMtProtoClient().sendAwait(GetState.instance())
+        return client.getServiceHolder()
+                .getUpdatesService().getState()
                 .flatMap(state -> client.getMtProtoResources()
-                        .getStoreLayout().getCurrentState()
-                        .switchIfEmpty(client.getMtProtoResources()
-                                .getStoreLayout().updateState(state)
-                                .thenReturn(state))
-                        .doOnNext(this::applyStateLocal)
-                        .thenMany(getDifference())
-                        .doOnNext(client.getMtProtoResources()
-                                .getEventDispatcher()::publish)
-                        .then());
+                .getStoreLayout().getCurrentState()
+                .switchIfEmpty(client.getMtProtoResources()
+                        .getStoreLayout().updateState(state)
+                        .thenReturn(state))
+                .doOnNext(this::applyStateLocal)
+                .thenMany(getDifference())
+                .doOnNext(client.getMtProtoResources()
+                        .getEventDispatcher()::publish)
+                .then());
     }
 
     public Flux<Event> handle(Updates updates) {
-        // *embedded* message updates must be handled not here.
         switch (updates.identifier()) {
             case UpdatesTooLong.ID:
                 return getDifference();
-            case UpdateShort.ID:
+            case UpdateShort.ID: {
                 UpdateShort updateShort = (UpdateShort) updates;
 
+                Flux<?> preApply = Flux.empty();
                 date = updateShort.date();
+                if (updateShort.update() instanceof PtsUpdate) {
+                    PtsUpdate ptsUpdate = (PtsUpdate) updateShort.update();
 
-                return updatesHandlers.handle(UpdateContext.create(client, updateShort.update()));
+                    if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) { // ignore
+                        return Flux.empty();
+                    } else if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) { // fill gap
+                        preApply = getDifference();
+                    } else { // apply
+                        pts = ptsUpdate.pts();
+                    }
+                }
+
+                return preApply.thenMany(updatesHandlers.handle(UpdateContext.create(client, updateShort.update())));
+            }
             case BaseUpdates.ID:
                 BaseUpdates baseUpdates = (BaseUpdates) updates;
 
@@ -164,12 +176,9 @@ public class UpdatesManager {
     }
 
     private Flux<Event> getDifference(int pts, int qts, int date) {
-        return client.getMtProtoClient()
-                .sendAwait(GetDifference.builder()
-                        .pts(pts)
-                        .qts(qts)
-                        .date(date)
-                        .build())
+        return client.getServiceHolder()
+                .getUpdatesService()
+                .getDifference(ImmutableGetDifference.of(pts, qts, date))
                 .flatMapMany(difference -> {
                     if (log.isTraceEnabled()) {
                         log.trace("difference: {}", difference);
@@ -207,7 +216,8 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(client.getMessageService().getInputPeer(peer)
+                                                .switchIfEmpty(client.getServiceHolder()
+                                                        .getMessageService().getInputPeer(peer)
                                                         .map(p -> peerToId(p, id)))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat));
@@ -244,7 +254,8 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(client.getMessageService().getInputPeer(peer)
+                                                .switchIfEmpty(client.getServiceHolder()
+                                                        .getMessageService().getInputPeer(peer)
                                                         .map(p -> peerToId(p, id)))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat));

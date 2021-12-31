@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.State;
 
 import java.util.List;
@@ -60,5 +61,13 @@ public interface StoreLayout {
 
     // common update methods
 
-    Mono<UserFull> onUserUpdate(UserFull payload);
+    Mono<User> onUserUpdate(User payload);
+
+    Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload);
+
+    Mono<UserInfo> onUserInfoUpdate(UserInfo payload);
+
+    Mono<Chat> onChatUpdate(Chat payload);
+
+    Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
 }

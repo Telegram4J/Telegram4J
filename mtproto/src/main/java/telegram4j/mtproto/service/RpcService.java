@@ -27,7 +27,7 @@ public abstract class RpcService {
 
     public Mono<InputPeer> getInputPeer(Peer peer) {
         return Mono.defer(() -> {
-            long id = TlEntityUtil.getPeerId(peer);
+            long id = TlEntityUtil.getRawPeerId(peer);
             switch (peer.identifier()) {
                 case PeerChannel.ID: return getInputPeerChannel(id);
                 case PeerChat.ID: return getInputPeerChat(id);
@@ -92,5 +92,16 @@ public abstract class RpcService {
                 .ofType(Channel.class)
                 .flatMap(user -> Mono.justOrEmpty(user.accessHash())
                         .map(accessHash -> ImmutableInputPeerChannel.of(user.id(), accessHash)));
+    }
+
+    protected static long calculatePaginationHash(Iterable<Long> ids) {
+        long hash = 0;
+        for (long id : ids) {
+            hash ^= id >> 21;
+            hash ^= id << 35;
+            hash ^= id >> 4;
+            hash += id;
+        }
+        return hash;
     }
 }

@@ -67,7 +67,7 @@ abstract class BaseChat implements Chat {
                     .map(m -> EntityParser.parse(spec.message(), m))
                     .orElseGet(() -> Tuples.of(spec.message(), List.of()));
 
-            return client.getMessageService()
+            return client.getServiceHolder().getMessageService()
                     .sendMessage(SendMessage.builder()
                             .randomId(CryptoUtil.random.nextLong())
                             .peer(getIdAsPeer())

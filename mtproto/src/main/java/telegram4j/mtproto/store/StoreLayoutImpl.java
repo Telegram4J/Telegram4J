@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.State;
 
 import java.util.List;
@@ -171,28 +172,73 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserFull> onUserUpdate(UserFull payload) {
-        return Mono.fromSupplier(() -> users.put(payload.user().id(),
-                new PartialFields<>(ImmutableBaseUser.copyOf((BaseUser) payload.user()),
-                        ImmutableUserFull.copyOf(payload))))
-                .mapNotNull(PartialFields::getFull);
+    public Mono<User> onUserUpdate(User payload) {
+        return Mono.fromSupplier(() -> saveUserMin(payload)).mapNotNull(PartialFields::getMin);
     }
 
-    private void saveUser(User user) {
+    @Override
+    public Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload) {
+        return Mono.fromSupplier(() -> saveUserFull(payload))
+                .then(Mono.empty()); // TODO: try to assemble such an object
+    }
+
+    @Override
+    public Mono<UserInfo> onUserInfoUpdate(UserInfo payload) {
+        return Mono.empty(); // unsupported
+    }
+
+    @Override
+    public Mono<Chat> onChatUpdate(Chat payload) {
+        return Mono.fromSupplier(() -> saveChatMin(payload)).mapNotNull(PartialFields::getMin);
+    }
+
+    @Override
+    public Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
+        return Mono.empty();
+    }
+
+    private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserFull(telegram4j.tl.users.UserFull user) {
+        ImmutableUserFull user0 = ImmutableUserFull.copyOf(user.fullUser());
+        ImmutableBaseUser user1 = ImmutableBaseUser.copyOf(user.users().stream()
+                .filter(u -> u.identifier() == BaseUser.ID && u.id() == user0.id())
+                .map(u -> (BaseUser) u)
+                .findFirst()
+                .orElseThrow());
+
+        var old = users.computeIfAbsent(user.fullUser().id(), k -> new PartialFields<>(user1, user0));
+        users.computeIfPresent(user.fullUser().id(), (k, v) -> new PartialFields<>(user1, user0));
+        saveUsernamePeer(user1);
+
+        saveContacts(user.chats(), user.users());
+
+        return old;
+    }
+
+    private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserMin(User user) {
         if (user.identifier() == BaseUser.ID) {
             ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
-            users.put(user0.id(), new PartialFields<>(user0));
+            var old = users.computeIfAbsent(user.id(), k -> new PartialFields<>(user0));
+            users.computeIfPresent(user0.id(), (k, v) -> new PartialFields<>(user0, v.full));
+            saveUsernamePeer(user0);
 
-            String username = user0.username();
-            Long accessHash = user0.accessHash();
-            // TODO: if access hash is null we must remove peer from cache?
-            if (username != null && accessHash != null) {
-                usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user0.id(), accessHash));
+            return old;
+        }
+        return null;
+    }
+
+    private void saveUsernamePeer(BaseUser user) {
+        String username = user.username();
+        Long accessHash = user.accessHash();
+        if (username != null) {
+            if (accessHash != null) {
+                usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user.id(), accessHash));
+            } else {
+                usernames.remove(stripUsername(username));
             }
         }
     }
 
-    private void saveChat(Chat chat) {
+    private PartialFields<Chat, ChatFull> saveChatMin(Chat chat) {
         Chat cpy;
         switch (chat.identifier()) {
             case BaseChat.ID:
@@ -205,16 +251,18 @@ public class StoreLayoutImpl implements StoreLayout {
                 throw new IllegalArgumentException("Unknown chat type: " + chat);
         }
 
-        chats.put(chat.id(), new PartialFields<>(cpy));
+        var old = chats.computeIfAbsent(cpy.id(), k -> new PartialFields<>(cpy));
+        chats.computeIfPresent(cpy.id(), (k, v) -> new PartialFields<>(cpy, v.full));
+        return old;
     }
 
     private void saveContacts(List<Chat> chats, List<User> users) {
         for (Chat chat : chats) {
-            saveChat(chat);
+            saveChatMin(chat);
         }
 
         for (User user : users) {
-            saveUser(user);
+            saveUserMin(user);
         }
     }
 

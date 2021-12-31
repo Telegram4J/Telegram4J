@@ -2,36 +2,36 @@ package telegram4j.core;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
-import telegram4j.mtproto.service.MessageService;
+import telegram4j.mtproto.service.ServiceHolder;
 
 import java.util.Objects;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient {
-    public static final int LAYER = 133;
+    public static final int LAYER = 137;
 
     private final AuthorizationResources authorizationResources;
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
-    private final MessageService messageService;
+    private final ServiceHolder serviceHolder;
     private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authorizationResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
-                          UpdatesHandlers updatesHandlers, Mono<Void> onDisconnect) {
+                          UpdatesHandlers updatesHandlers, ServiceHolder serviceHolder,
+                          Mono<Void> onDisconnect) {
         this.authorizationResources = authorizationResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
+        this.serviceHolder = serviceHolder;
         this.onDisconnect = onDisconnect;
 
         this.updatesManager = new UpdatesManager(this, updatesHandlers);
-        this.messageService = new MessageService(mtProtoClient, mtProtoResources.getStoreLayout());
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
@@ -61,8 +61,8 @@ public final class MTProtoTelegramClient {
         return mtProtoClient;
     }
 
-    public MessageService getMessageService() {
-        return messageService;
+    public ServiceHolder getServiceHolder() {
+        return serviceHolder;
     }
 
     public Mono<Void> disconnect() {

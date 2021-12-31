@@ -1,11 +1,11 @@
 package telegram4j.core.util;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.*;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PhotoSize;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
+import telegram4j.core.object.*;
 import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.action.MessageActionChatCreate;
 import telegram4j.core.object.chat.Channel;
@@ -23,8 +23,8 @@ import telegram4j.core.object.media.MessageMediaPhoto;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
+import telegram4j.tl.users.UserFull;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 public final class EntityFactory {
@@ -62,12 +62,31 @@ public final class EntityFactory {
 
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat) {
         switch (possibleChat.identifier()) {
-            case UserFull.ID:
+            case UserFull.ID: {
                 UserFull userFull = (UserFull) possibleChat;
 
-                User mappedFullUser = new User(client, userFull);
+                var users = userFull.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u)
+                        .map(d -> new User(client, d))
+                        .collect(Collectors.toList());
+
+                var minData = userFull.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID &&
+                                u.id() == userFull.fullUser().id())
+                        .map(u -> (BaseUser) u)
+                        .findFirst()
+                        .orElseThrow();
+
+                var chats = userFull.chats().stream()
+                        .map(d -> createChat(client, d))
+                        .collect(Collectors.toList());
+
+                User mappedFullUser = new User(client, userFull.fullUser(),
+                        minData, users, chats);
 
                 return new PrivateChat(client, mappedFullUser);
+            }
             case BaseUser.ID:
                 BaseUser baseUser = (BaseUser) possibleChat;
 
@@ -85,15 +104,15 @@ public final class EntityFactory {
             case ChatFull.ID:
                 ChatFull chatFull = (ChatFull) possibleChat;
 
-                List<Chat> chats = chatFull.chats().stream()
+                var chats = chatFull.chats().stream()
                         .map(d -> createChat(client, d))
                         .collect(Collectors.toList());
 
-                List<User> users = chatFull.users().stream()
+                var users = chatFull.users().stream()
                         .map(d -> new User(client, (BaseUser) d))
                         .collect(Collectors.toList());
 
-                telegram4j.tl.Chat minData = chatFull.chats().stream()
+                var minData = chatFull.chats().stream()
                         .filter(c -> c.id() == chatFull.fullChat().id())
                         .findFirst()
                         .orElseThrow(IllegalStateException::new);

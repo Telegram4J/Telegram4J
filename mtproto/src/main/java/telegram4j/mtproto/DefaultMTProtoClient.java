@@ -2,14 +2,15 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.ChannelException;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
+import reactor.netty.ConnectionObserver;
 import reactor.netty.FutureMono;
+import reactor.netty.channel.AbortedException;
 import reactor.netty.tcp.TcpClient;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -27,9 +28,8 @@ import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
-import telegram4j.tl.request.mtproto.GetFutureSalts;
 import telegram4j.tl.request.mtproto.ImmutableGetFutureSalts;
-import telegram4j.tl.request.mtproto.ImmutablePing;
+import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
 import telegram4j.tl.request.mtproto.Ping;
 
 import java.net.InetSocketAddress;
@@ -48,6 +48,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
+    private static final Throwable RETRY = new AbortedException((String) null);
     private static final Duration FUTURE_SALT_QUERY_PERIOD = Duration.ofMinutes(45);
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
 
@@ -67,10 +68,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final ResettableInterval pingEmitter;
     private final Sinks.Many<State> state;
 
+    private volatile Sinks.One<Void> closeHook;
+    private volatile boolean close; // needed for detecting close and disconnect states
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile Connection connection;
     private volatile long sessionId = random.nextLong();
-    private volatile int timeOffset;
+    private volatile long timeOffset;
     private volatile long serverSalt;
     private volatile long lastMessageId;
     private volatile long lastGeneratedMessageId;
@@ -103,20 +106,27 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private TcpClient initTcpClient(TcpClient tcpClient) {
         return tcpClient
                 .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
-                .doOnConnected(con -> {
-                    log.debug("Connected to datacenter №{} ({}:{})", dataCenter.getId(),
-                            dataCenter.getAddress(), dataCenter.getPort());
-                    log.debug("Sending transport identifier to the server.");
+                .observe((con, st) -> {
+                    if (st == ConnectionObserver.State.CONFIGURED) {
+                        log.debug("Connected to datacenter №{} ({}:{})", dataCenter.getId(),
+                                dataCenter.getAddress(), dataCenter.getPort());
+                        log.debug("Sending transport identifier to the server.");
 
-                    con.channel().writeAndFlush(transport.identifier(con.channel().alloc()));
-                })
-                .doOnDisconnected(con -> state.emitNext(State.DISCONNECTED, Sinks.EmitFailureHandler.FAIL_FAST));
+                        con.channel().writeAndFlush(transport.identifier(con.channel().alloc()));
+                    } else if (st == ConnectionObserver.State.DISCONNECTING ||
+                            st == ConnectionObserver.State.RELEASED) {
+                        if (!close) {
+                            state.emitNext(State.DISCONNECTED, Sinks.EmitFailureHandler.FAIL_FAST);
+                        }
+                    }
+                });
     }
 
     @Override
     public Mono<Void> connect() {
         return tcpClient.connect()
         .flatMap(connection -> {
+            this.closeHook = Sinks.one();
             this.connection = connection;
 
             Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
@@ -125,11 +135,25 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> stateHandler = state.asFlux()
                     .flatMap(state -> {
-                        if (state == State.DISCONNECTED) {
-                            // Trigger reconnect
-                            return Mono.error(new ChannelException());
+                        switch (state) {
+                            case CLOSED:
+                                close = true;
+                                resetSession();
+                                futureSaltEmitter.dispose();
+                                pingEmitter.dispose();
+                                closeHook.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+
+                                log.debug("Disconnected from the datacenter №{} ({}:{})",
+                                        dataCenter.getId(), dataCenter.getAddress(), dataCenter.getPort());
+                                return Mono.empty();
+                            case DISCONNECTED:
+                                futureSaltEmitter.dispose();
+                                pingEmitter.dispose();
+
+                                return Mono.error(RETRY);
+                            default:
+                                return Mono.empty();
                         }
-                        return Mono.empty();
                     })
                     .then();
 
@@ -200,8 +224,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         updateTimeOffset(messageId >> 32);
                         lastMessageId = messageId;
 
-                        TlObject obj = TlDeserializer.deserialize(decryptedBuf.readBytes(length));
+                        ByteBuf part = decryptedBuf.readBytes(length);
                         decryptedBuf.release();
+                        TlObject obj = TlDeserializer.deserialize(part);
+                        part.release();
 
                         rpcReceiver.emitNext(obj, emissionHandler);
                     })
@@ -209,11 +235,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> outboundHandler = outbound.asFlux()
-                    .flatMap(tuple -> tuple.method instanceof MTProtoObject
+                    .flatMap(tuple -> isMtprotoRequest(tuple.method)
                             ? Mono.just(tuple) : Mono.just(tuple).delayUntil(t -> onConnect))
                     .flatMap(tuple -> {
                         ByteBuf data = TlSerializer.serialize(alloc, tuple.method);
-                        if (tuple.method instanceof MTProtoObject) {
+                        if (isMtprotoRequest(tuple.method)) {
                             ByteBuf payload = alloc.buffer()
                                     .writeLongLE(0) // auth key id
                                     .writeLongLE(tuple.messageId)
@@ -286,7 +312,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> ping = pingEmitter.ticks()
-                    .flatMap(tick -> sendAwait(ImmutablePing.of(random.nextInt())))
+                    .flatMap(tick -> send(ImmutablePingDelayDisconnect.of(random.nextLong(),
+                            Math.toIntExact(PING_QUERY_PERIOD.getSeconds()))))
                     .then();
 
             Mono<Void> awaitKey = storeLayout.getAuthorizationKey(dataCenter)
@@ -303,23 +330,23 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<Void> startSchedule = Mono.defer(() -> {
                 futureSaltEmitter.start(FUTURE_SALT_QUERY_PERIOD);
                 pingEmitter.start(PING_QUERY_PERIOD);
-
                 state.emitNext(State.CONNECTED, Sinks.EmitFailureHandler.FAIL_FAST);
                 log.info("Connected to datacenter.");
                 return Mono.when(futureSaltSchedule, ping);
             });
 
-            return Mono.zip(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
+            return Mono.when(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
                             rpcHandler, awaitKey.then(startSchedule))
                     .then();
         })
+        .switchIfEmpty(Mono.fromRunnable(() -> state.emitNext(State.DISCONNECTED, emissionHandler)).then(Mono.error(RETRY)))
         .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
-                .filter(t -> t instanceof ChannelException)
-                .doBeforeRetry(signal -> {
+                .filter(t -> t instanceof AbortedException)
+                .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);
-                    log.debug("Reconnecting to the dc (attempts: {}).", signal.totalRetries());
+                    log.debug("Reconnecting to the datacenter (attempts: {}).", signal.totalRetries());
                 }))
-        .then(Mono.defer(() -> connection.onDispose()));
+        .then(Mono.defer(() -> closeHook.asMono()));
     }
 
     @Override
@@ -334,11 +361,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public boolean updateTimeOffset(long serverTime) {
-        int updated = Math.toIntExact(serverTime - System.currentTimeMillis() / 1000);
-        boolean changed = Math.abs(timeOffset - updated) > 10;
+        long updated = serverTime - System.currentTimeMillis() / 1000;
+        boolean changed = Math.abs(timeOffset - updated) > 3;
 
-        lastGeneratedMessageId = 0;
-        timeOffset = updated;
+        if (changed) {
+            lastGeneratedMessageId = 0;
+            timeOffset = updated;
+        }
 
         return changed;
     }
@@ -383,17 +412,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
     public Mono<Void> close() {
         return Mono.justOrEmpty(connection)
                 .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected.")))
-                .doOnNext(con -> {
-                    resetSession();
-                    futureSaltEmitter.dispose();
-                    pingEmitter.dispose();
-
-                    connection.dispose();
-                    log.debug("Disconnected from the datacenter №{} ({}:{})",
-                            dataCenter.getId(), dataCenter.getAddress(), dataCenter.getPort());
-
-                    state.emitNext(State.CLOSED, Sinks.EmitFailureHandler.FAIL_FAST);
-                })
+                .doOnNext(con -> state.emitNext(State.CLOSED, Sinks.EmitFailureHandler.FAIL_FAST))
+                .flatMap(con -> closeHook.asMono())
                 .then();
     }
 
@@ -401,7 +421,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         long millis = System.currentTimeMillis();
         long seconds = millis / 1000;
         long mod = millis % 1000;
-        long messageId = seconds + timeOffset << 32 | mod << 22 | random.nextInt(524288) << 2;
+        long messageId = seconds + timeOffset << 32 | mod << 22 | random.nextInt(0xFFFF) << 2;
 
         if (lastGeneratedMessageId >= messageId) {
             messageId = lastGeneratedMessageId + 4;
@@ -431,6 +451,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private Mono<Void> handleServiceMessage(Object obj, long messageId) {
         ByteBufAllocator alloc = connection.channel().alloc();
 
+        if (obj instanceof Pong) {
+            Pong pong = (Pong) obj;
+            messageId = pong.msgId();
+            resolve(messageId, obj);
+            return Mono.empty();
+        }
+
         if (isAwaitAcknowledge(messageId)) {
             return sendAcknowledgments();
         }
@@ -438,8 +465,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
         // For updates
         if (obj instanceof GzipPacked) {
             GzipPacked gzipPacked = (GzipPacked) obj;
-            obj = TlSerialUtil.decompressGzip(alloc.buffer()
-                    .writeBytes(gzipPacked.packedData()));
+            ByteBuf buf = alloc.buffer()
+                    .writeBytes(gzipPacked.packedData());
+            obj = TlSerialUtil.decompressGzip(buf);
+            buf.release();
         }
 
         if (obj instanceof RpcResult) {
@@ -464,13 +493,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.debug("Handling acknowledge for message(s): {}", msgsAck.msgIds());
                 }
-                return Mono.empty();
             }
 
-            if (obj instanceof Pong) {
-                Pong pong = (Pong) obj;
-                messageId = pong.msgId();
-            } else if (obj instanceof FutureSalts) {
+            if (obj instanceof FutureSalts) {
                 FutureSalts futureSalts = (FutureSalts) obj;
                 messageId = futureSalts.reqMsgId();
             }
@@ -488,6 +513,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                     // Need resend with delay.
                     return Mono.fromSupplier(() -> resolvers.get(messageId0))
+                            .doOnNext(t -> resolvers.remove(messageId0))
                             .delayElement(delay)
                             .map(t -> new RequestTuple(t, getMessageId()))
                             .doOnNext(t -> resolvers.put(t.messageId, t))
@@ -530,12 +556,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 rpcLog.debug("Handling bad msg notification: {}", badMsgNotification);
             }
 
-            if (obj instanceof BadServerSalt) {
-                BadServerSalt badServerSalt = (BadServerSalt) obj;
-
-                serverSalt = badServerSalt.newServerSalt();
-            }
-
             switch (badMsgNotification.errorCode()) {
                 case 16: // msg_id too low
                 case 17: // msg_id too high
@@ -543,9 +563,14 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         resetSession();
                     }
                     break;
+                case 48:
+                    BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;
+                    serverSalt = badServerSalt.newServerSalt();
+                    break;
             }
 
             return Mono.fromSupplier(() -> resolvers.get(badMsgNotification.badMsgId()))
+                    .doOnNext(t -> resolvers.remove(badMsgNotification.badMsgId()))
                     .map(t -> new RequestTuple(t, getMessageId()))
                     .doOnNext(t -> resolvers.put(t.messageId, t))
                     .doOnNext(tuple -> outbound.emitNext(tuple, emissionHandler))
@@ -621,6 +646,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
         return !(method instanceof MsgsAck);
     }
 
+    static boolean isMtprotoRequest(TlMethod<?> method) {
+        return !(method instanceof Ping) && !(method instanceof MsgsAck) && method instanceof MTProtoObject;
+    }
+
     static class RequestTuple {
         final Sinks.One<?> sink;
         final TlMethod<?> method;
@@ -634,6 +663,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
             this.sink = sink;
             this.method = method;
             this.messageId = messageId;
+        }
+
+        @Override
+        public String toString() {
+            return method.toString();
         }
     }
 }
