@@ -10,6 +10,7 @@ public class AbridgedTransport implements Transport {
     public static final int ID = 0xef;
 
     private final AtomicInteger size = new AtomicInteger(-1);
+    private final AtomicInteger completed = new AtomicInteger(-1);
 
     @Override
     public ByteBuf identifier(ByteBufAllocator allocator) {
@@ -30,7 +31,7 @@ public class AbridgedTransport implements Transport {
             buf.writeBytes(payload);
             return buf;
         } finally {
-            ReferenceCountUtil.safeRelease(payload);
+            payload.release();
         }
     }
 
@@ -46,6 +47,7 @@ public class AbridgedTransport implements Transport {
             return payload.readBytes(payloadLength);
         } finally {
             size.set(-1);
+            completed.set(-1);
         }
     }
 
@@ -58,8 +60,18 @@ public class AbridgedTransport implements Transport {
                 partialLength = payload.readUnsignedMediumLE();
             }
 
-            int payloadLength = partialLength * 4;
-            return payload.readableBytes() == size.updateAndGet(i -> i == -1 ? payloadLength : i);
+            int length = partialLength * 4;
+            int payloadLength = payload.readableBytes();
+            if (length != payloadLength) {
+                if (size.get() == -1) {
+                    size.set(length);
+                    completed.set(payloadLength);
+                    return false;
+                }
+
+                return completed.addAndGet(payloadLength + (partialLength == 0x7f ? 4 : 1)) == size.get();
+            }
+            return true;
         } finally {
             payload.resetReaderIndex();
         }

@@ -14,8 +14,8 @@ import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.mtproto.*;
+import telegram4j.tl.request.mtproto.ImmutableReqPqMulti;
 import telegram4j.tl.request.mtproto.ReqDHParams;
-import telegram4j.tl.request.mtproto.ReqPqMulti;
 import telegram4j.tl.request.mtproto.SetClientDHParams;
 
 import java.math.BigInteger;
@@ -49,7 +49,7 @@ public final class AuthorizationHandler {
             byte[] nonce = random.generateSeed(16);
             context.setNonce(nonce);
 
-            return client.send(ReqPqMulti.builder().nonce(nonce).build());
+            return client.send(ImmutableReqPqMulti.of(nonce));
         });
     }
 

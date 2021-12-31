@@ -10,6 +10,7 @@ public class IntermediateTransport implements Transport {
     public static final int ID = 0xeeeeeeee;
 
     private final AtomicInteger size = new AtomicInteger(-1);
+    private final AtomicInteger completed = new AtomicInteger(-1);
 
     @Override
     public ByteBuf identifier(ByteBufAllocator allocator) {
@@ -34,6 +35,7 @@ public class IntermediateTransport implements Transport {
             return payload.readBytes(length);
         } finally {
             size.set(-1);
+            completed.set(-1);
         }
     }
 
@@ -42,7 +44,18 @@ public class IntermediateTransport implements Transport {
         payload.markReaderIndex();
         try {
             int length = payload.readIntLE();
-            return payload.readableBytes() == size.updateAndGet(i -> i == -1 ? length : i);
+            int payloadLength = payload.readableBytes();
+            if (length != payloadLength) { // is a part of stream
+                if (size.get() == -1) { // header of a stream
+                    size.set(length);
+                    completed.set(payloadLength);
+                    return false;
+                }
+
+                // payload.readableBytes() + 4 need because reader index has already moved
+                return completed.addAndGet(payloadLength + 4) == size.get();
+            }
+            return true;
         } finally {
             payload.resetReaderIndex();
         }
