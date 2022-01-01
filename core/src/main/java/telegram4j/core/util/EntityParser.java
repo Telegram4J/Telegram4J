@@ -9,8 +9,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class EntityParser {
+
+    private static final String markdownV2 = "_*[]()~`";
+    private static final Pattern USER_LINK_ID_PATTERN = Pattern.compile("^tg://user\\?id=(\\d{1,19})$", Pattern.CASE_INSENSITIVE);
 
     public static Tuple2<String, List<MessageEntity>> parse(String str, Mode mode) {
         switch (mode) {
@@ -19,8 +24,6 @@ public final class EntityParser {
             default: throw new IllegalStateException();
         }
     }
-
-    private static final String markdownV2 = "_*[]()~`";
 
     private static Tuple2<String, List<MessageEntity>> parseMarkdownV2(String str) {
 
@@ -171,7 +174,7 @@ public final class EntityParser {
                             }
                         }
 
-                        userId = getLinkUserId(url.toString());
+                        userId = parseLinkUserId(url.toString());
                         if (userId == -1) {
                             // TODO: check link?
                             arg = url.toString();
@@ -225,19 +228,13 @@ public final class EntityParser {
         throw new UnsupportedOperationException();
     }
 
-    private static long getLinkUserId(String url) {
-        url = url.toLowerCase();
-
-        if (!url.startsWith("tg://user?id=")) {
+    private static long parseLinkUserId(String url) {
+        Matcher m = USER_LINK_ID_PATTERN.matcher(url);
+        if (!m.matches()) {
             return -1;
         }
 
-        String id = url.substring(url.indexOf('=') + 1);
-        try {
-            return Long.parseLong(id);
-        } catch (Throwable t) {
-            return -1;
-        }
+        return Long.parseLong(m.group(1));
     }
 
     private static class Token {

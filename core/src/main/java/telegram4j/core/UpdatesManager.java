@@ -178,7 +178,7 @@ public class UpdatesManager {
     private Flux<Event> getDifference(int pts, int qts, int date) {
         return client.getServiceHolder()
                 .getUpdatesService()
-                .getDifference(ImmutableGetDifference.of(pts, qts, date))
+                .getDifference(ImmutableGetDifference.of(pts, date, qts))
                 .flatMapMany(difference -> {
                     if (log.isTraceEnabled()) {
                         log.trace("difference: {}", difference);

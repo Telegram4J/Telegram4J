@@ -134,6 +134,9 @@ public class MessageEntity implements TelegramObject {
         /** Indicates a credit card number. */
         BANK_CARD_NUMBER,
 
+        /** Message entity representing a spoiler text. */
+        SPOILER,
+
         /** Unknown message entity. */
         UNKNOWN;
 
@@ -158,6 +161,7 @@ public class MessageEntity implements TelegramObject {
                 case MessageEntityStrike.ID: return STRIKETHROUGH;
                 case MessageEntityBlockquote.ID: return BLOCK_QUOTE;
                 case MessageEntityBankCard.ID: return BANK_CARD_NUMBER;
+                case MessageEntitySpoiler.ID: return SPOILER;
                 default: throw new IllegalArgumentException("Unknown message type: " + data);
             }
         }
