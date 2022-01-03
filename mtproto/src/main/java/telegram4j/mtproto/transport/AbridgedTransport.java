@@ -77,4 +77,9 @@ public class AbridgedTransport implements Transport {
             payload.resetReaderIndex();
         }
     }
+
+    @Override
+    public boolean supportQuickAck() {
+        return false;
+    }
 }

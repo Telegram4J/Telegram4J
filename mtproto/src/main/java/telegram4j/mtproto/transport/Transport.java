@@ -12,4 +12,6 @@ public interface Transport {
     ByteBuf decode(ByteBuf payload);
 
     boolean canDecode(ByteBuf buf);
+
+    boolean supportQuickAck();
 }

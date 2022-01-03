@@ -37,12 +37,14 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static telegram4j.mtproto.transport.IntermediateTransport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 import static telegram4j.tl.TlSerialUtil.readInt128;
 
@@ -50,7 +52,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
-    private static final Throwable RETRY = new AbortedException((String) null);
+    private static final Throwable RETRY = new RetryConnectException();
     private static final Duration FUTURE_SALT_QUERY_PERIOD = Duration.ofMinutes(45);
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
 
@@ -82,6 +84,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentMap<Long, RequestEntry> resolvers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, Long> quickAckTokens = new ConcurrentHashMap<>();
 
     public DefaultMTProtoClient(MTProtoOptions options) {
         this.dataCenter = options.getDatacenter();
@@ -168,10 +171,16 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             .addComponents(true, bufs))
                     .map(transport::decode)
                     .flatMap(payload -> {
-                        if (payload.readableBytes() == Integer.BYTES) { // The error code writes as negative int32
-                            int code = payload.readIntLE() * -1;
+                        if (payload.readableBytes() == Integer.BYTES) {
+                            int val = payload.readIntLE();
                             payload.release();
-                            return Mono.error(() -> TransportException.create(code));
+                            if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
+                                rpcLog.debug("Handling quick ack for {}", quickAckTokens.get(val));
+                                quickAckTokens.remove(val);
+                                return Mono.empty();
+                            } else { // The error code writes as negative int32
+                                return Mono.error(() -> TransportException.create(val * -1));
+                            }
                         }
                         return Mono.just(payload);
                     })
@@ -272,6 +281,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         byte[] plainDataB = toByteArray(plainData);
                         byte[] msgKeyLarge = sha256Digest(Arrays.copyOfRange(authKey, 88, 120), plainDataB);
+
+                        if (transport.supportQuickAck()) {
+                            int quickAck = readIntLE(msgKeyLarge) | QUICK_ACK_MASK;
+                            quickAckTokens.put(quickAck, tuple.messageId);
+                        }
+
                         byte[] messageKey = Arrays.copyOfRange(msgKeyLarge, 8, 24);
 
                         ByteBuf authKeyBuf = Unpooled.wrappedBuffer(authKey);
@@ -344,7 +359,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
         .switchIfEmpty(Mono.fromRunnable(() -> state.emitNext(State.DISCONNECTED, emissionHandler)).then(Mono.error(RETRY)))
         .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
-                .filter(t -> t instanceof AbortedException || t instanceof IOException)
+                .filter(t -> t == RETRY || t instanceof AbortedException || t instanceof IOException)
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);
                     log.debug("Reconnecting to the datacenter (attempts: {}).", signal.totalRetries());
@@ -452,23 +467,19 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private Mono<Void> handleServiceMessage(Object obj, long messageId) {
-        if (obj instanceof Pong) {
-            Pong pong = (Pong) obj;
-            messageId = pong.msgId();
-            resolve(messageId, obj);
-            return Mono.empty();
-        }
-
-        if (isAwaitAcknowledge(messageId)) {
-            return sendAcknowledgments();
-        }
-
         // For updates
         if (obj instanceof GzipPacked) {
             GzipPacked gzipPacked = (GzipPacked) obj;
             ByteBuf buf = Unpooled.wrappedBuffer(gzipPacked.packedData());
             obj = TlSerialUtil.decompressGzip(buf);
             buf.release();
+        }
+
+        if (obj instanceof Pong) {
+            Pong pong = (Pong) obj;
+            messageId = pong.msgId();
+            resolve(messageId, obj);
+            return Mono.empty();
         }
 
         if (obj instanceof RpcResult) {
@@ -585,21 +596,18 @@ public class DefaultMTProtoClient implements MTProtoClient {
             this.updates.emitNext(updates, emissionHandler);
         }
 
-        return acknowledgmentMessage(messageId);
+        return Mono.empty();
     }
 
     private Mono<Void> acknowledgmentMessage(long messageId) {
-        acknowledgments.add(messageId);
+        if (transport.supportQuickAck()) {
+            return Mono.empty();
+        }
 
-        return sendAcknowledgments();
-    }
+        if (!Objects.equals(acknowledgments.peek(), messageId)){
+            acknowledgments.add(messageId);
+        }
 
-    private boolean isAwaitAcknowledge(long messageId) {
-        return acknowledgments.contains(messageId) &&
-                acknowledgments.size() + 1 > acksSendThreshold;
-    }
-
-    private Mono<Void> sendAcknowledgments() {
         return Mono.defer(() -> {
             if (acknowledgments.size() < acksSendThreshold) {
                 return Mono.empty();
@@ -670,6 +678,16 @@ public class DefaultMTProtoClient implements MTProtoClient {
         @Override
         public String toString() {
             return method.toString();
+        }
+    }
+
+    static class RetryConnectException extends RuntimeException {
+
+        RetryConnectException() {}
+
+        @Override
+        public Throwable fillInStackTrace() {
+            return this;
         }
     }
 }

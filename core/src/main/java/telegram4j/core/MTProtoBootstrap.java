@@ -230,7 +230,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (transport != null) {
             return transport;
         }
-        return new IntermediateTransport();
+        return new IntermediateTransport(true);
     }
 
     private TcpClient initTcpClient() {
