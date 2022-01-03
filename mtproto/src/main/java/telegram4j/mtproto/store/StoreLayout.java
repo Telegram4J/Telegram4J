@@ -51,6 +51,17 @@ public interface StoreLayout {
 
     Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
 
+    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChatParticipant(UpdateChatParticipant action, List<Chat> chats, List<User> users);
+
+    Mono<Void> onChatParticipants(UpdateChatParticipants action, List<Chat> chats, List<User> users);
+
+
     // not an update-related methods
 
     Mono<Void> updateSelfId(long userId);

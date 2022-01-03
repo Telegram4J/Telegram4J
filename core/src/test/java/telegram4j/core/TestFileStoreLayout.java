@@ -175,6 +175,31 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, List<Chat> chats, List<User> users) {
+        return delegate.onChatParticipantAdd(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, List<Chat> chats, List<User> users) {
+        return delegate.onChatParticipantAdmin(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, List<Chat> chats, List<User> users) {
+        return delegate.onChatParticipantDelete(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChatParticipant(UpdateChatParticipant action, List<Chat> chats, List<User> users) {
+        return delegate.onChatParticipant(action, chats, users);
+    }
+
+    @Override
+    public Mono<Void> onChatParticipants(UpdateChatParticipants action, List<Chat> chats, List<User> users) {
+        return delegate.onChatParticipants(action, chats, users);
+    }
+
+    @Override
     public Mono<Void> updateSelfId(long userId) {
         return delegate.updateSelfId(userId);
     }
