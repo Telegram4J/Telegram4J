@@ -126,7 +126,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(dc, initTcpClient(), initTransport(),
                             storeLayout, acksSendThreshold, EmissionHandlers.park(Duration.ofNanos(10)))));
-            mtProtoClientManager.add(mtProtoClient);
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -163,6 +162,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .filter(i -> i == 0)
                                         .flatMap(ig -> disconnect);
                             case CONNECTED:
+                                mtProtoClientManager.add(mtProtoClient);
+
                                 Mono<Void> fetchSelfId = storeLayout.getSelfId()
                                         .filter(l -> l != 0)
                                         .switchIfEmpty(serviceHolder.getUserService().getFullUser(InputUserSelf.instance())

@@ -2,6 +2,7 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -32,6 +33,7 @@ import telegram4j.tl.request.mtproto.ImmutableGetFutureSalts;
 import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
 import telegram4j.tl.request.mtproto.Ping;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.Arrays;
@@ -63,7 +65,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final Sinks.Many<MTProtoObject> authReceiver;
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
-    private final Sinks.Many<RequestTuple> outbound;
+    private final Sinks.Many<RequestEntry> outbound;
     private final ResettableInterval futureSaltEmitter;
     private final ResettableInterval pingEmitter;
     private final Sinks.Many<State> state;
@@ -79,7 +81,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private volatile long lastGeneratedMessageId;
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
-    private final ConcurrentMap<Long, RequestTuple> resolvers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, RequestEntry> resolvers = new ConcurrentHashMap<>();
 
     public DefaultMTProtoClient(MTProtoOptions options) {
         this.dataCenter = options.getDatacenter();
@@ -168,6 +170,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .flatMap(payload -> {
                         if (payload.readableBytes() == Integer.BYTES) { // The error code writes as negative int32
                             int code = payload.readIntLE() * -1;
+                            payload.release();
                             return Mono.error(() -> TransportException.create(code));
                         }
                         return Mono.just(payload);
@@ -191,21 +194,19 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         byte[] messageKey = readInt128(buf);
 
-                        ByteBuf authKeyBuf = alloc.buffer()
-                                .writeBytes(authorizationKey.getAuthKey());
-
+                        // Releasing is unnecessary because it clears byte array
+                        ByteBuf authKeyBuf = Unpooled.wrappedBuffer(authorizationKey.getAuthKey());
                         AES256IGECipher cipher = createAesCipher(messageKey, authKeyBuf, true);
 
                         byte[] decrypted = cipher.decrypt(toByteArray(buf));
-                        byte[] messageKeyCLarge = sha256Digest(concat(toByteArray(authKeyBuf.slice(96, 32)), decrypted));
+                        byte[] messageKeyCLarge = sha256Digest(toByteArray(authKeyBuf.slice(96, 32)), decrypted);
                         byte[] messageKeyC = Arrays.copyOfRange(messageKeyCLarge, 8, 24);
 
                         if (!Arrays.equals(messageKey, messageKeyC)) {
                             throw new IllegalStateException("Incorrect message key.");
                         }
 
-                        ByteBuf decryptedBuf = alloc.buffer()
-                                .writeBytes(decrypted);
+                        ByteBuf decryptedBuf = Unpooled.wrappedBuffer(decrypted);
 
                         long serverSalt = decryptedBuf.readLongLE();
                         long sessionId = decryptedBuf.readLongLE();
@@ -240,7 +241,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .flatMap(tuple -> {
                         ByteBuf data = TlSerializer.serialize(alloc, tuple.method);
                         if (isMtprotoRequest(tuple.method)) {
-                            ByteBuf payload = alloc.buffer()
+                            ByteBuf payload = alloc.buffer(20 + data.readableBytes())
                                     .writeLongLE(0) // auth key id
                                     .writeLongLE(tuple.messageId)
                                     .writeIntLE(data.readableBytes())
@@ -256,7 +257,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         int unpadded = (32 + data.readableBytes() + minPadding) % 16;
                         int padding = minPadding + (unpadded != 0 ? 16 - unpadded : 0);
 
-                        ByteBuf plainData = alloc.buffer()
+                        ByteBuf plainData = alloc.buffer(32 + data.readableBytes() + padding)
                                 .writeLongLE(serverSalt)
                                 .writeLongLE(sessionId)
                                 .writeLongLE(tuple.messageId)
@@ -270,16 +271,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         byte[] authKeyId = authorizationKey.getAuthKeyId();
 
                         byte[] plainDataB = toByteArray(plainData);
-                        byte[] msgKeyLarge = sha256Digest(concat(Arrays.copyOfRange(authKey, 88, 120), plainDataB));
+                        byte[] msgKeyLarge = sha256Digest(Arrays.copyOfRange(authKey, 88, 120), plainDataB);
                         byte[] messageKey = Arrays.copyOfRange(msgKeyLarge, 8, 24);
 
-                        ByteBuf authKeyBuf = alloc.buffer().writeBytes(authKey);
+                        ByteBuf authKeyBuf = Unpooled.wrappedBuffer(authKey);
                         AES256IGECipher cipher = createAesCipher(messageKey, authKeyBuf, false);
 
-                        ByteBuf payload = alloc.buffer()
+                        byte[] enc = cipher.encrypt(plainDataB);
+                        ByteBuf payload = alloc.buffer(enc.length + authKeyId.length + messageKey.length)
                                 .writeBytes(authKeyId)
                                 .writeBytes(messageKey)
-                                .writeBytes(cipher.encrypt(plainDataB));
+                                .writeBytes(enc);
 
                         return FutureMono.from(connection.channel()
                                 .writeAndFlush(transport.encode(payload)));
@@ -339,9 +341,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             rpcHandler, awaitKey.then(startSchedule))
                     .then();
         })
+        // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
         .switchIfEmpty(Mono.fromRunnable(() -> state.emitNext(State.DISCONNECTED, emissionHandler)).then(Mono.error(RETRY)))
         .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
-                .filter(t -> t instanceof AbortedException)
+                .filter(t -> t instanceof AbortedException || t instanceof IOException)
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);
                     log.debug("Reconnecting to the datacenter (attempts: {}).", signal.totalRetries());
@@ -378,7 +381,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             long messageId = getMessageId();
 
             Sinks.One<R> res = Sinks.one();
-            RequestTuple tuple = new RequestTuple(res, method, messageId);
+            RequestEntry tuple = new RequestEntry(res, method, messageId);
             if (isAwaitResult(method)) {
                 resolvers.put(messageId, tuple);
             } else {
@@ -393,7 +396,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     @Override
     public Mono<Void> send(TlMethod<?> method) {
         return Mono.fromRunnable(() -> {
-            RequestTuple tuple = new RequestTuple(Sinks.one(), method, getMessageId());
+            RequestEntry tuple = new RequestEntry(Sinks.one(), method, getMessageId());
             outbound.emitNext(tuple, emissionHandler);
         });
     }
@@ -449,8 +452,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private Mono<Void> handleServiceMessage(Object obj, long messageId) {
-        ByteBufAllocator alloc = connection.channel().alloc();
-
         if (obj instanceof Pong) {
             Pong pong = (Pong) obj;
             messageId = pong.msgId();
@@ -465,8 +466,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         // For updates
         if (obj instanceof GzipPacked) {
             GzipPacked gzipPacked = (GzipPacked) obj;
-            ByteBuf buf = alloc.buffer()
-                    .writeBytes(gzipPacked.packedData());
+            ByteBuf buf = Unpooled.wrappedBuffer(gzipPacked.packedData());
             obj = TlSerialUtil.decompressGzip(buf);
             buf.release();
         }
@@ -481,8 +481,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             if (obj instanceof GzipPacked) {
                 GzipPacked gzipPacked = (GzipPacked) obj;
 
-                ByteBuf buf = alloc.buffer()
-                        .writeBytes(gzipPacked.packedData());
+                ByteBuf buf = Unpooled.wrappedBuffer(gzipPacked.packedData());
                 obj = TlSerialUtil.decompressGzip(buf);
                 buf.release();
             }
@@ -500,7 +499,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 messageId = futureSalts.reqMsgId();
             }
 
-            RequestTuple req = resolvers.get(messageId);
+            RequestEntry req = resolvers.get(messageId);
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
                 if (rpcError.errorCode() == 420) { // FLOOD_WAIT_X
@@ -515,7 +514,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     return Mono.fromSupplier(() -> resolvers.get(messageId0))
                             .doOnNext(t -> resolvers.remove(messageId0))
                             .delayElement(delay)
-                            .map(t -> new RequestTuple(t, getMessageId()))
+                            .map(t -> t.withMessageId(getMessageId()))
                             .doOnNext(t -> resolvers.put(t.messageId, t))
                             .doOnNext(tuple -> outbound.emitNext(tuple, emissionHandler))
                             .then();
@@ -571,7 +570,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             return Mono.fromSupplier(() -> resolvers.get(badMsgNotification.badMsgId()))
                     .doOnNext(t -> resolvers.remove(badMsgNotification.badMsgId()))
-                    .map(t -> new RequestTuple(t, getMessageId()))
+                    .map(t -> t.withMessageId(getMessageId()))
                     .doOnNext(t -> resolvers.put(t.messageId, t))
                     .doOnNext(tuple -> outbound.emitNext(tuple, emissionHandler))
                     .then();
@@ -650,19 +649,22 @@ public class DefaultMTProtoClient implements MTProtoClient {
         return !(method instanceof Ping) && !(method instanceof MsgsAck) && method instanceof MTProtoObject;
     }
 
-    static class RequestTuple {
+    static class RequestEntry {
         final Sinks.One<?> sink;
         final TlMethod<?> method;
         final long messageId;
 
-        RequestTuple(RequestTuple tuple, long messageId) {
-            this(tuple.sink, tuple.method, messageId);
-        }
-
-        RequestTuple(Sinks.One<?> sink, TlMethod<?> method, long messageId) {
+        RequestEntry(Sinks.One<?> sink, TlMethod<?> method, long messageId) {
             this.sink = sink;
             this.method = method;
             this.messageId = messageId;
+        }
+
+        RequestEntry withMessageId(long messageId) {
+            if (messageId == this.messageId) {
+                return this;
+            }
+            return new RequestEntry(sink, method, messageId);
         }
 
         @Override

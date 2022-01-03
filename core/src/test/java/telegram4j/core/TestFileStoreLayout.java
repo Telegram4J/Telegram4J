@@ -3,7 +3,7 @@ package telegram4j.core;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.util.ReferenceCountUtil;
+import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
@@ -51,14 +51,12 @@ public class TestFileStoreLayout implements StoreLayout {
 
                     log.info("Loading auth key from the file store for dc №{}.", dc.getId());
                     String lines = String.join("", Files.readAllLines(fileName));
-                    ByteBuf buf = allocator.buffer()
-                            .writeBytes(ByteBufUtil.decodeHexDump(lines));
-
+                    ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
                     int l = buf.readIntLE();
                     byte[] authKey = readBytes(buf, l);
                     int l1 = buf.readIntLE();
                     byte[] authKeyId = readBytes(buf, l1);
-                    ReferenceCountUtil.safeRelease(buf);
+                    buf.release();
 
                     return new AuthorizationKeyHolder(dc, authKey, authKeyId);
                 }));
@@ -71,17 +69,19 @@ public class TestFileStoreLayout implements StoreLayout {
                 .and(Mono.fromCallable(() -> {
                     log.info("Saving auth key to the file store for dc №{}.", authorizationKey.getDc().getId());
 
-                    ByteBuf buf = allocator.buffer()
-                            .writeIntLE(authorizationKey.getAuthKey().length)
-                            .writeBytes(authorizationKey.getAuthKey())
-                            .writeIntLE(authorizationKey.getAuthKeyId().length)
-                            .writeBytes(authorizationKey.getAuthKeyId());
+                    byte[] authKey = authorizationKey.getAuthKey();
+                    byte[] authKeyId = authorizationKey.getAuthKeyId();
+                    ByteBuf buf = allocator.buffer(8 + authKey.length + authKeyId.length)
+                            .writeIntLE(authKey.length)
+                            .writeBytes(authKey)
+                            .writeIntLE(authKeyId.length)
+                            .writeBytes(authKeyId);
 
                     Path fileName = Path.of(String.format(AUTH_KEY_FILE, authorizationKey.getDc().getId()));
                     try {
                         return Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
                     } finally {
-                        ReferenceCountUtil.safeRelease(buf);
+                        buf.release();
                     }
                 }));
     }

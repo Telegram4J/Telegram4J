@@ -1,7 +1,7 @@
 package telegram4j.mtproto.util;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
@@ -148,10 +148,13 @@ public final class CryptoUtil {
         }
     }
 
-    public static byte[] sha256Digest(byte[] bytes) {
+    public static byte[] sha256Digest(byte[]... bytes) {
         MessageDigest sha256 = SHA256.get();
         sha256.reset();
-        return sha256.digest(bytes);
+        for (byte[] b : bytes) {
+            sha256.update(b);
+        }
+        return sha256.digest();
     }
 
     public static byte[] sha1Digest(byte[] bytes) {
@@ -215,14 +218,13 @@ public final class CryptoUtil {
     }
 
     public static AES256IGECipher createAesCipher(byte[] messageKey, ByteBuf authKeyBuf, boolean server) {
-        ByteBufAllocator alloc = authKeyBuf.alloc();
         int x = server ? 8 : 0;
 
-        ByteBuf sha256a = alloc.buffer().writeBytes(sha256Digest(
-                concat(messageKey, toByteArray(authKeyBuf.retainedSlice(x, 36)))));
+        ByteBuf sha256a = Unpooled.wrappedBuffer(sha256Digest(
+                messageKey, toByteArray(authKeyBuf.retainedSlice(x, 36))));
 
-        ByteBuf sha256b = alloc.buffer().writeBytes(sha256Digest(
-                concat(toByteArray(authKeyBuf.retainedSlice(x + 40, 36)), messageKey)));
+        ByteBuf sha256b = Unpooled.wrappedBuffer(sha256Digest(
+                toByteArray(authKeyBuf.retainedSlice(x + 40, 36)), messageKey));
 
         byte[] aesKey = concat(
                 toByteArray(sha256a.retainedSlice(0, 8)),
@@ -233,6 +235,8 @@ public final class CryptoUtil {
                 toByteArray(sha256b.retainedSlice(0, 8)),
                 toByteArray(sha256a.retainedSlice(8, 16)),
                 toByteArray(sha256b.retainedSlice(24, 8)));
+        sha256a.release();
+        sha256b.release();
 
         return new AES256IGECipher(aesKey, aesIV);
     }

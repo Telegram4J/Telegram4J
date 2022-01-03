@@ -24,7 +24,7 @@ public class IntermediateTransport implements Transport {
                     .writeIntLE(payload.readableBytes())
                     .writeBytes(payload);
         } finally {
-            ReferenceCountUtil.safeRelease(payload);
+            payload.release();
         }
     }
 
@@ -34,6 +34,7 @@ public class IntermediateTransport implements Transport {
             int length = payload.readIntLE();
             return payload.readBytes(length);
         } finally {
+            payload.release();
             size.set(-1);
             completed.set(-1);
         }
