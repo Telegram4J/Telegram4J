@@ -21,14 +21,14 @@ public class ChatParticipantUpdateEvent extends ChatEvent{
     private final ExportedChatInvite invite;
     private final int qts;
 
-    public ChatParticipantUpdateEvent(MTProtoTelegramClient client, long chat_id, Instant date, long actor_id, long user_id, @Nullable ChatParticipant prev_participant,@Nullable ChatParticipant new_participant,@Nullable ExportedChatInvite invite, int qts){
+    public ChatParticipantUpdateEvent(MTProtoTelegramClient client, long chatId, Instant date, long actorId, long userId, @Nullable ChatParticipant prevParticipant,@Nullable ChatParticipant newParticipant,@Nullable ExportedChatInvite invite, int qts){
         super(client);
-        this.chatId = chat_id;
+        this.chatId = chatId;
         this.date = date;
-        this.actorId = actor_id;
-        this.userId = user_id;
-        this.prevParticipant = prev_participant;
-        this.newParticipant = new_participant;
+        this.actorId = actorId;
+        this.userId = userId;
+        this.prevParticipant = prevParticipant;
+        this.newParticipant = newParticipant;
         this.invite = invite;
         this.qts = qts;
     }

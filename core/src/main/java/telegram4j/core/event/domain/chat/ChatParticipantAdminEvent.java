@@ -8,11 +8,11 @@ public class ChatParticipantAdminEvent extends ChatEvent{
     private final boolean isAdmin;
     private final int version;
 
-    public ChatParticipantAdminEvent(MTProtoTelegramClient client, long chat, long user,boolean is_admin, int version) {
+    public ChatParticipantAdminEvent(MTProtoTelegramClient client, long chat, long user,boolean isAdmin, int version) {
         super(client);
         chatId = chat;
         userId = user;
-        this.isAdmin = is_admin;
+        this.isAdmin = isAdmin;
         this.version = version;
     }
 
