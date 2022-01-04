@@ -62,6 +62,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final StoreLayout storeLayout;
     private final int acksSendThreshold;
     private final Sinks.EmitFailureHandler emissionHandler;
+    private final Type type;
 
     private final AuthorizationContext authContext = new AuthorizationContext();
     private final Sinks.Many<MTProtoObject> authReceiver;
@@ -88,7 +89,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final ConcurrentMap<Long, RequestEntry> resolvers = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Long> quickAckTokens = new ConcurrentHashMap<>();
 
-    DefaultMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
+    DefaultMTProtoClient(Type type, DataCenter dataCenter, MTProtoOptions options) {
+        this.type = type;
         this.dataCenter = dataCenter;
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
@@ -112,26 +114,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     public DefaultMTProtoClient(MTProtoOptions options) {
-        this.dataCenter = options.getDatacenter();
-        this.tcpClient = initTcpClient(options.getTcpClient());
-        this.transport = options.getTransport().get();
-        this.storeLayout = options.getStoreLayout();
-        this.acksSendThreshold = options.getAcksSendThreshold();
-        this.emissionHandler = options.getEmissionHandler();
-        this.options = options;
-
-        this.authReceiver = Sinks.many().multicast()
-                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-        this.rpcReceiver = Sinks.many().multicast()
-                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-        this.updates = Sinks.many().multicast()
-                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-        this.outbound = Sinks.many().multicast()
-                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-        this.state = Sinks.many().replay()
-                .latestOrDefault(State.RECONNECT);
-        this.futureSaltEmitter = new ResettableInterval(Schedulers.boundedElastic());
-        this.pingEmitter = new ResettableInterval(Schedulers.boundedElastic());
+        this(Type.DEFAULT, options.getDatacenter(), options);
     }
 
     private TcpClient initTcpClient(TcpClient tcpClient) {
@@ -462,7 +445,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public MTProtoClient createMediaClient(DataCenter dc) {
-        DefaultMTProtoClient client = new DefaultMTProtoClient(dc, options);
+        if (type != Type.DEFAULT) {
+            throw new IllegalStateException("Not default client can't create media clients.");
+        }
+
+        DefaultMTProtoClient client = new DefaultMTProtoClient(Type.MEDIA, dc, options);
 
         client.authorizationKey = authorizationKey;
         client.lastGeneratedMessageId = lastGeneratedMessageId;
@@ -470,6 +457,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
         client.serverSalt = serverSalt;
 
         return client;
+    }
+
+    @Override
+    public Type getType() {
+        return type;
     }
 
     @Override

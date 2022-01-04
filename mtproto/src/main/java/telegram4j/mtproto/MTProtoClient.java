@@ -27,6 +27,8 @@ public interface MTProtoClient {
 
     MTProtoClient createMediaClient(DataCenter dc);
 
+    Type getType();
+
     Mono<Void> close();
 
     enum State {
@@ -34,5 +36,11 @@ public interface MTProtoClient {
         CLOSED,
         CONNECTED,
         RECONNECT
+    }
+
+    enum Type {
+        DEFAULT,
+        MEDIA,
+        CDN
     }
 }

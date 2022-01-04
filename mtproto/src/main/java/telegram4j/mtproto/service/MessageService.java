@@ -22,6 +22,7 @@ import telegram4j.tl.messages.MessageViews;
 import telegram4j.tl.messages.PeerSettings;
 import telegram4j.tl.messages.*;
 import telegram4j.tl.request.messages.*;
+import telegram4j.tl.request.messages.UpdateDialogFilter;
 import telegram4j.tl.request.upload.SaveBigFilePart;
 import telegram4j.tl.request.upload.SaveFilePart;
 
@@ -44,8 +45,6 @@ public class MessageService extends RpcService {
     public MessageService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
     }
-
-    // TODO list:
 
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
         return client.sendAwait(GetMessages.builder()
@@ -295,85 +294,406 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetFeaturedStickers.of(hash));
     }
 
-    // readFeaturedStickers id:Vector<long> = Bool;
-    // getRecentStickers flags:# attached:flags.0?true hash:long = messages.RecentStickers;
-    // saveRecentSticker flags:# attached:flags.0?true id:InputDocument unsave:Bool = Bool;
-    // clearRecentStickers flags:# attached:flags.0?true = Bool;
-    // getArchivedStickers flags:# masks:flags.0?true offset_id:long limit:int = messages.ArchivedStickers;
-    // getMaskStickers hash:long = messages.AllStickers;
-    // getAttachedStickers media:InputStickeredMedia = Vector<StickerSetCovered>;
-    // setGameScore flags:# edit_message:flags.0?true force:flags.1?true peer:InputPeer id:int user_id:InputUser score:int = Updates;
-    // setInlineGameScore flags:# edit_message:flags.0?true force:flags.1?true id:InputBotInlineMessageID user_id:InputUser score:int = Bool;
-    // getGameHighScores peer:InputPeer id:int user_id:InputUser = messages.HighScores;
-    // getInlineGameHighScores id:InputBotInlineMessageID user_id:InputUser = messages.HighScores;
-    // getCommonChats user_id:InputUser max_id:long limit:int = messages.Chats;
-    // getAllChats except_ids:Vector<long> = messages.Chats;
-    // getWebPage url:string hash:int = WebPage;
-    // toggleDialogPin flags:# pinned:flags.0?true peer:InputDialogPeer = Bool;
-    // reorderPinnedDialogs flags:# force:flags.0?true folder_id:int order:Vector<InputDialogPeer> = Bool;
-    // getPinnedDialogs folder_id:int = messages.PeerDialogs;
-    // setBotShippingResults flags:# query_id:long error:flags.0?string shipping_options:flags.1?Vector<ShippingOption> = Bool;
-    // setBotPrecheckoutResults flags:# success:flags.1?true query_id:long error:flags.0?string = Bool;
-    // uploadMedia peer:InputPeer media:InputMedia = MessageMedia;
-    // sendScreenshotNotification peer:InputPeer reply_to_msg_id:int random_id:long = Updates;
-    // getFavedStickers hash:long = messages.FavedStickers;
-    // faveSticker id:InputDocument unfave:Bool = Bool;
-    // getUnreadMentions peer:InputPeer offset_id:int add_offset:int limit:int max_id:int min_id:int = messages.Messages;
-    // readMentions peer:InputPeer = messages.AffectedHistory;
-    // getRecentLocations peer:InputPeer limit:int hash:long = messages.Messages;
-    // sendMultiMedia flags:# silent:flags.5?true background:flags.6?true clear_draft:flags.7?true peer:InputPeer reply_to_msg_id:flags.0?int multi_media:Vector<InputSingleMedia> schedule_date:flags.10?int = Updates;
-    // uploadEncryptedFile peer:InputEncryptedChat file:InputEncryptedFile = EncryptedFile;
-    // searchStickerSets flags:# exclude_featured:flags.0?true q:string hash:long = messages.FoundStickerSets;
-    // getSplitRanges = Vector<MessageRange>;
-    // markDialogUnread flags:# unread:flags.0?true peer:InputDialogPeer = Bool;
-    // getDialogUnreadMarks = Vector<DialogPeer>;
-    // clearAllDrafts = Bool;
-    // updatePinnedMessage flags:# silent:flags.0?true unpin:flags.1?true pm_oneside:flags.2?true peer:InputPeer id:int = Updates;
-    // sendVote peer:InputPeer msg_id:int options:Vector<bytes> = Updates;
-    // getPollResults peer:InputPeer msg_id:int = Updates;
-    // getOnlines peer:InputPeer = ChatOnlines;
-    // editChatAbout peer:InputPeer about:string = Bool;
-    // editChatDefaultBannedRights peer:InputPeer banned_rights:ChatBannedRights = Updates;
-    // getEmojiKeywords lang_code:string = EmojiKeywordsDifference;
-    // getEmojiKeywordsDifference lang_code:string from_version:int = EmojiKeywordsDifference;
-    // getEmojiKeywordsLanguages lang_codes:Vector<string> = Vector<EmojiLanguage>;
-    // getEmojiURL lang_code:string = EmojiURL;
-    // getSearchCounters peer:InputPeer filters:Vector<MessagesFilter> = Vector<messages.SearchCounter>;
-    // requestUrlAuth flags:# peer:flags.1?InputPeer msg_id:flags.1?int button_id:flags.1?int url:flags.2?string = UrlAuthResult;
-    // acceptUrlAuth flags:# write_allowed:flags.0?true peer:flags.1?InputPeer msg_id:flags.1?int button_id:flags.1?int url:flags.2?string = UrlAuthResult;
-    // hidePeerSettingsBar peer:InputPeer = Bool;
-    // getScheduledHistory peer:InputPeer hash:long = messages.Messages;
-    // getScheduledMessages peer:InputPeer id:Vector<int> = messages.Messages;
-    // sendScheduledMessages peer:InputPeer id:Vector<int> = Updates;
-    // deleteScheduledMessages peer:InputPeer id:Vector<int> = Updates;
-    // getPollVotes flags:# peer:InputPeer id:int option:flags.0?bytes offset:flags.1?string limit:int = messages.VotesList;
-    // toggleStickerSets flags:# uninstall:flags.0?true archive:flags.1?true unarchive:flags.2?true stickersets:Vector<InputStickerSet> = Bool;
-    // getDialogFilters = Vector<DialogFilter>;
-    // getSuggestedDialogFilters = Vector<DialogFilterSuggested>;
-    // updateDialogFilter flags:# id:int filter:flags.0?DialogFilter = Bool;
-    // updateDialogFiltersOrder order:Vector<int> = Bool;
-    // getOldFeaturedStickers offset:int limit:int hash:long = messages.FeaturedStickers;
-    // getReplies peer:InputPeer msg_id:int offset_id:int offset_date:int add_offset:int limit:int max_id:int min_id:int hash:long = messages.Messages;
-    // getDiscussionMessage peer:InputPeer msg_id:int = messages.DiscussionMessage;
-    // readDiscussion peer:InputPeer msg_id:int read_max_id:int = Bool;
-    // unpinAllMessages peer:InputPeer = messages.AffectedHistory;
-    // deleteChat chat_id:long = Bool;
-    // deletePhoneCallHistory flags:# revoke:flags.0?true = messages.AffectedFoundMessages;
-    // checkHistoryImport import_head:string = messages.HistoryImportParsed;
-    // initHistoryImport peer:InputPeer file:InputFile media_count:int = messages.HistoryImport;
-    // uploadImportedMedia peer:InputPeer import_id:long file_name:string media:InputMedia = MessageMedia;
-    // startHistoryImport peer:InputPeer import_id:long = Bool;
-    // getExportedChatInvites flags:# revoked:flags.3?true peer:InputPeer admin_id:InputUser offset_date:flags.2?int offset_link:flags.2?string limit:int = messages.ExportedChatInvites;
-    // getExportedChatInvite peer:InputPeer link:string = messages.ExportedChatInvite;
-    // editExportedChatInvite flags:# revoked:flags.2?true peer:InputPeer link:string expire_date:flags.0?int usage_limit:flags.1?int = messages.ExportedChatInvite;
-    // deleteRevokedExportedChatInvites peer:InputPeer admin_id:InputUser = Bool;
-    // deleteExportedChatInvite peer:InputPeer link:string = Bool;
-    // getAdminsWithInvites peer:InputPeer = messages.ChatAdminsWithInvites;
-    // getChatInviteImporters peer:InputPeer link:string offset_date:int offset_user:InputUser limit:int = messages.ChatInviteImporters;
-    // setHistoryTTL peer:InputPeer period:int = Updates;
-    // checkHistoryImportPeer peer:InputPeer = messages.CheckedHistoryImportPeer;
-    // setChatTheme peer:InputPeer emoticon:string = Updates;
-    // getMessageReadParticipants peer:InputPeer msg_id:int = Vector<long>;
+    public Mono<Boolean> readFeaturedStickers(Iterable<Long> ids) {
+        return client.sendAwait(ReadFeaturedStickers.builder()
+                .id(ids)
+                .build());
+    }
+
+    public Mono<RecentStickers> getRecentStickers(boolean attached, long hash) {
+        return client.sendAwait(GetRecentStickers.builder()
+                .attached(attached)
+                .hash(hash)
+                .build());
+    }
+
+    public Mono<Boolean> saveRecentSticker(boolean attached, InputDocument document, boolean unsave) {
+        return client.sendAwait(SaveRecentSticker.builder()
+                .attached(attached)
+                .id(document)
+                .unsave(unsave)
+                .build());
+    }
+
+    public Mono<Boolean> clearRecentStickers(boolean attached) {
+        return client.sendAwait(ClearRecentStickers.builder()
+                .attached(attached)
+                .build());
+    }
+
+    public Mono<ArchivedStickers> getArchivedStickers(boolean marks, long offsetId, int limit) {
+        return client.sendAwait(GetArchivedStickers.builder()
+                .masks(marks)
+                .offsetId(offsetId)
+                .limit(limit)
+                .build());
+    }
+
+    public Mono<AllStickers> getMaskStickers(long hash) {
+        return client.sendAwait(ImmutableGetMaskStickers.of(hash));
+    }
+
+    public Flux<StickerSetCovered> getAttachedStickers(InputStickeredMedia media) {
+        return client.sendAwait(ImmutableGetAttachedStickers.of(media))
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<Updates> setGameScore(SetGameScore request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Boolean> setInlineGameScore(SetInlineGameScore request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<HighScores> getGameHighScores(InputPeer peer, int id, InputUser user) {
+        return client.sendAwait(ImmutableGetGameHighScores.of(peer, id, user));
+    }
+
+    public Mono<HighScores> getInlineGameHighScores(InputBotInlineMessageID id, InputUser user) {
+        return client.sendAwait(ImmutableGetInlineGameHighScores.of(id, user));
+    }
+
+    public Mono<Chats> getCommonChats(InputUser user, long maxId, int limit) {
+        return client.sendAwait(ImmutableGetCommonChats.of(user, maxId, limit));
+    }
+
+    public Mono<Chats> getAllChats(Iterable<Long> exceptIds) {
+        return client.sendAwait(GetAllChats.builder()
+                .exceptIds(exceptIds)
+                .build());
+    }
+
+    public Mono<WebPage> getWebPage(String url, int hash) {
+        return client.sendAwait(ImmutableGetWebPage.of(url, hash));
+    }
+
+    public Mono<Boolean> toggleDialogPin(boolean pinned, InputDialogPeer peer) {
+        return client.sendAwait(ToggleDialogPin.builder()
+                .pinned(pinned)
+                .peer(peer)
+                .build());
+    }
+
+    public Mono<Boolean> reorderPinnedDialogs(boolean force, int folderId, Iterable<? extends InputDialogPeer> order) {
+        return client.sendAwait(ReorderPinnedDialogs.builder()
+                .force(force)
+                .folderId(folderId)
+                .order(order)
+                .build());
+    }
+
+    public Mono<PeerDialogs> getPinnedDialogs(int folderId) {
+        return client.sendAwait(ImmutableGetPinnedDialogs.of(folderId));
+    }
+
+    public Mono<Boolean> setBotShippingResults(long queryId, @Nullable String error,
+                                               @Nullable Iterable<? extends ShippingOption> shippingOptions) {
+        return client.sendAwait(SetBotShippingResults.builder()
+                .queryId(queryId)
+                .error(error)
+                .shippingOptions(shippingOptions)
+                .build());
+    }
+
+    public Mono<Boolean> setBotPrecheckoutResults(boolean success, long queryId, @Nullable String error) {
+        return client.sendAwait(SetBotPrecheckoutResults.builder()
+                .success(success)
+                .queryId(queryId)
+                .error(error)
+                .build());
+    }
+
+    public Mono<MessageMedia> uploadMedia(InputPeer peer, InputMedia media) {
+        return client.sendAwait(ImmutableUploadMedia.of(peer, media));
+    }
+
+    public Mono<Updates> sendScreenshotNotification(InputPeer peer, int replyToMsgId, long randomId) {
+        return client.sendAwait(ImmutableSendScreenshotNotification.of(peer, replyToMsgId, randomId));
+    }
+
+    public Mono<FavedStickers> getFavedStickers(long hash) {
+        return client.sendAwait(ImmutableGetFavedStickers.of(hash));
+    }
+
+    public Mono<Boolean> faveSticker(InputDocument document, boolean unfave) {
+        return client.sendAwait(ImmutableFaveSticker.of(document, unfave));
+    }
+
+    public Mono<Messages> getUnreadMentions(InputPeer peer, int offsetId, int addOffset, int limit, int maxId, int minId) {
+        return client.sendAwait(ImmutableGetUnreadMentions.of(peer, offsetId, addOffset, limit, maxId, minId));
+    }
+
+    public Mono<AffectedHistory> readMentions(InputPeer peer) {
+        return client.sendAwait(ImmutableReadMentions.of(peer));
+    }
+
+    public Mono<Messages> getRecentLocations(InputPeer peer, int limit, long hash) {
+        return client.sendAwait(ImmutableGetRecentLocations.of(peer, limit, hash));
+    }
+
+    public Mono<Updates> sendMultiMedia(SendMultiMedia request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<EncryptedFile> uploadEncryptedFile(InputEncryptedChat peer, InputEncryptedFile file) {
+        return client.sendAwait(ImmutableUploadEncryptedFile.of(peer, file));
+    }
+
+    public Mono<FoundStickerSets> searchStickerSets(boolean excludeFeatured, String query, long hash) {
+        return client.sendAwait(SearchStickerSets.builder()
+                .excludeFeatured(excludeFeatured)
+                .q(query)
+                .hash(hash)
+                .build());
+    }
+
+    public Flux<MessageRange> getSplitRanges() {
+        return client.sendAwait(GetSplitRanges.instance())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<Boolean> markDialogUnread(boolean unread, InputDialogPeer peer) {
+        return client.sendAwait(MarkDialogUnread.builder()
+                .unread(unread)
+                .peer(peer)
+                .build());
+    }
+
+    public Flux<DialogPeer> getDialogUnreadMarks() {
+        return client.sendAwait(GetDialogUnreadMarks.instance())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<Boolean> clearAllDrafts() {
+        return client.sendAwait(ClearAllDrafts.instance());
+    }
+
+    public Mono<Updates> updatePinnedMessage(UpdatePinnedMessage request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<byte[]> options) {
+        return client.sendAwait(SendVote.builder()
+                .peer(peer)
+                .msgId(msgId)
+                .options(options)
+                .build());
+    }
+
+    public Mono<Updates> getPollResults(InputPeer peer, int msgId) {
+        return client.sendAwait(ImmutableGetPollResults.of(peer, msgId));
+    }
+
+    public Mono<Integer> getOnlines(InputPeer peer) {
+        return client.sendAwait(ImmutableGetOnlines.of(peer)).map(ChatOnlines::onlines);
+    }
+
+    public Mono<Boolean> editChatAbout(InputPeer peer, String about) {
+        return client.sendAwait(ImmutableEditChatAbout.of(peer, about));
+    }
+
+    public Mono<Updates> editChatDefaultBannedRights(InputPeer peer, ChatBannedRights rights) {
+        return client.sendAwait(ImmutableEditChatDefaultBannedRights.of(peer, rights));
+    }
+
+    public Mono<EmojiKeywordsDifference> getEmojiKeywordsDifference(String langCode, int fromVersion) {
+        return client.sendAwait(ImmutableGetEmojiKeywordsDifference.of(langCode, fromVersion));
+    }
+
+    public Flux<EmojiLanguage> getEmojiKeywordsLanguages(Iterable<String> langCodes) {
+        return client.sendAwait(GetEmojiKeywordsLanguages.builder()
+                .langCodes(langCodes)
+                .build())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<EmojiURL> getEmojiUrl(String langCode) {
+        return client.sendAwait(ImmutableGetEmojiURL.of(langCode));
+    }
+
+    public Flux<SearchCounter> getSearchCounters(InputPeer peer, Iterable<? extends MessagesFilter> filters) {
+        return client.sendAwait(GetSearchCounters.builder()
+                .peer(peer)
+                .filters(filters)
+                .build())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<UrlAuthResult> requestUrlAuth(@Nullable InputPeer peer, @Nullable Integer msgId,
+                                              @Nullable Integer buttonId, @Nullable String url) {
+        return client.sendAwait(RequestUrlAuth.builder()
+                .peer(peer)
+                .msgId(msgId)
+                .buttonId(buttonId)
+                .url(url)
+                .build());
+    }
+
+    public Mono<UrlAuthResult> acceptUrlAuth(AcceptUrlAuth request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Boolean> hidePeerSettingsBar(InputPeer peer) {
+        return client.sendAwait(ImmutableHidePeerSettingsBar.of(peer));
+    }
+
+    public Mono<Messages> getScheduledHistory(InputPeer peer, long hash) {
+        return client.sendAwait(ImmutableGetScheduledHistory.of(peer, hash));
+    }
+
+    public Mono<Messages> getScheduledMessages(InputPeer peer, Iterable<Integer> ids) {
+        return client.sendAwait(GetScheduledMessages.builder()
+                .peer(peer)
+                .id(ids)
+                .build());
+    }
+
+    public Mono<Updates> sendScheduledMessages(InputPeer peer, Iterable<Integer> ids) {
+        return client.sendAwait(SendScheduledMessages.builder()
+                .peer(peer)
+                .id(ids)
+                .build());
+    }
+
+    public Mono<Updates> deleteScheduledMessages(InputPeer peer, Iterable<Integer> ids) {
+        return client.sendAwait(DeleteScheduledMessages.builder()
+                .peer(peer)
+                .id(ids)
+                .build());
+    }
+
+    public Mono<VotesList> getPollVotes(InputPeer peer, int id, @Nullable byte[] option,
+                                        @Nullable String offset, int limit) {
+        return client.sendAwait(GetPollVotes.builder()
+                .peer(peer)
+                .id(id)
+                .option(option) // It's ok
+                .offset(offset)
+                .limit(limit)
+                .build());
+    }
+
+    public Mono<Boolean> toggleStickerSets(ToggleStickerSets request) {
+        return client.sendAwait(request);
+    }
+
+    public Flux<DialogFilter> getDialogFilters() {
+        return client.sendAwait(GetDialogFilters.instance())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Flux<DialogFilterSuggested> getSuggestedDialogFilters() {
+        return client.sendAwait(GetSuggestedDialogFilters.instance())
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<Boolean> updateDialogFilter(int id, @Nullable DialogFilter filter) {
+        return client.sendAwait(UpdateDialogFilter.builder()
+                .id(id)
+                .filter(filter)
+                .build());
+    }
+
+    public Mono<Boolean> updateDialogFiltersOrder(Iterable<Integer> order) {
+        return client.sendAwait(UpdateDialogFiltersOrder.builder()
+                .order(order)
+                .build());
+    }
+
+    public Mono<FeaturedStickers> getOldFeaturedStickers(int offset, int limit, long hash) {
+        return client.sendAwait(ImmutableGetOldFeaturedStickers.of(offset, limit, hash));
+    }
+
+    public Mono<Messages> getReplies(InputPeer peer, int msgId, int offsetId, int offsetDate,
+                                     int addOffset, int limit, int maxId, int minId, long hash) {
+        return client.sendAwait(ImmutableGetReplies.of(peer, msgId, offsetId, offsetDate, addOffset, limit, maxId, minId, hash));
+    }
+
+    public Mono<DiscussionMessage> getDiscussionMessage(InputPeer peer, int msgId) {
+        return client.sendAwait(ImmutableGetDiscussionMessage.of(peer, msgId));
+    }
+
+    public Mono<Boolean> readDiscussion(InputPeer peer, int msgId, int readMaxId) {
+        return client.sendAwait(ImmutableReadDiscussion.of(peer, msgId, readMaxId));
+    }
+
+    public Mono<AffectedHistory> unpingAllMessages(InputPeer peer) {
+        return client.sendAwait(ImmutableUnpinAllMessages.of(peer));
+    }
+
+    public Mono<Boolean> deleteChat(long chatId) {
+        return client.sendAwait(ImmutableDeleteChat.of(chatId));
+    }
+
+    public Mono<AffectedFoundMessages> deletePhoneCallHistory(boolean revoked) {
+        return client.sendAwait(DeletePhoneCallHistory.builder()
+                .revoke(revoked)
+                .build());
+    }
+
+    public Mono<HistoryImportParsed> checkHistoryImport(String importHead) {
+        return client.sendAwait(ImmutableCheckHistoryImport.of(importHead));
+    }
+
+    public Mono<HistoryImport> initHistoryImport(InputPeer peer, InputFile file, int mediaCount) {
+        return client.sendAwait(ImmutableInitHistoryImport.of(peer, file, mediaCount));
+    }
+
+    public Mono<MessageMedia> uploadImportedMedia(InputPeer peer, long importId, String fileName, InputMedia media) {
+        return client.sendAwait(ImmutableUploadImportedMedia.of(peer, importId, fileName, media));
+    }
+
+    public Mono<Boolean> startHistoryImport(InputPeer peer, long importId) {
+        return client.sendAwait(ImmutableStartHistoryImport.of(peer, importId));
+    }
+
+    public Mono<ExportedChatInvites> getExportedChatInvites(GetExportedChatInvites request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<telegram4j.tl.messages.ExportedChatInvite> getExportedChatInvite(InputPeer peer, String link) {
+        return client.sendAwait(ImmutableGetExportedChatInvite.of(peer, link));
+    }
+
+    public Mono<telegram4j.tl.messages.ExportedChatInvite> editExportedChatInvite(EditExportedChatInvite request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Boolean> deleteRevokedExportedChatInvites(InputPeer peer, InputUser admin) {
+        return client.sendAwait(ImmutableDeleteRevokedExportedChatInvites.of(peer, admin));
+    }
+
+    public Mono<Boolean> deleteExportedChatInvite(InputPeer peer, String link) {
+        return client.sendAwait(ImmutableDeleteExportedChatInvite.of(peer, link));
+    }
+
+    public Mono<ChatAdminsWithInvites> getAdminsWithInvites(InputPeer peer) {
+        return client.sendAwait(ImmutableGetAdminsWithInvites.of(peer));
+    }
+
+    public Mono<ChatInviteImporters> getChatInviteImporters(GetChatInviteImporters request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Updates> setHistoryTtl(InputPeer peer, int period) {
+        return client.sendAwait(ImmutableSetHistoryTTL.of(peer, period));
+    }
+
+    public Mono<CheckedHistoryImportPeer> checkHistoryImportPeer(InputPeer peer) {
+        return client.sendAwait(ImmutableCheckHistoryImportPeer.of(peer));
+    }
+
+    public Mono<Updates> setChatTheme(InputPeer peer, String emoticon) {
+        return client.sendAwait(ImmutableSetChatTheme.of(peer, emoticon));
+    }
+
+    public Flux<Long> getMessageReadParticipants(InputPeer peer, int msgId) {
+        return client.sendAwait(ImmutableGetMessageReadParticipants.of(peer, msgId))
+                .flatMapIterable(Function.identity());
+    }
+
+    // Upload methods
 
     public Mono<InputFile> saveFile(ByteBuf data, String name) {
         long fileId = CryptoUtil.random.nextLong();
