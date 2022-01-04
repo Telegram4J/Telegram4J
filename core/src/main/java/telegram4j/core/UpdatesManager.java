@@ -24,6 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getPeerId;
+import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 public class UpdatesManager {
 
@@ -204,23 +205,28 @@ public class UpdatesManager {
                                     .collect(Collectors.toMap(User::id, Function.identity()));
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
+                                    .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
-                                        Peer peer = data instanceof MessageService
-                                                ? ((MessageService) data).peerId()
-                                                : ((BaseMessage) data).peerId();
-
-                                        long id = getPeerId(peer);
+                                        long id = getPeerId(data.peerId());
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c))
                                                 .orElse(null);
 
+                                        var user = Optional.ofNullable(data.fromId())
+                                                .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
+                                                .map(p -> usersMap.get(getRawPeerId(p)))
+                                                .filter(u -> u.identifier() == BaseUser.ID)
+                                                .map(u -> (BaseUser) u)
+                                                .map(d -> new telegram4j.core.object.User(client, d))
+                                                .orElse(null);
+
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
                                                 .switchIfEmpty(client.getServiceHolder()
-                                                        .getMessageService().getInputPeer(peer)
+                                                        .getMessageService().getInputPeer(data.peerId())
                                                         .map(p -> peerToId(p, id)))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
-                                                .map(m -> new SendMessageEvent(client, m, chat));
+                                                .map(m -> new SendMessageEvent(client, m, chat, user));
                                     });
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
@@ -242,15 +248,21 @@ public class UpdatesManager {
                                     .collect(Collectors.toMap(User::id, Function.identity()));
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
+                                    .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
-                                        Peer peer = data instanceof MessageService
-                                                ? ((MessageService) data).peerId()
-                                                : ((BaseMessage) data).peerId();
-
+                                        Peer peer = data.peerId();
                                         long id = getPeerId(peer);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c))
+                                                .orElse(null);
+
+                                        var user = Optional.ofNullable(data.fromId())
+                                                .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
+                                                .map(p -> usersMap.get(getRawPeerId(p)))
+                                                .filter(u -> u.identifier() == BaseUser.ID)
+                                                .map(u -> (BaseUser) u)
+                                                .map(d -> new telegram4j.core.object.User(client, d))
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
@@ -258,7 +270,7 @@ public class UpdatesManager {
                                                         .getMessageService().getInputPeer(peer)
                                                         .map(p -> peerToId(p, id)))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
-                                                .map(m -> new SendMessageEvent(client, m, chat));
+                                                .map(m -> new SendMessageEvent(client, m, chat, user));
                                     });
 
                             State intermediateState = difference0.intermediateState();

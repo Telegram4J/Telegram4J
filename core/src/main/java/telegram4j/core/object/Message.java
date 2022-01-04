@@ -21,7 +21,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static telegram4j.mtproto.util.TlEntityUtil.or;
 import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
 public class Message implements TelegramObject {
@@ -61,12 +60,11 @@ public class Message implements TelegramObject {
     }
 
     public int getId() {
-        return or(baseData, serviceData, BaseMessage::id, MessageService::id);
+        return getBaseData().id();
     }
 
-    public Optional<Id> getFromChatId() {
-        return Optional.ofNullable(or(baseData, serviceData, BaseMessage::fromId, MessageService::fromId))
-                .map(Id::of);
+    public Optional<Id> getAuthorId() {
+        return Optional.ofNullable(getBaseData().fromId()).map(Id::of);
     }
 
     public Id getChatId() {
@@ -74,17 +72,15 @@ public class Message implements TelegramObject {
     }
 
     public Optional<MessageReplyHeader> getReplyTo() {
-        return Optional.ofNullable(or(baseData, serviceData, BaseMessage::replyTo, MessageService::replyTo))
-                .map(d -> new MessageReplyHeader(client, d));
+        return Optional.ofNullable(getBaseData().replyTo()).map(d -> new MessageReplyHeader(client, d));
     }
 
     public Instant getCreateTimestamp() {
-        return Instant.ofEpochSecond(or(baseData, serviceData, BaseMessage::date, MessageService::date));
+        return Instant.ofEpochSecond(getBaseData().date());
     }
 
     public Optional<Duration> getAutoDeleteDuration() {
-        return Optional.ofNullable(or(baseData, serviceData, BaseMessage::ttlPeriod, MessageService::ttlPeriod))
-                .map(Duration::ofSeconds);
+        return Optional.ofNullable(getBaseData().ttlPeriod()).map(Duration::ofSeconds);
     }
 
     // BaseMessage fields
@@ -194,6 +190,8 @@ public class Message implements TelegramObject {
         });
     }
 
+    // Private methods
+
     private InputPeer getChatIdAsPeer() {
         switch (getChatId().getType()) {
             case CHAT: return ImmutableInputPeerChat.of(getChatId().asLongRaw());
@@ -203,6 +201,10 @@ public class Message implements TelegramObject {
             case SECRET_CHAT: // ????
             default: throw new IllegalArgumentException("Unknown peer type: " + getChatId().getType());
         }
+    }
+
+    private BaseMessageFields getBaseData() {
+        return baseData != null ? baseData : Objects.requireNonNull(serviceData);
     }
 
     @Override

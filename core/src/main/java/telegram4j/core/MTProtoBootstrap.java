@@ -33,6 +33,7 @@ import telegram4j.tl.request.help.GetConfig;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
@@ -42,7 +43,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private final AuthorizationResources authorizationResources;
 
     private TcpClient tcpClient;
-    private Transport transport;
+    private Supplier<Transport> transport;
     private int acksSendThreshold = 3;
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
     private MTProtoClientManager mtProtoClientManager;
@@ -71,7 +72,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setTransport(Transport transport) {
+    public MTProtoBootstrap<O> setTransport(Supplier<Transport> transport) {
         this.transport = Objects.requireNonNull(transport, "transport");
         return this;
     }
@@ -226,11 +227,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .build();
     }
 
-    private Transport initTransport() {
+    private Supplier<Transport> initTransport() {
         if (transport != null) {
             return transport;
         }
-        return new IntermediateTransport(true);
+        return () -> new IntermediateTransport(true);
     }
 
     private TcpClient initTcpClient() {

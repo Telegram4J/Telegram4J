@@ -48,16 +48,4 @@ public class TlEntityUtil {
         }
         return impl.cast(obj);
     }
-
-    public static <F, S, R> R or(@Nullable F first, @Nullable S second,
-                                 Function<F, ? extends R> firstMap,
-                                 Function<S, ? extends R> secondMap) {
-        if (first != null) {
-            return firstMap.apply(first);
-        }
-        if (second != null) {
-            return secondMap.apply(second);
-        }
-        throw new IllegalArgumentException("All sides are null.");
-    }
 }

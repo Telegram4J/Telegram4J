@@ -25,6 +25,8 @@ public interface MTProtoClient {
 
     DataCenter getDatacenter();
 
+    MTProtoClient createMediaClient(DataCenter dc);
+
     Mono<Void> close();
 
     enum State {

@@ -5,16 +5,18 @@ import reactor.netty.tcp.TcpClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
+import java.util.function.Supplier;
+
 public class MTProtoOptions {
     private final DataCenter datacenter;
     private final TcpClient tcpClient;
-    private final Transport transport;
+    private final Supplier<Transport> transport;
     private final StoreLayout storeLayout;
     private final int acksSendThreshold;
     private final Sinks.EmitFailureHandler emissionHandler;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
-                          Transport transport, StoreLayout storeLayout,
+                          Supplier<Transport> transport, StoreLayout storeLayout,
                           int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
@@ -32,7 +34,7 @@ public class MTProtoOptions {
         return tcpClient;
     }
 
-    public Transport getTransport() {
+    public Supplier<Transport> getTransport() {
         return transport;
     }
 

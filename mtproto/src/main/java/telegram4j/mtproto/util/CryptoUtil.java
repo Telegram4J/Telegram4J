@@ -217,6 +217,13 @@ public final class CryptoUtil {
                 ((long) bytes[7] & 0xff) << 56;
     }
 
+    public static int readIntLE(byte[] bytes) {
+        return (int) bytes[0] & 0xff |
+                ((int) bytes[1] & 0xff) << 8 |
+                ((int) bytes[2] & 0xff) << 16 |
+                ((int) bytes[3] & 0xff) << 24;
+    }
+
     public static AES256IGECipher createAesCipher(byte[] messageKey, ByteBuf authKeyBuf, boolean server) {
         int x = server ? 8 : 0;
 

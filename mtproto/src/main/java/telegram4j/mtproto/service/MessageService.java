@@ -5,97 +5,296 @@ import io.netty.buffer.ByteBufUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
+import reactor.util.annotation.Nullable;
+import reactor.util.concurrent.Queues;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.mtproto.util.EmissionHandlers;
+import telegram4j.tl.ExportedChatInvite;
 import telegram4j.tl.*;
-import telegram4j.tl.request.messages.BaseSendMessageRequest;
-import telegram4j.tl.request.messages.EditMessage;
-import telegram4j.tl.request.messages.SendMedia;
-import telegram4j.tl.request.messages.SendMessage;
+import telegram4j.tl.messages.MessageViews;
+import telegram4j.tl.messages.PeerSettings;
+import telegram4j.tl.messages.*;
+import telegram4j.tl.request.messages.*;
+import telegram4j.tl.request.upload.SaveBigFilePart;
 import telegram4j.tl.request.upload.SaveFilePart;
 
 import java.security.MessageDigest;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 public class MessageService extends RpcService {
 
     private static final int PART_SIZE = 512 * 1024;
     private static final int TEN_MB = 10 * 1024 * 1024;
     private static final int LIMIT_MB = 2000 * 1024 * 1024;
-    private static final int PARALLELISM = 3;
+    private static final int PARALLELISM = 5;
+
+    private static final Sinks.EmitFailureHandler emissionHandler = EmissionHandlers.park(Duration.ofNanos(10));
 
     public MessageService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
     }
 
     // TODO list:
-    // getMessages id:Vector<InputMessage> = messages.Messages;
-    // getDialogs flags:# exclude_pinned:flags.0?true folder_id:flags.1?int offset_date:int offset_id:int offset_peer:InputPeer limit:int hash:long = messages.Dialogs;
-    // getHistory peer:InputPeer offset_id:int offset_date:int add_offset:int limit:int max_id:int min_id:int hash:long = messages.Messages;
-    // search flags:# peer:InputPeer q:string from_id:flags.0?InputPeer top_msg_id:flags.1?int filter:MessagesFilter min_date:int max_date:int offset_id:int add_offset:int limit:int max_id:int min_id:int hash:long = messages.Messages;
-    // readHistory peer:InputPeer max_id:int = messages.AffectedMessages;
-    // deleteHistory flags:# just_clear:flags.0?true revoke:flags.1?true peer:InputPeer max_id:int = messages.AffectedHistory;
-    // deleteMessages flags:# revoke:flags.0?true id:Vector<int> = messages.AffectedMessages;
-    // receivedMessages max_id:int = Vector<ReceivedNotifyMessage>;
-    // setTyping flags:# peer:InputPeer top_msg_id:flags.0?int action:SendMessageAction = Bool;
-    // sendMessage flags:# no_webpage:flags.1?true silent:flags.5?true background:flags.6?true clear_draft:flags.7?true peer:InputPeer reply_to_msg_id:flags.0?int message:string random_id:long reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> schedule_date:flags.10?int = Updates;
-    // sendMedia flags:# silent:flags.5?true background:flags.6?true clear_draft:flags.7?true peer:InputPeer reply_to_msg_id:flags.0?int media:InputMedia message:string random_id:long reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> schedule_date:flags.10?int = Updates;
-    // forwardMessages flags:# silent:flags.5?true background:flags.6?true with_my_score:flags.8?true drop_author:flags.11?true drop_media_captions:flags.12?true from_peer:InputPeer id:Vector<int> random_id:Vector<long> to_peer:InputPeer schedule_date:flags.10?int = Updates;
-    // reportSpam peer:InputPeer = Bool;
-    // getPeerSettings peer:InputPeer = PeerSettings;
-    // report peer:InputPeer id:Vector<int> reason:ReportReason message:string = Bool;
-    // getChats id:Vector<long> = messages.Chats;
-    // getFullChat chat_id:long = messages.ChatFull;
-    // editChatTitle chat_id:long title:string = Updates;
-    // editChatPhoto chat_id:long photo:InputChatPhoto = Updates;
-    // addChatUser chat_id:long user_id:InputUser fwd_limit:int = Updates;
-    // deleteChatUser flags:# revoke_history:flags.0?true chat_id:long user_id:InputUser = Updates;
-    // createChat users:Vector<InputUser> title:string = Updates;
-    // getDhConfig version:int random_length:int = messages.DhConfig;
-    // requestEncryption user_id:InputUser random_id:int g_a:bytes = EncryptedChat;
-    // acceptEncryption peer:InputEncryptedChat g_b:bytes key_fingerprint:long = EncryptedChat;
-    // discardEncryption flags:# delete_history:flags.0?true chat_id:int = Bool;
-    // setEncryptedTyping peer:InputEncryptedChat typing:Bool = Bool;
-    // readEncryptedHistory peer:InputEncryptedChat max_date:int = Bool;
-    // sendEncrypted flags:# silent:flags.0?true peer:InputEncryptedChat random_id:long data:bytes = messages.SentEncryptedMessage;
-    // sendEncryptedFile flags:# silent:flags.0?true peer:InputEncryptedChat random_id:long data:bytes file:InputEncryptedFile = messages.SentEncryptedMessage;
-    // sendEncryptedService peer:InputEncryptedChat random_id:long data:bytes = messages.SentEncryptedMessage;
-    // receivedQueue max_qts:int = Vector<long>;
-    // reportEncryptedSpam peer:InputEncryptedChat = Bool;
-    // readMessageContents id:Vector<int> = messages.AffectedMessages;
-    // getStickers emoticon:string hash:long = messages.Stickers;
-    // getAllStickers hash:long = messages.AllStickers;
-    // getWebPagePreview flags:# message:string entities:flags.3?Vector<MessageEntity> = MessageMedia;
-    // exportChatInvite flags:# legacy_revoke_permanent:flags.2?true peer:InputPeer expire_date:flags.0?int usage_limit:flags.1?int = ExportedChatInvite;
-    // checkChatInvite hash:string = ChatInvite;
-    // importChatInvite hash:string = Updates;
-    // getStickerSet stickerset:InputStickerSet = messages.StickerSet;
-    // installStickerSet stickerset:InputStickerSet archived:Bool = messages.StickerSetInstallResult;
-    // uninstallStickerSet stickerset:InputStickerSet = Bool;
-    // startBot bot:InputUser peer:InputPeer random_id:long start_param:string = Updates;
-    // getMessagesViews peer:InputPeer id:Vector<int> increment:Bool = messages.MessageViews;
-    // editChatAdmin chat_id:long user_id:InputUser is_admin:Bool = Bool;
-    // migrateChat chat_id:long = Updates;
-    // searchGlobal flags:# folder_id:flags.0?int q:string filter:MessagesFilter min_date:int max_date:int offset_rate:int offset_peer:InputPeer offset_id:int limit:int = messages.Messages;
-    // reorderStickerSets flags:# masks:flags.0?true order:Vector<long> = Bool;
-    // getDocumentByHash sha256:bytes size:int mime_type:string = Document;
-    // getSavedGifs hash:long = messages.SavedGifs;
-    // saveGif id:InputDocument unsave:Bool = Bool;
-    // getInlineBotResults flags:# bot:InputUser peer:InputPeer geo_point:flags.0?InputGeoPoint query:string offset:string = messages.BotResults;
-    // setInlineBotResults flags:# gallery:flags.0?true private:flags.1?true query_id:long results:Vector<InputBotInlineResult> cache_time:int next_offset:flags.2?string switch_pm:flags.3?InlineBotSwitchPM = Bool;
-    // sendInlineBotResult flags:# silent:flags.5?true background:flags.6?true clear_draft:flags.7?true hide_via:flags.11?true peer:InputPeer reply_to_msg_id:flags.0?int random_id:long query_id:long id:string schedule_date:flags.10?int = Updates;
-    // getMessageEditData peer:InputPeer id:int = messages.MessageEditData;
-    // editMessage flags:# no_webpage:flags.1?true peer:InputPeer id:int message:flags.11?string media:flags.14?InputMedia reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> schedule_date:flags.15?int = Updates;
-    // editInlineBotMessage flags:# no_webpage:flags.1?true id:InputBotInlineMessageID message:flags.11?string media:flags.14?InputMedia reply_markup:flags.2?ReplyMarkup entities:flags.3?Vector<MessageEntity> = Bool;
-    // getBotCallbackAnswer flags:# game:flags.1?true peer:InputPeer msg_id:int data:flags.0?bytes password:flags.2?InputCheckPasswordSRP = messages.BotCallbackAnswer;
-    // setBotCallbackAnswer flags:# alert:flags.1?true query_id:long message:flags.0?string url:flags.2?string cache_time:int = Bool;
-    // getPeerDialogs peers:Vector<InputDialogPeer> = messages.PeerDialogs;
-    // saveDraft flags:# no_webpage:flags.1?true reply_to_msg_id:flags.0?int peer:InputPeer message:string entities:flags.3?Vector<MessageEntity> = Bool;
-    // getAllDrafts = Updates;
-    // getFeaturedStickers hash:long = messages.FeaturedStickers;
+
+    public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
+        return client.sendAwait(GetMessages.builder()
+                .id(ids)
+                .build());
+    }
+
+    public Mono<Dialogs> getDialogs(GetDialogs request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Messages> getHistory(InputPeer peer, int offsetId, int offsetDate, int addOffset,
+                                     int limit, int maxId, int minId, long hash) {
+        return client.sendAwait(ImmutableGetHistory.of(peer, offsetId, offsetDate, addOffset, limit, maxId, minId, hash));
+    }
+
+    public Mono<Messages> search(Search request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<AffectedMessages> readHistory(InputPeer peer, int maxId) {
+        return client.sendAwait(ImmutableReadHistory.of(peer, maxId));
+    }
+
+    public Mono<AffectedHistory> deleteHistory(DeleteHistory request) {
+        return client.sendAwait(request);
+    }
+
+    public Flux<ReceivedNotifyMessage> receivedMessages(int maxId) {
+        return client.sendAwait(ImmutableReceivedMessages.of(maxId))
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<Boolean> setTyping(InputPeer peer, @Nullable Integer topMsgId, SendMessageAction action) {
+        return client.sendAwait(SetTyping.builder()
+                .peer(peer)
+                .topMsgId(topMsgId)
+                .action(action)
+                .build());
+    }
+
+    public Flux<Message> forwardMessages(ForwardMessages request) {
+        return client.sendAwait(request)
+                .ofType(BaseUpdates.class)
+                .flatMapMany(updates -> {
+                    client.updates().emitNext(updates, emissionHandler);
+
+                    return Flux.fromIterable(updates.updates())
+                            .ofType(UpdateNewMessageFields.class)
+                            .map(UpdateNewMessageFields::message);
+                });
+    }
+
+    public Mono<Boolean> reportSpam(InputPeer peer) {
+        return client.sendAwait(ImmutableReportSpam.of(peer));
+    }
+
+    public Mono<PeerSettings> getPeerSettings(InputPeer peer) {
+        return client.sendAwait(ImmutableGetPeerSettings.of(peer));
+    }
+
+    public Mono<Boolean> report(InputPeer peer, Iterable<Integer> ids, ReportReason reason, String message) {
+        return client.sendAwait(Report.builder()
+                .peer(peer)
+                .id(ids)
+                .reason(reason)
+                .message(message)
+                .build());
+    }
+
+    public Mono<DhConfig> getDhConfig(int version, int randomLength) {
+        return client.sendAwait(ImmutableGetDhConfig.of(version, randomLength));
+    }
+
+    public Mono<EncryptedChat> requestEncryption(InputUser user, int randomId, byte[] ga) {
+        return client.sendAwait(ImmutableRequestEncryption.of(user, randomId, ga));
+    }
+
+    public Mono<EncryptedChat> acceptEncryption(InputEncryptedChat peer, byte[] ga, long fingerprint) {
+        return client.sendAwait(ImmutableAcceptEncryption.of(peer, ga, fingerprint));
+    }
+
+    public Mono<Boolean> discardEncryption(boolean deleteEncryption, int chatId) {
+        return client.sendAwait(DiscardEncryption.builder()
+                .deleteHistory(deleteEncryption)
+                .chatId(chatId)
+                .build());
+    }
+
+    public Mono<Boolean> setEncryptedTyping(InputEncryptedChat peer, boolean typing) {
+        return client.sendAwait(ImmutableSetEncryptedTyping.of(peer, typing));
+    }
+
+    public Mono<Boolean> readEncryptedHistory(InputEncryptedChat peer, int maxDate) {
+        return client.sendAwait(ImmutableReadEncryptedHistory.of(peer, maxDate));
+    }
+
+    public Mono<SentEncryptedMessage> sendEncrypted(SendEncrypted request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<SentEncryptedMessage> sendEncryptedFile(SendEncryptedFile request) {
+        return client.sendAwait(request);
+    }
+
+    public Flux<Long> receivedQueue(int maxQts) {
+        return client.sendAwait(ImmutableReceivedQueue.of(maxQts))
+                .flatMapIterable(Function.identity());
+    }
+
+    public Mono<AffectedMessages> readMessageContents(Iterable<Integer> ids) {
+        return client.sendAwait(ReadMessageContents.builder()
+                .id(ids)
+                .build());
+    }
+
+    public Mono<Stickers> getStickers(String emoticon, long hash) {
+        return client.sendAwait(ImmutableGetStickers.of(emoticon, hash));
+    }
+
+    public Mono<AllStickers> getAllStickers(long hash) {
+        return client.sendAwait(ImmutableGetAllStickers.of(hash));
+    }
+
+    public Mono<MessageMedia> getWebPagePreview(String message, @Nullable Iterable<? extends MessageEntity> entities) {
+        return client.sendAwait(GetWebPagePreview.builder()
+                .message(message)
+                .entities(entities)
+                .build());
+    }
+
+    public Mono<ExportedChatInvite> exportChatInvite(ExportChatInvite request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<ChatInvite> checkChatInvite(String hash) {
+        return client.sendAwait(ImmutableCheckChatInvite.of(hash));
+    }
+
+    // TODO: check updates type
+    public Mono<Updates> importChatInvite(String hash) {
+        return client.sendAwait(ImmutableImportChatInvite.of(hash));
+    }
+
+    public Mono<StickerSetWithDocuments> getStickerSet(InputStickerSet stickerSet, int hash) {
+        return client.sendAwait(ImmutableGetStickerSet.of(stickerSet, hash));
+    }
+
+    public Mono<StickerSetInstallResult> installStickerSet(InputStickerSet stickerSet, boolean archived) {
+        return client.sendAwait(ImmutableInstallStickerSet.of(stickerSet, archived));
+    }
+
+    public Mono<Boolean> uninstallStickerSet(InputStickerSet stickerSet) {
+        return client.sendAwait(ImmutableUninstallStickerSet.of(stickerSet));
+    }
+
+    public Mono<Updates> startBot(InputUser bot, InputPeer peer, long randomId, String startParam) {
+        return client.sendAwait(ImmutableStartBot.of(bot, peer, randomId, startParam));
+    }
+
+    public Mono<MessageViews> getMessagesViews(InputPeer peer, Iterable<Integer> ids, boolean increment) {
+        return client.sendAwait(GetMessagesViews.builder()
+                .peer(peer)
+                .id(ids)
+                .increment(increment)
+                .build());
+    }
+
+    public Mono<Boolean> editChatAdmin(long chatId, InputUser user, boolean isAdmin) {
+        return client.sendAwait(ImmutableEditChatAdmin.of(chatId, user, isAdmin));
+    }
+
+    public Mono<Updates> migrateChat(long chatId) {
+        return client.sendAwait(ImmutableMigrateChat.of(chatId));
+    }
+
+    public Mono<Messages> searchGlobal(SearchGlobal request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Boolean> reorderStickerSet(boolean masks, Iterable<Long> order) {
+        return client.sendAwait(ReorderStickerSets.builder()
+                .masks(masks)
+                .order(order)
+                .build());
+    }
+
+    public Mono<Document> getDocumentByHash(byte[] sha256, int size, String mimeType) {
+        return client.sendAwait(ImmutableGetDocumentByHash.of(sha256, size, mimeType));
+    }
+
+    public Mono<SavedGifs> getSavedGifs(long hash) {
+        return client.sendAwait(ImmutableGetSavedGifs.of(hash));
+    }
+
+    public Mono<Boolean> saveGif(InputDocument document, boolean unsave) {
+        return client.sendAwait(ImmutableSaveGif.of(document, unsave));
+    }
+
+    public Mono<BotResults> getInlineBotResults(InputUser bot, InputPeer peer, @Nullable InputGeoPoint geoPoint,
+                                                String query, String offset) {
+        return client.sendAwait(GetInlineBotResults.builder()
+                .bot(bot)
+                .peer(peer)
+                .geoPoint(geoPoint)
+                .query(query)
+                .offset(offset)
+                .build());
+    }
+
+    public Mono<Updates> sendInlineBotResult(SendInlineBotResult request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<MessageEditData> getMessageEditData(InputPeer peer, int id) {
+        return client.sendAwait(ImmutableGetMessageEditData.of(peer, id));
+    }
+
+    public Mono<Boolean> editInlineBotMessage(EditInlineBotMessage request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<BotCallbackAnswer> getBotCallbackAnswer(GetBotCallbackAnswer request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<Boolean> setBotCallbackAnswer(SetBotCallbackAnswer request) {
+        return client.sendAwait(request);
+    }
+
+    public Mono<PeerDialogs> getPeerDialogs(Iterable<? extends InputDialogPeer> peers) {
+        return client.sendAwait(GetPeerDialogs.builder()
+                .peers(peers)
+                .build());
+    }
+
+    public Mono<Boolean> saveDraft(SaveDraft request) {
+        return client.sendAwait(request);
+    }
+
+    // TODO: check updates type
+    public Mono<Updates> getAllDrafts() {
+        return client.sendAwait(GetAllDrafts.instance());
+    }
+
+    public Mono<FeaturedStickers> getFeaturedStickers(long hash) {
+        return client.sendAwait(ImmutableGetFeaturedStickers.of(hash));
+    }
+
     // readFeaturedStickers id:Vector<long> = Bool;
     // getRecentStickers flags:# attached:flags.0?true hash:long = messages.RecentStickers;
     // saveRecentSticker flags:# attached:flags.0?true id:InputDocument unsave:Bool = Bool;
@@ -187,8 +386,62 @@ public class MessageService extends RpcService {
         }
 
         if (big) {
-            // TODO: implement session paralleling
-            return Mono.empty();
+            Sinks.Many<SaveBigFilePart> queue = Sinks.many().multicast()
+                    .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+
+            AtomicInteger it = new AtomicInteger(0);
+            AtomicInteger suc = new AtomicInteger(0);
+
+            List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
+            DataCenter mediaDc = DataCenter.mediaDataCenters.get(0);
+
+            Sinks.Empty<Void> done = Sinks.empty();
+
+            Mono<Void> initialize = Flux.range(0, PARALLELISM)
+                    .map(i -> client.createMediaClient(mediaDc))
+                    .doOnNext(clients::add)
+                    .flatMap(MTProtoClient::connect)
+                    .then();
+
+            Mono<Void> sender = queue.asFlux()
+                    .publishOn(Schedulers.boundedElastic())
+                    .handle((req, sink) -> {
+                        MTProtoClient client = clients.get(it.getAndUpdate(i -> i + 1 == PARALLELISM ? 0 : i + 1));
+                        client.sendAwait(req)
+                                .filter(b -> b)
+                                .switchIfEmpty(Mono.error(new IllegalStateException("Failed to upload part #" + req.filePart())))
+                                .flatMap(b -> {
+                                    if (suc.incrementAndGet() == req.fileTotalParts()) {
+                                        done.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                                        queue.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
+                                        return Flux.fromIterable(clients)
+                                                .flatMap(MTProtoClient::close)
+                                                .then(Mono.fromRunnable(sink::complete));
+                                    }
+                                    return Mono.empty();
+                                })
+                                .subscribe();
+                    })
+                    .then();
+
+            Mono<Void> reader = Flux.range(0, parts)
+                    .doOnNext(filePart -> {
+                        ByteBuf part = data.readBytes(Math.min(PART_SIZE, data.readableBytes()));
+                        byte[] partBytes = CryptoUtil.toByteArray(part);
+
+                        SaveBigFilePart req = SaveBigFilePart.builder()
+                                .fileId(fileId)
+                                .filePart(filePart)
+                                .bytes(partBytes)
+                                .fileTotalParts(parts)
+                                .build();
+
+                        queue.emitNext(req, emissionHandler);
+                    })
+                    .then();
+
+            return Mono.when(initialize, reader, sender)
+                    .then(Mono.fromSupplier(() -> ImmutableInputFileBig.of(fileId, parts, name)));
         }
 
         MessageDigest md5 = CryptoUtil.MD5.get();
@@ -220,7 +473,7 @@ public class MessageService extends RpcService {
                 .map(TupleUtils.function((updates, peer) -> {
                     var upd = transformMessageUpdate(request, updates, peer);
 
-                    client.updates().emitNext(upd.getT2(), Sinks.EmitFailureHandler.FAIL_FAST);
+                    client.updates().emitNext(upd.getT2(), emissionHandler);
 
                     return upd.getT1();
                 }));
@@ -232,7 +485,7 @@ public class MessageService extends RpcService {
                 .map(TupleUtils.function((updates, peer) -> {
                     var upd = transformMessageUpdate(request, updates, peer);
 
-                    client.updates().emitNext(upd.getT2(), Sinks.EmitFailureHandler.FAIL_FAST);
+                    client.updates().emitNext(upd.getT2(), emissionHandler);
 
                     return upd.getT1();
                 }));
@@ -251,7 +504,7 @@ public class MessageService extends RpcService {
                                     .findFirst()
                                     .orElseThrow();
 
-                            client.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
+                            client.updates().emitNext(updates, emissionHandler);
 
                             return update.message();
                         default:
@@ -260,7 +513,7 @@ public class MessageService extends RpcService {
                 });
     }
 
-    // Short-send related updates object should be transformed to the updateShort.
+    // Short-send related updates object should be transformed to the updateShort or baseUpdate.
     // https://core.telegram.org/api/updates-sequence
     static Tuple2<Message, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
         switch (updates.identifier()) {
@@ -369,7 +622,8 @@ public class MessageService extends RpcService {
 
                 return Tuples.of(message, casted);
             }
-            default: throw new IllegalArgumentException("Unknown updates type: " + updates);
+            default:
+                throw new IllegalArgumentException("Unknown updates type: " + updates);
         }
     }
 }

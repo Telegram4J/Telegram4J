@@ -69,6 +69,7 @@ public class MTProtoBotExample {
                             .then();
 
                     Mono<Void> listenMessages = client.on(SendMessageEvent.class)
+                            .filter(e -> e.getAuthor().map(a -> !a.getFlags().contains(telegram4j.core.object.User.Flag.BOT)).orElse(false))
                             .flatMap(e -> Mono.from(e.getMessage().getEntities()
                                     .filter(list -> !list.isEmpty() && list.get(0).getType() == MessageEntity.Type.BOT_COMMAND)
                                     .map(list -> list.get(0))

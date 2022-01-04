@@ -175,7 +175,7 @@ public class GroupChat extends BaseChat {
         /** Whether the current user has left the group. */
         LEFT(2),
 
-        /** Whether the group was <a href="Whether the group was migrated"> migrated</a>. */
+        /** Whether the group was <a href="https://core.telegram.org/api/channel">migrated</a>. */
         DEACTIVATED(5),
 
         /** Whether a group call is currently active. */

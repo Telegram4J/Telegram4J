@@ -72,8 +72,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final ResettableInterval pingEmitter;
     private final Sinks.Many<State> state;
 
+    private final MTProtoOptions options;
+
     private volatile Sinks.One<Void> closeHook;
-    private volatile boolean close; // needed for detecting close and disconnect states
+    private volatile boolean close = false; // needed for detecting close and disconnect states
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile Connection connection;
     private volatile long sessionId = random.nextLong();
@@ -86,13 +88,37 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final ConcurrentMap<Long, RequestEntry> resolvers = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Long> quickAckTokens = new ConcurrentHashMap<>();
 
-    public DefaultMTProtoClient(MTProtoOptions options) {
-        this.dataCenter = options.getDatacenter();
+    DefaultMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
+        this.dataCenter = dataCenter;
         this.tcpClient = initTcpClient(options.getTcpClient());
-        this.transport = options.getTransport();
+        this.transport = options.getTransport().get();
         this.storeLayout = options.getStoreLayout();
         this.acksSendThreshold = options.getAcksSendThreshold();
         this.emissionHandler = options.getEmissionHandler();
+        this.options = options;
+
+        this.authReceiver = Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        this.rpcReceiver = Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        this.updates = Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        this.outbound = Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        this.state = Sinks.many().replay()
+                .latestOrDefault(State.RECONNECT);
+        this.futureSaltEmitter = new ResettableInterval(Schedulers.boundedElastic());
+        this.pingEmitter = new ResettableInterval(Schedulers.boundedElastic());
+    }
+
+    public DefaultMTProtoClient(MTProtoOptions options) {
+        this.dataCenter = options.getDatacenter();
+        this.tcpClient = initTcpClient(options.getTcpClient());
+        this.transport = options.getTransport().get();
+        this.storeLayout = options.getStoreLayout();
+        this.acksSendThreshold = options.getAcksSendThreshold();
+        this.emissionHandler = options.getEmissionHandler();
+        this.options = options;
 
         this.authReceiver = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
@@ -118,11 +144,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         log.debug("Sending transport identifier to the server.");
 
                         con.channel().writeAndFlush(transport.identifier(con.channel().alloc()));
-                    } else if (st == ConnectionObserver.State.DISCONNECTING ||
-                            st == ConnectionObserver.State.RELEASED) {
-                        if (!close) {
-                            state.emitNext(State.DISCONNECTED, Sinks.EmitFailureHandler.FAIL_FAST);
-                        }
+                    } else if (!close && (st == ConnectionObserver.State.DISCONNECTING ||
+                            st == ConnectionObserver.State.RELEASED)) {
+                        state.emitNext(State.DISCONNECTED, emissionHandler);
                     }
                 });
     }
@@ -147,10 +171,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 futureSaltEmitter.dispose();
                                 pingEmitter.dispose();
                                 closeHook.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                                this.state.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
 
                                 log.debug("Disconnected from the datacenter №{} ({}:{})",
                                         dataCenter.getId(), dataCenter.getAddress(), dataCenter.getPort());
-                                return Mono.empty();
+                                return Mono.fromRunnable(connection::dispose)
+                                        .onErrorResume(t -> Mono.empty());
                             case DISCONNECTED:
                                 futureSaltEmitter.dispose();
                                 pingEmitter.dispose();
@@ -352,18 +378,26 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 return Mono.when(futureSaltSchedule, ping);
             });
 
-            return Mono.when(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
+            return Mono.zip(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
                             rpcHandler, awaitKey.then(startSchedule))
                     .then();
         })
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
-        .switchIfEmpty(Mono.fromRunnable(() -> state.emitNext(State.DISCONNECTED, emissionHandler)).then(Mono.error(RETRY)))
+        .switchIfEmpty(Mono.defer(() -> {
+            if (close) {
+                return Mono.empty();
+            }
+
+            state.emitNext(State.DISCONNECTED, emissionHandler);
+            return Mono.error(RETRY);
+        }))
         .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
-                .filter(t -> t == RETRY || t instanceof AbortedException || t instanceof IOException)
+                .filter(t -> !close && (t == RETRY || t instanceof AbortedException || t instanceof IOException))
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);
                     log.debug("Reconnecting to the datacenter (attempts: {}).", signal.totalRetries());
                 }))
+        .onErrorResume(t -> Mono.empty())
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
@@ -427,11 +461,22 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
+    public MTProtoClient createMediaClient(DataCenter dc) {
+        DefaultMTProtoClient client = new DefaultMTProtoClient(dc, options);
+
+        client.authorizationKey = authorizationKey;
+        client.lastGeneratedMessageId = lastGeneratedMessageId;
+        client.timeOffset = timeOffset;
+        client.serverSalt = serverSalt;
+
+        return client;
+    }
+
+    @Override
     public Mono<Void> close() {
         return Mono.justOrEmpty(connection)
                 .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected.")))
-                .doOnNext(con -> state.emitNext(State.CLOSED, Sinks.EmitFailureHandler.FAIL_FAST))
-                .flatMap(con -> closeHook.asMono())
+                .doOnNext(con -> state.emitNext(State.CLOSED, emissionHandler))
                 .then();
     }
 
@@ -624,8 +669,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @SuppressWarnings("unchecked")
     private void resolve(long messageId, @Nullable Object value) {
-        resolvers.computeIfPresent(messageId, (k, tuple) -> {
-            Sinks.One<Object> sink = (Sinks.One<Object>) tuple.sink;
+        resolvers.computeIfPresent(messageId, (k, v) -> {
+            Sinks.One<Object> sink = (Sinks.One<Object>) v.sink;
             if (value == null) {
                 sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
             } else if (value instanceof Throwable) {

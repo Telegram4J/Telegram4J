@@ -7,9 +7,15 @@ import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.tl.*;
+import telegram4j.tl.BaseMessage;
+import telegram4j.tl.BaseUser;
+import telegram4j.tl.MessageService;
+import telegram4j.tl.Peer;
+import telegram4j.tl.UpdateEditMessageFields;
+import telegram4j.tl.UpdateNewMessageFields;
 import telegram4j.tl.api.TlObject;
 
 import java.util.Optional;
@@ -46,15 +52,23 @@ class MessageUpdateHandlers {
                 .map(c -> EntityFactory.createChat(client, c))
                 .orElse(null);
 
+        User user = Optional.ofNullable(userData)
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(u -> (BaseUser) u)
+                .map(d -> new User(client, d))
+                .orElse(null);
+
         Peer peerId = upd.message() instanceof BaseMessage
                 ? ((BaseMessage) upd.message()).peerId()
                 : ((MessageService) upd.message()).peerId();
 
-        Message newMessage = EntityFactory.createMessage(client, upd.message(), Optional.ofNullable(chat)
+        Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)
-                .orElseGet(() -> Id.of(peerId)));
+                .orElseGet(() -> Id.of(peerId));
 
-        return Flux.just(new SendMessageEvent(client, newMessage, chat));
+        Message newMessage = EntityFactory.createMessage(client, upd.message(), resolvedChatId);
+
+        return Flux.just(new SendMessageEvent(client, newMessage, chat, user));
     }
 
     static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
