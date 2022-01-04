@@ -29,8 +29,8 @@ public class ChatParticipantDeleteEvent extends ChatEvent {
     @Override
     public String toString() {
         return "ChatParticipantDeleteEvent{" +
-                "chat_id=" + chatId +
-                ", user_id=" + userId +
+                "chatId=" + chatId +
+                ", userId=" + userId +
                 ", version=" + version +
                 '}';
     }

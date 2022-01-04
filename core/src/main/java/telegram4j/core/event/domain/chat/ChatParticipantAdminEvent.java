@@ -35,9 +35,9 @@ public class ChatParticipantAdminEvent extends ChatEvent{
     @Override
     public String toString() {
         return "ChatParticipantAdminEvent{" +
-                "chat_id=" + chatId +
-                ", user_id=" + userId +
-                ", is_admin=" + isAdmin +
+                "chatId=" + chatId +
+                ", userId=" + userId +
+                ", isAdmin=" + isAdmin +
                 ", version=" + version +
                 '}';
     }

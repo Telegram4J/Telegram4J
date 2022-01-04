@@ -67,12 +67,12 @@ public class ChatParticipantUpdateEvent extends ChatEvent{
     @Override
     public String toString() {
         return "ChatParticipantAdminEvent{" +
-                "chat_id=" + chatId +
+                "chatId=" + chatId +
                 ", date=" + date +
-                ", actor_id=" + actorId +
-                ", user_id=" + userId +
-                ", prev_participant=" + prevParticipant +
-                ", new_participant=" + newParticipant +
+                ", actorId=" + actorId +
+                ", userId=" + userId +
+                ", prevParticipant=" + prevParticipant +
+                ", newParticipant=" + newParticipant +
                 ", invite=" + invite +
                 ", qts=" + qts +
                 '}';

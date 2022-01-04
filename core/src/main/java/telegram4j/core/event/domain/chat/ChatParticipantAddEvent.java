@@ -43,9 +43,9 @@ public class ChatParticipantAddEvent extends ChatEvent {
     @Override
     public String toString() {
         return "ChatParticipantAddEvent{" +
-                "chat_id=" + chatId +
-                ", user_id=" + userId +
-                ", inviter_id=" + inviterId +
+                "chatId=" + chatId +
+                ", userId=" + userId +
+                ", inviterId=" + inviterId +
                 ", date=" + date +
                 ", version=" + version +
                 '}';
