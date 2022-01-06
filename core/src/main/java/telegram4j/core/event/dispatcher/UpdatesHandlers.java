@@ -3,6 +3,7 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.event.domain.chat.*;
 import telegram4j.tl.*;
 
 import java.util.ArrayList;
@@ -36,6 +37,17 @@ public final class UpdatesHandlers {
                 UserUpdateHandlers::handleUpdateUserStatus);
         addHandler(UpdateUserTyping.class, UserUpdateHandlers::handleStateUpdateUserTyping,
                 UserUpdateHandlers::handleUpdateUserTyping);
+        //chat updates
+        addHandler(UpdateChatParticipantAdd.class,
+                ChatUpdateHandlers::handleStateUpdateChatParticipantAdd,ChatUpdateHandlers::handleUpdateChatParticipantAdd);
+        addHandler(UpdateChatParticipantAdmin.class,
+                ChatUpdateHandlers::handleStateUpdateChatParticipantAdmin,ChatUpdateHandlers::handleUpdateChatParticipantAdmin);
+        addHandler(UpdateChatParticipantDelete.class,
+                ChatUpdateHandlers::handleStateUpdateChatParticipantDelete,ChatUpdateHandlers::handleUpdateChatParticipantDelete);
+        addHandler(UpdateChatParticipant.class,
+                ChatUpdateHandlers::handleStateUpdateChatParticipant, ChatUpdateHandlers::handleUpdateChatParticipant);
+        addHandler(UpdateChatParticipants.class,
+                ChatUpdateHandlers::handleStateUpdateChatParticipants, ChatUpdateHandlers::handleUpdateChatParticipants);
     }
 
     public static final UpdatesHandlers instance = new UpdatesHandlers();

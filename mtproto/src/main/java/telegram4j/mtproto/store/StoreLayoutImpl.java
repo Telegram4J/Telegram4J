@@ -157,6 +157,41 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
+    public Mono<Void> onChatParticipant(UpdateChatParticipant action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
+    public Mono<Void> onChatParticipants(UpdateChatParticipants action, List<Chat> chats, List<User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
     public Mono<Void> updateSelfId(long userId) {
         return Mono.fromRunnable(() -> selfId = userId);
     }
