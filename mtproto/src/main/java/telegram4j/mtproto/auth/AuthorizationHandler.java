@@ -79,7 +79,7 @@ public final class AuthorizationHandler {
 
         if (obj instanceof DhGenFail) {
             DhGenFail dhGenFail = (DhGenFail) obj;
-            return handleDhGenFail(dhGenFail).then(Mono.empty());
+            return handleDhGenFail(dhGenFail);
         }
 
         return Mono.error(new IllegalStateException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())));

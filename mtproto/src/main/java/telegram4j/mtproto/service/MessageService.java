@@ -713,7 +713,7 @@ public class MessageService extends RpcService {
             AtomicInteger suc = new AtomicInteger(0);
 
             List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
-            DataCenter mediaDc = DataCenter.mediaDataCenters.get(0);
+            DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.get(0);
 
             Sinks.Empty<Void> done = Sinks.empty();
 
@@ -924,7 +924,7 @@ public class MessageService extends RpcService {
                 BaseUpdates casted = (BaseUpdates) updates;
 
                 UpdateMessageID updateMessageID = casted.updates().stream()
-                        .filter(upd -> upd instanceof UpdateMessageID)
+                        .filter(u -> u.identifier() == UpdateMessageID.ID)
                         .map(upd -> (UpdateMessageID) upd)
                         .findFirst()
                         .orElseThrow(IllegalStateException::new);

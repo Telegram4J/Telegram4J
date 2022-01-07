@@ -75,7 +75,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private final MTProtoOptions options;
 
-    private volatile Sinks.One<Void> closeHook;
+    private volatile Sinks.Empty<Void> closeHook;
     private volatile boolean close = false; // needed for detecting close and disconnect states
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile Connection connection;
@@ -138,11 +138,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
     public Mono<Void> connect() {
         return tcpClient.connect()
         .flatMap(connection -> {
-            this.closeHook = Sinks.one();
+            this.closeHook = Sinks.empty();
             this.connection = connection;
 
             Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
-
             ByteBufAllocator alloc = connection.channel().alloc();
 
             Mono<Void> stateHandler = state.asFlux()
@@ -184,7 +183,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             int val = payload.readIntLE();
                             payload.release();
                             if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
-                                rpcLog.debug("Handling quick ack for {}", quickAckTokens.get(val));
+                                Long id = quickAckTokens.get(val);
+                                Objects.requireNonNull(id, "id");
+                                rpcLog.debug("Handling quick ack for {}", id);
                                 quickAckTokens.remove(val);
                                 return Mono.empty();
                             } else { // The error code writes as negative int32
@@ -374,7 +375,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             state.emitNext(State.DISCONNECTED, emissionHandler);
             return Mono.error(RETRY);
         }))
-        .retryWhen(Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(10))
+        .retryWhen(options.getRetry()
                 .filter(t -> !close && (t == RETRY || t instanceof AbortedException || t instanceof IOException))
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, Sinks.EmitFailureHandler.FAIL_FAST);

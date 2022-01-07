@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient {
+    /** The supported api scheme version. */
     public static final int LAYER = 137;
 
     private final AuthorizationResources authorizationResources;

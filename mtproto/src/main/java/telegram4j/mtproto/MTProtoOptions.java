@@ -2,6 +2,8 @@ package telegram4j.mtproto;
 
 import reactor.core.publisher.Sinks;
 import reactor.netty.tcp.TcpClient;
+import reactor.util.retry.Retry;
+import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
@@ -14,16 +16,19 @@ public class MTProtoOptions {
     private final StoreLayout storeLayout;
     private final int acksSendThreshold;
     private final Sinks.EmitFailureHandler emissionHandler;
+    private final RetryBackoffSpec retry;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<Transport> transport, StoreLayout storeLayout,
-                          int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler) {
+                          int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler,
+                          RetryBackoffSpec retry) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
         this.transport = transport;
         this.storeLayout = storeLayout;
         this.acksSendThreshold = acksSendThreshold;
         this.emissionHandler = emissionHandler;
+        this.retry = retry;
     }
 
     public DataCenter getDatacenter() {
@@ -48,5 +53,9 @@ public class MTProtoOptions {
 
     public Sinks.EmitFailureHandler getEmissionHandler() {
         return emissionHandler;
+    }
+
+    public RetryBackoffSpec getRetry() {
+        return retry;
     }
 }

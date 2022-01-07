@@ -11,6 +11,8 @@ import reactor.netty.tcp.TcpClient;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
+import reactor.util.retry.Retry;
+import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
@@ -31,6 +33,7 @@ import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -45,10 +48,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private TcpClient tcpClient;
     private Supplier<Transport> transport;
     private int acksSendThreshold = 3;
+    private RetryBackoffSpec retry;
+
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
     private MTProtoClientManager mtProtoClientManager;
 
-    private InitConnection<TlObject> initConnection;
+    private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
     private EventDispatcher eventDispatcher;
     private DataCenter dataCenter;
@@ -82,8 +87,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setInitConnectionParams(InitConnection<TlObject> initConnection) {
-        this.initConnection = Objects.requireNonNull(initConnection, "initConnection");
+    public MTProtoBootstrap<O> setInitConnectionParams(InitConnectionParams initConnectionParams) {
+        this.initConnectionParams = Objects.requireNonNull(initConnectionParams, "initConnectionParams");
         return this;
     }
 
@@ -107,6 +112,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setRetry(RetryBackoffSpec retry) {
+        this.retry = Objects.requireNonNull(retry, "retry");
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -119,14 +129,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MTProtoClient> clientFactory) {
         return Mono.create(sink -> {
             StoreLayout storeLayout = initStoreLayout();
-            DataCenter dc = initDataCenter();
             EventDispatcher eventDispatcher = initEventDispatcher();
             MTProtoClientManager mtProtoClientManager = initMtProtoClientManager();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
-                    new MTProtoOptions(dc, initTcpClient(), initTransport(),
-                            storeLayout, acksSendThreshold, EmissionHandlers.park(Duration.ofNanos(10)))));
+                    new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
+                            storeLayout, acksSendThreshold, EmissionHandlers.park(Duration.ofNanos(10)), initRetry())));
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -174,7 +183,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
                                 return mtProtoClient.sendAwait(InvokeWithLayer.builder()
                                                 .layer(MTProtoTelegramClient.LAYER)
-                                                .query(initConnectionParams())
+                                                .query(initConnection())
                                                 .build())
                                         .then(mtProtoClient.sendAwait(importAuthorization()))
                                         .then(fetchSelfId)
@@ -211,20 +220,25 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         }
     }
 
-    private InitConnection<TlObject> initConnectionParams() {
-        if (initConnection != null) {
-            return initConnection;
-        }
-        return InitConnection.builder()
-                .apiId(authorizationResources.getAppId())
-                .appVersion("0.1.0")
-                .deviceModel("telegram4j")
-                .langCode("en")
-                .langPack("")
-                .systemVersion("0.1.0")
-                .systemLangCode("en")
+    private InitConnection<TlObject> initConnection() {
+        InitConnectionParams params = initConnectionParams != null
+                ? initConnectionParams
+                : InitConnectionParams.getDefault();
+
+        var initConnection = InitConnection.builder()
                 .query(GetConfig.instance())
-                .build();
+                .apiId(authorizationResources.getAppId())
+                .appVersion(params.getAppVersion())
+                .deviceModel(params.getDeviceModel())
+                .langCode(params.getLangCode())
+                .langPack(params.getLangPack())
+                .systemVersion(params.getSystemVersion())
+                .systemLangCode(params.getSystemLangCode());
+
+        params.getProxy().ifPresent(initConnection::proxy);
+        params.getParams().ifPresent(initConnection::params);
+
+        return initConnection.build();
     }
 
     private Supplier<Transport> initTransport() {
@@ -251,23 +265,24 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     private StoreLayout initStoreLayout() {
-        if (storeLayout != null) {
-            return storeLayout;
-        }
-        return new StoreLayoutImpl();
+        return storeLayout != null ? storeLayout : new StoreLayoutImpl();
     }
 
     private DataCenter initDataCenter() {
         if (dataCenter != null) {
             return dataCenter;
         }
-        return DataCenter.productionDataCenters.get(1); // dc#2
+        return DataCenter.productionDataCentersIpv4.get(1); // dc#2
+    }
+
+    private RetryBackoffSpec initRetry() {
+        if (retry != null) {
+            return retry;
+        }
+        return Retry.fixedDelay(5, Duration.ofSeconds(10));
     }
 
     private MTProtoClientManager initMtProtoClientManager() {
-        if (mtProtoClientManager != null) {
-            return mtProtoClientManager;
-        }
-        return new MTProtoClientManagerImpl();
+        return mtProtoClientManager != null ? mtProtoClientManager : new MTProtoClientManagerImpl();
     }
 }
