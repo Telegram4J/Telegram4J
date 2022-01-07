@@ -4,7 +4,7 @@ import java.util.EnumSet;
 
 public enum ChatAdminRights {
 
-    /** If set, allows the admin to modify the description of the <a href="https://core.telegram.org/api/channel>channel/supergroup</a>. */
+    /** If set, allows the admin to modify the description of the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
     CHANGE_INFO(0),
 
     /** If set, allows the admin to post messages in the <a href="https://core.telegram.org/api/channel">channel</a>. */

@@ -11,13 +11,12 @@ import java.time.Duration;
 
 public final class ResettableInterval implements Disposable {
     private final Scheduler timerScheduler;
-    private final Disposable.Swap swap;
+    private final Disposable.Swap swap = Disposables.swap();
     private final Sinks.Many<Long> ticks = Sinks.many().multicast()
             .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
 
     public ResettableInterval(Scheduler timerScheduler) {
         this.timerScheduler = timerScheduler;
-        this.swap = Disposables.swap();
     }
 
     public void start(Duration period) {

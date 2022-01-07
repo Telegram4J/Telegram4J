@@ -242,7 +242,7 @@ public class Message implements TelegramObject {
         /** Whether the message should be shown as not modified to the user, even if an edit date is present. */
         EDIT_HIDE(21),
 
-        /** Whether this message is <a href="Whether this message is pinned">pinned</a>. */
+        /** Whether this message is <a href="https://core.telegram.org/api/pin">pinned</a>. */
         PINNED(24);
 
         private final int value;
