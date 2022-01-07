@@ -12,7 +12,8 @@ ext {
     junit_version = '5.7.2'
     logback_version = '1.2.3'
 
-    tl_parser_version = 'master-SNAPSHOT'
+    tl_parser_version = '0.1.0'
+    tl_parser_group = 'com.telegram4j'
 }
 
 allprojects {
@@ -36,8 +37,7 @@ allprojects {
     dependencies {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
 
-        api "com.github.telegram4j:tl-parser:$tl_parser_version"
-        api "com.github.telegram4j.tl-parser:api:$tl_parser_version"
+        api "$tl_parser_group:tl-parser:$tl_parser_version"
     }
 
     configurations.all {

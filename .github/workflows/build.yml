@@ -22,5 +22,7 @@ jobs:
         with:
           distribution: 'adopt'
           java-version: ${{ matrix.java }}
+      - name: Clone tl-parser project
+        run: git clone --depth=1 --branch=master https://github.com/Telegram4J/tl-parser ../tl-parser
       - name: Build sources with Gradle
         run: ./gradlew build
