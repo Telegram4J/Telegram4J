@@ -1,42 +1,44 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 
 import java.time.Instant;
 
 public class ChatParticipantAddEvent extends ChatEvent {
-    private final long chatId;
-    private final long userId;
-    private final long inviterId;
-    private final Instant date;
+    private final Id chatId;
+    private final Id userId;
+    private final Id inviterId;
+    private final Instant timestamp;
     private final int version;
 
-    public ChatParticipantAddEvent(MTProtoTelegramClient client, long chat, long user, long inviter,Instant date,int version) {
+    public ChatParticipantAddEvent(MTProtoTelegramClient client, Id chatId, Id userId,
+                                   Id inviterId, Instant timestamp, int version) {
         super(client);
-        chatId = chat;
-        userId = user;
-        inviterId = inviter;
-        this.date = date;
+        this.chatId = chatId;
+        this.userId = userId;
+        this.inviterId = inviterId;
+        this.timestamp = timestamp;
         this.version = version;
     }
 
-    public long getChatId() {
+    public Id getChatId() {
         return chatId;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
-    public long getInviterId() {
+    public Id getInviterId() {
         return inviterId;
     }
 
-    public Instant getDate() {
-        return date;
+    public Instant getTimestamp() {
+        return timestamp;
     }
 
-    public int getVersion(){
+    public int getVersion() {
         return version;
     }
 
@@ -46,7 +48,7 @@ public class ChatParticipantAddEvent extends ChatEvent {
                 "chatId=" + chatId +
                 ", userId=" + userId +
                 ", inviterId=" + inviterId +
-                ", date=" + date +
+                ", timestamp=" + timestamp +
                 ", version=" + version +
                 '}';
     }

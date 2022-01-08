@@ -2,61 +2,67 @@ package telegram4j.core.event.domain.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.Id;
 import telegram4j.tl.ChatParticipant;
-import telegram4j.tl.ExportedChatInvite;
 
 import java.time.Instant;
 import java.util.Optional;
 
-public class ChatParticipantUpdateEvent extends ChatEvent{
-    private final long chatId;
-    private final Instant date;
-    private final long actorId;
-    private final long userId;
+public class ChatParticipantUpdateEvent extends ChatEvent {
+    private final Id chatId;
+    private final Instant timestamp;
+    private final Id actorId;
+    private final Id userId;
     @Nullable
-    private final ChatParticipant prevParticipant;
+    private final ChatParticipant oldParticipant;
     @Nullable
-    private final ChatParticipant newParticipant;
+    private final ChatParticipant currentParticipant;
     @Nullable
     private final ExportedChatInvite invite;
     private final int qts;
 
-    public ChatParticipantUpdateEvent(MTProtoTelegramClient client, long chatId, Instant date, long actorId, long userId, @Nullable ChatParticipant prevParticipant,@Nullable ChatParticipant newParticipant,@Nullable ExportedChatInvite invite, int qts){
+    public ChatParticipantUpdateEvent(MTProtoTelegramClient client, Id chatId,
+                                      Instant timestamp, Id actorId, Id userId,
+                                      @Nullable ChatParticipant oldParticipant,
+                                      @Nullable ChatParticipant currentParticipant,
+                                      @Nullable ExportedChatInvite invite, int qts) {
         super(client);
         this.chatId = chatId;
-        this.date = date;
+        this.timestamp = timestamp;
         this.actorId = actorId;
         this.userId = userId;
-        this.prevParticipant = prevParticipant;
-        this.newParticipant = newParticipant;
+        this.oldParticipant = oldParticipant;
+        this.currentParticipant = currentParticipant;
         this.invite = invite;
         this.qts = qts;
     }
 
-    public long getChatId() {
+    public Id getChatId() {
         return chatId;
     }
-    public Instant getDate() {
-        return date;
+
+    public Instant getTimestamp() {
+        return timestamp;
     }
 
-    public long getActorId() {
+    public Id getActorId() {
         return actorId;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
-    public Optional<ChatParticipant> getPrevParticipant(){
-        return Optional.ofNullable(prevParticipant);
+    public Optional<ChatParticipant> getOldParticipant() {
+        return Optional.ofNullable(oldParticipant);
     }
 
-    public Optional<ChatParticipant> getNewParticipant(){
-        return Optional.ofNullable(newParticipant);
+    public Optional<ChatParticipant> getCurrentParticipant() {
+        return Optional.ofNullable(currentParticipant);
     }
 
-    public Optional<ExportedChatInvite> getInvite(){
+    public Optional<ExportedChatInvite> getInvite() {
         return Optional.ofNullable(invite);
     }
 
@@ -68,11 +74,11 @@ public class ChatParticipantUpdateEvent extends ChatEvent{
     public String toString() {
         return "ChatParticipantAdminEvent{" +
                 "chatId=" + chatId +
-                ", date=" + date +
+                ", timestamp=" + timestamp +
                 ", actorId=" + actorId +
                 ", userId=" + userId +
-                ", prevParticipant=" + prevParticipant +
-                ", newParticipant=" + newParticipant +
+                ", oldParticipant=" + oldParticipant +
+                ", currentParticipant=" + currentParticipant +
                 ", invite=" + invite +
                 ", qts=" + qts +
                 '}';

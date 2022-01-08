@@ -249,6 +249,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return old;
     }
 
+    @Nullable
     private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserMin(User user) {
         if (user.identifier() == BaseUser.ID) {
             ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);

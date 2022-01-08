@@ -3,11 +3,13 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.*;
-import telegram4j.core.event.domain.user.UpdateChannelUserTypingEvent;
+import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Id;
 import telegram4j.tl.*;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 public class ChatUpdateHandlers {
 
@@ -48,23 +50,62 @@ public class ChatUpdateHandlers {
     // =====================
 
     static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
-        return Flux.just(new ChatParticipantAddEvent(context.getClient(), context.getUpdate().chatId(),context.getUpdate().userId(),context.getUpdate().inviterId(), Instant.ofEpochSecond(context.getUpdate().date()),context.getUpdate().version()));
+        Id chatId = Id.of(context.getUpdate().chatId());
+        Id userId = Id.of(context.getUpdate().userId());
+        Id inviterId = Id.of(context.getUpdate().inviterId());
+        Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
+
+        return Flux.just(new ChatParticipantAddEvent(context.getClient(),
+                chatId, userId, inviterId, timestamp, context.getUpdate().version()));
     }
 
     static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
-        return Flux.just(new ChatParticipantAdminEvent(context.getClient(), context.getUpdate().chatId(),context.getUpdate().userId(),context.getUpdate().isAdmin(),context.getUpdate().version()));
+        Id chatId = Id.of(context.getUpdate().chatId());
+        Id userId = Id.of(context.getUpdate().userId());
+
+        return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chatId, userId,
+                context.getUpdate().isAdmin(), context.getUpdate().version()));
     }
 
     static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
-        return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), context.getUpdate().chatId(),context.getUpdate().userId(),context.getUpdate().version()));
+        Id chatId = Id.of(context.getUpdate().chatId());
+        Id userId = Id.of(context.getUpdate().userId());
+
+        return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chatId, userId, context.getUpdate().version()));
     }
 
     static Flux<ChatParticipantUpdateEvent> handleUpdateChatParticipant(StatefulUpdateContext<UpdateChatParticipant, Void> context) {
-        return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), context.getUpdate().chatId(),Instant.ofEpochSecond(context.getUpdate().date()),context.getUpdate().actorId(),context.getUpdate().userId(),context.getUpdate().prevParticipant(),context.getUpdate().newParticipant(),context.getUpdate().invite(),context.getUpdate().qts()));
+        Id chatId = Id.of(context.getUpdate().chatId());
+        Id userId = Id.of(context.getUpdate().userId());
+        Id actorId = Id.of(context.getUpdate().actorId());
+        Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
+        ExportedChatInvite exportedChatInvite = Optional.ofNullable(context.getUpdate().invite())
+                .map(d -> new ExportedChatInvite(context.getClient(), d))
+                .orElse(null);
+
+        return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), chatId, timestamp, actorId, userId,
+                context.getUpdate().prevParticipant(), context.getUpdate().newParticipant(),
+                exportedChatInvite, context.getUpdate().qts()));
     }
 
-    static Flux<ChatParticipantsUpdateEvent> handleUpdateChatParticipants(StatefulUpdateContext<UpdateChatParticipants, Void> context) {
-        return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), context.getUpdate().participants()));
+    static Flux<ChatEvent> handleUpdateChatParticipants(StatefulUpdateContext<UpdateChatParticipants, Void> context) {
+        ChatParticipants chatParticipants = context.getUpdate().participants();
+        switch (chatParticipants.identifier()) {
+            case ChatParticipantsForbidden.ID: {
+                ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
+                Id chatId = Id.of(upd.chatId());
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, upd.selfParticipant(), null, null));
+            }
+            case BaseChatParticipants.ID: {
+                BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
+                Id chatId = Id.of(upd.chatId());
+                List<ChatParticipant> participants = upd.participants();
+                int version = upd.version();
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, null, version, participants));
+            }
+            default:
+                return Flux.error(new IllegalArgumentException("Unknown chat participants type: " + chatParticipants));
+        }
     }
 
 }

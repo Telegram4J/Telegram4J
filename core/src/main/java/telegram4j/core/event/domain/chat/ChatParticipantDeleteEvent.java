@@ -1,28 +1,29 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 
 public class ChatParticipantDeleteEvent extends ChatEvent {
-    private final long chatId;
-    private final long userId;
+    private final Id chatId;
+    private final Id userId;
     private final int version;
 
-    public ChatParticipantDeleteEvent(MTProtoTelegramClient client, long chat, long user, int version) {
+    public ChatParticipantDeleteEvent(MTProtoTelegramClient client, Id chatId, Id userId, int version) {
         super(client);
-        chatId = chat;
-        userId = user;
+        this.chatId = chatId;
+        this.userId = userId;
         this.version = version;
     }
 
-    public long getChatId() {
+    public Id getChatId() {
         return chatId;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
-    public int getVersion(){
+    public int getVersion() {
         return version;
     }
 

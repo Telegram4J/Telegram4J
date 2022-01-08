@@ -1,26 +1,27 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 
-public class ChatParticipantAdminEvent extends ChatEvent{
-    private final long chatId;
-    private final long userId;
+public class ChatParticipantAdminEvent extends ChatEvent {
+    private final Id chatId;
+    private final Id userId;
     private final boolean isAdmin;
     private final int version;
 
-    public ChatParticipantAdminEvent(MTProtoTelegramClient client, long chat, long user,boolean isAdmin, int version) {
+    public ChatParticipantAdminEvent(MTProtoTelegramClient client, Id chatId, Id userId, boolean isAdmin, int version) {
         super(client);
-        chatId = chat;
-        userId = user;
+        this.chatId = chatId;
+        this.userId = userId;
         this.isAdmin = isAdmin;
         this.version = version;
     }
 
-    public long getChatId() {
+    public Id getChatId() {
         return chatId;
     }
 
-    public long getUserId() {
+    public Id getUserId() {
         return userId;
     }
 
