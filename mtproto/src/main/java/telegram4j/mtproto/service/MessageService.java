@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -15,23 +16,31 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.mtproto.util.EmissionHandlers;
 import telegram4j.tl.ExportedChatInvite;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.MessageViews;
 import telegram4j.tl.messages.PeerSettings;
 import telegram4j.tl.messages.*;
-import telegram4j.tl.request.messages.*;
 import telegram4j.tl.request.messages.UpdateDialogFilter;
+import telegram4j.tl.request.messages.*;
+import telegram4j.tl.request.upload.GetFile;
+import telegram4j.tl.request.upload.ImmutableGetWebFile;
 import telegram4j.tl.request.upload.SaveBigFilePart;
 import telegram4j.tl.request.upload.SaveFilePart;
+import telegram4j.tl.storage.FileType;
+import telegram4j.tl.upload.BaseFile;
+import telegram4j.tl.upload.File;
+import telegram4j.tl.upload.FileCdnRedirect;
+import telegram4j.tl.upload.WebFile;
 
 import java.security.MessageDigest;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+
+import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
 public class MessageService extends RpcService {
 
@@ -39,8 +48,7 @@ public class MessageService extends RpcService {
     private static final int TEN_MB = 10 * 1024 * 1024;
     private static final int LIMIT_MB = 2000 * 1024 * 1024;
     private static final int PARALLELISM = 5;
-
-    private static final Sinks.EmitFailureHandler emissionHandler = EmissionHandlers.park(Duration.ofNanos(10));
+    private static final int PRECISE_LIMIT = 1024 << 10; // 1mb
 
     public MessageService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
@@ -90,7 +98,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(request)
                 .ofType(BaseUpdates.class)
                 .flatMapMany(updates -> {
-                    client.updates().emitNext(updates, emissionHandler);
+                    client.updates().emitNext(updates, DEFAULT_PARKING);
 
                     return Flux.fromIterable(updates.updates())
                             .ofType(UpdateNewMessageFields.class)
@@ -503,8 +511,8 @@ public class MessageService extends RpcService {
 
     public Flux<EmojiLanguage> getEmojiKeywordsLanguages(Iterable<String> langCodes) {
         return client.sendAwait(GetEmojiKeywordsLanguages.builder()
-                .langCodes(langCodes)
-                .build())
+                        .langCodes(langCodes)
+                        .build())
                 .flatMapIterable(Function.identity());
     }
 
@@ -514,9 +522,9 @@ public class MessageService extends RpcService {
 
     public Flux<SearchCounter> getSearchCounters(InputPeer peer, Iterable<? extends MessagesFilter> filters) {
         return client.sendAwait(GetSearchCounters.builder()
-                .peer(peer)
-                .filters(filters)
-                .build())
+                        .peer(peer)
+                        .filters(filters)
+                        .build())
                 .flatMapIterable(Function.identity());
     }
 
@@ -756,7 +764,7 @@ public class MessageService extends RpcService {
                                 .fileTotalParts(parts)
                                 .build();
 
-                        queue.emitNext(req, emissionHandler);
+                        queue.emitNext(req, DEFAULT_PARKING);
                     })
                     .then();
 
@@ -787,13 +795,81 @@ public class MessageService extends RpcService {
                         parts, name, ByteBufUtil.hexDump(md5.digest()))));
     }
 
+    public Mono<Void> getWebFile(InputWebFileLocation location, Function<WebFile, ? extends Publisher<?>> progressor) {
+        AtomicInteger offset = new AtomicInteger();
+        AtomicBoolean complete = new AtomicBoolean();
+        int limit = PRECISE_LIMIT;
+
+        return Mono.defer(() -> client.sendAwait(ImmutableGetWebFile.of(location, offset.get(), limit)))
+                .flatMap(part -> {
+                    offset.addAndGet(limit);
+                    if (part.fileType() == FileType.UNKNOWN) { // download completed
+                        complete.set(true);
+                        return Mono.empty();
+                    }
+
+                    return Mono.from(progressor.apply(part));
+                })
+                .repeat(() -> !complete.get())
+                .then();
+    }
+
+    public Mono<Void> getFile(boolean precise, boolean cdnSupported, InputFileLocation location,
+                              Function<File, ? extends Publisher<?>> progressor) {
+        AtomicInteger offset = new AtomicInteger();
+        AtomicBoolean complete = new AtomicBoolean();
+        int limit = PRECISE_LIMIT; // TODO
+        var headerRequest = GetFile.builder()
+                .precise(precise)
+                .cdnSupported(cdnSupported)
+                .location(location)
+                .offset(offset.get())
+                .limit(limit)
+                .build();
+
+        return client.sendAwait(headerRequest)
+                .flatMap(header -> {
+                    switch (header.identifier()) {
+                        case BaseFile.ID:
+                            BaseFile baseFile = (BaseFile) header;
+                            offset.addAndGet(limit);
+
+                            Mono<Void> download = Mono.defer(() -> client.sendAwait(headerRequest.withOffset(offset.get())))
+                                    .cast(BaseFile.class)
+                                    .flatMap(part -> {
+                                        offset.addAndGet(limit);
+                                        if (part.type() == FileType.UNKNOWN) { // download completed
+                                            complete.set(true);
+                                            return Mono.empty();
+                                        }
+
+                                        return Mono.from(progressor.apply(part));
+                                    })
+                                    .repeat(() -> !complete.get())
+                                    .then();
+
+                            // apply header and continue download
+                            return Mono.from(progressor.apply(baseFile)).then(download);
+                        case FileCdnRedirect.ID:
+                            FileCdnRedirect fileCdnRedirect = (FileCdnRedirect) header;
+
+                            // TODO: implement
+                        default:
+                            return Mono.error(new IllegalArgumentException("Unknown file type: " + header));
+                    }
+                })
+                .then();
+    }
+
+    // Message interactions
+
     public Mono<Message> sendMessage(SendMessage request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
                 .map(TupleUtils.function((updates, peer) -> {
                     var upd = transformMessageUpdate(request, updates, peer);
 
-                    client.updates().emitNext(upd.getT2(), emissionHandler);
+                    client.updates().emitNext(upd.getT2(), DEFAULT_PARKING);
 
                     return upd.getT1();
                 }));
@@ -805,7 +881,7 @@ public class MessageService extends RpcService {
                 .map(TupleUtils.function((updates, peer) -> {
                     var upd = transformMessageUpdate(request, updates, peer);
 
-                    client.updates().emitNext(upd.getT2(), emissionHandler);
+                    client.updates().emitNext(upd.getT2(), DEFAULT_PARKING);
 
                     return upd.getT1();
                 }));
@@ -824,7 +900,7 @@ public class MessageService extends RpcService {
                                     .findFirst()
                                     .orElseThrow();
 
-                            client.updates().emitNext(updates, emissionHandler);
+                            client.updates().emitNext(updates, DEFAULT_PARKING);
 
                             return update.message();
                         default:
@@ -833,7 +909,7 @@ public class MessageService extends RpcService {
                 });
     }
 
-    // Short-send related updates object should be transformed to the updateShort or baseUpdate.
+    // Short-send related updates object should be transformed to the updateShort or baseUpdates.
     // https://core.telegram.org/api/updates-sequence
     static Tuple2<Message, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
         switch (updates.identifier()) {

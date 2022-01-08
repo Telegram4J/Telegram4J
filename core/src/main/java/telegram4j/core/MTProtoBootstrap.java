@@ -33,7 +33,6 @@ import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 
 import java.time.Duration;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -168,6 +167,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         switch (state) {
                             case CLOSED:
                                 mtProtoClientManager.remove(mtProtoClient.getDatacenter());
+
                                 return Mono.just(mtProtoClientManager.activeCount())
                                         .filter(i -> i == 0)
                                         .flatMap(ig -> disconnect);

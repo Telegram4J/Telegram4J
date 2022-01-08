@@ -8,6 +8,8 @@ import java.util.concurrent.locks.LockSupport;
 
 public final class EmissionHandlers {
 
+    public static final Sinks.EmitFailureHandler DEFAULT_PARKING = park(Duration.ofNanos(10));
+
     public static Sinks.EmitFailureHandler park(Duration delay) {
         return new ParkEmissionHandler(delay.toNanos());
     }
