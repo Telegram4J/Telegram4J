@@ -101,7 +101,7 @@ public class User implements TelegramObject {
     }
 
     public Id getId() {
-        return Id.of(minData.id(), minData.accessHash());
+        return Id.ofUser(minData.id(), minData.accessHash());
     }
 
     // FullUser fields

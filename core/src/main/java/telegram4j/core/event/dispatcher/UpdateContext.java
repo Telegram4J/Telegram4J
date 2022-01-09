@@ -7,6 +7,7 @@ import telegram4j.tl.User;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 public class UpdateContext<U extends Update> {
     private final MTProtoTelegramClient client;
@@ -15,10 +16,10 @@ public class UpdateContext<U extends Update> {
     private final U update;
 
     protected UpdateContext(MTProtoTelegramClient client, List<Chat> chats, List<User> users, U update) {
-        this.client = client;
-        this.chats = chats;
-        this.users = users;
-        this.update = update;
+        this.client = Objects.requireNonNull(client, "client");
+        this.chats = Objects.requireNonNull(chats, "chats");
+        this.users = Objects.requireNonNull(users, "users");
+        this.update = Objects.requireNonNull(update, "update");
     }
 
     public static <U extends Update> UpdateContext<U> create(MTProtoTelegramClient client, U update) {

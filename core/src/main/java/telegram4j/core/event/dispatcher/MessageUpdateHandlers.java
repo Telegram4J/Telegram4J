@@ -10,12 +10,7 @@ import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.tl.BaseMessage;
-import telegram4j.tl.BaseUser;
-import telegram4j.tl.MessageService;
-import telegram4j.tl.Peer;
-import telegram4j.tl.UpdateEditMessageFields;
-import telegram4j.tl.UpdateNewMessageFields;
+import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 
 import java.util.Optional;
@@ -58,9 +53,7 @@ class MessageUpdateHandlers {
                 .map(d -> new User(client, d))
                 .orElse(null);
 
-        Peer peerId = upd.message() instanceof BaseMessage
-                ? ((BaseMessage) upd.message()).peerId()
-                : ((MessageService) upd.message()).peerId();
+        Peer peerId = ((BaseMessageFields) upd.message()).peerId();
 
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)
@@ -83,9 +76,7 @@ class MessageUpdateHandlers {
                 .map(c -> EntityFactory.createChat(client, c))
                 .orElse(null);
 
-        Peer peerId = upd.message() instanceof BaseMessage
-                ? ((BaseMessage) upd.message()).peerId()
-                : ((MessageService) upd.message()).peerId();
+        Peer peerId = ((BaseMessageFields) upd.message()).peerId();
 
         Id resolvedId = Optional.ofNullable(chat)
                 .map(Chat::getId)

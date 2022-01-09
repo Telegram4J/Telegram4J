@@ -37,7 +37,7 @@ public final class UpdatesHandlers {
                 UserUpdateHandlers::handleUpdateUserStatus);
         addHandler(UpdateUserTyping.class, UserUpdateHandlers::handleStateUpdateUserTyping,
                 UserUpdateHandlers::handleUpdateUserTyping);
-        //chat updates
+        // chat updates
         addHandler(UpdateChatParticipantAdd.class,
                 ChatUpdateHandlers::handleStateUpdateChatParticipantAdd,ChatUpdateHandlers::handleUpdateChatParticipantAdd);
         addHandler(UpdateChatParticipantAdmin.class,
@@ -74,9 +74,9 @@ public final class UpdatesHandlers {
     }
 
     static class HandlerTuple<U extends Update, O> {
-        private final Class<? extends U> type;
-        private final StateUpdateHandler<U, O> updateHandler;
-        private final UpdateHandler<U, O> handler;
+        final Class<? extends U> type;
+        final StateUpdateHandler<U, O> updateHandler;
+        final UpdateHandler<U, O> handler;
 
         HandlerTuple(Class<? extends U> type, StateUpdateHandler<U, O> updateHandler, UpdateHandler<U, O> handler) {
             this.type = type;

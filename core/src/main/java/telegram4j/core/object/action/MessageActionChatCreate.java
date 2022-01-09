@@ -23,7 +23,7 @@ public class MessageActionChatCreate extends BaseMessageAction {
 
     public List<Id> getUserIds() {
         return data.users().stream()
-                .map(Id::of)
+                .map(l -> Id.ofUser(l, null))
                 .collect(Collectors.toList());
     }
 }

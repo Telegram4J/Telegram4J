@@ -65,7 +65,7 @@ class UserUpdateHandlers {
     // =====================
 
     static Flux<UpdateChannelUserTypingEvent> handleUpdateChannelUserTyping(StatefulUpdateContext<UpdateChannelUserTyping, Void> context) {
-        Id channelId = Id.of(Id.ZERO_CHANNEL_ID - context.getUpdate().channelId());
+        Id channelId = Id.ofChannel(context.getUpdate().channelId(), null);
         Id fromId = Id.of(context.getUpdate().fromId());
 
         return Flux.just(new UpdateChannelUserTypingEvent(context.getClient(), channelId, fromId,
@@ -73,7 +73,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateChatUserTypingEvent> handleUpdateChatUserTyping(StatefulUpdateContext<UpdateChatUserTyping, Void> context) {
-        Id chatId = Id.of(Id.ZERO_CHANNEL_ID - context.getUpdate().chatId());
+        Id chatId = Id.ofChannel(context.getUpdate().chatId(), null);
         Id fromId = Id.of(context.getUpdate().fromId());
 
         return Flux.just(new UpdateChatUserTypingEvent(context.getClient(), chatId,
@@ -83,14 +83,14 @@ class UserUpdateHandlers {
     static Flux<UpdateUserNameEvent> handleUpdateUserName(StatefulUpdateContext<UpdateUserName, UserNameFields> context) {
         UpdateUserName upd = context.getUpdate();
 
-        Id userId = Id.of(upd.userId());
+        Id userId = Id.ofUser(upd.userId(), null);
         UserNameFields old = context.getOld();
 
         return Flux.just(new UpdateUserNameEvent(context.getClient(), userId, upd.firstName(), upd.lastName(), upd.username(), old));
     }
 
     static Flux<UpdateUserPhoneEvent> handleUpdateUserPhone(StatefulUpdateContext<UpdateUserPhone, String> context) {
-        Id userId = Id.of(context.getUpdate().userId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
         String old = context.getOld();
 
         return Flux.just(new UpdateUserPhoneEvent(context.getClient(), userId, context.getUpdate().phone(), old));
@@ -99,7 +99,7 @@ class UserUpdateHandlers {
     static Flux<UpdateUserPhotoEvent> handleUpdateUserPhoto(StatefulUpdateContext<UpdateUserPhoto, UserProfilePhoto> context) {
         MTProtoTelegramClient client = context.getClient();
 
-        Id userId = Id.of(context.getUpdate().userId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
         Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
         var currentPhoto = Optional.of(context.getUpdate().photo())
                 .map(d -> unmapEmpty(d, ChatPhotoFields.class))
@@ -115,7 +115,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateUserStatusEvent> handleUpdateUserStatus(StatefulUpdateContext<UpdateUserStatus, UserStatus> context) {
-        Id userId = Id.of(context.getUpdate().userId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
         var currentStatus = createUserStatus(context.getClient(), context.getUpdate().status());
         var oldStatus = Optional.ofNullable(context.getOld())
                 .map(d -> createUserStatus(context.getClient(), d))
@@ -125,7 +125,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateUserTypingEvent> handleUpdateUserTyping(StatefulUpdateContext<UpdateUserTyping, Void> context) {
-        Id userId = Id.of(context.getUpdate().userId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
 
         return Flux.just(new UpdateUserTypingEvent(context.getClient(), userId, context.getUpdate().action()));
     }

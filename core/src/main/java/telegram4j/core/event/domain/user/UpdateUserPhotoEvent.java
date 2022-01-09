@@ -4,7 +4,6 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.Id;
-import telegram4j.tl.UserProfilePhoto;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -12,13 +11,14 @@ import java.util.Optional;
 public class UpdateUserPhotoEvent extends UserEvent {
     private final Id userId;
     private final Instant timestamp;
+    @Nullable
     private final ChatPhoto currentPhoto;
     @Nullable
     private final ChatPhoto oldPhoto;
     private final boolean previous;
 
     public UpdateUserPhotoEvent(MTProtoTelegramClient client, Id userId, Instant timestamp,
-                                ChatPhoto currentPhoto, @Nullable ChatPhoto oldPhoto, boolean previous) {
+                                @Nullable ChatPhoto currentPhoto, @Nullable ChatPhoto oldPhoto, boolean previous) {
         super(client);
         this.userId = userId;
         this.timestamp = timestamp;
@@ -35,8 +35,8 @@ public class UpdateUserPhotoEvent extends UserEvent {
         return timestamp;
     }
 
-    public ChatPhoto getCurrentPhoto() {
-        return currentPhoto;
+    public Optional<ChatPhoto> getCurrentPhoto() {
+        return Optional.ofNullable(currentPhoto);
     }
 
     public Optional<ChatPhoto> getOldPhoto() {

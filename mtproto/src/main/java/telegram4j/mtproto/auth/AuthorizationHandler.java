@@ -21,6 +21,7 @@ import telegram4j.tl.request.mtproto.SetClientDHParams;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
@@ -103,8 +104,21 @@ public final class AuthorizationHandler {
         byte[] pqBytes = resPQ.pq();
 
         List<Long> fingerprints = resPQ.serverPublicKeyFingerprints();
-        long fingerprint = fingerprints.get(0);
-        PublicRsaKey key = PublicRsaKey.publicKeys.get(fingerprint);
+
+        long fingerprint = -1;
+        PublicRsaKey key = null;
+        for (long l : fingerprints) {
+            PublicRsaKey k = PublicRsaKey.publicKeys.get(l);
+            if (k != null) {
+                fingerprint = l;
+                key = k;
+                break;
+            }
+        }
+
+        if (fingerprint == -1) {
+            return Mono.error(new IllegalStateException("Unknown server fingerprints: " + fingerprints));
+        }
 
         BigInteger pq = fromByteArray(pqBytes);
         BigInteger p = BigInteger.valueOf(pqPrimeLeemon(pq.longValueExact()));
@@ -115,7 +129,7 @@ public final class AuthorizationHandler {
         context.setNewNonce(random.generateSeed(32));
 
         if (p.longValueExact() > q.longValueExact()) {
-            throw new IllegalStateException("Incorrect prime factorization. p: " + p + ", q: " + q + ", pq: " + pq);
+            return Mono.error(new IllegalStateException("Incorrect prime factorization. p: " + p + ", q: " + q + ", pq: " + pq));
         }
 
         PQInnerData pqInnerData = PQInnerDataDc.builder()

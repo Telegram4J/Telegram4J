@@ -34,7 +34,7 @@ public class GroupChat extends BaseChat {
     private final List<User> users;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
-        super(client, Id.of(-minData.id()), Type.GROUP);
+        super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = minData;
         this.fullData = null;
         this.chats = null;
@@ -44,7 +44,7 @@ public class GroupChat extends BaseChat {
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChatFull fullData,
                      telegram4j.tl.BaseChat minData,
                      List<Chat> chats, List<User> users) {
-        super(client, Id.of(-minData.id()), Type.GROUP);
+        super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = minData;
         this.fullData = fullData;
         this.chats = Collections.unmodifiableList(chats);

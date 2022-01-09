@@ -50,12 +50,12 @@ abstract class BaseChat implements Chat {
 
     // Interaction methods implementation
 
-    private InputPeer getIdAsPeer() {
+    protected InputPeer getIdAsPeer() {
         switch (type) {
-            case PRIVATE: return ImmutableInputPeerUser.of(id.asLongRaw(), id.getAccessHash().orElseThrow());
+            case PRIVATE: return ImmutableInputPeerUser.of(id.asLong(), id.getAccessHash().orElseThrow());
             case SUPERGROUP:
-            case CHANNEL: return ImmutableInputPeerChannel.of(id.asLongRaw(), id.getAccessHash().orElseThrow());
-            case GROUP: return ImmutableInputPeerChat.of(id.asLongRaw());
+            case CHANNEL: return ImmutableInputPeerChannel.of(id.asLong(), id.getAccessHash().orElseThrow());
+            case GROUP: return ImmutableInputPeerChat.of(id.asLong());
             default: throw new IllegalStateException();
         }
     }
@@ -84,7 +84,7 @@ abstract class BaseChat implements Chat {
                                     .map(Math::toIntExact)
                                     .orElse(null))
                             .build())
-                    .map(e -> EntityFactory.createMessage(client, e, getId()));
+                    .map(e -> EntityFactory.createMessage(client, e, id));
         });
     }
 

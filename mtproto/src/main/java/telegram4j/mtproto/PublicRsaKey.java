@@ -1,86 +1,131 @@
 package telegram4j.mtproto;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
+import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.tl.TlSerialUtil;
+
 import java.math.BigInteger;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public final class PublicRsaKey {
-    private final BigInteger exponent;
     private final BigInteger modulus;
+    private final BigInteger exponent;
 
     public static final Map<Long, PublicRsaKey> publicKeys;
 
     static {
 
-        publicKeys = Map.of(0xc3b42b026ce86b21L, create(
-                new BigInteger("c150023e2f70db7985ded064759cfecf0af328e69a41daf4d6f01b538135a6f91f8f8b2a0ec9ba9720ce" +
-                        "352efcf6c5680ffc424bd634864902de0b4bd6d49f4e580230e3ae97d95c8b19442b3c0a10d8f5633fecedd6926a7f6" +
-                        "dab0ddb7d457f9ea81b8465fcd6fffeed114011df91c059caedaf97625f6c96ecc74725556934ef781d866b34f011fc" +
-                        "e4d835a090196e9a5f0e4449af7eb697ddb9076494ca5f81104a305b6dd27665722c46b60e5df680fb16b210607ef21" +
-                        "7652e60236c255f6a28315f4083a96791d7214bf64c1df4fd0db1944fb26a2a57031b32eee64ad15a8ba68885cde74a" +
-                        "5bfc920f6abf59ba5c75506373e7130f9042da922179251f", 16),
-                new BigInteger("010001", 16)), 0xbc35f3509f7b7a5L, create(
-                new BigInteger("aeec36c8ffc109cb099624685b97815415657bd76d8c9c3e398103d7ad16c9bba6f525ed0412d7ae2c2d" +
-                        "e2b44e77d72cbf4b7438709a4e646a05c43427c7f184debf72947519680e651500890c6832796dd11f772c25ff8f576" +
-                        "755afe055b0a3752c696eb7d8da0d8be1faf38c9bdd97ce0a77d3916230c4032167100edd0f9e7a3a9b602d04367b68" +
-                        "9536af0d64b613ccba7962939d3b57682beb6dae5b608130b2e52aca78ba023cf6ce806b1dc49c72cf928a7199d22e3" +
-                        "d7ac84e47bc9427d0236945d10dbd15177bab413fbf0edfda09f014c7a7da088dde9759702ca760af2b8e4e97cc055c" +
-                        "617bd74c3d97008635b98dc4d621b4891da9fb0473047927", 16),
-                new BigInteger("010001", 16)), 0x15ae5fa8b5529542L, create(
-                new BigInteger("bdf2c77d81f6afd47bd30f29ac76e55adfe70e487e5e48297e5a9055c9c07d2b93b4ed3994d3eca5098b" +
-                        "f18d978d54f8b7c713eb10247607e69af9ef44f38e28f8b439f257a11572945cc0406fe3f37bb92b79112db69eedf2d" +
-                        "c71584a661638ea5becb9e23585074b80d57d9f5710dd30d2da940e0ada2f1b878397dc1a72b5ce2531b6f7dd158e09" +
-                        "c828d03450ca0ff8a174deacebcaa22dde84ef66ad370f259d18af806638012da0ca4a70baa83d9c158f3552bc9158e" +
-                        "69bf332a45809e1c36905a5caa12348dd57941a482131be7b2355a5f4635374f3bd3ddf5ff925bf4809ee27c1e67d91" +
-                        "20c5fe08a9de458b1b4a3c5d0a428437f2beca81f4e2d5ff", 16),
-                new BigInteger("010001", 16)), 0xaeae98e13cd7f94fL, create(
-                new BigInteger("b3f762b739be98f343eb1921cf0148cfa27ff7af02b6471213fed9daa0098976e667750324f1abcea4c3" +
-                        "1e43b7d11f1579133f2b3d9fe27474e462058884e5e1b123be9cbbc6a443b2925c08520e7325e6f1a6d50e117eb61ea" +
-                        "49d2534c8bb4d2ae4153fabe832b9edf4c5755fdd8b19940b81d1d96cf433d19e6a22968a85dc80f0312f596bd2530c" +
-                        "1cfb28b5fe019ac9bc25cd9c2a5d8a0f3a1c0c79bcca524d315b5e21b5c26b46babe3d75d06d1cd33329ec782a0f228" +
-                        "91ed1db42a1d6c0dea431428bc4d7aabdcf3e0eb6fda4e23eb7733e7727e9a1915580796c55188d2596d2665ad1182b" +
-                        "a7abf15aaa5a8b779ea996317a20ae044b820bff35b6e8a1", 16),
-                new BigInteger("010001", 16)), 0x5a181b2235057d98L, create(
-                new BigInteger("be6a71558ee577ff03023cfa17aab4e6c86383cff8a7ad38edb9fafe6f323f2d5106cbc8cafb83b869cf" +
-                        "fd1ccf121cd743d509e589e68765c96601e813dc5b9dfc4be415c7a6526132d0035ca33d6d6075d4f535122a1cdfe01" +
-                        "7041f1088d1419f65c8e5490ee613e16dbf662698c0f54870f0475fa893fc41eb55b08ff1ac211bc045ded31be27d12" +
-                        "c96d8d3cfc6a7ae8aa50bf2ee0f30ed507cc2581e3dec56de94f5dc0a7abee0be990b893f2887bd2c6310a1e0a9e3e3" +
-                        "8bd34fded2541508dc102a9c9b4c95effd9dd2dfe96c29be647d6c69d66ca500843cfaed6e440196f1dbe0e2e22163c" +
-                        "61ca48c79116fa77216726749a976a1c4b0944b5121e8c01", 16),
-                new BigInteger("010001", 16)), 0x5931aac70e0d30f7L, create(
-                new BigInteger("F8B7F73EF804D72C5B25408C6840245744324935699DA0E389E76707945BB4D5A309EA9255A9181DBAAA" +
-                        "18C208BF958219D15DAEA39F30D70D4ACB4FB5253A47D526470EADAAE388CA4A52B943A37BD1FEE175482AABA3C8BD8" +
-                        "849D2BEE1938C978842324A9ABB0E1B3F549BAF4DEF65141B53AA84034E15E23F3BF4103205586BDD61BDF998BEB795" +
-                        "DF1924E0484C4F60497CAD934760D579441F81BABA151F61CB4CEA53FE62557E2918A608DF585E6575ECD5E16A3D2D2" +
-                        "1F471919214869E265F1DD00F048B2E41F60B413BC98BF977D044A38E9ABEDAE01338468D9D7B9AEBDA2DA877B8585D" +
-                        "DDC33BD1514A5E32D7303C026E3C45F77DE561C5DCDFCE99", 16),
-                new BigInteger("010001", 16)), 0x254672538e935938L, create(
-                new BigInteger("CEE1D50BBB04E742A1A3FC83559B569E5980E417FF68CF0A658DD6CD2D7AC3AC35B01AA2A63F2880C186" +
-                        "ED42DB181B5898A11A23B20824EE963369B531A5D59ECA92F1DECF6860198B2F2B48DDD2ED2D9AF30A7845765E86CD0" +
-                        "9017BD9788CF8E6207208C05FC9C6C92A64B079891EB11508EE150EF1E4219A6FD4614129258ED53ADD087A68AE5114" +
-                        "A9AA5450D8595CC876A161435CBDB2026F8FBF00FEDCA0A067E9C079172CCCECC09C2B16C428EC776373149DB66AAB9" +
-                        "A4DEBF7916B391E832AE5A7892E27DE0AB1B4451C55F90F1F2ECE3ACEF708BC2C5EE022066EE4344C7268D724AABAAC" +
-                        "667667D727AC3F2956ED4BDAF7089DDE0AEB18A6652DA16F", 16),
-                new BigInteger("010001", 16)));
+        publicKeys = Map.of(
+                // dc 2
+                // -----BEGIN PUBLIC KEY-----
+                // MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAruw2yP/BCcsJliRoW5eB
+                // VBVle9dtjJw+OYED160Wybum9SXtBBLXriwt4rROd9csv0t0OHCaTmRqBcQ0J8fx
+                // hN6/cpR1GWgOZRUAiQxoMnlt0R93LCX/j1dnVa/gVbCjdSxpbrfY2g2L4frzjJvd
+                // l84Kd9ORYjDEAyFnEA7dD556OptgLQQ2e2iVNq8NZLYTzLp5YpOdO1doK+ttrltg
+                // gTCy5SrKeLoCPPbOgGsdxJxyz5KKcZnSLj16yE5HvJQn0CNpRdENvRUXe6tBP78O
+                // 39oJ8BTHp9oIjd6XWXAsp2CvK45Ol8wFXGF710w9lwCGNbmNxNYhtIkdqfsEcwR5
+                // JwIDAQAB
+                // -----END PUBLIC KEY-----
+
+                0xbc35f3509f7b7a5L, create(new BigInteger("AEEC36C8FFC109CB099624685B97815415657BD76D8C9C3E398103D7A" +
+                                "D16C9BBA6F525ED0412D7AE2C2DE2B44E77D72CBF4B7438709A4E646A05C43427C7F184DEBF72947519680E" +
+                                "651500890C6832796DD11F772C25FF8F576755AFE055B0A3752C696EB7D8DA0D8BE1FAF38C9BDD97CE0A77D" +
+                                "3916230C4032167100EDD0F9E7A3A9B602D04367B689536AF0D64B613CCBA7962939D3B57682BEB6DAE5B60" +
+                                "8130B2E52ACA78BA023CF6CE806B1DC49C72CF928A7199D22E3D7AC84E47BC9427D0236945D10DBD15177BA" +
+                                "B413FBF0EDFDA09F014C7A7DA088DDE9759702CA760AF2B8E4E97CC055C617BD74C3D97008635B98DC4D621" +
+                                "B4891DA9FB0473047927", 16),
+                        new BigInteger("010001", 16)),
+
+                // cdn dc 121
+                // -----BEGIN RSA PUBLIC KEY-----
+                // MIIBCgKCAQEA4tWHcGJlElkxuxKQJwFjJaulmVHgdxNA3wgI2E8XbNnA88y51Xog
+                // V5m8BEYuTSP4llXZY4ZSJW5VlFXnmsJT/hmjyeFqqTajyAW6nb9vwZX291QvqD/1
+                // ZCFBy7TLvCM0lbNIEhcLMf33ZV8AetLAd+uRLF6QHosys5w0iJ7x+UbGwDxyfeic
+                // 8EJJnsKaXrUOwRycMRN+V/zDySa0EYl1u1EB1MDX1/jIV1IQEbLvdBH4vsVTVEdW
+                // KHlzOcFzT9qX/g8XibCPiHLJvqQb8hVibvs9NaANyClcBEt3mOucG1/46Lilkc/K
+                // d4nlCcohk0jIHNp8symUzNWRPUGmTs3SPwIDAQAB
+                // -----END RSA PUBLIC KEY-----
+
+                0x995effd323b5db80L, create(new BigInteger("E2D587706265125931BB129027016325ABA59951E0771340DF0808D8" +
+                                "4F176CD9C0F3CCB9D57A205799BC04462E4D23F89655D9638652256E559455E79AC253FE19A3C9E16AA936A" +
+                                "3C805BA9DBF6FC195F6F7542FA83FF5642141CBB4CBBC233495B34812170B31FDF7655F007AD2C077EB912C" +
+                                "5E901E8B32B39C34889EF1F946C6C03C727DE89CF042499EC29A5EB50EC11C9C31137E57FCC3C926B411897" +
+                                "5BB5101D4C0D7D7F8C857521011B2EF7411F8BEC55354475628797339C1734FDA97FE0F1789B08F8872C9BE" +
+                                "A41BF215626EFB3D35A00DC8295C044B7798EB9C1B5FF8E8B8A591CFCA7789E509CA219348C81CDA7CB3299" +
+                                "4CCD5913D41A64ECDD23F", 16),
+                        new BigInteger("010001", 16)),
+
+                // cdn dc 201
+                // -----BEGIN RSA PUBLIC KEY-----
+                // MIIBCgKCAQEAug6fETVb7NkXYYu5ueZuM0pqw1heuqUrZNYomQN0lS0o7i6mAWwb
+                // 1/FiscFK+y4LQSSEx+oUzXAhjmll9fmb4e7PbUiXo8MuXO0Rj3e5416DXfTiOYGW
+                // XlFRV0aQzu8agy1epKwkFDidnmy7g5rJJV0q1+3eR+Jk2OEc/B6lMAOv3fBU6xhE
+                // ZByN9gqc6fvkNo13PQ8JYZUSGttzLlYy76uFmvFBhRsJU+LNQ2+bsTHwafSffVYl
+                // Z2boJOblvqbRWe453CzssaSWywGXOQmWvVbEe7F8q1ki/s7S8BxYWrhSLJ6bsu9V
+                // ZWnIHD9vB34QF8IABPRE93mhCOHBqJxSBQIDAQAB
+                // -----END RSA PUBLIC KEY-----
+
+                0xc884b3e62d09e5c5L, create(new BigInteger("BA0E9F11355BECD917618BB9B9E66E334A6AC3585EBAA52B64D62899" +
+                                "0374952D28EE2EA6016C1BD7F162B1C14AFB2E0B412484C7EA14CD70218E6965F5F99BE1EECF6D4897A3C32" +
+                                "E5CED118F77B9E35E835DF4E23981965E5151574690CEEF1A832D5EA4AC2414389D9E6CBB839AC9255D2AD7" +
+                                "EDDE47E264D8E11CFC1EA53003AFDDF054EB1844641C8DF60A9CE9FBE4368D773D0F096195121ADB732E563" +
+                                "2EFAB859AF141851B0953E2CD436F9BB131F069F49F7D56256766E824E6E5BEA6D159EE39DC2CECB1A496CB" +
+                                "0197390996BD56C47BB17CAB5922FECED2F01C585AB8522C9E9BB2EF556569C81C3F6F077E1017C20004F44" +
+                                "4F779A108E1C1A89C5205", 16),
+                        new BigInteger("010001", 16)),
+
+                // cdn dc 203
+                // -----BEGIN RSA PUBLIC KEY-----
+                // MIIBCgKCAQEAv/L6td+mj7Dl81NHfu+Xf1KNtvZPR1tS5xFqkiUson1u7D2ulK05
+                // jM8HKvpV1o+1HPPqhaXhasvsX90u3TIHRQ0zuJKJxKAiZo3GK7phHozjAJ9VUFbO
+                // 7jKAa5BTE9tXgA5ZwJAiQWb3U6ykwRzk3fFRe5WaW7xfVUiepxyWGdr1eecoWCfB
+                // af1TCXfcS7vcyljNT03pwt2YyS5iXE5IB5wBB5yqSSm4GYtWWR67UjIsXBd77TRp
+                // foLGpfOdUHxBz4ZSj8D76m1zlpID5J2pF6bH4+ZCz0SUpv3j7bE8WFlvgMfwEPhw
+                // xMYidRGayq9YlLlYd4D+Yoq0U6jS3MWTRQIDAQAB
+                // -----END RSA PUBLIC KEY-----
+
+                0xbb27580fd5b01626L, create(new BigInteger("BFF2FAB5DFA68FB0E5F353477EEF977F528DB6F64F475B52E7116A92" +
+                                "252CA27D6EEC3DAE94AD398CCF072AFA55D68FB51CF3EA85A5E16ACBEC5FDD2EDD3207450D33B89289C4A02" +
+                                "2668DC62BBA611E8CE3009F555056CEEE32806B905313DB57800E59C090224166F753ACA4C11CE4DDF1517B" +
+                                "959A5BBC5F55489EA71C9619DAF579E7285827C169FD530977DC4BBBDCCA58CD4F4DE9C2DD98C92E625C4E4" +
+                                "8079C01079CAA4929B8198B56591EBB52322C5C177BED34697E82C6A5F39D507C41CF86528FC0FBEA6D7396" +
+                                "9203E49DA917A6C7E3E642CF4494A6FDE3EDB13C58596F80C7F010F870C4C62275119ACAAF5894B9587780F" +
+                                "E628AB453A8D2DCC59345", 16),
+                        new BigInteger("010001", 16))
+        );
     }
 
-    PublicRsaKey(BigInteger exponent, BigInteger modulus) {
-        this.exponent = exponent;
+    PublicRsaKey(BigInteger modulus, BigInteger exponent) {
         this.modulus = modulus;
+        this.exponent = exponent;
+    }
+
+    public static long computeTail(ByteBufAllocator alloc, PublicRsaKey key) {
+        ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.modulus));
+        ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.exponent));
+
+        ByteBuf conc = Unpooled.wrappedBuffer(modulusBytes, exponentBytes);
+        byte[] sha1 = CryptoUtil.sha1Digest(CryptoUtil.toByteArray(conc));
+        byte[] tail = CryptoUtil.substring(sha1, sha1.length - 8, 8);
+        CryptoUtil.reverse(tail);
+
+        return Unpooled.wrappedBuffer(tail).readLong();
     }
 
     public static PublicRsaKey create(BigInteger exponent, BigInteger modulus) {
         return new PublicRsaKey(exponent, modulus);
     }
 
-    public BigInteger getExponent() {
-        return exponent;
-    }
-
     public BigInteger getModulus() {
         return modulus;
+    }
+
+    public BigInteger getExponent() {
+        return exponent;
     }
 
     @Override
@@ -88,19 +133,19 @@ public final class PublicRsaKey {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         PublicRsaKey publicKey = (PublicRsaKey) o;
-        return exponent.equals(publicKey.exponent) && modulus.equals(publicKey.modulus);
+        return modulus.equals(publicKey.modulus) && exponent.equals(publicKey.exponent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(exponent, modulus);
+        return Objects.hash(modulus, exponent);
     }
 
     @Override
     public String toString() {
         return "PublicRsaKey{" +
-                "exponent=" + exponent +
-                ", modulus=" + modulus +
+                "modulus=" + modulus +
+                ", exponent=" + exponent +
                 '}';
     }
 }

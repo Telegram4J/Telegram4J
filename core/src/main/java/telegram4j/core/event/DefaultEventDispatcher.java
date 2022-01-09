@@ -5,15 +5,17 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import telegram4j.core.event.domain.Event;
 
+import java.util.Objects;
+
 public class DefaultEventDispatcher implements EventDispatcher {
     private final Scheduler eventScheduler;
     private final Sinks.Many<Event> sink;
     private final Sinks.EmitFailureHandler emissionHandler;
 
     public DefaultEventDispatcher(Scheduler eventScheduler, Sinks.Many<Event> sink, Sinks.EmitFailureHandler emissionHandler) {
-        this.eventScheduler = eventScheduler;
-        this.sink = sink;
-        this.emissionHandler = emissionHandler;
+        this.eventScheduler = Objects.requireNonNull(eventScheduler, "eventScheduler");
+        this.sink = Objects.requireNonNull(sink, "sink");
+        this.emissionHandler = Objects.requireNonNull(emissionHandler, "emissionHandler");
     }
 
     @Override

@@ -8,6 +8,7 @@ import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
+import telegram4j.core.object.Photo;
 import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.User;
@@ -31,7 +32,7 @@ public class Channel extends BaseChat {
     private final List<User> users;
 
     public Channel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
-        super(client, Id.of(Id.ZERO_CHANNEL_ID - minData.id(), minData.accessHash()), Type.CHANNEL);
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL);
         this.minData = minData;
         this.fullData = null;
         this.chats = null;
@@ -40,7 +41,7 @@ public class Channel extends BaseChat {
 
     public Channel(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData,
                    List<Chat> chats, List<User> users) {
-        super(client, Id.of(Id.ZERO_CHANNEL_ID - minData.id(), minData.accessHash()), Type.CHANNEL);
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.chats = Collections.unmodifiableList(chats);
@@ -171,7 +172,7 @@ public class Channel extends BaseChat {
     public Optional<Id> getMigratedFromChatId() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::migratedFromChatId)
-                .map(Id::of);
+                .map(Id::ofChat);
     }
 
     public Optional<Integer> getMigratedFromMaxId() {
@@ -195,7 +196,7 @@ public class Channel extends BaseChat {
     public Optional<Id> getLinkedChatId() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::linkedChatId)
-                .map(Id::of);
+                .map(Id::ofChat);
     }
 
     public Optional<ChannelLocation> getLocation() {

@@ -2,7 +2,7 @@ package telegram4j.core.util;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.PhotoSize;
+import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.*;

@@ -8,28 +8,9 @@ import telegram4j.tl.PeerUser;
 import telegram4j.tl.api.EmptyObject;
 import telegram4j.tl.api.TlObject;
 
-import java.util.function.Function;
-
 public class TlEntityUtil {
 
-    private static final long ZERO_CHANNEL_ID = -1000000000000L;
-
     private TlEntityUtil() {
-    }
-
-    public static long getPeerId(Peer peer) {
-        switch (peer.identifier()) {
-            case PeerChannel.ID:
-                PeerChannel peerChannel = (PeerChannel) peer;
-                return ZERO_CHANNEL_ID - peerChannel.channelId();
-            case PeerChat.ID:
-                PeerChat peerChat = (PeerChat) peer;
-                return -peerChat.chatId();
-            case PeerUser.ID:
-                PeerUser peerUser = (PeerUser) peer;
-                return peerUser.userId();
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
-        }
     }
 
     public static long getRawPeerId(Peer peer) {
@@ -42,8 +23,8 @@ public class TlEntityUtil {
     }
 
     @Nullable
-    public static <T extends TlObject, R extends T> R unmapEmpty(T obj, Class<R> impl) {
-        if (obj instanceof EmptyObject) {
+    public static <T extends TlObject, R extends T> R unmapEmpty(@Nullable T obj, Class<R> impl) {
+        if (obj == null || obj instanceof EmptyObject) {
             return null;
         }
         return impl.cast(obj);

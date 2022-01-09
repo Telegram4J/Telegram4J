@@ -194,11 +194,9 @@ public class Message implements TelegramObject {
 
     private InputPeer getChatIdAsPeer() {
         switch (getChatId().getType()) {
-            case CHAT: return ImmutableInputPeerChat.of(getChatId().asLongRaw());
-            case CHANNEL: return ImmutableInputPeerChannel.of(getChatId().asLongRaw(),
-                    getChatId().getAccessHash().orElseThrow());
-            case USER: return ImmutableInputPeerUser.of(getChatId().asLongRaw(), getChatId().getAccessHash().orElseThrow());
-            case SECRET_CHAT: // ????
+            case CHAT: return ImmutableInputPeerChat.of(getChatId().asLong());
+            case CHANNEL: return ImmutableInputPeerChannel.of(getChatId().asLong(), getChatId().getAccessHash().orElseThrow());
+            case USER: return ImmutableInputPeerUser.of(getChatId().asLong(), getChatId().getAccessHash().orElseThrow());
             default: throw new IllegalArgumentException("Unknown peer type: " + getChatId().getType());
         }
     }
@@ -210,7 +208,7 @@ public class Message implements TelegramObject {
     @Override
     public String toString() {
         return "Message{" +
-                "data=" + (serviceData != null ? serviceData : baseData) +
+                "data=" + getBaseData() +
                 "}";
     }
 

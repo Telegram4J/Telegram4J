@@ -50,9 +50,9 @@ public class ChatUpdateHandlers {
     // =====================
 
     static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
-        Id chatId = Id.of(context.getUpdate().chatId());
-        Id userId = Id.of(context.getUpdate().userId());
-        Id inviterId = Id.of(context.getUpdate().inviterId());
+        Id chatId = Id.ofChat(context.getUpdate().chatId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id inviterId = Id.ofUser(context.getUpdate().inviterId(), null);
         Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
 
         return Flux.just(new ChatParticipantAddEvent(context.getClient(),
@@ -60,24 +60,24 @@ public class ChatUpdateHandlers {
     }
 
     static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
-        Id chatId = Id.of(context.getUpdate().chatId());
-        Id userId = Id.of(context.getUpdate().userId());
+        Id chatId = Id.ofChat(context.getUpdate().chatId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
 
         return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chatId, userId,
                 context.getUpdate().isAdmin(), context.getUpdate().version()));
     }
 
     static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
-        Id chatId = Id.of(context.getUpdate().chatId());
-        Id userId = Id.of(context.getUpdate().userId());
+        Id chatId = Id.ofChat(context.getUpdate().chatId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
 
         return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chatId, userId, context.getUpdate().version()));
     }
 
     static Flux<ChatParticipantUpdateEvent> handleUpdateChatParticipant(StatefulUpdateContext<UpdateChatParticipant, Void> context) {
-        Id chatId = Id.of(context.getUpdate().chatId());
-        Id userId = Id.of(context.getUpdate().userId());
-        Id actorId = Id.of(context.getUpdate().actorId());
+        Id chatId = Id.ofChat(context.getUpdate().chatId());
+        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id actorId = Id.ofUser(context.getUpdate().actorId(), null);
         Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(context.getUpdate().invite())
                 .map(d -> new ExportedChatInvite(context.getClient(), d))
@@ -93,12 +93,12 @@ public class ChatUpdateHandlers {
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
-                Id chatId = Id.of(upd.chatId());
+                Id chatId = Id.ofChat(upd.chatId());
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, upd.selfParticipant(), null, null));
             }
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
-                Id chatId = Id.of(upd.chatId());
+                Id chatId = Id.ofChat(upd.chatId());
                 List<ChatParticipant> participants = upd.participants();
                 int version = upd.version();
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, null, version, participants));

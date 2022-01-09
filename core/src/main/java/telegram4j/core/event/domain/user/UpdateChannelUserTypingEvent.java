@@ -5,6 +5,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.tl.SendMessageAction;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class UpdateChannelUserTypingEvent extends UserEvent {
@@ -20,9 +21,9 @@ public class UpdateChannelUserTypingEvent extends UserEvent {
                                         Id fromId, SendMessageAction action,
                                         @Nullable Integer topMessageId) {
         super(client);
-        this.channelId = channelId;
-        this.fromId = fromId;
-        this.action = action;
+        this.channelId = Objects.requireNonNull(channelId, "channelId");
+        this.fromId = Objects.requireNonNull(fromId, "fromId");
+        this.action = Objects.requireNonNull(action, "action");
         this.topMessageId = topMessageId;
     }
 

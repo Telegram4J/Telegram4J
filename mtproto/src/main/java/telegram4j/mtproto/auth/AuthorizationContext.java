@@ -77,4 +77,15 @@ public final class AuthorizationContext {
     public AtomicInteger getRetry() {
         return retry;
     }
+
+    public void clear() {
+        nonce = null;
+        newNonce = null;
+        serverNonce = null;
+        authKey = null;
+        serverSalt = 0;
+        authAuxHash = null;
+        serverDHParams = null;
+        retry.set(0);
+    }
 }

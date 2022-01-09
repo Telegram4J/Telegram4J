@@ -19,11 +19,11 @@ import telegram4j.tl.updates.DifferenceEmpty;
 import telegram4j.tl.updates.DifferenceSlice;
 import telegram4j.tl.updates.State;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static telegram4j.mtproto.util.TlEntityUtil.getPeerId;
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 public class UpdatesManager {
@@ -39,8 +39,8 @@ public class UpdatesManager {
     private volatile int seq;
 
     public UpdatesManager(MTProtoTelegramClient client, UpdatesHandlers updatesHandlers) {
-        this.client = client;
-        this.updatesHandlers = updatesHandlers;
+        this.client = Objects.requireNonNull(client, "client");
+        this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
     }
 
     public int getPts() {
@@ -199,15 +199,15 @@ public class UpdatesManager {
                             // difference0.newEncryptedMessages()
 
                             var chatsMap = difference0.chats().stream()
-                                    .collect(Collectors.toMap(c -> -c.id(), Function.identity()));
+                                    .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
                             var usersMap = difference0.users().stream()
-                                    .collect(Collectors.toMap(User::id, Function.identity()));
+                                    .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
-                                        long id = getPeerId(data.peerId());
+                                        long id = getRawPeerId(data.peerId());
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c))
@@ -242,16 +242,16 @@ public class UpdatesManager {
                             DifferenceSlice difference0 = (DifferenceSlice) difference;
 
                             var chatsMap = difference0.chats().stream()
-                                    .collect(Collectors.toMap(c -> -c.id(), Function.identity()));
+                                    .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
                             var usersMap = difference0.users().stream()
-                                    .collect(Collectors.toMap(User::id, Function.identity()));
+                                    .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
                                         Peer peer = data.peerId();
-                                        long id = getPeerId(peer);
+                                        long id = getRawPeerId(peer);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c))
@@ -293,28 +293,28 @@ public class UpdatesManager {
         switch (peer.identifier()) {
             case InputPeerChannel.ID:
                 InputPeerChannel inputPeerChannel = (InputPeerChannel) peer;
-                return Id.of(Id.ZERO_CHANNEL_ID - inputPeerChannel.channelId(), inputPeerChannel.accessHash());
+                return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
             case InputPeerChannelFromMessage.ID:
                 var minInputPeerChannel = (InputPeerChannelFromMessage) peer;
                 Long channelAccessHash0 = minInputPeerChannel.peer() instanceof InputPeerChannel
                         ? ((InputPeerChannel) minInputPeerChannel.peer()).accessHash()
                         : null;
 
-                return Id.of(Id.ZERO_CHANNEL_ID - minInputPeerChannel.channelId(), channelAccessHash0);
+                return Id.ofChannel(minInputPeerChannel.channelId(), channelAccessHash0);
             case InputPeerChat.ID:
                 InputPeerChat inputPeerChat = (InputPeerChat) peer;
-                return Id.of(-inputPeerChat.chatId());
-            case InputPeerSelf.ID: return Id.of(resolvedId);
+                return Id.ofChat(inputPeerChat.chatId());
+            case InputPeerSelf.ID: return Id.ofUser(resolvedId, null);
             case InputPeerUser.ID:
                 InputPeerUser inputPeerUser = (InputPeerUser) peer;
-                return Id.of(inputPeerUser.userId(), inputPeerUser.accessHash());
+                return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
             case InputPeerUserFromMessage.ID:
                 var minInputPeerUser = (InputPeerUserFromMessage) peer;
                 Long channelAccessHash = minInputPeerUser.peer() instanceof InputPeerChannel
                         ? ((InputPeerChannel) minInputPeerUser.peer()).accessHash()
                         : null;
 
-                return Id.of(minInputPeerUser.userId(), channelAccessHash);
+                return Id.ofUser(minInputPeerUser.userId(), channelAccessHash);
             default: throw new IllegalArgumentException("Unknown input peer type: " + peer);
         }
     }

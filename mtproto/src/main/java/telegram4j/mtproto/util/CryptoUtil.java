@@ -10,6 +10,7 @@ import javax.crypto.Cipher;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.RSAPublicKeySpec;
+import java.util.Collections;
 
 public final class CryptoUtil {
 
@@ -139,7 +140,7 @@ public final class CryptoUtil {
     public static byte[] rsaEncrypt(byte[] src, PublicRsaKey key) {
         try {
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            PublicKey publicKey = keyFactory.generatePublic(new RSAPublicKeySpec(key.getExponent(), key.getModulus()));
+            PublicKey publicKey = keyFactory.generatePublic(new RSAPublicKeySpec(key.getModulus(), key.getExponent()));
             Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, publicKey);
             return cipher.doFinal(src);
@@ -222,6 +223,15 @@ public final class CryptoUtil {
                 ((int) bytes[1] & 0xff) << 8 |
                 ((int) bytes[2] & 0xff) << 16 |
                 ((int) bytes[3] & 0xff) << 24;
+    }
+
+    public static void reverse(byte[] bytes) {
+        for (int i = 0, mid = bytes.length >> 1, j = bytes.length - 1; i < mid; i++, j--) {
+            byte ib = bytes[i];
+            byte jb = bytes[j];
+            bytes[i] = jb;
+            bytes[j] = ib;
+        }
     }
 
     public static AES256IGECipher createAesCipher(byte[] messageKey, ByteBuf authKeyBuf, boolean server) {

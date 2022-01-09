@@ -54,7 +54,7 @@ public class MessageEntity implements TelegramObject {
 
     public Optional<Id> getUserId() {
         return data instanceof MessageEntityMentionName
-                ? Optional.of((MessageEntityMentionName) data).map(e -> Id.of(e.userId()))
+                ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
                 : Optional.empty();
     }
 

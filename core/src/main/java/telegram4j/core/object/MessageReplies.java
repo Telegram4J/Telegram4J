@@ -43,7 +43,7 @@ public class MessageReplies implements TelegramObject {
     }
 
     public Optional<Id> getChannelId() {
-        return Optional.ofNullable(data.channelId()).map(Id::of);
+        return Optional.ofNullable(data.channelId()).map(c -> Id.ofChannel(c, null));
     }
 
     public Optional<Integer> getMaxId() {

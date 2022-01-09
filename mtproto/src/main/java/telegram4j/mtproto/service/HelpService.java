@@ -60,8 +60,10 @@ public class HelpService extends RpcService {
         return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdates, message));
     }
 
-    public Mono<CdnConfig> getCdnConfig() {
-        return client.sendAwait(GetCdnConfig.instance());
+    public Flux<CdnPublicKey> getCdnConfig() {
+        return client.sendAwait(GetCdnConfig.instance())
+                .map(CdnConfig::publicKeys)
+                .flatMapIterable(Function.identity());
     }
 
     public Mono<RecentMeUrls> getRecentMeUrls(String referer) {

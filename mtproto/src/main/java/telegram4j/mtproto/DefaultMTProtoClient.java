@@ -318,6 +318,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<Void> authHandlerFuture = authReceiver.asFlux()
                     .checkpoint("Authorization handler.")
                     .flatMap(authHandler::handle)
+                    .doOnError(IllegalStateException.class, e -> {
+                        log.error("Authorization exception.", e);
+                        authContext.clear();
+                    })
                     .then();
 
             Mono<Void> rpcHandler = rpcReceiver.asFlux()

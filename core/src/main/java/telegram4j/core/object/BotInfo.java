@@ -23,7 +23,7 @@ public class BotInfo implements TelegramObject {
     }
 
     public Id getUserId() {
-        return Id.of(data.userId());
+        return Id.ofUser(data.userId(), null);
     }
 
     public String getDescription() {

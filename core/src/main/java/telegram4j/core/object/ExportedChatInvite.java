@@ -29,7 +29,7 @@ public class ExportedChatInvite implements TelegramObject {
     }
 
     public Id getAdminId() {
-        return Id.of(data.adminId());
+        return Id.ofUser(data.adminId(), null);
     }
 
     public Instant getCreateTimestamp() {

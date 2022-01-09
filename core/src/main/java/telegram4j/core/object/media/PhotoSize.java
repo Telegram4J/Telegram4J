@@ -1,6 +1,7 @@
-package telegram4j.core.object;
+package telegram4j.core.object.media;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.TelegramObject;
 
 public class PhotoSize implements TelegramObject {
 
