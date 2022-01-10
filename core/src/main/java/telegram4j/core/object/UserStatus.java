@@ -3,6 +3,7 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -11,33 +12,33 @@ public class UserStatus implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final Type type;
     @Nullable
-    private final Integer expires;
+    private final Instant expiresTimestamp;
     @Nullable
-    private final Integer wasOnline;
+    private final Instant wasOnlineTimestamp;
 
     public UserStatus(MTProtoTelegramClient client, Type type) {
         this(client, type, null, null);
     }
 
     public UserStatus(MTProtoTelegramClient client, Type type,
-                      @Nullable Integer expires,
-                      @Nullable Integer wasOnline) {
+                      @Nullable Instant expiresTimestamp,
+                      @Nullable Instant wasOnlineTimestamp) {
         this.client = Objects.requireNonNull(client, "client");
         this.type = Objects.requireNonNull(type, "type");
-        this.expires = expires;
-        this.wasOnline = wasOnline;
+        this.expiresTimestamp = expiresTimestamp;
+        this.wasOnlineTimestamp = wasOnlineTimestamp;
     }
 
     public Type getType() {
         return type;
     }
 
-    public Optional<Integer> getExpires() {
-        return Optional.ofNullable(expires);
+    public Optional<Instant> getExpiresTimestamp() {
+        return Optional.ofNullable(expiresTimestamp);
     }
 
-    public Optional<Integer> getWasOnline() {
-        return Optional.ofNullable(wasOnline);
+    public Optional<Instant> getWasOnlineTimestamp() {
+        return Optional.ofNullable(wasOnlineTimestamp);
     }
 
     @Override
@@ -50,20 +51,21 @@ public class UserStatus implements TelegramObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         UserStatus that = (UserStatus) o;
-        return type == that.type && Objects.equals(expires, that.expires) && Objects.equals(wasOnline, that.wasOnline);
+        return type == that.type && Objects.equals(expiresTimestamp, that.expiresTimestamp) &&
+                Objects.equals(wasOnlineTimestamp, that.wasOnlineTimestamp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, expires, wasOnline);
+        return Objects.hash(type, expiresTimestamp, wasOnlineTimestamp);
     }
 
     @Override
     public String toString() {
         return "UserStatus{" +
                 "type=" + type +
-                ", expires=" + expires +
-                ", wasOnline=" + wasOnline +
+                ", expiresTimestamp=" + expiresTimestamp +
+                ", wasOnlineTimestamp=" + wasOnlineTimestamp +
                 '}';
     }
 

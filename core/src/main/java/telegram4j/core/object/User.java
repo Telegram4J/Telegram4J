@@ -24,16 +24,16 @@ public class User implements TelegramObject {
 
     public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData,
                 List<User> users, List<Chat> chats) {
-        this.client = client;
-        this.minData = minData;
-        this.fullData = fullData;
+        this.client = Objects.requireNonNull(client, "client");
+        this.minData = Objects.requireNonNull(minData, "minData");
+        this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.chats = Collections.unmodifiableList(chats);
         this.users = Collections.unmodifiableList(users);
     }
 
     public User(MTProtoTelegramClient client, BaseUser minData) {
-        this.client = client;
-        this.minData = minData;
+        this.client = Objects.requireNonNull(client, "client");
+        this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.chats = null;
         this.users = null;
@@ -66,11 +66,17 @@ public class User implements TelegramObject {
         return Optional.ofNullable(minData).map(BaseUser::phone);
     }
 
-    public Optional<ChatPhoto> getPhoto() {
+    public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(minData)
-                .map(BaseUser::photo)
-                .map(u -> TlEntityUtil.unmapEmpty(u, BaseUserProfilePhoto.class))
-                .map(c -> new ChatPhoto(client, c));
+                .map(u -> TlEntityUtil.unmapEmpty(u.photo(), BaseUserProfilePhoto.class))
+                .map(c -> new ChatPhoto(client, c, ImmutableInputPeerUser.of(minData.id(),
+                        Objects.requireNonNull(minData.accessHash())))); // TODO: fetch accessHash
+    }
+
+    public Optional<Photo> getPhoto() {
+        return Optional.ofNullable(fullData)
+                .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
+                .map(d -> new Photo(client, d));
     }
 
     public Optional<UserStatus> getStatus() {
@@ -82,7 +88,6 @@ public class User implements TelegramObject {
     public Optional<Integer> getBotInfoVersion() {
         return Optional.ofNullable(minData).map(BaseUser::botInfoVersion);
     }
-
 
     public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(minData)
@@ -115,9 +120,6 @@ public class User implements TelegramObject {
                 .map(UserFull::settings)
                 .map(d -> new PeerSettings(client, d));
     }
-
-    // @Nullable
-    // Photo profilePhoto();
 
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)

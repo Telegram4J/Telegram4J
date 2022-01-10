@@ -1,12 +1,15 @@
 package telegram4j.core;
 
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.tl.upload.File;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -76,5 +79,12 @@ public final class MTProtoTelegramClient {
 
     public <E extends Event> Flux<E> on(Class<E> type) {
         return mtProtoResources.getEventDispatcher().on(type);
+    }
+
+    public Mono<Void> getFile(String fileReferenceId, Function<File, ? extends Publisher<?>> progressor) {
+        return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
+                .map(FileReferenceId::asLocation)
+                .flatMap(loc -> serviceHolder.getMessageService()
+                        .getFile(false, false, loc, progressor));
     }
 }

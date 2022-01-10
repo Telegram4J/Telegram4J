@@ -17,7 +17,6 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
-import reactor.util.retry.Retry;
 import telegram4j.mtproto.auth.AuthorizationContext;
 import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
@@ -43,6 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.transport.IntermediateTransport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
@@ -163,7 +163,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 futureSaltEmitter.dispose();
                                 pingEmitter.dispose();
 
-                                return Mono.error(RETRY);
+                                return Mono.fromRunnable(connection::dispose)
+                                        .onErrorResume(t -> Mono.empty())
+                                        .then(Mono.error(RETRY));
                             default:
                                 return Mono.empty();
                         }
@@ -185,7 +187,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
                                 Long id = quickAckTokens.get(val);
                                 Objects.requireNonNull(id, "id");
-                                rpcLog.debug("Handling quick ack for {}", id);
+                                if (rpcLog.isDebugEnabled()) {
+                                    rpcLog.debug("[0x{}] Handling quick ack.", Long.toHexString(id));
+                                }
+
                                 quickAckTokens.remove(val);
                                 return Mono.empty();
                             } else { // The error code writes as negative int32
@@ -194,6 +199,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         }
                         return Mono.just(payload);
                     })
+                    .doOnError(TransportException.class, t -> log.error("Transport exception. code: " + t.getCode(), t))
                     .doOnNext(buf -> {
                         long authKeyId = buf.readLongLE();
 
@@ -526,7 +532,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
         if (obj instanceof RpcResult) {
             RpcResult rpcResult = (RpcResult) obj;
-            rpcLog.debug("[{}] Handling RPC result.", rpcResult.reqMsgId());
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[0x{}] Handling RPC result.", Long.toHexString(rpcResult.reqMsgId()));
+            }
 
             messageId = rpcResult.reqMsgId();
             obj = rpcResult.result();
@@ -543,7 +551,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 MsgsAck msgsAck = (MsgsAck) obj;
 
                 if (rpcLog.isDebugEnabled()) {
-                    rpcLog.debug("Handling acknowledge for message(s): {}", msgsAck.msgIds());
+                    rpcLog.debug("[0x{}] Handling acknowledge for message(s): [{}]",
+                            Long.toHexString(messageId), msgsAck.msgIds().stream()
+                                    .map(l -> String.format("0x%x", l))
+                                    .collect(Collectors.joining(", ")));
                 }
             }
 
@@ -561,7 +572,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     Duration delay = Duration.ofSeconds(Integer.parseInt(arg));
 
                     long messageId0 = messageId;
-                    rpcLog.debug("[{}] Delaying for {} seconds.", messageId0, delay);
+                    if (rpcLog.isDebugEnabled()) {
+                        rpcLog.debug("[0x{}] Delaying for {}.", Long.toHexString(messageId0), delay);
+                    }
 
                     // Need resend with delay.
                     return Mono.fromSupplier(() -> resolvers.get(messageId0))
@@ -583,7 +596,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof MessageContainer) {
             MessageContainer messageContainer = (MessageContainer) obj;
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("Handling message container: {}", messageContainer);
+                rpcLog.debug("Handling message container.");
+            } else if (rpcLog.isTraceEnabled()) {
+                rpcLog.debug("Handling message container: {}.", messageContainer);
             }
 
             return Flux.fromIterable(messageContainer.messages())
@@ -594,7 +609,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
         if (obj instanceof NewSession) {
             NewSession newSession = (NewSession) obj;
-
             rpcLog.debug("Handling new session salt creation.");
 
             serverSalt = newSession.serverSalt();
@@ -605,7 +619,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof BadMsgNotification) {
             BadMsgNotification badMsgNotification = (BadMsgNotification) obj;
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("Handling bad msg notification: {}", badMsgNotification);
+                rpcLog.debug("Handling notification: {}", badMsgNotification);
             }
 
             switch (badMsgNotification.errorCode()) {

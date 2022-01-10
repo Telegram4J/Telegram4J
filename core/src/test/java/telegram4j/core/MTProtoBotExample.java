@@ -6,6 +6,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.core.command.Command;
 import telegram4j.core.command.EchoCommand;
+import telegram4j.core.command.PingCommand;
 import telegram4j.core.command.ShrugCommand;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
@@ -23,7 +24,7 @@ public class MTProtoBotExample {
 
     private static final Logger log = Loggers.getLogger(MTProtoBotExample.class);
 
-    private static final List<Command> commands = List.of(new EchoCommand(), new ShrugCommand());
+    private static final List<Command> commands = List.of(new EchoCommand(), new ShrugCommand(), new PingCommand());
     private static final Map<String, Command> commandsMap = commands.stream()
             .collect(Collectors.toMap(c -> c.getInfo().command().toLowerCase(Locale.ROOT), Function.identity()));
 

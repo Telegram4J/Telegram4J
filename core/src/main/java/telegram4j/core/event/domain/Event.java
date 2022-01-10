@@ -12,7 +12,7 @@ public abstract class Event {
         this.client = Objects.requireNonNull(client, "client");
     }
 
-    public MTProtoTelegramClient getClient() {
+    public final MTProtoTelegramClient getClient() {
         return client;
     }
 }

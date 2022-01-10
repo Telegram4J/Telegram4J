@@ -1,10 +1,7 @@
 package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Mono;
-import telegram4j.core.object.ChatPhoto;
-import telegram4j.core.object.Id;
-import telegram4j.core.object.Message;
-import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.*;
 import telegram4j.core.spec.SendMessageSpec;
 
 import java.time.Duration;
@@ -16,7 +13,9 @@ public interface Chat extends TelegramObject {
 
     Type getType();
 
-    Optional<ChatPhoto> getPhoto();
+    Optional<ChatPhoto> getMinPhoto();
+
+    Optional<Photo> getPhoto();
 
     Optional<Duration> getMessageAutoDeleteDuration();
 

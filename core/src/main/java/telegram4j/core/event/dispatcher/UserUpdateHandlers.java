@@ -101,13 +101,14 @@ class UserUpdateHandlers {
 
         Id userId = Id.ofUser(context.getUpdate().userId(), null);
         Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
+        var inputPeer = ImmutableInputPeerUser.of(context.getUpdate().userId(), -1); // TODO: resolve access_hash
         var currentPhoto = Optional.of(context.getUpdate().photo())
                 .map(d -> unmapEmpty(d, ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d))
+                .map(d -> new ChatPhoto(client, d, inputPeer))
                 .orElse(null);
         var oldPhoto = Optional.ofNullable(context.getOld())
                 .map(d -> unmapEmpty(d, ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d))
+                .map(d -> new ChatPhoto(client, d, inputPeer))
                 .orElse(null);
 
         return Flux.just(new UpdateUserPhotoEvent(context.getClient(), userId, timestamp,

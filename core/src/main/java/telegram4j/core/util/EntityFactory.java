@@ -1,11 +1,10 @@
 package telegram4j.core.util;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
-import telegram4j.core.object.*;
 import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.action.MessageActionChatCreate;
 import telegram4j.core.object.chat.Channel;
@@ -20,11 +19,13 @@ import telegram4j.core.object.markup.ReplyKeyboardMarkup;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.object.media.MessageMediaPhoto;
+import telegram4j.core.object.media.PhotoSize;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 public final class EntityFactory {
@@ -42,10 +43,12 @@ public final class EntityFactory {
                 return new UserStatus(client, UserStatus.Type.LAST_WEEK);
             case UserStatusOffline.ID:
                 UserStatusOffline userStatusOffline = (UserStatusOffline) data;
-                return new UserStatus(client, UserStatus.Type.OFFLINE, null, userStatusOffline.wasOnline());
+                Instant wasOnlineTimestamp = Instant.ofEpochMilli(userStatusOffline.wasOnline());
+                return new UserStatus(client, UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
             case UserStatusOnline.ID:
                 UserStatusOnline userStatusOnline = (UserStatusOnline) data;
-                return new UserStatus(client, UserStatus.Type.ONLINE, userStatusOnline.expires(), null);
+                Instant expiresTimestamp = Instant.ofEpochMilli(userStatusOnline.expires());
+                return new UserStatus(client, UserStatus.Type.ONLINE, expiresTimestamp, null);
             case UserStatusRecently.ID:
                 return new UserStatus(client, UserStatus.Type.RECENTLY);
             default: throw new IllegalArgumentException("Unknown user status type: " + data);

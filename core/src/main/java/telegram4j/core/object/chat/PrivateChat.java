@@ -3,6 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ChatPhoto;
+import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
 
 import java.time.Duration;
@@ -23,7 +24,12 @@ public final class PrivateChat extends BaseChat {
     }
 
     @Override
-    public Optional<ChatPhoto> getPhoto() {
+    public Optional<ChatPhoto> getMinPhoto() {
+        return user.getMinPhoto();
+    }
+
+    @Override
+    public Optional<Photo> getPhoto() {
         return user.getPhoto();
     }
 

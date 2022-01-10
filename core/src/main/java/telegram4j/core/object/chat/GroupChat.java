@@ -2,15 +2,16 @@ package telegram4j.core.object.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.*;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
+import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
+import telegram4j.core.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.*;
 import telegram4j.tl.ExportedChatInvite;
 import telegram4j.tl.PeerNotifySettings;
+import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -52,17 +53,17 @@ public class GroupChat extends BaseChat {
     }
 
     @Override
-    public Optional<ChatPhoto> getPhoto() {
-        // TODO: implement
-        Optional<ChatPhoto> fullChatPhoto = Optional.empty()/*Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new ChatPhoto(client, d))*/;
-
-        Optional<ChatPhoto> minChatPhoto = Optional.of(minData)
+    public Optional<ChatPhoto> getMinPhoto() {
+        return Optional.of(minData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d));
+                .map(d -> new ChatPhoto(client, d, getIdAsPeer()));
+    }
 
-        return fullChatPhoto.isPresent() ? fullChatPhoto : minChatPhoto;
+    @Override
+    public Optional<Photo> getPhoto() {
+        return Optional.ofNullable(fullData)
+                .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
+                .map(d -> new Photo(client, d));
     }
 
     @Override
