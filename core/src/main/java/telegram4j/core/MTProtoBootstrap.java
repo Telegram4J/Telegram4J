@@ -188,7 +188,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .then(mtProtoClient.sendAwait(importAuthorization()))
                                         .then(fetchSelfId)
                                         .then(telegramClient.getUpdatesManager().fillGap())
-                                        .thenReturn(telegramClient)
+                                        .thenReturn(telegramClient) // FIXME: reconnections drop signals
                                         .doOnNext(sink::success);
                             default:
                                 return Mono.empty();

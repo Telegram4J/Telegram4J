@@ -15,4 +15,12 @@ public class PhotoSize implements TelegramObject {
     public MTProtoTelegramClient getClient() {
         return client;
     }
+
+    // TODO list:
+    // photoSizeEmpty type:string
+    // photoSize type:string w:int h:int size:int
+    // photoCachedSize type:string w:int h:int bytes:bytes
+    // photoStrippedSize type:string bytes:bytes
+    // photoSizeProgressive type:string w:int h:int sizes:Vector<int>
+    // photoPathSize type:string bytes:bytes
 }

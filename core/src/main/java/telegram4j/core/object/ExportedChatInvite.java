@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 public class ExportedChatInvite implements TelegramObject {
@@ -12,8 +13,8 @@ public class ExportedChatInvite implements TelegramObject {
     private final telegram4j.tl.ExportedChatInvite data;
 
     public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ExportedChatInvite data) {
-        this.client = client;
-        this.data = data;
+        this.client = Objects.requireNonNull(client, "client");
+        this.data = Objects.requireNonNull(data, "data");
     }
 
     public boolean isRevoked() {

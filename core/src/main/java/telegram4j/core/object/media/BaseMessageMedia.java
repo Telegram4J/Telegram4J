@@ -4,12 +4,12 @@ import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
-abstract class BaseMessageMedia implements MessageMedia {
+public class BaseMessageMedia implements MessageMedia {
 
-    private final MTProtoTelegramClient client;
-    private final Type type;
+    protected final MTProtoTelegramClient client;
+    protected final Type type;
 
-    protected BaseMessageMedia(MTProtoTelegramClient client, Type type) {
+    public BaseMessageMedia(MTProtoTelegramClient client, Type type) {
         this.client = Objects.requireNonNull(client, "client");
         this.type = Objects.requireNonNull(type, "type");
     }

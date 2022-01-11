@@ -17,9 +17,26 @@ import telegram4j.core.object.markup.ReplyKeyboardForceReply;
 import telegram4j.core.object.markup.ReplyKeyboardHide;
 import telegram4j.core.object.markup.ReplyKeyboardMarkup;
 import telegram4j.core.object.markup.ReplyMarkup;
+import telegram4j.core.object.media.DocumentAttribute;
+import telegram4j.core.object.media.DocumentAttributeAudio;
+import telegram4j.core.object.media.DocumentAttributeFilename;
+import telegram4j.core.object.media.DocumentAttributeImageSize;
+import telegram4j.core.object.media.DocumentAttributeSticker;
+import telegram4j.core.object.media.DocumentAttributeVideo;
 import telegram4j.core.object.media.MessageMedia;
+import telegram4j.core.object.media.MessageMediaContact;
+import telegram4j.core.object.media.MessageMediaDice;
+import telegram4j.core.object.media.MessageMediaDocument;
+import telegram4j.core.object.media.MessageMediaGame;
+import telegram4j.core.object.media.MessageMediaGeo;
+import telegram4j.core.object.media.MessageMediaGeoLive;
+import telegram4j.core.object.media.MessageMediaInvoice;
 import telegram4j.core.object.media.MessageMediaPhoto;
+import telegram4j.core.object.media.MessageMediaPoll;
+import telegram4j.core.object.media.MessageMediaVenue;
+import telegram4j.core.object.media.MessageMediaWebPage;
 import telegram4j.core.object.media.PhotoSize;
+import telegram4j.core.object.media.*;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
@@ -147,6 +164,38 @@ public final class EntityFactory {
             case telegram4j.tl.MessageMediaPhoto.ID:
                 return new MessageMediaPhoto(client, (telegram4j.tl.MessageMediaPhoto) data);
 
+            case telegram4j.tl.MessageMediaGeo.ID:
+                return new MessageMediaGeo(client, (telegram4j.tl.MessageMediaGeo) data);
+
+            case telegram4j.tl.MessageMediaContact.ID:
+                return new MessageMediaContact(client, (telegram4j.tl.MessageMediaContact) data);
+
+            case telegram4j.tl.MessageMediaUnsupported.ID:
+                return new BaseMessageMedia(client, MessageMedia.Type.UNSUPPORTED);
+
+            case telegram4j.tl.MessageMediaDocument.ID:
+                return new MessageMediaDocument(client, (telegram4j.tl.MessageMediaDocument) data);
+
+            case telegram4j.tl.MessageMediaWebPage.ID:
+                return new MessageMediaWebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
+
+            case telegram4j.tl.MessageMediaVenue.ID:
+                return new MessageMediaVenue(client, (telegram4j.tl.MessageMediaVenue) data);
+
+            case telegram4j.tl.MessageMediaGame.ID:
+                return new MessageMediaGame(client, (telegram4j.tl.MessageMediaGame) data);
+
+            case telegram4j.tl.MessageMediaInvoice.ID:
+                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data);
+
+            case telegram4j.tl.MessageMediaGeoLive.ID:
+                return new MessageMediaGeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
+
+            case telegram4j.tl.MessageMediaPoll.ID:
+                return new MessageMediaPoll(client, (telegram4j.tl.MessageMediaPoll) data);
+
+            case telegram4j.tl.MessageMediaDice.ID:
+                return new MessageMediaDice(client, (telegram4j.tl.MessageMediaDice) data);
             default:
                 throw new IllegalArgumentException("Unknown message action type: " + data);
         }
@@ -238,6 +287,27 @@ public final class EntityFactory {
                 // TODO
             default:
                 throw new IllegalArgumentException("Unknown photo size type: " + data);
+        }
+    }
+
+    public static DocumentAttribute createDocumentAttribute(MTProtoTelegramClient client, telegram4j.tl.DocumentAttribute data) {
+        switch (data.identifier()) {
+            case telegram4j.tl.DocumentAttributeHasStickers.ID:
+                return new BaseDocumentAttribute(client, DocumentAttribute.Type.HAS_STICKERS);
+            case telegram4j.tl.DocumentAttributeAnimated.ID:
+                return new BaseDocumentAttribute(client, DocumentAttribute.Type.ANIMATED);
+            case telegram4j.tl.DocumentAttributeAudio.ID:
+                return new DocumentAttributeAudio(client, (telegram4j.tl.DocumentAttributeAudio) data);
+            case telegram4j.tl.DocumentAttributeFilename.ID:
+                return new DocumentAttributeFilename(client, (telegram4j.tl.DocumentAttributeFilename) data);
+            case telegram4j.tl.DocumentAttributeImageSize.ID:
+                return new DocumentAttributeImageSize(client, (telegram4j.tl.DocumentAttributeImageSize) data);
+            case telegram4j.tl.DocumentAttributeSticker.ID:
+                return new DocumentAttributeSticker(client, (telegram4j.tl.DocumentAttributeSticker) data);
+            case telegram4j.tl.DocumentAttributeVideo.ID:
+                return new DocumentAttributeVideo(client, (telegram4j.tl.DocumentAttributeVideo) data);
+            default:
+                throw new IllegalArgumentException("Unknown document attribute type: " + data);
         }
     }
 }

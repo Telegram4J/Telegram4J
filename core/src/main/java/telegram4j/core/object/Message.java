@@ -206,9 +206,23 @@ public class Message implements TelegramObject {
     }
 
     @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Message message = (Message) o;
+        return getBaseData().equals(message.getBaseData()) && resolvedChatId.equals(message.resolvedChatId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getBaseData(), resolvedChatId);
+    }
+
+    @Override
     public String toString() {
         return "Message{" +
                 "data=" + getBaseData() +
+                ", resolvedChatId=" + resolvedChatId +
                 "}";
     }
 
