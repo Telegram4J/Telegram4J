@@ -12,12 +12,14 @@ import java.util.Optional;
 public class ChatPhoto implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final ChatPhotoFields data;
+
     private final String smallFileReferenceId;
     private final String bigFileReferenceId;
 
     public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+
         this.smallFileReferenceId = FileReferenceId.ofChatPhoto(peer, data, FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL)
                 .serialize(ByteBufAllocator.DEFAULT);
         this.bigFileReferenceId = FileReferenceId.ofChatPhoto(peer, data, FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG)
@@ -45,7 +47,7 @@ public class ChatPhoto implements TelegramObject {
         return data.photoId();
     }
 
-    public Optional<byte[]> strippedThumb() {
+    public Optional<byte[]> getStrippedThumb() {
         return Optional.ofNullable(data.strippedThumb());
     }
 

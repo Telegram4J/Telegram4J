@@ -35,7 +35,11 @@ import telegram4j.core.object.media.MessageMediaPhoto;
 import telegram4j.core.object.media.MessageMediaPoll;
 import telegram4j.core.object.media.MessageMediaVenue;
 import telegram4j.core.object.media.MessageMediaWebPage;
+import telegram4j.core.object.media.PhotoCachedSize;
+import telegram4j.core.object.media.PhotoPathSize;
 import telegram4j.core.object.media.PhotoSize;
+import telegram4j.core.object.media.PhotoSizeProgressive;
+import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
@@ -278,13 +282,16 @@ public final class EntityFactory {
 
     public static PhotoSize createPhotoSize(MTProtoTelegramClient client, telegram4j.tl.PhotoSize data) {
         switch (data.identifier()) {
-            case BasePhotoSize.ID:
-            case PhotoCachedSize.ID:
-            case PhotoPathSize.ID:
-            case PhotoSizeEmpty.ID:
-            case PhotoSizeProgressive.ID:
-            case PhotoStrippedSize.ID:
-                // TODO
+            case telegram4j.tl.BasePhotoSize.ID:
+                return new DefaultPhotoSize(client, (telegram4j.tl.BasePhotoSize) data);
+            case telegram4j.tl.PhotoCachedSize.ID:
+                return new PhotoCachedSize(client, (telegram4j.tl.PhotoCachedSize) data);
+            case telegram4j.tl.PhotoPathSize.ID:
+                return new PhotoPathSize(client, (telegram4j.tl.PhotoPathSize) data);
+            case telegram4j.tl.PhotoSizeProgressive.ID:
+                return new PhotoSizeProgressive(client, (telegram4j.tl.PhotoSizeProgressive) data);
+            case telegram4j.tl.PhotoStrippedSize.ID:
+                return new PhotoStrippedSize(client, (telegram4j.tl.PhotoStrippedSize) data);
             default:
                 throw new IllegalArgumentException("Unknown photo size type: " + data);
         }

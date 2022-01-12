@@ -134,7 +134,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
-                            storeLayout, acksSendThreshold, EmissionHandlers.park(Duration.ofNanos(10)), initRetry())));
+                            storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING, initRetry())));
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -279,7 +279,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (retry != null) {
             return retry;
         }
-        return Retry.fixedDelay(5, Duration.ofSeconds(10));
+        return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(10));
     }
 
     private MTProtoClientManager initMtProtoClientManager() {
