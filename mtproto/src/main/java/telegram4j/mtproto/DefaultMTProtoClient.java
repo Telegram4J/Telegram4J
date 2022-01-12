@@ -3,7 +3,6 @@ package telegram4j.mtproto;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -86,7 +85,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private volatile long lastGeneratedMessageId;
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
-    private final ConcurrentMap<Long, RequestEntry> resolvers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, RequestEntry> requests = new ConcurrentHashMap<>();
     private final ConcurrentMap<Integer, Long> quickAckTokens = new ConcurrentHashMap<>();
 
     DefaultMTProtoClient(Type type, DataCenter dataCenter, MTProtoOptions options) {
@@ -176,6 +175,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> inboundHandler = connection.inbound()
                     .receive().retain()
+                    .publishOn(Schedulers.boundedElastic())
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
                             .addComponents(true, bufs))
@@ -186,7 +186,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             payload.release();
                             if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
                                 Long id = quickAckTokens.get(val);
-                                Objects.requireNonNull(id, "id");
+                                if (id == null) {
+                                    return Mono.error(new IllegalStateException("Unserialized quick acknowledge."));
+                                }
+
                                 if (rpcLog.isDebugEnabled()) {
                                     rpcLog.debug("[0x{}] Handling quick ack.", Long.toHexString(id));
                                 }
@@ -199,7 +202,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         }
                         return Mono.just(payload);
                     })
-                    .doOnError(TransportException.class, t -> log.error("Transport exception. code: " + t.getCode(), t))
                     .doOnNext(buf -> {
                         long authKeyId = buf.readLongLE();
 
@@ -257,7 +259,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         rpcReceiver.emitNext(obj, emissionHandler);
                     })
-                    .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                     .then();
 
             Mono<Void> outboundHandler = outbound.asFlux()
@@ -313,6 +314,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 .writeBytes(authKeyId)
                                 .writeBytes(messageKey)
                                 .writeBytes(enc);
+
+                        if (rpcLog.isDebugEnabled()) {
+                            rpcLog.debug("[0x{}] Sending request.", Long.toHexString(tuple.messageId));
+                        }
 
                         return FutureMono.from(connection.channel()
                                 .writeAndFlush(transport.encode(payload)));
@@ -374,6 +379,14 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             return Mono.zip(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
                             rpcHandler, awaitKey.then(startSchedule))
+                    .doOnError(t -> {
+                        if (t instanceof TransportException) {
+                            TransportException t0 = (TransportException) t;
+                            log.error("Transport exception. code: " + t0.getCode(), t0);
+                        } else {
+                            log.error("Unexpected client exception.", t);
+                        }
+                    })
                     .then();
         })
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
@@ -426,7 +439,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Sinks.One<R> res = Sinks.one();
             RequestEntry tuple = new RequestEntry(res, method, messageId);
             if (isAwaitResult(method)) {
-                resolvers.put(messageId, tuple);
+                requests.put(messageId, tuple);
             } else {
                 res.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
             }
@@ -563,7 +576,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 messageId = futureSalts.reqMsgId();
             }
 
-            RequestEntry req = resolvers.get(messageId);
+            RequestEntry req = requests.get(messageId);
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
                 if (rpcError.errorCode() == 420) { // FLOOD_WAIT_X
@@ -577,11 +590,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     }
 
                     // Need resend with delay.
-                    return Mono.fromSupplier(() -> resolvers.get(messageId0))
-                            .doOnNext(t -> resolvers.remove(messageId0))
+                    return Mono.fromSupplier(() -> requests.get(messageId0))
+                            .doOnNext(t -> requests.remove(messageId0))
                             .delayElement(delay)
                             .map(t -> t.withMessageId(getMessageId()))
-                            .doOnNext(t -> resolvers.put(t.messageId, t))
+                            .doOnNext(t -> requests.put(t.messageId, t))
                             .doOnNext(tuple -> outbound.emitNext(tuple, emissionHandler))
                             .then();
                 }
@@ -635,10 +648,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     break;
             }
 
-            return Mono.fromSupplier(() -> resolvers.get(badMsgNotification.badMsgId()))
-                    .doOnNext(t -> resolvers.remove(badMsgNotification.badMsgId()))
+            return Mono.fromSupplier(() -> requests.get(badMsgNotification.badMsgId()))
+                    .doOnNext(t -> requests.remove(badMsgNotification.badMsgId()))
                     .map(t -> t.withMessageId(getMessageId()))
-                    .doOnNext(t -> resolvers.put(t.messageId, t))
+                    .doOnNext(t -> requests.put(t.messageId, t))
                     .doOnNext(tuple -> outbound.emitNext(tuple, emissionHandler))
                     .then();
         }
@@ -680,7 +693,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @SuppressWarnings("unchecked")
     private void resolve(long messageId, @Nullable Object value) {
-        resolvers.computeIfPresent(messageId, (k, v) -> {
+        requests.computeIfPresent(messageId, (k, v) -> {
             Sinks.One<Object> sink = (Sinks.One<Object>) v.sink;
             if (value == null) {
                 sink.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);

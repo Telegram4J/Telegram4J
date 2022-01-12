@@ -63,7 +63,11 @@ public class IntermediateTransport implements Transport {
             int length = payload.readIntLE();
             int payloadLength = payload.readableBytes();
 
-            if (payloadLength < length) { // is a part of stream
+            if (quickAck && (length & QUICK_ACK_MASK) != 0) {
+                return true;
+            }
+
+            if (payloadLength != length) { // is a part of stream
                 if (size.get() == -1) { // header of a stream
                     size.set(length);
                     completed.set(payloadLength);
@@ -72,8 +76,6 @@ public class IntermediateTransport implements Transport {
 
                 // payload.readableBytes() + 4 need because reader index has already moved
                 return completed.addAndGet(payloadLength + 4) == size.get();
-            } else if (quickAck && payloadLength == 0 && (length & QUICK_ACK_MASK) != 0) {
-                return true;
             }
             return true;
         } finally {

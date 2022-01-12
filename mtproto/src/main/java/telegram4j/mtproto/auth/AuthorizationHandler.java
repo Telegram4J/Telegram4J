@@ -21,7 +21,6 @@ import telegram4j.tl.request.mtproto.SetClientDHParams;
 import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
@@ -208,7 +207,7 @@ public final class AuthorizationHandler {
                 sha1Digest(context.getNewNonce(), context.getNewNonce())),
                 substring(context.getNewNonce(), 0, 4));
 
-        AES256IGECipher cipher = new AES256IGECipher(tmpAesKey, tmpAesIv);
+        AES256IGECipher cipher = new AES256IGECipher(false, tmpAesKey, tmpAesIv);
         ByteBuf answer = alloc.buffer()
                 .writeBytes(cipher.decrypt(encryptedAnswerB))
                 .skipBytes(20); // answer hash

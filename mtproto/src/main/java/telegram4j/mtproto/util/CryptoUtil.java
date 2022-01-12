@@ -10,7 +10,6 @@ import javax.crypto.Cipher;
 import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.RSAPublicKeySpec;
-import java.util.Collections;
 
 public final class CryptoUtil {
 
@@ -255,6 +254,6 @@ public final class CryptoUtil {
         sha256a.release();
         sha256b.release();
 
-        return new AES256IGECipher(aesKey, aesIV);
+        return new AES256IGECipher(!server, aesKey, aesIV);
     }
 }
