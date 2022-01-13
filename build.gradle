@@ -53,6 +53,14 @@ allprojects {
         if (JavaVersion.current().isJava9Compatible()) {
             options.addBooleanOption('html5', true)
         }
+
+        options {
+            encoding = "UTF-8"
+            addStringOption "encoding", "UTF-8"
+            tags = ["apiNote:a:API Note:",
+                    "implSpec:a:Implementation Requirements:",
+                    "implNote:a:Implementation Note:"]
+        }
     }
 
     test {
