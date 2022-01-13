@@ -28,12 +28,24 @@ public class ChatService extends RpcService {
         super(client, storeLayout);
     }
 
+    /**
+     * Retrieve minimal chats by their ids.
+     *
+     * @param ids An iterable of chat id elements
+     * @return A {@link Mono} emitting on successful completion a list of
+     * minimal chats or slice of list if there are a lot of chats
+     */
     public Mono<Chats> getChats(Iterable<Long> ids) {
-        return client.sendAwait(GetChats.builder()
-                .id(ids)
-                .build());
+        return client.sendAwait(GetChats.builder().id(ids).build());
     }
 
+    /**
+     * Retrieve detailed information about chat by their id.
+     *
+     * @param chatId The id of the chat.
+     * @return A {@link Mono} emitting on successful completion an object contains
+     * detailed info about chat and auxiliary data
+     */
     public Mono<ChatFull> getFullChat(long chatId) {
         return client.sendAwait(ImmutableGetFullChat.of(chatId))
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
@@ -157,10 +169,26 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableEditPhoto.of(channel, photo));
     }
 
+    /**
+     * Check if a username is free and can be assigned to a channel/supergroup
+     * @apiNote This method not available for bots.
+     *
+     * @param channel the channel/supergroup that will assign the specified username
+     * @param username the username to check
+     * @return A {@link Mono} emitting on successful completion {@code true}
+     */
     public Mono<Boolean> checkUsername(InputChannel channel, String username) {
         return client.sendAwait(ImmutableCheckUsername.of(channel, username));
     }
 
+    /**
+     * Change the username of a supergroup/channel.
+     * @apiNote This method not available for bots.
+     *
+     * @param channel the channel/supergroup that will assign the specified username
+     * @param username the username to update
+     * @return A {@link Mono} emitting on successful completion {@code true}
+     */
     public Mono<Boolean> updateUsername(InputChannel channel, String username) {
         return client.sendAwait(ImmutableUpdateUsername.of(channel, username));
     }

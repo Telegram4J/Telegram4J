@@ -196,6 +196,7 @@ public class FileReferenceId {
     public enum Type {
         UNKNOWN,
         DOCUMENT,
+        STICKER,
         PHOTO,
         CHAT_PHOTO;
 

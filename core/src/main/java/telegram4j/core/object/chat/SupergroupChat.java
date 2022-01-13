@@ -21,7 +21,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class Channel extends BaseChat {
+public class SupergroupChat extends BaseChat {
 
     private final telegram4j.tl.Channel minData;
     @Nullable
@@ -31,17 +31,17 @@ public class Channel extends BaseChat {
     @Nullable
     private final List<User> users;
 
-    public Channel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
-        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL);
-        this.minData = minData;
+    public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.SUPERGROUP);
+        this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.chats = null;
         this.users = null;
     }
 
-    public Channel(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData,
-                   List<Chat> chats, List<User> users) {
-        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL);
+    public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData,
+                          List<Chat> chats, List<User> users) {
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.SUPERGROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.chats = Collections.unmodifiableList(chats);
@@ -205,6 +205,18 @@ public class Channel extends BaseChat {
                 .map(d -> new ChannelLocation(client, d));
     }
 
+    public Optional<Duration> getSlowmodeDuration() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::slowmodeSeconds)
+                .map(Duration::ofSeconds);
+    }
+
+    public Optional<Instant> getSlowmodeNextSendTimestamp() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::slowmodeNextSendDate)
+                .map(Instant::ofEpochSecond);
+    }
+
     public Optional<Integer> getStatsDcId() {
         return Optional.ofNullable(fullData).map(ChannelFull::statsDc);
     }
@@ -244,8 +256,8 @@ public class Channel extends BaseChat {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        Channel channel = (Channel) o;
-        return minData.equals(channel.minData) && Objects.equals(fullData, channel.fullData);
+        SupergroupChat that = (SupergroupChat) o;
+        return minData.equals(that.minData) && Objects.equals(fullData, that.fullData);
     }
 
     @Override
@@ -255,7 +267,7 @@ public class Channel extends BaseChat {
 
     @Override
     public String toString() {
-        return "Channel{" +
+        return "SupergroupChat{" +
                 "minData=" + minData +
                 ", fullData=" + fullData +
                 ", chats=" + chats +

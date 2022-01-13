@@ -26,6 +26,10 @@ public interface Chat extends TelegramObject {
     Mono<Message> sendMessage(SendMessageSpec spec);
 
     enum Type {
-        GROUP, PRIVATE, SUPERGROUP, CHANNEL, UNKNOWN
+        PRIVATE,
+        GROUP,
+        SUPERGROUP,
+        CHANNEL,
+        UNKNOWN
     }
 }

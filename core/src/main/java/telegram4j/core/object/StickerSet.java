@@ -2,10 +2,14 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.media.PhotoSize;
+import telegram4j.core.util.EntityFactory;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class StickerSet implements TelegramObject {
 
@@ -58,10 +62,12 @@ public class StickerSet implements TelegramObject {
         return data.shortName();
     }
 
-    // @Nullable
-    // public List<PhotoSize> getThumbs() {
-    //     return data.thumbs();
-    // }
+    public Optional<List<PhotoSize>> getThumbs() {
+        return Optional.ofNullable(data.thumbs())
+                .map(l -> l.stream()
+                        .map(d -> EntityFactory.createPhotoSize(client, d))
+                        .collect(Collectors.toList()));
+    }
 
     public Optional<Integer> getThumbDcId() {
         return Optional.ofNullable(data.thumbDcId());

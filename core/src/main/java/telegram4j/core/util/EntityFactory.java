@@ -9,8 +9,7 @@ import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.action.MessageActionChatCreate;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
-import telegram4j.core.object.chat.GroupChat;
-import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.object.chat.*;
 import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.object.markup.ReplyInlineMarkup;
 import telegram4j.core.object.markup.ReplyKeyboardForceReply;
@@ -41,6 +40,7 @@ import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
+import telegram4j.tl.BaseChat;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
@@ -124,6 +124,10 @@ public final class EntityFactory {
             case telegram4j.tl.Channel.ID:
                 telegram4j.tl.Channel channel = (telegram4j.tl.Channel) possibleChat;
 
+                if (channel.megagroup()) {
+                    return new SupergroupChat(client, channel);
+                }
+
                 return new Channel(client, channel);
             case ChatFull.ID:
                 ChatFull chatFull = (ChatFull) possibleChat;
@@ -142,8 +146,14 @@ public final class EntityFactory {
                         .orElseThrow(IllegalStateException::new);
 
                 if (chatFull.fullChat() instanceof ChannelFull) {
-                    return new Channel(client, (ChannelFull) chatFull.fullChat(),
-                            (telegram4j.tl.Channel) minData, chats, users);
+                    ChannelFull channelFull = (ChannelFull) chatFull.fullChat();
+                    var channelMin = (telegram4j.tl.Channel) minData;
+
+                    if (channelMin.megagroup()) {
+                        return new SupergroupChat(client, channelFull, channelMin, chats, users);
+                    }
+
+                    return new Channel(client, channelFull, channelMin, chats, users);
                 }
 
                 return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(),
@@ -157,6 +167,8 @@ public final class EntityFactory {
         switch (data.identifier()) {
             case telegram4j.tl.MessageActionChatCreate.ID:
                 return new MessageActionChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
+
+            // TODO: implement
 
             default:
                 throw new IllegalArgumentException("Unknown message action type: " + data);

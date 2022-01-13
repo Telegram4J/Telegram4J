@@ -12,7 +12,10 @@ import telegram4j.tl.photos.Photos;
 import telegram4j.tl.request.contacts.*;
 import telegram4j.tl.request.help.EditUserInfo;
 import telegram4j.tl.request.help.ImmutableGetUserInfo;
-import telegram4j.tl.request.photos.*;
+import telegram4j.tl.request.photos.DeletePhotos;
+import telegram4j.tl.request.photos.ImmutableGetUserPhotos;
+import telegram4j.tl.request.photos.ImmutableUpdateProfilePhoto;
+import telegram4j.tl.request.photos.UploadProfilePhoto;
 import telegram4j.tl.request.users.GetUsers;
 import telegram4j.tl.request.users.ImmutableGetFullUser;
 import telegram4j.tl.request.users.SetSecureValueErrors;
@@ -26,6 +29,12 @@ public class UserService extends RpcService {
         super(client, storeLayout);
     }
 
+    /**
+     * Retrieve minimal information about users.
+     *
+     * @param userIds An iterable of user id elements
+     * @return A {@link Flux} emitting minimal users
+     */
     public Flux<User> getUsers(Iterable<? extends InputUser> userIds) {
         return client.sendAwait(GetUsers.builder().addAllId(userIds).build())
                 .flatMapIterable(Function.identity())
@@ -33,6 +42,13 @@ public class UserService extends RpcService {
                         .thenReturn(u));
     }
 
+    /**
+     * Retrieve full information about user.
+     *
+     * @param id The id of the user
+     * @return A {@link Mono} emitting on successful completion an object contains
+     * full info about user and auxiliary data
+     */
     public Mono<UserFull> getFullUser(InputUser id) {
         return client.sendAwait(ImmutableGetFullUser.of(id))
                 .flatMap(u -> storeLayout.onUserUpdate(u).thenReturn(u));
@@ -48,6 +64,13 @@ public class UserService extends RpcService {
     // They are methods form other RPC service, but user-related
     // Methods from ContactsService
 
+    /**
+     * Search peers by substring of query.
+     *
+     * @param username The peer full username
+     * @return A {@link Mono} emitting on successful completion an object contains
+     * info on users found by username and auxiliary data
+     */
     public Mono<ResolvedPeer> resolveUsername(String username) {
         return Mono.defer(() -> {
             String corrected = username.toLowerCase().trim()
@@ -93,6 +116,15 @@ public class UserService extends RpcService {
         return client.sendAwait(ImmutableGetBlocked.of(offset, limit));
     }
 
+    /**
+     * Search peers by substring of query.
+     * @apiNote This method not available for bots.
+     *
+     * @param query The peer name substring
+     * @param limit The max count of found peers
+     * @return A {@link Mono} emitting on successful completion an object contains
+     * info on users found by name substring and auxiliary data
+     */
     public Mono<Found> search(String query, int limit) {
         return client.sendAwait(ImmutableSearch.of(query, limit));
     }

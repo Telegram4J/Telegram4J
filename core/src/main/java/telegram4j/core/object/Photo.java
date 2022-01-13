@@ -3,10 +3,10 @@ package telegram4j.core.object;
 import io.netty.buffer.ByteBufAllocator;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
+import telegram4j.core.object.media.VideoSize;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.BasePhoto;
-import telegram4j.tl.VideoSize;
 
 import java.time.Instant;
 import java.util.List;
@@ -70,7 +70,10 @@ public class Photo implements TelegramObject {
     }
 
     public Optional<List<VideoSize>> getVideoSizes() {
-        return Optional.ofNullable(data.videoSizes());
+        return Optional.ofNullable(data.videoSizes())
+                .map(l -> l.stream()
+                        .map(d -> new VideoSize(client, d))
+                        .collect(Collectors.toList()));
     }
 
     public int getDcId() {

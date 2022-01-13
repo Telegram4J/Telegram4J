@@ -225,6 +225,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableEditChatAdmin.of(chatId, user, isAdmin));
     }
 
+    // Not for bots
     public Mono<Updates> migrateChat(long chatId) {
         return client.sendAwait(ImmutableMigrateChat.of(chatId));
     }
