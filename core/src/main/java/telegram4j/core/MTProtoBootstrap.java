@@ -261,7 +261,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         }
         return new DefaultEventDispatcher(Schedulers.boundedElastic(),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                EmissionHandlers.park(Duration.ofNanos(10)));
+                EmissionHandlers.DEFAULT_PARKING);
     }
 
     private StoreLayout initStoreLayout() {

@@ -3,7 +3,7 @@ package telegram4j.core.event.domain.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
-import telegram4j.tl.ChatParticipant;
+import telegram4j.core.object.chat.ChatParticipant;
 
 import java.util.List;
 import java.util.Optional;

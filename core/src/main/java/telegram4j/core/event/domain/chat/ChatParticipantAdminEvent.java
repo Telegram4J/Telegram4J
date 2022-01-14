@@ -1,28 +1,29 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
 
 public class ChatParticipantAdminEvent extends ChatEvent {
-    private final Id chatId;
-    private final Id userId;
+    private final Chat chat;
+    private final User user;
     private final boolean isAdmin;
     private final int version;
 
-    public ChatParticipantAdminEvent(MTProtoTelegramClient client, Id chatId, Id userId, boolean isAdmin, int version) {
+    public ChatParticipantAdminEvent(MTProtoTelegramClient client, Chat chat, User user, boolean isAdmin, int version) {
         super(client);
-        this.chatId = chatId;
-        this.userId = userId;
+        this.chat = chat;
+        this.user = user;
         this.isAdmin = isAdmin;
         this.version = version;
     }
 
-    public Id getChatId() {
-        return chatId;
+    public Chat getChat() {
+        return chat;
     }
 
-    public Id getUserId() {
-        return userId;
+    public User getUser() {
+        return user;
     }
 
     public boolean isAdmin() {
@@ -36,10 +37,10 @@ public class ChatParticipantAdminEvent extends ChatEvent {
     @Override
     public String toString() {
         return "ChatParticipantAdminEvent{" +
-                "chatId=" + chatId +
-                ", userId=" + userId +
+                "chat=" + chat +
+                ", user=" + user +
                 ", isAdmin=" + isAdmin +
                 ", version=" + version +
-                '}';
+                "} " + super.toString();
     }
 }

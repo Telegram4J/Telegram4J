@@ -409,11 +409,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
-    public Flux<TlObject> rpcReceiver() {
-        return rpcReceiver.asFlux();
-    }
-
-    @Override
     public Sinks.Many<Updates> updates() {
         return updates;
     }

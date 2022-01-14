@@ -225,6 +225,7 @@ public final class EntityParser {
     }
 
     private static Tuple2<String, List<MessageEntity>> parseHtml(String str) {
+        // TODO: implement
         throw new UnsupportedOperationException();
     }
 

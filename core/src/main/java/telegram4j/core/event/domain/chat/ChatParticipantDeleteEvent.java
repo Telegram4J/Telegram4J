@@ -1,26 +1,27 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
 
 public class ChatParticipantDeleteEvent extends ChatEvent {
-    private final Id chatId;
-    private final Id userId;
+    private final Chat chat;
+    private final User user;
     private final int version;
 
-    public ChatParticipantDeleteEvent(MTProtoTelegramClient client, Id chatId, Id userId, int version) {
+    public ChatParticipantDeleteEvent(MTProtoTelegramClient client, Chat chat, User user, int version) {
         super(client);
-        this.chatId = chatId;
-        this.userId = userId;
+        this.chat = chat;
+        this.user = user;
         this.version = version;
     }
 
-    public Id getChatId() {
-        return chatId;
+    public Chat getChat() {
+        return chat;
     }
 
-    public Id getUserId() {
-        return userId;
+    public User getUser() {
+        return user;
     }
 
     public int getVersion() {
@@ -30,9 +31,9 @@ public class ChatParticipantDeleteEvent extends ChatEvent {
     @Override
     public String toString() {
         return "ChatParticipantDeleteEvent{" +
-                "chatId=" + chatId +
-                ", userId=" + userId +
+                "chat=" + chat +
+                ", user=" + user +
                 ", version=" + version +
-                '}';
+                "} " + super.toString();
     }
 }

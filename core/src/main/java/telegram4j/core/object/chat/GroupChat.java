@@ -15,10 +15,7 @@ import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -36,7 +33,7 @@ public class GroupChat extends BaseChat {
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
-        this.minData = minData;
+        this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.chats = null;
         this.users = null;
@@ -46,8 +43,8 @@ public class GroupChat extends BaseChat {
                      telegram4j.tl.BaseChat minData,
                      List<Chat> chats, List<User> users) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
-        this.minData = minData;
-        this.fullData = fullData;
+        this.minData = Objects.requireNonNull(minData, "minData");
+        this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.chats = Collections.unmodifiableList(chats);
         this.users = Collections.unmodifiableList(users);
     }

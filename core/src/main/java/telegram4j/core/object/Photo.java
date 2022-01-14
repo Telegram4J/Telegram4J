@@ -18,12 +18,14 @@ public class Photo implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final BasePhoto data;
+
     private final String smallFileReferenceId;
     private final String bigFileReferenceId;
 
     public Photo(MTProtoTelegramClient client, BasePhoto data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+
         this.smallFileReferenceId = FileReferenceId.ofPhoto(data)
                 .serialize(ByteBufAllocator.DEFAULT);
         this.bigFileReferenceId = FileReferenceId.ofPhoto(data)

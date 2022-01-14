@@ -7,7 +7,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.State;
 
-import java.util.List;
+import java.util.Map;
 
 public interface StoreLayout {
 
@@ -31,36 +31,35 @@ public interface StoreLayout {
 
     // message updates
 
-    Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users);
+    Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users);
+    Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users);
 
     // user updates
 
-    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users);
+    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users);
+    Mono<Void> onChatUserTyping(UpdateChatUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users);
+    Mono<Void> onUserTyping(UpdateUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users);
+    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users);
+    Mono<String> onUserPhoneUpdate(UpdateUserPhone action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users);
+    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users);
+    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, List<Chat> chats, List<User> users);
+    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, List<Chat> chats, List<User> users);
+    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, List<Chat> chats, List<User> users);
+    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatParticipant(UpdateChatParticipant action, List<Chat> chats, List<User> users);
+    Mono<Void> onChatParticipant(UpdateChatParticipant action, Map<Long, Chat> chats, Map<Long, User> users);
 
-    Mono<Void> onChatParticipants(UpdateChatParticipants action, List<Chat> chats, List<User> users);
-
+    Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users);
 
     // not an update-related methods
 

@@ -6,14 +6,14 @@ import telegram4j.tl.Chat;
 import telegram4j.tl.Update;
 import telegram4j.tl.User;
 
-import java.util.List;
+import java.util.Map;
 
 public class StatefulUpdateContext<U extends Update, O> extends UpdateContext<U> {
     @Nullable
     private final O old;
 
-    protected StatefulUpdateContext(MTProtoTelegramClient client, List<Chat> chats,
-                                    List<User> users, U update, @Nullable O old) {
+    protected StatefulUpdateContext(MTProtoTelegramClient client, Map<Long, Chat> chats,
+                                    Map<Long, User> users, U update, @Nullable O old) {
         super(client, chats, users, update);
         this.old = old;
     }

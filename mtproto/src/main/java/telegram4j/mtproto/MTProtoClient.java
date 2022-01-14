@@ -5,17 +5,12 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import telegram4j.tl.Updates;
 import telegram4j.tl.api.TlMethod;
-import telegram4j.tl.api.TlObject;
 
 public interface MTProtoClient {
 
     Mono<Void> connect();
 
-    Flux<TlObject> rpcReceiver();
-
     Sinks.Many<Updates> updates();
-
-    boolean updateTimeOffset(long serverTime);
 
     <R, T extends TlMethod<R>> Mono<R> sendAwait(T object);
 
@@ -25,9 +20,11 @@ public interface MTProtoClient {
 
     DataCenter getDatacenter();
 
-    MTProtoClient createMediaClient(DataCenter dc);
-
     Type getType();
+
+    boolean updateTimeOffset(long serverTime);
+
+    MTProtoClient createMediaClient(DataCenter dc);
 
     Mono<Void> close();
 

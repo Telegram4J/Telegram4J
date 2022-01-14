@@ -9,6 +9,7 @@ import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.*;
@@ -113,7 +114,7 @@ public class UpdatesManager {
 
                 return preApply.thenMany(updatesHandlers.handle(UpdateContext.create(client, updateShort.update())));
             }
-            case BaseUpdates.ID:
+            case BaseUpdates.ID: {
                 BaseUpdates baseUpdates = (BaseUpdates) updates;
 
                 Flux<?> preApply = Flux.empty();
@@ -122,15 +123,21 @@ public class UpdatesManager {
                     preApply = getDifference();
                 }
 
+                var usersMap = baseUpdates.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+                var chatsMap = baseUpdates.chats().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+
                 seq = updSeq;
                 date = baseUpdates.date();
 
                 Flux<Event> events = Flux.fromIterable(baseUpdates.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
-                                client, baseUpdates.chats(), baseUpdates.users(), update)));
+                                client, chatsMap, usersMap, update)));
 
                 return preApply.thenMany(events);
-            case UpdatesCombined.ID:
+            }
+            case UpdatesCombined.ID: {
                 UpdatesCombined updatesCombined = (UpdatesCombined) updates;
 
                 Flux<?> preApply0 = Flux.empty();
@@ -139,14 +146,20 @@ public class UpdatesManager {
                     preApply0 = getDifference();
                 }
 
+                var usersMap = updatesCombined.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+                var chatsMap = updatesCombined.chats().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+
                 seq = updatesCombined.seq();
                 date = updatesCombined.date();
 
                 Flux<Event> events0 = Flux.fromIterable(updatesCombined.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
-                                client, updatesCombined.chats(), updatesCombined.users(), update)));
+                                client, chatsMap, usersMap, update)));
 
                 return preApply0.thenMany(events0);
+            }
             default:
                 return Flux.empty();
         }
@@ -200,7 +213,6 @@ public class UpdatesManager {
 
                             var chatsMap = difference0.chats().stream()
                                     .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
-
                             var usersMap = difference0.users().stream()
                                     .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
@@ -217,8 +229,7 @@ public class UpdatesManager {
                                                 .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
                                                 .map(p -> usersMap.get(getRawPeerId(p)))
                                                 .filter(u -> u.identifier() == BaseUser.ID)
-                                                .map(u -> (BaseUser) u)
-                                                .map(d -> new telegram4j.core.object.User(client, d))
+                                                .map(d -> new User(client, (BaseUser) d))
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
@@ -231,8 +242,7 @@ public class UpdatesManager {
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
-                                            client, difference0.chats(),
-                                            difference0.users(), update)))
+                                            client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents);
 
                             return applyState(difference0.state())
@@ -261,8 +271,7 @@ public class UpdatesManager {
                                                 .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
                                                 .map(p -> usersMap.get(getRawPeerId(p)))
                                                 .filter(u -> u.identifier() == BaseUser.ID)
-                                                .map(u -> (BaseUser) u)
-                                                .map(d -> new telegram4j.core.object.User(client, d))
+                                                .map(d -> new User(client, (BaseUser) d))
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
@@ -277,7 +286,7 @@ public class UpdatesManager {
 
                             return Flux.fromIterable(difference0.otherUpdates())
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
-                                            client, difference0.chats(), difference0.users(), update)))
+                                            client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents)
                                     .transform(f -> getDifference(intermediateState.pts(),
                                             intermediateState.qts(), intermediateState.date())

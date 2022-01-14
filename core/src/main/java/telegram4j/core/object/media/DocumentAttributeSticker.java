@@ -24,6 +24,7 @@ public class DocumentAttributeSticker extends BaseDocumentAttribute {
         return data.alt();
     }
 
+    // TODO: mapping for this object
     public InputStickerSet getStickerSet() {
         return data.stickerset();
     }

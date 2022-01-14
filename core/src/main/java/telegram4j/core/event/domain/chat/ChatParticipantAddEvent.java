@@ -1,37 +1,38 @@
 package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
 
 import java.time.Instant;
 
 public class ChatParticipantAddEvent extends ChatEvent {
-    private final Id chatId;
-    private final Id userId;
-    private final Id inviterId;
+    private final Chat chat;
+    private final User user;
+    private final User inviter;
     private final Instant timestamp;
     private final int version;
 
-    public ChatParticipantAddEvent(MTProtoTelegramClient client, Id chatId, Id userId,
-                                   Id inviterId, Instant timestamp, int version) {
+    public ChatParticipantAddEvent(MTProtoTelegramClient client, Chat chat, User user,
+                                   User inviter, Instant timestamp, int version) {
         super(client);
-        this.chatId = chatId;
-        this.userId = userId;
-        this.inviterId = inviterId;
+        this.chat = chat;
+        this.user = user;
+        this.inviter = inviter;
         this.timestamp = timestamp;
         this.version = version;
     }
 
-    public Id getChatId() {
-        return chatId;
+    public Chat getChat() {
+        return chat;
     }
 
-    public Id getUserId() {
-        return userId;
+    public User getUser() {
+        return user;
     }
 
-    public Id getInviterId() {
-        return inviterId;
+    public User getInviter() {
+        return inviter;
     }
 
     public Instant getTimestamp() {
@@ -45,11 +46,11 @@ public class ChatParticipantAddEvent extends ChatEvent {
     @Override
     public String toString() {
         return "ChatParticipantAddEvent{" +
-                "chatId=" + chatId +
-                ", userId=" + userId +
-                ", inviterId=" + inviterId +
+                "chat=" + chat +
+                ", user=" + user +
+                ", inviter=" + inviter +
                 ", timestamp=" + timestamp +
                 ", version=" + version +
-                '}';
+                "} " + super.toString();
     }
 }

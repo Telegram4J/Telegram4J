@@ -10,6 +10,11 @@ import java.util.Objects;
 import java.util.OptionalLong;
 
 public final class Id {
+    // TODO: create access hash resolving
+    public static final long ACCESS_HASH_NOOP = 0;
+    public static final long ACCESS_HASH_UNAVAILABLE = -1;
+    public static final long ACCESS_HASH_UNRESOLVED = -2;
+
     private final Type type;
     private final long value;
     private final long accessHash;
@@ -21,7 +26,7 @@ public final class Id {
     }
 
     public static Id ofChat(long value) {
-        return new Id(Type.CHAT, value, -1);
+        return new Id(Type.CHAT, value, ACCESS_HASH_NOOP);
     }
 
     public static Id ofChannel(long value, @Nullable Long accessHash) {
@@ -34,23 +39,23 @@ public final class Id {
 
     public static Id of(Peer peer) {
         switch (peer.identifier()) {
-            case PeerChannel.ID: return of(Type.CHANNEL, ((PeerChannel) peer).channelId());
-            case PeerChat.ID: return of(Type.CHAT, ((PeerChat) peer).chatId());
-            case PeerUser.ID: return of(Type.USER, ((PeerUser) peer).userId());
+            case PeerChannel.ID: return of(Type.CHANNEL, ((PeerChannel) peer).channelId(), ACCESS_HASH_UNRESOLVED);
+            case PeerChat.ID: return of(Type.CHAT, ((PeerChat) peer).chatId(), ACCESS_HASH_UNRESOLVED);
+            case PeerUser.ID: return of(Type.USER, ((PeerUser) peer).userId(), ACCESS_HASH_UNRESOLVED);
             default: throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 
     public static Id of(Type type, long value) {
-        return new Id(type, value, -1);
+        return new Id(type, value, ACCESS_HASH_UNAVAILABLE);
     }
 
     public static Id of(Type type, String value) {
-        return new Id(type, Long.parseLong(value), -1);
+        return new Id(type, Long.parseLong(value), ACCESS_HASH_UNAVAILABLE);
     }
 
     public static Id of(Type type, long value, @Nullable Long accessHash) {
-        return new Id(type, value, accessHash != null ? accessHash : -1);
+        return new Id(type, value, accessHash != null ? accessHash : ACCESS_HASH_UNAVAILABLE);
     }
 
     public long asLong() {
@@ -66,7 +71,12 @@ public final class Id {
     }
 
     public OptionalLong getAccessHash() {
-        return accessHash != -1 ? OptionalLong.of(accessHash) : OptionalLong.empty();
+        if (accessHash != ACCESS_HASH_UNAVAILABLE &&
+                accessHash != ACCESS_HASH_UNRESOLVED &&
+                accessHash != ACCESS_HASH_NOOP) {
+            return OptionalLong.of(accessHash);
+        }
+        return OptionalLong.empty();
     }
 
     @Override

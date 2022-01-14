@@ -33,7 +33,7 @@ public class Channel extends BaseChat {
 
     public Channel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
         super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL);
-        this.minData = minData;
+        this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.chats = null;
         this.users = null;

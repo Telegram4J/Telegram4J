@@ -8,7 +8,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.State;
 
-import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -72,7 +72,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onNewMessage(Message message, List<Chat> chats, List<User> users) {
+    public Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
             messages.put(createMessageId(message), message);
@@ -80,7 +80,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> onEditMessage(Message message, List<Chat> chats, List<User> users) {
+    public Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             return messages.put(createMessageId(message), message);
@@ -88,28 +88,28 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onUserTyping(UpdateUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, List<Chat> chats, List<User> users) {
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             var old = this.users.get(action.userId());
@@ -124,7 +124,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, List<Chat> chats, List<User> users) {
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             var old = this.users.get(action.userId());
@@ -135,7 +135,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, List<Chat> chats, List<User> users) {
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             var old = this.users.get(action.userId());
@@ -146,7 +146,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, List<Chat> chats, List<User> users) {
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             var old = this.users.get(action.userId());
@@ -157,35 +157,35 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onChatParticipant(UpdateChatParticipant action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatParticipant(UpdateChatParticipant action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
     }
 
     @Override
-    public Mono<Void> onChatParticipants(UpdateChatParticipants action, List<Chat> chats, List<User> users) {
+    public Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users) {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
         });
@@ -292,7 +292,11 @@ public class StoreLayoutImpl implements StoreLayout {
         return old;
     }
 
-    private void saveContacts(List<Chat> chats, List<User> users) {
+    private void saveContacts(Map<Long, Chat> chats, Map<Long, User> users) {
+        saveContacts(chats.values(), users.values());
+    }
+
+    private void saveContacts(Iterable<Chat> chats, Iterable<User> users) {
         for (Chat chat : chats) {
             saveChatMin(chat);
         }

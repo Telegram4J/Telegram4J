@@ -5,11 +5,15 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.*;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.*;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class ChatUpdateHandlers {
 
@@ -50,57 +54,105 @@ public class ChatUpdateHandlers {
     // =====================
 
     static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
-        Id chatId = Id.ofChat(context.getUpdate().chatId());
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
-        Id inviterId = Id.ofUser(context.getUpdate().inviterId(), null);
-        Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
+        UpdateChatParticipantAdd upd = context.getUpdate();
+
+        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .orElseThrow();
+        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+        User inviter = Optional.ofNullable(context.getUsers().get(upd.inviterId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+        Instant timestamp = Instant.ofEpochSecond(upd.date());
 
         return Flux.just(new ChatParticipantAddEvent(context.getClient(),
-                chatId, userId, inviterId, timestamp, context.getUpdate().version()));
+                chat, user, inviter, timestamp, upd.version()));
     }
 
     static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
-        Id chatId = Id.ofChat(context.getUpdate().chatId());
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        UpdateChatParticipantAdmin upd = context.getUpdate();
 
-        return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chatId, userId,
-                context.getUpdate().isAdmin(), context.getUpdate().version()));
+        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .orElseThrow();
+        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+
+        return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chat, user,
+                upd.isAdmin(), upd.version()));
     }
 
     static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
-        Id chatId = Id.ofChat(context.getUpdate().chatId());
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        UpdateChatParticipantDelete upd = context.getUpdate();
 
-        return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chatId, userId, context.getUpdate().version()));
+        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .orElseThrow();
+        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+
+        return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chat, user, upd.version()));
     }
 
     static Flux<ChatParticipantUpdateEvent> handleUpdateChatParticipant(StatefulUpdateContext<UpdateChatParticipant, Void> context) {
-        Id chatId = Id.ofChat(context.getUpdate().chatId());
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
-        Id actorId = Id.ofUser(context.getUpdate().actorId(), null);
-        Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
-        ExportedChatInvite exportedChatInvite = Optional.ofNullable(context.getUpdate().invite())
+        UpdateChatParticipant upd = context.getUpdate();
+
+        Instant timestamp = Instant.ofEpochSecond(upd.date());
+        ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(d -> new ExportedChatInvite(context.getClient(), d))
                 .orElse(null);
+        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .orElseThrow();
+        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+        User actor = Optional.ofNullable(context.getUsers().get(upd.actorId()))
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .orElseThrow();
+        ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
+                .map(d -> new ChatParticipant(context.getClient(), d))
+                .orElse(null);
+        ChatParticipant currentParticipant = Optional.ofNullable(upd.newParticipant())
+                .map(d -> new ChatParticipant(context.getClient(), d))
+                .orElse(null);
 
-        return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), chatId, timestamp, actorId, userId,
-                context.getUpdate().prevParticipant(), context.getUpdate().newParticipant(),
-                exportedChatInvite, context.getUpdate().qts()));
+        return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), timestamp,
+                oldParticipant, currentParticipant, exportedChatInvite, upd.qts(),
+                chat, actor, user));
     }
 
+    // TODO: make ChatParticipant extends User or something like this to don't drop user data.
     static Flux<ChatEvent> handleUpdateChatParticipants(StatefulUpdateContext<UpdateChatParticipants, Void> context) {
         ChatParticipants chatParticipants = context.getUpdate().participants();
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
                 Id chatId = Id.ofChat(upd.chatId());
-                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, upd.selfParticipant(), null, null));
+                ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
+                        .map(d -> new ChatParticipant(context.getClient(), d))
+                        .orElse(null);
+
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, selfParticipant, null, null));
             }
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
                 Id chatId = Id.ofChat(upd.chatId());
-                List<ChatParticipant> participants = upd.participants();
+                var participants = upd.participants().stream()
+                        .map(d -> new ChatParticipant(context.getClient(), d))
+                        .collect(Collectors.toList());
                 int version = upd.version();
+
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, null, version, participants));
             }
             default:
