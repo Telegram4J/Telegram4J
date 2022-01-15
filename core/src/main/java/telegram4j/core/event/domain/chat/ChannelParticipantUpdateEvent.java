@@ -4,14 +4,18 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
-import telegram4j.core.object.chat.GroupChat;
 
 import java.time.Instant;
 import java.util.Optional;
 
-public class ChatParticipantUpdateEvent extends ChatEvent {
+public class ChannelParticipantUpdateEvent extends ChatEvent {
+
+    private final Channel channel;
     private final Instant timestamp;
+    private final User actor;
+    private final User user;
     @Nullable
     private final ChatParticipant oldParticipant;
     @Nullable
@@ -19,24 +23,20 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     @Nullable
     private final ExportedChatInvite invite;
     private final int qts;
-    private final GroupChat chat;
-    private final User actor;
-    private final User user;
 
-    public ChatParticipantUpdateEvent(MTProtoTelegramClient client, Instant timestamp,
-                                      @Nullable ChatParticipant oldParticipant,
-                                      @Nullable ChatParticipant currentParticipant,
-                                      @Nullable ExportedChatInvite invite, int qts,
-                                      GroupChat chat, User actor, User user) {
+    public ChannelParticipantUpdateEvent(MTProtoTelegramClient client, Channel channel, Instant timestamp,
+                                         User actor, User user, @Nullable ChatParticipant oldParticipant,
+                                         @Nullable ChatParticipant currentParticipant,
+                                         @Nullable ExportedChatInvite invite, int qts) {
         super(client);
+        this.channel = channel;
         this.timestamp = timestamp;
+        this.actor = actor;
+        this.user = user;
         this.oldParticipant = oldParticipant;
         this.currentParticipant = currentParticipant;
         this.invite = invite;
         this.qts = qts;
-        this.chat = chat;
-        this.actor = actor;
-        this.user = user;
     }
 
     public boolean isLeftEvent() {
@@ -47,8 +47,20 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
         return oldParticipant == null;
     }
 
+    public Channel getChannel() {
+        return channel;
+    }
+
     public Instant getTimestamp() {
         return timestamp;
+    }
+
+    public User getActor() {
+        return actor;
+    }
+
+    public User getUser() {
+        return user;
     }
 
     public Optional<ChatParticipant> getOldParticipant() {
@@ -65,31 +77,5 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
 
     public int getQts() {
         return qts;
-    }
-
-    public GroupChat getChat() {
-        return chat;
-    }
-
-    public User getActor() {
-        return actor;
-    }
-
-    public User getUser() {
-        return user;
-    }
-
-    @Override
-    public String toString() {
-        return "ChatParticipantUpdateEvent{" +
-                "timestamp=" + timestamp +
-                ", oldParticipant=" + oldParticipant +
-                ", currentParticipant=" + currentParticipant +
-                ", invite=" + invite +
-                ", qts=" + qts +
-                ", chat=" + chat +
-                ", actor=" + actor +
-                ", user=" + user +
-                "} " + super.toString();
     }
 }

@@ -200,6 +200,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users) {
+        return delegate.onChannelParticipant(update, chats, users);
+    }
+
+    @Override
     public Mono<Void> updateSelfId(long userId) {
         return delegate.updateSelfId(userId);
     }

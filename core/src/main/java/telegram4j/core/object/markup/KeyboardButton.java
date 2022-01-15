@@ -1,8 +1,9 @@
 package telegram4j.core.object.markup;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.tl.*;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -10,46 +11,11 @@ import java.util.Optional;
 public class KeyboardButton implements TelegramObject {
 
     private final MTProtoTelegramClient client;
-    private final Type type;
-    private final String text;
-    @Nullable
-    private final byte[] data;
-    @Nullable
-    private final Boolean requiresPassword;
-    @Nullable
-    private final Boolean quiz;
-    @Nullable
-    private final String query;
-    @Nullable
-    private final String url;
-    @Nullable
-    private final String forwardText;
-    @Nullable
-    private final Integer buttonId;
-    @Nullable
-    private final Boolean requestWriteAccess;
+    private final telegram4j.tl.KeyboardButton data;
 
-    public KeyboardButton(MTProtoTelegramClient client, Type type, String text) {
-        this(client, type, text, null, null, null,
-                null, null, null, null, null);
-    }
-
-    public KeyboardButton(MTProtoTelegramClient client, Type type, String text,
-                          @Nullable byte[] data, @Nullable Boolean requiresPassword,
-                          @Nullable Boolean quiz, @Nullable String query, @Nullable String url,
-                          @Nullable String forwardText, @Nullable Integer buttonId,
-                          @Nullable Boolean requestWriteAccess) {
+    public KeyboardButton(MTProtoTelegramClient client, telegram4j.tl.KeyboardButton data) {
         this.client = Objects.requireNonNull(client, "client");
-        this.type = Objects.requireNonNull(type, "type");
-        this.text = Objects.requireNonNull(text, "text");
-        this.data = data;
-        this.requiresPassword = requiresPassword;
-        this.quiz = quiz;
-        this.query = query;
-        this.url = url;
-        this.forwardText = forwardText;
-        this.buttonId = buttonId;
-        this.requestWriteAccess = requestWriteAccess;
+        this.data = Objects.requireNonNull(data, "data");
     }
 
     @Override
@@ -58,49 +24,76 @@ public class KeyboardButton implements TelegramObject {
     }
 
     public Type getType() {
-        return type;
+        return Type.of(data);
     }
 
     public String getText() {
-        return text;
+        return data.text();
     }
 
     public Optional<byte[]> getData() {
-        return Optional.ofNullable(data);
+        return data.identifier() == KeyboardButtonCallback.ID
+                ? Optional.of(((KeyboardButtonCallback) data).data())
+                : Optional.empty();
     }
 
     public Optional<Boolean> isQuiz() {
-        return Optional.ofNullable(quiz);
+        return data.identifier() == KeyboardButtonRequestPoll.ID
+                ? Optional.ofNullable(((KeyboardButtonRequestPoll) data).quiz())
+                : Optional.empty();
     }
 
     public Optional<String> getQuery() {
-        return Optional.ofNullable(query);
+        return data.identifier() == KeyboardButtonSwitchInline.ID
+                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
+                : Optional.empty();
     }
 
     public Optional<String> getUrl() {
-        return Optional.ofNullable(url);
+        return data.identifier() == KeyboardButtonSwitchInline.ID
+                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
+                : Optional.empty();
     }
 
     public Optional<String> getForwardText() {
-        return Optional.ofNullable(forwardText);
+        return data.identifier() == KeyboardButtonSwitchInline.ID
+                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
+                : Optional.empty();
     }
 
     public Optional<Integer> getButtonId() {
-        return Optional.ofNullable(buttonId);
+        return data.identifier() == KeyboardButtonUrlAuth.ID
+                ? Optional.of(((KeyboardButtonUrlAuth) data).buttonId())
+                : Optional.empty();
     }
 
     public Optional<Boolean> isRequestWriteAccess() {
-        return Optional.ofNullable(requestWriteAccess);
+        return data.identifier() == InputKeyboardButtonUrlAuth.ID
+                ? Optional.of(((InputKeyboardButtonUrlAuth) data).requestWriteAccess())
+                : Optional.empty();
     }
 
-    public Optional<Boolean> requiresPassword() {
-        return Optional.ofNullable(requiresPassword);
+    public Optional<Boolean> isRequiresPassword() {
+        return data.identifier() == KeyboardButtonCallback.ID
+                ? Optional.of(((KeyboardButtonCallback) data).requiresPassword())
+                : Optional.empty();
     }
 
-    // TODO: implement
-    // public InputUser getBotId() {
-    //     return data.bot();
-    // }
+    public Optional<Id> getBotId() {
+        if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
+            var inputUser = ((BaseInputUser) ((InputKeyboardButtonUrlAuth) data).bot());
+            return Optional.of(Id.ofUser(inputUser.userId(), inputUser.accessHash()));
+        }
+        return Optional.empty();
+    }
+
+    public Optional<Id> getUserId() {
+        if (data.identifier() == InputKeyboardButtonUserProfile.ID) {
+            var inputUser = ((BaseInputUser) ((InputKeyboardButtonUserProfile) data).userId());
+            return Optional.of(Id.ofUser(inputUser.userId(), inputUser.accessHash()));
+        }
+        return Optional.empty();
+    }
 
     public enum Type {
         DEFAULT,
@@ -123,6 +116,39 @@ public class KeyboardButton implements TelegramObject {
 
         URL,
 
-        URL_AUTH,
+        USER_PROFILE,
+
+        URL_AUTH;
+
+        public static Type of(telegram4j.tl.KeyboardButton data) {
+            switch (data.identifier()) {
+                case BaseKeyboardButton.ID:
+                    return DEFAULT;
+                case KeyboardButtonUrlAuth.ID:
+                case InputKeyboardButtonUrlAuth.ID:
+                    return URL_AUTH;
+                case KeyboardButtonUserProfile.ID:
+                case InputKeyboardButtonUserProfile.ID:
+                    return USER_PROFILE;
+                case KeyboardButtonBuy.ID:
+                    return BUY;
+                case KeyboardButtonCallback.ID:
+                    return CALLBACK;
+                case KeyboardButtonGame.ID:
+                    return GAME;
+                case KeyboardButtonRequestGeoLocation.ID:
+                    return REQUEST_GEO_LOCATION;
+                case KeyboardButtonRequestPhone.ID:
+                    return REQUEST_PHONE;
+                case KeyboardButtonRequestPoll.ID:
+                    return REQUEST_POLL;
+                case KeyboardButtonSwitchInline.ID:
+                    return SWITCH_INLINE;
+                case KeyboardButtonUrl.ID:
+                    return URL;
+                default:
+                    throw new IllegalStateException("Unexpected keyboard button type: " + data);
+            }
+        }
     }
 }

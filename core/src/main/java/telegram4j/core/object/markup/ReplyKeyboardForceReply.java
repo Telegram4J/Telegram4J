@@ -28,11 +28,6 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
     }
 
     @Override
-    public telegram4j.tl.ReplyKeyboardForceReply getData() {
-        return data;
-    }
-
-    @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

@@ -1,12 +1,10 @@
 package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Mono;
-import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParser;
@@ -78,7 +76,7 @@ abstract class BaseChat implements Chat {
                             .replyToMsgId(spec.replyToMessageId().orElse(null))
                             .message(tuple.getT1())
                             .entities(tuple.getT2())
-                            .replyMarkup(spec.replyMarkup().map(ReplyMarkup::getData).orElse(null))
+                            // .replyMarkup(spec.replyMarkup().map(ReplyMarkup::getData).orElse(null))
                             .scheduleDate(spec.scheduleTimestamp()
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
@@ -86,19 +84,6 @@ abstract class BaseChat implements Chat {
                             .build())
                     .map(e -> EntityFactory.createMessage(client, e, id));
         });
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BaseChat baseChat = (BaseChat) o;
-        return id.equals(baseChat.id) && type == baseChat.type;
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, type);
     }
 
     @Override

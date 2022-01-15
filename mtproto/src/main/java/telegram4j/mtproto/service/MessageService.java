@@ -1004,7 +1004,7 @@ public class MessageService extends RpcService {
                         .filter(u -> u.identifier() == UpdateMessageID.ID)
                         .map(upd -> (UpdateMessageID) upd)
                         .findFirst()
-                        .orElseThrow(IllegalStateException::new);
+                        .orElseThrow();
 
                 if (updateMessageID.randomId() != request.randomId()) {
                     throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
@@ -1015,7 +1015,7 @@ public class MessageService extends RpcService {
                         .filter(upd -> upd instanceof UpdateNewMessageFields)
                         .map(upd -> ((UpdateNewMessageFields) upd).message())
                         .findFirst()
-                        .orElseThrow(IllegalStateException::new);
+                        .orElseThrow();
 
                 return Tuples.of(message, casted);
             }

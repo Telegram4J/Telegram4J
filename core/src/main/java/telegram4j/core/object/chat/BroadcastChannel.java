@@ -22,14 +22,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class SupergroupChat extends BaseChannel {
+public class BroadcastChannel extends BaseChannel {
 
-    public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
-        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.SUPERGROUP, minData);
+    public BroadcastChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL, minData);
     }
 
-    public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
-        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.SUPERGROUP, fullData, minData);
+    public BroadcastChannel(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
+        super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.CHANNEL, fullData, minData);
     }
 
     @Override
@@ -39,7 +39,8 @@ public class SupergroupChat extends BaseChannel {
 
     @Override
     public Optional<ChatPhoto> getMinPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
+        return Optional.of(minData)
+                .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BaseChatPhoto.class))
                 .map(d -> new ChatPhoto(client, d, getIdAsPeer()));
     }
 
@@ -164,28 +165,14 @@ public class SupergroupChat extends BaseChannel {
         return Optional.ofNullable(fullData).map(ChannelFull::folderId);
     }
 
-    public Optional<Id> getLinkedChatId() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::linkedChatId)
-                .map(Id::ofChat);
-    }
-
     public Optional<ChannelLocation> getLocation() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.location(), BaseChannelLocation.class))
                 .map(d -> new ChannelLocation(client, d));
     }
 
-    public Optional<Duration> getSlowmodeDuration() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::slowmodeSeconds)
-                .map(Duration::ofSeconds);
-    }
-
-    public Optional<Instant> getSlowmodeNextSendTimestamp() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::slowmodeNextSendDate)
-                .map(Instant::ofEpochSecond);
+    public Optional<Integer> getStatsDcId() {
+        return Optional.ofNullable(fullData).map(ChannelFull::statsDc);
     }
 
     public Optional<Integer> getPts() {
@@ -210,7 +197,7 @@ public class SupergroupChat extends BaseChannel {
 
     @Override
     public String toString() {
-        return "SupergroupChat{} " + super.toString();
+        return "BroadcastChannel{} " + super.toString();
     }
 
     public enum Flag {
@@ -225,13 +212,13 @@ public class SupergroupChat extends BaseChannel {
         /** Is this a channel? */
         BROADCAST(5),
 
-        /** Is this channel verified by telegram?. */
+        /** Is this channel verified by telegram? */
         VERIFIED(7),
 
         /** Is this a supergroup? */
         MEGAGROUP(8),
 
-        /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()}) */
+        /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()})ю */
         RESTRICTED(9),
 
         /** Whether signatures are enabled (channels). */

@@ -19,11 +19,6 @@ public final class ReplyKeyboardHide extends ReplyMarkup {
     }
 
     @Override
-    public telegram4j.tl.ReplyKeyboardHide getData() {
-        return data;
-    }
-
-    @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

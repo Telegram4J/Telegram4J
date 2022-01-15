@@ -47,7 +47,6 @@ public final class PrivateChat extends BaseChat {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         PrivateChat that = (PrivateChat) o;
         return user.equals(that.user);
     }

@@ -18,8 +18,6 @@ public abstract class ReplyMarkup implements TelegramObject {
         return client;
     }
 
-    public abstract telegram4j.tl.ReplyMarkup getData();
-
     @Override
     public String toString() {
         return "ReplyMarkup{}";

@@ -2,13 +2,15 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class User implements TelegramObject {
@@ -17,26 +19,17 @@ public class User implements TelegramObject {
     private final BaseUser minData;
     @Nullable
     private final UserFull fullData;
-    @Nullable
-    private final List<Chat> chats;
-    @Nullable
-    private final List<User> users;
 
-    public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData,
-                List<User> users, List<Chat> chats) {
+    public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData) {
         this.client = Objects.requireNonNull(client, "client");
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
-        this.chats = Collections.unmodifiableList(chats);
-        this.users = Collections.unmodifiableList(users);
     }
 
     public User(MTProtoTelegramClient client, BaseUser minData) {
         this.client = Objects.requireNonNull(client, "client");
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
-        this.chats = null;
-        this.users = null;
     }
 
     @Override
@@ -51,24 +44,23 @@ public class User implements TelegramObject {
     // MinUser fields
 
     public Optional<String> getFirstName() {
-        return Optional.ofNullable(minData).map(BaseUser::firstName);
+        return Optional.ofNullable(minData.firstName());
     }
 
     public Optional<String> getLastName() {
-        return Optional.ofNullable(minData).map(BaseUser::lastName);
+        return Optional.ofNullable(minData.lastName());
     }
 
     public Optional<String> getUsername() {
-        return Optional.ofNullable(minData).map(BaseUser::username);
+        return Optional.ofNullable(minData.username());
     }
 
     public Optional<String> getPhone() {
-        return Optional.ofNullable(minData).map(BaseUser::phone);
+        return Optional.ofNullable(minData.phone());
     }
 
     public Optional<ChatPhoto> getMinPhoto() {
-        return Optional.ofNullable(minData)
-                .map(u -> TlEntityUtil.unmapEmpty(u.photo(), BaseUserProfilePhoto.class))
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
                 .map(c -> new ChatPhoto(client, c, ImmutableInputPeerUser.of(minData.id(),
                         Objects.requireNonNull(minData.accessHash())))); // TODO: fetch accessHash
     }
@@ -80,29 +72,26 @@ public class User implements TelegramObject {
     }
 
     public Optional<UserStatus> getStatus() {
-        return Optional.ofNullable(minData)
-                .map(BaseUser::status)
-                .map(s -> EntityFactory.createUserStatus(client, s));
+        return Optional.ofNullable(minData.status()).map(d -> EntityFactory.createUserStatus(client, d));
     }
 
     public Optional<Integer> getBotInfoVersion() {
-        return Optional.ofNullable(minData).map(BaseUser::botInfoVersion);
+        return Optional.ofNullable(minData.botInfoVersion());
     }
 
     public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData)
-                .map(BaseUser::restrictionReason)
+        return Optional.ofNullable(minData.restrictionReason())
                 .map(list -> list.stream()
                         .map(d -> new RestrictionReason(client, d))
                         .collect(Collectors.toList()));
     }
 
-    public Optional<Integer> getBotInlinePlaceholder() {
-        return Optional.ofNullable(minData).map(BaseUser::botInfoVersion);
+    public Optional<String> getBotInlinePlaceholder() {
+        return Optional.ofNullable(minData.botInlinePlaceholder());
     }
 
     public Optional<String> getLangCode() {
-        return Optional.ofNullable(minData).map(BaseUser::langCode);
+        return Optional.ofNullable(minData.langCode());
     }
 
     public Id getId() {
@@ -155,26 +144,17 @@ public class User implements TelegramObject {
         return Optional.ofNullable(fullData).map(UserFull::themeEmoticon);
     }
 
-    public Optional<List<Chat>> getChats() {
-        return Optional.ofNullable(chats);
-    }
-
-    public Optional<List<User>> getUsers() {
-        return Optional.ofNullable(users);
-    }
-
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         User user = (User) o;
-        return minData.equals(user.minData) && Objects.equals(fullData, user.fullData) &&
-                Objects.equals(chats, user.chats) && Objects.equals(users, user.users);
+        return minData.equals(user.minData) && Objects.equals(fullData, user.fullData);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minData, fullData, chats, users);
+        return Objects.hash(minData, fullData);
     }
 
     @Override
@@ -182,8 +162,6 @@ public class User implements TelegramObject {
         return "User{" +
                 "minData=" + minData +
                 ", fullData=" + fullData +
-                ", chats=" + chats +
-                ", users=" + users +
                 '}';
     }
 

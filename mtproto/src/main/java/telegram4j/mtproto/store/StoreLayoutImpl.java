@@ -192,6 +192,13 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users) {
+        return Mono.fromRunnable(() -> {
+            saveContacts(chats, users);
+        });
+    }
+
+    @Override
     public Mono<Void> updateSelfId(long userId) {
         return Mono.fromRunnable(() -> selfId = userId);
     }

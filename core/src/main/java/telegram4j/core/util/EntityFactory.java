@@ -7,10 +7,8 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.action.MessageActionChatCreate;
-import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.*;
-import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.object.markup.ReplyInlineMarkup;
 import telegram4j.core.object.markup.ReplyKeyboardForceReply;
 import telegram4j.core.object.markup.ReplyKeyboardHide;
@@ -47,7 +45,6 @@ import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
 import java.time.Instant;
-import java.util.stream.Collectors;
 
 public final class EntityFactory {
 
@@ -89,12 +86,6 @@ public final class EntityFactory {
             case UserFull.ID: {
                 UserFull userFull = (UserFull) possibleChat;
 
-                var users = userFull.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
-                        .map(u -> (BaseUser) u)
-                        .map(d -> new User(client, d))
-                        .collect(Collectors.toList());
-
                 var minData = userFull.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID &&
                                 u.id() == userFull.fullUser().id())
@@ -102,12 +93,7 @@ public final class EntityFactory {
                         .findFirst()
                         .orElseThrow();
 
-                var chats = userFull.chats().stream()
-                        .map(d -> createChat(client, d))
-                        .collect(Collectors.toList());
-
-                User mappedFullUser = new User(client, userFull.fullUser(),
-                        minData, users, chats);
+                User mappedFullUser = new User(client, userFull.fullUser(), minData);
 
                 return new PrivateChat(client, mappedFullUser);
             }
@@ -128,36 +114,28 @@ public final class EntityFactory {
                     return new SupergroupChat(client, channel);
                 }
 
-                return new Channel(client, channel);
+                return new BroadcastChannel(client, channel);
             case ChatFull.ID:
                 ChatFull chatFull = (ChatFull) possibleChat;
-
-                var chats = chatFull.chats().stream()
-                        .map(d -> createChat(client, d))
-                        .collect(Collectors.toList());
-
-                var users = chatFull.users().stream()
-                        .map(d -> new User(client, (BaseUser) d))
-                        .collect(Collectors.toList());
+                // TODO: I haven't been able to figure out what chatFull.users() is for yet, so I'm just ignoring it
 
                 var minData = chatFull.chats().stream()
                         .filter(c -> c.id() == chatFull.fullChat().id())
                         .findFirst()
-                        .orElseThrow(IllegalStateException::new);
+                        .orElseThrow();
 
-                if (chatFull.fullChat() instanceof ChannelFull) {
+                if (chatFull.fullChat().identifier() == ChannelFull.ID) {
                     ChannelFull channelFull = (ChannelFull) chatFull.fullChat();
                     var channelMin = (telegram4j.tl.Channel) minData;
 
                     if (channelMin.megagroup()) {
-                        return new SupergroupChat(client, channelFull, channelMin, chats, users);
+                        return new SupergroupChat(client, channelFull, channelMin);
                     }
 
-                    return new Channel(client, channelFull, channelMin, chats, users);
+                    return new BroadcastChannel(client, channelFull, channelMin);
                 }
 
-                return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(),
-                        (telegram4j.tl.BaseChat) minData, chats, users);
+                return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(), (telegram4j.tl.BaseChat) minData);
             default:
                 throw new IllegalArgumentException("Unknown chat type: " + possibleChat);
         }
@@ -233,62 +211,6 @@ public final class EntityFactory {
 
             default:
                 throw new IllegalArgumentException("Unknown reply markup type: " + data);
-        }
-    }
-
-    public static KeyboardButton createKeyboardButton(MTProtoTelegramClient client, telegram4j.tl.KeyboardButton data) {
-        switch (data.identifier()) {
-            case BaseKeyboardButton.ID:
-                return new KeyboardButton(client, KeyboardButton.Type.DEFAULT, data.text());
-            case KeyboardButtonBuy.ID:
-                return new KeyboardButton(client, KeyboardButton.Type.BUY, data.text());
-
-            case KeyboardButtonCallback.ID:
-                KeyboardButtonCallback keyboardButtonCallback = (KeyboardButtonCallback) data;
-                return new KeyboardButton(client, KeyboardButton.Type.CALLBACK, keyboardButtonCallback.text(),
-                        keyboardButtonCallback.data(), keyboardButtonCallback.requiresPassword(),
-                        null, null, null, null, null, null);
-
-            case KeyboardButtonGame.ID:
-                return new KeyboardButton(client, KeyboardButton.Type.GAME, data.text());
-
-            case KeyboardButtonRequestGeoLocation.ID:
-                return new KeyboardButton(client, KeyboardButton.Type.REQUEST_GEO_LOCATION, data.text());
-
-            case KeyboardButtonRequestPhone.ID:
-                return new KeyboardButton(client, KeyboardButton.Type.REQUEST_PHONE, data.text());
-
-            case KeyboardButtonRequestPoll.ID:
-                KeyboardButtonRequestPoll keyboardButtonRequestPoll = (KeyboardButtonRequestPoll) data;
-                return new KeyboardButton(client, KeyboardButton.Type.REQUEST_POLL, data.text(),
-                        null, null, keyboardButtonRequestPoll.quiz(),
-                        null, null, null, null, null);
-
-            case KeyboardButtonSwitchInline.ID:
-                KeyboardButtonSwitchInline keyboardButtonSwitchInline = (KeyboardButtonSwitchInline) data;
-                return new KeyboardButton(client, KeyboardButton.Type.SWITCH_INLINE, data.text(),
-                        null, null, null, keyboardButtonSwitchInline.query(),
-                        null, null, null, null);
-
-            case KeyboardButtonUrl.ID:
-                KeyboardButtonUrl keyboardButtonUrl = (KeyboardButtonUrl) data;
-                return new KeyboardButton(client, KeyboardButton.Type.URL, data.text(),
-                        null, null, null, null, keyboardButtonUrl.url(), null, null, null);
-
-            case KeyboardButtonUrlAuth.ID:
-                KeyboardButtonUrlAuth KeyboardButtonUrlAuth = (KeyboardButtonUrlAuth) data;
-                return new KeyboardButton(client, KeyboardButton.Type.URL_AUTH, data.text(),
-                        null, null, null, null, KeyboardButtonUrlAuth.url(), KeyboardButtonUrlAuth.fwdText(),
-                        KeyboardButtonUrlAuth.buttonId(), null);
-
-            case InputKeyboardButtonUrlAuth.ID:
-                InputKeyboardButtonUrlAuth inputKeyboardButtonUrlAuth = (InputKeyboardButtonUrlAuth) data;
-                return new KeyboardButton(client, KeyboardButton.Type.INPUT_URH_AUTH, data.text(),
-                        null, null, null, null, inputKeyboardButtonUrlAuth.url(),
-                        inputKeyboardButtonUrlAuth.fwdText(), null, null);
-
-            default:
-                throw new IllegalArgumentException("Unknown keyboard button type: " + data);
         }
     }
 

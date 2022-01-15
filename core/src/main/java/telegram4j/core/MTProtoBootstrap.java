@@ -211,7 +211,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         .apiId(authorizationResources.getAppId())
                         .apiHash(authorizationResources.getAppHash())
                         .botAuthToken(authorizationResources.getBotAuthToken()
-                                .orElseThrow(IllegalStateException::new))
+                                .orElseThrow())
                         .build();
             case USER:
                 throw new UnsupportedOperationException("User authorization hasn't yet implemented.");

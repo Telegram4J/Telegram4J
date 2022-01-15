@@ -1,7 +1,6 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.util.EntityParser;
 
 import java.time.Instant;
@@ -32,7 +31,7 @@ interface SendMessageSpecDef extends Spec {
 
     Optional<EntityParser.Mode> parseMode();
 
-    Optional<ReplyMarkup> replyMarkup();
+    // Optional<ReplyMarkup> replyMarkup();
 
     // Optional<List<MessageEntity>> entities();
 

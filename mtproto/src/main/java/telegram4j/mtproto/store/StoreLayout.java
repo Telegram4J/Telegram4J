@@ -61,6 +61,8 @@ public interface StoreLayout {
 
     Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users);
 
+    Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users);
+
     // not an update-related methods
 
     Mono<Void> updateSelfId(long userId);

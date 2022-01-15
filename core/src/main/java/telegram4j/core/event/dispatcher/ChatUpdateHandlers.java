@@ -4,10 +4,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.*;
 import telegram4j.core.object.ExportedChatInvite;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.User;
-import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.object.chat.GroupChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.*;
 
@@ -15,7 +14,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class ChatUpdateHandlers {
+class ChatUpdateHandlers {
 
     // State handler
     // =====================
@@ -53,11 +52,18 @@ public class ChatUpdateHandlers {
     // Update handler
     // =====================
 
+    // I couldn't figure out when the following events are called,
+    // so I haven't tested them and can't be sure about mapping:
+    // - UpdateChatParticipantAdd
+    // - UpdateChatParticipantAdmin
+    // - UpdateChatParticipantDelete
+
     static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
         UpdateChatParticipantAdd upd = context.getUpdate();
 
-        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .map(c -> (GroupChat) c)
                 .orElseThrow();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
@@ -76,8 +82,9 @@ public class ChatUpdateHandlers {
     static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
         UpdateChatParticipantAdmin upd = context.getUpdate();
 
-        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .map(c -> (GroupChat) c)
                 .orElseThrow();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
@@ -91,8 +98,9 @@ public class ChatUpdateHandlers {
     static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
         UpdateChatParticipantDelete upd = context.getUpdate();
 
-        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .map(c -> (GroupChat) c)
                 .orElseThrow();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
@@ -109,8 +117,9 @@ public class ChatUpdateHandlers {
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(d -> new ExportedChatInvite(context.getClient(), d))
                 .orElse(null);
-        Chat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .map(c -> (GroupChat) c)
                 .orElseThrow();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
@@ -138,22 +147,28 @@ public class ChatUpdateHandlers {
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
-                Id chatId = Id.ofChat(upd.chatId());
+                GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                        .map(d -> EntityFactory.createChat(context.getClient(), d))
+                        .map(c -> (GroupChat) c)
+                        .orElseThrow();
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
                         .map(d -> new ChatParticipant(context.getClient(), d))
                         .orElse(null);
 
-                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, selfParticipant, null, null));
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, selfParticipant, null, null));
             }
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
-                Id chatId = Id.ofChat(upd.chatId());
+                GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
+                        .map(d -> EntityFactory.createChat(context.getClient(), d))
+                        .map(c -> (GroupChat) c)
+                        .orElseThrow();
                 var participants = upd.participants().stream()
                         .map(d -> new ChatParticipant(context.getClient(), d))
                         .collect(Collectors.toList());
                 int version = upd.version();
 
-                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chatId, null, version, participants));
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, null, version, participants));
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown chat participants type: " + chatParticipants));

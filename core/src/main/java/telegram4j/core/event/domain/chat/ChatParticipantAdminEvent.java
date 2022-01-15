@@ -2,15 +2,15 @@ package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
-import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.GroupChat;
 
 public class ChatParticipantAdminEvent extends ChatEvent {
-    private final Chat chat;
+    private final GroupChat chat;
     private final User user;
     private final boolean isAdmin;
     private final int version;
 
-    public ChatParticipantAdminEvent(MTProtoTelegramClient client, Chat chat, User user, boolean isAdmin, int version) {
+    public ChatParticipantAdminEvent(MTProtoTelegramClient client, GroupChat chat, User user, boolean isAdmin, int version) {
         super(client);
         this.chat = chat;
         this.user = user;
@@ -18,7 +18,7 @@ public class ChatParticipantAdminEvent extends ChatEvent {
         this.version = version;
     }
 
-    public Chat getChat() {
+    public GroupChat getChat() {
         return chat;
     }
 

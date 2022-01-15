@@ -2,18 +2,18 @@ package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
-import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.GroupChat;
 
 import java.time.Instant;
 
 public class ChatParticipantAddEvent extends ChatEvent {
-    private final Chat chat;
+    private final GroupChat chat;
     private final User user;
     private final User inviter;
     private final Instant timestamp;
     private final int version;
 
-    public ChatParticipantAddEvent(MTProtoTelegramClient client, Chat chat, User user,
+    public ChatParticipantAddEvent(MTProtoTelegramClient client, GroupChat chat, User user,
                                    User inviter, Instant timestamp, int version) {
         super(client);
         this.chat = chat;
@@ -23,7 +23,7 @@ public class ChatParticipantAddEvent extends ChatEvent {
         this.version = version;
     }
 
-    public Chat getChat() {
+    public GroupChat getChat() {
         return chat;
     }
 

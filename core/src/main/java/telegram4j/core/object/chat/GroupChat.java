@@ -6,7 +6,6 @@ import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.Photo;
-import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ExportedChatInvite;
@@ -15,7 +14,10 @@ import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -26,27 +28,17 @@ public class GroupChat extends BaseChat {
     private final telegram4j.tl.BaseChat minData;
     @Nullable
     private final telegram4j.tl.BaseChatFull fullData;
-    @Nullable
-    private final List<Chat> chats;
-    @Nullable
-    private final List<User> users;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
-        this.chats = null;
-        this.users = null;
     }
 
-    public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChatFull fullData,
-                     telegram4j.tl.BaseChat minData,
-                     List<Chat> chats, List<User> users) {
+    public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
-        this.chats = Collections.unmodifiableList(chats);
-        this.users = Collections.unmodifiableList(users);
     }
 
     @Override
@@ -76,8 +68,12 @@ public class GroupChat extends BaseChat {
     }
 
     // ChatMin fields
-    // TODO: implement
-    // migrated_to flags.6?InputChannel Means this chat was upgraded to a supergroup
+
+    public Optional<Id> getMigratedToChannelId() {
+        return Optional.ofNullable(minData.migratedTo())
+                .map(c -> (BaseInputChannel) c)
+                .map(c -> Id.ofChannel(c.channelId(), c.accessHash()));
+    }
 
     public String getTitle() {
         return minData.title();
@@ -151,18 +147,8 @@ public class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData).map(BaseChatFull::themeEmoticon);
     }
 
-    // Auxiliary contacts fields
-
-    public Optional<List<User>> getUsers() {
-        return Optional.ofNullable(users);
-    }
-
-    public Optional<List<Chat>> getChats() {
-        return Optional.ofNullable(chats);
-    }
-
     public enum Flag {
-        // MinUser flags
+        // MinChat flags
 
         /** Whether the current user is the creator of the group. */
         CREATOR(0),
@@ -182,7 +168,7 @@ public class GroupChat extends BaseChat {
         /** Whether there's anyone in the group call. */
         CALL_NOT_EMPTY(24),
 
-        // FullUser flags
+        // FullChat flags
 
         /** Can we change the username of this chat? */
         CAN_SET_USERNAME(7),
