@@ -1,6 +1,6 @@
 package telegram4j.mtproto;
 
-public class TransportException extends RuntimeException {
+public class TransportException extends MTProtoException {
 
     private static final long serialVersionUID = -8781856208087639394L;
 

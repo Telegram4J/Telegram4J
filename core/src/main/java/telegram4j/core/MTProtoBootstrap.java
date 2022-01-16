@@ -48,6 +48,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Supplier<Transport> transport;
     private int acksSendThreshold = 3;
     private RetryBackoffSpec retry;
+    private RetryBackoffSpec authRetry;
 
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
     private MTProtoClientManager mtProtoClientManager;
@@ -116,6 +117,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setAuthRetry(RetryBackoffSpec authRetry) {
+        this.authRetry = Objects.requireNonNull(authRetry, "authRetry");
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -134,7 +140,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
-                            storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING, initRetry())));
+                            storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
+                            initRetry(), initAuthRetry())));
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -152,7 +159,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             Disposable.Composite composite = Disposables.composite();
 
-            composite.add(mtProtoClient.connect().subscribe());
+            composite.add(mtProtoClient.connect()
+                    .doFinally(signal -> {
+                        sink.success();
+                        onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                    })
+                    .subscribe());
 
             composite.add(mtProtoClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
@@ -176,7 +188,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
                                 Mono<Void> fetchSelfId = storeLayout.getSelfId()
                                         .filter(l -> l != 0)
-                                        .switchIfEmpty(serviceHolder.getUserService().getFullUser(InputUserSelf.instance())
+                                        .switchIfEmpty(serviceHolder.getUserService()
+                                                .getFullUser(InputUserSelf.instance())
                                                 .flatMap(user -> storeLayout.updateSelfId(user.fullUser().id()))
                                                 .then(Mono.empty()))
                                         .then();
@@ -280,6 +293,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return retry;
         }
         return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(10));
+    }
+
+    private RetryBackoffSpec initAuthRetry() {
+        if (retry != null) {
+            return retry;
+        }
+        return Retry.fixedDelay(5, Duration.ofSeconds(3));
     }
 
     private MTProtoClientManager initMtProtoClientManager() {

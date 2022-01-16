@@ -41,6 +41,6 @@ public class ChatParticipantAdminEvent extends ChatEvent {
                 ", user=" + user +
                 ", isAdmin=" + isAdmin +
                 ", version=" + version +
-                "} " + super.toString();
+                '}';
     }
 }

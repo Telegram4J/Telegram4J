@@ -34,6 +34,6 @@ public class ChatParticipantDeleteEvent extends ChatEvent {
                 "chat=" + chat +
                 ", user=" + user +
                 ", version=" + version +
-                "} " + super.toString();
+                '}';
     }
 }

@@ -3,6 +3,7 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.event.domain.message.DeleteMessagesEvent;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
@@ -10,13 +11,12 @@ import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.tl.BaseMessageFields;
-import telegram4j.tl.BaseUser;
-import telegram4j.tl.UpdateEditMessageFields;
-import telegram4j.tl.UpdateNewMessageFields;
+import telegram4j.mtproto.store.ResolvedDeletedMessages;
+import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
@@ -35,6 +35,12 @@ class MessageUpdateHandlers {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onEditMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
+    }
+
+    public static Mono<ResolvedDeletedMessages> handleStateUpdateDeleteMessages(UpdateContext<UpdateDeleteMessagesFields> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onDeleteMessages(context.getUpdate());
     }
 
     // Update handler
@@ -87,5 +93,37 @@ class MessageUpdateHandlers {
         Message newMessage = EntityFactory.createMessage(client, message, resolvedId);
 
         return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat));
+    }
+
+    public static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
+        return Mono.justOrEmpty(context.getOld())
+                .flatMapMany(re -> {
+                    Id chatId;
+                    switch (re.getPeer().identifier()) {
+                        case InputPeerChannel.ID:
+                            InputPeerChannel peerChannel = (InputPeerChannel) re.getPeer();
+                            chatId = Id.ofChannel(peerChannel.channelId(), peerChannel.accessHash());
+                            break;
+                        case InputPeerChat.ID:
+                            InputPeerChat peerChat = (InputPeerChat) re.getPeer();
+                            chatId = Id.ofChat(peerChat.chatId());
+                            break;
+                        case InputPeerUser.ID:
+                            InputPeerUser peerUser = (InputPeerUser) re.getPeer();
+                            chatId = Id.ofChannel(peerUser.userId(), peerUser.accessHash());
+                            break;
+                        default:
+                            throw new IllegalStateException();
+                    }
+
+                    var oldMessages = re.getMessages().stream()
+                            .map(d -> EntityFactory.createMessage(context.getClient(), d, chatId))
+                            .collect(Collectors.toList());
+
+                    boolean scheduled = context.getUpdate().identifier() == UpdateDeleteScheduledMessages.ID;
+
+                    return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
+                            scheduled, oldMessages, context.getUpdate().messages()));
+                });
     }
 }

@@ -12,7 +12,7 @@ public class IntermediateTransport implements Transport {
     private final AtomicInteger size = new AtomicInteger(-1);
     private final AtomicInteger completed = new AtomicInteger(-1);
 
-    private final boolean quickAck;
+    private volatile boolean quickAck;
 
     public IntermediateTransport(boolean quickAck) {
         this.quickAck = quickAck;
@@ -68,8 +68,7 @@ public class IntermediateTransport implements Transport {
             }
 
             if (payloadLength != length) { // is a part of stream
-                if (size.get() == -1) { // header of a stream
-                    size.set(length);
+                if (size.compareAndSet(-1, length)) { // header of a stream
                     completed.set(payloadLength);
                     return false;
                 }
@@ -86,5 +85,10 @@ public class IntermediateTransport implements Transport {
     @Override
     public boolean supportQuickAck() {
         return quickAck;
+    }
+
+    @Override
+    public void setQuickAckState(boolean enable) {
+        this.quickAck = enable;
     }
 }

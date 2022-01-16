@@ -90,6 +90,6 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
                 ", chat=" + chat +
                 ", actor=" + actor +
                 ", user=" + user +
-                "} " + super.toString();
+                '}';
     }
 }

@@ -78,4 +78,18 @@ public class ChannelParticipantUpdateEvent extends ChatEvent {
     public int getQts() {
         return qts;
     }
+
+    @Override
+    public String toString() {
+        return "ChannelParticipantUpdateEvent{" +
+                "channel=" + channel +
+                ", timestamp=" + timestamp +
+                ", actor=" + actor +
+                ", user=" + user +
+                ", oldParticipant=" + oldParticipant +
+                ", currentParticipant=" + currentParticipant +
+                ", invite=" + invite +
+                ", qts=" + qts +
+                '}';
+    }
 }

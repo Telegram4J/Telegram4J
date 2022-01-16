@@ -3,6 +3,7 @@ package telegram4j.mtproto.auth;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
@@ -82,7 +83,9 @@ public final class AuthorizationHandler {
             return handleDhGenFail(dhGenFail);
         }
 
-        return Mono.error(new IllegalStateException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())));
+        return Mono.fromRunnable(() -> onAuthSink.emitError(
+                new AuthorizationException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())),
+                Sinks.EmitFailureHandler.FAIL_FAST));
     }
 
     private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
@@ -91,11 +94,14 @@ public final class AuthorizationHandler {
                 context.getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash3, newNonceHash)) {
-            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash3)));
+            return Mono.fromRunnable(() -> onAuthSink.emitError(new AuthorizationException("New nonce hash mismatch, excepted: "
+                            + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash3)),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
-        return Mono.error(new IllegalStateException("Failed to create an authorization key."));
+        return Mono.fromRunnable(() -> onAuthSink.emitError(
+                new AuthorizationException("Failed to create an authorization key."),
+                Sinks.EmitFailureHandler.FAIL_FAST));
     }
 
     private Mono<Void> handleResPQ(ResPQ resPQ) {
@@ -116,7 +122,9 @@ public final class AuthorizationHandler {
         }
 
         if (fingerprint == -1) {
-            return Mono.error(new IllegalStateException("Unknown server fingerprints: " + fingerprints));
+            return Mono.fromRunnable(() -> onAuthSink.emitError(
+                    new AuthorizationException("Unknown server fingerprints: " + fingerprints),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
         BigInteger pq = fromByteArray(pqBytes);
@@ -128,7 +136,10 @@ public final class AuthorizationHandler {
         context.setNewNonce(random.generateSeed(32));
 
         if (p.longValueExact() > q.longValueExact()) {
-            return Mono.error(new IllegalStateException("Incorrect prime factorization. p: " + p + ", q: " + q + ", pq: " + pq));
+            return Mono.fromRunnable(() -> onAuthSink.emitError(
+                    new AuthorizationException("Incorrect prime factorization. p: "
+                    + p + ", q: " + q + ", pq: " + pq),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
         PQInnerData pqInnerData = PQInnerDataDc.builder()
@@ -164,8 +175,10 @@ public final class AuthorizationHandler {
                 context.getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash1, newNonceHash)) {
-            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash1)));
+            return Mono.fromRunnable(() -> onAuthSink.emitError(
+                    new AuthorizationException("New nonce hash mismatch, excepted: "
+                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash1)),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
         long serverSalt = readLongLE(xor(substring(context.getNewNonce(), 0, 8),
@@ -185,8 +198,10 @@ public final class AuthorizationHandler {
                 context.getAuthAuxHash()), 4, 16);
 
         if (!Arrays.equals(newNonceHash2, newNonceHash)) {
-            return Mono.error(() -> new IllegalStateException("New nonce hash mismatch, excepted: "
-                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash2)));
+            return Mono.fromRunnable(() -> onAuthSink.emitError(
+                    new AuthorizationException("New nonce hash mismatch, excepted: "
+                    + ByteBufUtil.hexDump(newNonceHash) + ", but received: " + ByteBufUtil.hexDump(newNonceHash2)),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
         ServerDHParams serverDHParams = context.getServerDHParams();
@@ -207,12 +222,12 @@ public final class AuthorizationHandler {
                 sha1Digest(context.getNewNonce(), context.getNewNonce())),
                 substring(context.getNewNonce(), 0, 4));
 
-        AES256IGECipher cipher = new AES256IGECipher(false, tmpAesKey, tmpAesIv);
-        ByteBuf answer = alloc.buffer()
-                .writeBytes(cipher.decrypt(encryptedAnswerB))
+        AES256IGECipher decrypter = new AES256IGECipher(false, tmpAesKey, tmpAesIv);
+        ByteBuf answer = Unpooled.wrappedBuffer(decrypter.decrypt(encryptedAnswerB))
                 .skipBytes(20); // answer hash
 
         ServerDHInnerData serverDHInnerData = TlDeserializer.deserialize(answer);
+        answer.release();
 
         BigInteger b = fromByteArray(random.generateSeed(256));
         BigInteger g = BigInteger.valueOf(serverDHInnerData.g());
@@ -232,7 +247,9 @@ public final class AuthorizationHandler {
 
         byte[] innerData = toByteArray(TlSerializer.serialize(alloc, clientDHInnerData));
         byte[] innerDataWithHash = align(concat(sha1Digest(innerData), innerData), 16);
-        byte[] dataWithHashEnc = cipher.encrypt(innerDataWithHash);
+
+        AES256IGECipher encrypter = new AES256IGECipher(true, tmpAesKey, tmpAesIv);
+        byte[] dataWithHashEnc = encrypter.encrypt(innerDataWithHash);
 
         client.updateTimeOffset(serverDHInnerData.serverTime());
 

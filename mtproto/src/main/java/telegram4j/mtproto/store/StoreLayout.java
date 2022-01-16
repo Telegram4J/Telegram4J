@@ -35,6 +35,8 @@ public interface StoreLayout {
 
     Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users);
 
+    Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update);
+
     // user updates
 
     Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);

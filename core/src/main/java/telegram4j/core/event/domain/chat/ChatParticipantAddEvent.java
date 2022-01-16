@@ -51,6 +51,6 @@ public class ChatParticipantAddEvent extends ChatEvent {
                 ", inviter=" + inviter +
                 ", timestamp=" + timestamp +
                 ", version=" + version +
-                "} " + super.toString();
+                '}';
     }
 }

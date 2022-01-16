@@ -32,6 +32,8 @@ public interface MTProtoClient {
         DISCONNECTED,
         CLOSED,
         CONNECTED,
+        AUTHORIZATION_BEGIN,
+        AUTHORIZATION_END,
         RECONNECT
     }
 

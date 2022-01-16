@@ -10,10 +10,12 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 import telegram4j.tl.help.UserInfo;
+import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
 import java.nio.charset.StandardCharsets;
@@ -21,11 +23,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
-import static telegram4j.tl.TlSerialUtil.readBytes;
-
 public class TestFileStoreLayout implements StoreLayout {
 
-    private static final String AUTH_KEY_FILE = "core/src/test/resources/authkey-%s.bin";
+    private static final String DB_FILE = "core/src/test/resources/db-%s.bin";
 
     private static final Logger log = Loggers.getLogger(TestFileStoreLayout.class);
 
@@ -33,6 +33,7 @@ public class TestFileStoreLayout implements StoreLayout {
     private final StoreLayout delegate;
 
     private volatile AuthorizationKeyHolder authorizationKey;
+    private volatile ImmutableState state;
 
     public TestFileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
         this.allocator = allocator;
@@ -44,19 +45,17 @@ public class TestFileStoreLayout implements StoreLayout {
         return Mono.justOrEmpty(authorizationKey)
                 .subscribeOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromCallable(() -> {
-                    Path fileName = Path.of(String.format(AUTH_KEY_FILE, dc.getId()));
+                    Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
                     if (!Files.exists(fileName)) {
                         return null;
                     }
 
-                    log.info("Loading auth key from the file store for dc №{}.", dc.getId());
+                    log.debug("Loading session information from the file store for dc №{}.", dc.getId());
                     String lines = String.join("", Files.readAllLines(fileName));
                     ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
-                    int l = buf.readIntLE();
-                    byte[] authKey = readBytes(buf, l);
-                    int l1 = buf.readIntLE();
-                    byte[] authKeyId = readBytes(buf, l1);
-                    buf.release();
+                    byte[] authKey = TlSerialUtil.deserializeBytes(buf);
+                    byte[] authKeyId = TlSerialUtil.deserializeBytes(buf);
+                    this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
 
                     return new AuthorizationKeyHolder(dc, authKey, authKeyId);
                 }));
@@ -65,25 +64,31 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
         return Mono.fromRunnable(() -> this.authorizationKey = authorizationKey)
-                .subscribeOn(Schedulers.boundedElastic())
-                .and(Mono.fromCallable(() -> {
-                    log.info("Saving auth key to the file store for dc №{}.", authorizationKey.getDc().getId());
+                .and(save());
+    }
 
-                    byte[] authKey = authorizationKey.getAuthKey();
-                    byte[] authKeyId = authorizationKey.getAuthKeyId();
-                    ByteBuf buf = allocator.buffer(8 + authKey.length + authKeyId.length)
-                            .writeIntLE(authKey.length)
-                            .writeBytes(authKey)
-                            .writeIntLE(authKeyId.length)
-                            .writeBytes(authKeyId);
+    private Mono<Void> save() {
+        return Mono.fromCallable(() -> {
+            if (authorizationKey == null) {
+                return null;
+            }
 
-                    Path fileName = Path.of(String.format(AUTH_KEY_FILE, authorizationKey.getDc().getId()));
-                    try {
-                        return Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
-                    } finally {
-                        buf.release();
-                    }
-                }));
+            log.debug("Saving session information to file store for dc №{}.", authorizationKey.getDc().getId());
+
+            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKey());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKeyId());
+            ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
+            ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
+
+            Path fileName = Path.of(String.format(DB_FILE, authorizationKey.getDc().getId()));
+            try {
+                Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
+            } finally {
+                buf.release();
+            }
+
+            return null;
+        });
     }
 
     // Delegation of methods
@@ -91,7 +96,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<State> getCurrentState() {
-        return delegate.getCurrentState();
+        return Mono.justOrEmpty(state);
     }
 
     @Override
@@ -137,6 +142,11 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
         return delegate.onEditMessage(message, chats, users);
+    }
+
+    @Override
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update) {
+        return delegate.onDeleteMessages(update);
     }
 
     @Override
@@ -211,7 +221,8 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<Void> updateState(State state) {
-        return delegate.updateState(state);
+        return Mono.fromRunnable(() -> this.state = ImmutableState.copyOf(state))
+                .and(save());
     }
 
     @Override

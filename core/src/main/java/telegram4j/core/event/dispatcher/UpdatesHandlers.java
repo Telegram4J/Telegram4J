@@ -13,14 +13,12 @@ public final class UpdatesHandlers {
 
     static {
         // message updates
-        addHandler(UpdateNewChannelMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
+        addHandler(UpdateNewMessageFields.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
                 MessageUpdateHandlers::handleUpdateNewMessage);
-        addHandler(UpdateNewMessage.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
-                MessageUpdateHandlers::handleUpdateNewMessage);
-        addHandler(UpdateEditMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
+        addHandler(UpdateEditMessageFields.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
                 MessageUpdateHandlers::handleUpdateEditMessage);
-        addHandler(UpdateEditChannelMessage.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
-                MessageUpdateHandlers::handleUpdateEditMessage);
+        addHandler(UpdateDeleteMessagesFields.class, MessageUpdateHandlers::handleStateUpdateDeleteMessages,
+                MessageUpdateHandlers::handleUpdateDeleteMessages);
         // user updates
         addHandler(UpdateChannelUserTyping.class, UserUpdateHandlers::handleStateUpdateChannelUserTyping,
                 UserUpdateHandlers::handleUpdateChannelUserTyping);

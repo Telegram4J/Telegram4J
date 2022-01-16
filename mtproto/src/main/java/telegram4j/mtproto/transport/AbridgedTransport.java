@@ -2,7 +2,6 @@ package telegram4j.mtproto.transport;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.util.ReferenceCountUtil;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -82,4 +81,7 @@ public class AbridgedTransport implements Transport {
     public boolean supportQuickAck() {
         return false;
     }
+
+    @Override
+    public void setQuickAckState(boolean enable) {}
 }

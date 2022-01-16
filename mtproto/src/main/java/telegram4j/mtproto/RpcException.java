@@ -2,7 +2,7 @@ package telegram4j.mtproto;
 
 import telegram4j.tl.mtproto.RpcError;
 
-public class RpcException extends RuntimeException {
+public class RpcException extends MTProtoException {
     private static final long serialVersionUID = -4159674899075462143L;
 
     private final RpcError error;

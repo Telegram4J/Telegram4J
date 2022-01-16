@@ -8,13 +8,12 @@ import javax.crypto.spec.SecretKeySpec;
 
 public final class AES256IGECipher {
     private static final String AES_ECB_ALGORITHM = "AES/ECB/NoPadding";
-    private static final String AES_CBC_ALGORITHM = "AES/ECB/NoPadding";
 
     private final Cipher delegate;
     private final byte[] iv;
 
     public AES256IGECipher(boolean encrypt, byte[] key, byte[] iv) {
-        this.delegate = newCipher(encrypt ? AES_CBC_ALGORITHM : AES_ECB_ALGORITHM);
+        this.delegate = newCipher(AES_ECB_ALGORITHM);
         this.iv = iv;
 
         SecretKey secretKey = new SecretKeySpec(key, "AES");
