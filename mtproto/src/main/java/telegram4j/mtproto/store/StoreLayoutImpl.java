@@ -11,8 +11,10 @@ import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
@@ -47,6 +49,30 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<InputUser> resolveUser(long userId) {
+        return Mono.fromSupplier(() -> {
+            if (userId == selfId) {
+                return InputUserSelf.instance();
+            }
+
+            return Optional.ofNullable(chats.get(userId))
+                    .map(c -> (Channel) c.min)
+                    .map(Channel::accessHash)
+                    .map(ah -> ImmutableBaseInputUser.of(userId, ah))
+                    .orElse(null);
+        });
+    }
+
+    @Override
+    public Mono<InputChannel> resolveChannel(long channelId) {
+        return Mono.fromSupplier(() -> Optional.ofNullable(chats.get(channelId))
+                .map(c -> (Channel) c.min)
+                .map(Channel::accessHash)
+                .map(ah -> ImmutableBaseInputChannel.of(channelId, ah))
+                .orElse(null));
+    }
+
+    @Override
     public Mono<Message> getMessageById(long chatId, int messageId) {
         return Mono.fromSupplier(() -> messages.get(new MessageId(messageId, chatId)));
     }
@@ -57,8 +83,13 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<ChatFull> getChatFullById(long chatId) {
-        return Mono.fromSupplier(() -> chats.get(chatId)).mapNotNull(PartialFields::getFull);
+    public Mono<telegram4j.tl.messages.ChatFull> getChatFullById(long chatId) {
+        return Mono.fromSupplier(() -> chats.get(chatId))
+                .filter(userInfo -> userInfo.full != null)
+                .map(userInfo -> telegram4j.tl.messages.ChatFull.builder()
+                        .chats(List.of(userInfo.min))
+                        .fullChat(Objects.requireNonNull(userInfo.full))
+                        .build());
     }
 
     @Override
@@ -67,8 +98,13 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserFull> getUserFullById(long userId) {
-        return Mono.fromSupplier(() -> users.get(userId)).mapNotNull(PartialFields::getFull);
+    public Mono<telegram4j.tl.users.UserFull> getUserFullById(long userId) {
+        return Mono.fromSupplier(() -> users.get(userId))
+                .filter(userInfo -> userInfo.full != null)
+                .map(userInfo -> telegram4j.tl.users.UserFull.builder()
+                        .users(List.of(userInfo.min))
+                        .fullUser(Objects.requireNonNull(userInfo.full))
+                        .build());
     }
 
     @Override
@@ -139,21 +175,7 @@ public class StoreLayoutImpl implements StoreLayout {
             if (peer.identifier() == InputPeerEmpty.ID) {
                 return null;
             }
-
-            long rawPeerId;
-            switch (peer.identifier()) {
-                case InputPeerChat.ID:
-                    rawPeerId = ((InputPeerChat) peer).chatId();
-                    break;
-                case InputPeerChannel.ID:
-                    rawPeerId = ((InputPeerChannel) peer).channelId();
-                    break;
-                case InputPeerUser.ID:
-                    rawPeerId = ((InputPeerUser) peer).userId();
-                    break;
-                default:
-                    throw new IllegalStateException();
-            }
+            long rawPeerId = getRawInputPeerId(peer);
 
             var messages = update.messages().stream()
                     .map(id -> new MessageId(id, rawPeerId))
@@ -341,15 +363,16 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Nullable
     private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserMin(User user) {
-        if (user.identifier() == BaseUser.ID && isAccessible(user)) {
-            ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
-            var old = users.computeIfAbsent(user.id(), k -> new PartialFields<>(user0));
-            users.computeIfPresent(user0.id(), (k, v) -> new PartialFields<>(user0, v.full));
-            saveUsernamePeer(user0);
-
-            return old;
+        if (user.identifier() != BaseUser.ID || (!isAccessible(user) && chats.containsKey(user.id()))) {
+            return null;
         }
-        return null;
+
+        ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
+        var old = users.computeIfAbsent(user.id(), k -> new PartialFields<>(user0));
+        users.computeIfPresent(user0.id(), (k, v) -> new PartialFields<>(user0, v.full));
+        saveUsernamePeer(user0);
+
+        return old;
     }
 
     private InputPeer getInputPeer(Peer peer) {
@@ -373,6 +396,10 @@ public class StoreLayoutImpl implements StoreLayout {
                 return ImmutableInputPeerChannel.of(rawPeerId, accessHash);
             }
             case PeerUser.ID:
+                if (rawPeerId == selfId) {
+                    return InputPeerSelf.instance();
+                }
+
                 var userInfo = users.get(rawPeerId);
                 if (userInfo == null) {
                     return InputPeerEmpty.instance();
@@ -399,7 +426,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Nullable
     private PartialFields<Chat, ChatFull> saveChatMin(Chat chat) {
-        if (!isAccessible(chat)) {
+        if (!isAccessible(chat) && chats.containsKey(chat.id())) {
             return null;
         }
 
@@ -446,6 +473,18 @@ public class StoreLayoutImpl implements StoreLayout {
                 return !user.min() && user.accessHash() != null;
             default:
                 return true;
+        }
+    }
+
+    private long getRawInputPeerId(InputPeer peer) {
+        switch (peer.identifier()) {
+            case InputPeerChat.ID: return ((InputPeerChat) peer).chatId();
+            case InputPeerChannel.ID: return ((InputPeerChannel) peer).channelId();
+            case InputPeerUser.ID: return ((InputPeerUser) peer).userId();
+            case InputPeerChannelFromMessage.ID: return ((InputPeerChannelFromMessage) peer).channelId();
+            case InputPeerUserFromMessage.ID: return ((InputPeerUserFromMessage) peer).userId();
+            case InputPeerSelf.ID: return selfId;
+            default: throw new IllegalStateException();
         }
     }
 

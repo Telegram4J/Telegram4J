@@ -15,8 +15,10 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 import telegram4j.tl.help.UserInfo;
+import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
+import telegram4j.tl.users.UserFull;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -107,6 +109,16 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<InputPeer> resolvePeer(String username) {
         return delegate.resolvePeer(username);
+    }
+
+    @Override
+    public Mono<InputUser> resolveUser(long userId) {
+        return delegate.resolveUser(userId);
+    }
+
+    @Override
+    public Mono<InputChannel> resolveChannel(long channelId) {
+        return delegate.resolveChannel(channelId);
     }
 
     @Override

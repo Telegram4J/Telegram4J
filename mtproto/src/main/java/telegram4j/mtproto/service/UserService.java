@@ -21,6 +21,7 @@ import telegram4j.tl.request.users.ImmutableGetFullUser;
 import telegram4j.tl.request.users.SetSecureValueErrors;
 import telegram4j.tl.users.UserFull;
 
+import java.util.List;
 import java.util.function.Function;
 
 public class UserService extends RpcService {
@@ -30,7 +31,17 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Retrieve minimal information about users.
+     * Retrieve minimal information about user.
+     *
+     * @param userId The id of user
+     * @return A {@link Mono} emitting on successful completion minimal information about user
+     */
+    public Mono<User> getUser(InputUser userId) {
+        return getUsers(List.of(userId)).next();
+    }
+
+    /**
+     * Retrieve minimal information about list of users.
      *
      * @param userIds An iterable of user id elements
      * @return A {@link Flux} emitting minimal users
@@ -43,11 +54,11 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Retrieve full information about user.
+     * Retrieve detailed information about user.
      *
      * @param id The id of the user
      * @return A {@link Mono} emitting on successful completion an object contains
-     * full info about user and auxiliary data
+     * detailed info about user and auxiliary data
      */
     public Mono<UserFull> getFullUser(InputUser id) {
         return client.sendAwait(ImmutableGetFullUser.of(id))

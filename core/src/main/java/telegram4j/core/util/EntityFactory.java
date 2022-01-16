@@ -141,6 +141,29 @@ public final class EntityFactory {
         }
     }
 
+    public static User createUser(MTProtoTelegramClient client, TlObject possibleUser) {
+        switch (possibleUser.identifier()) {
+            case UserFull.ID: {
+                UserFull userFull = (UserFull) possibleUser;
+
+                var minData = userFull.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID &&
+                                u.id() == userFull.fullUser().id())
+                        .map(u -> (BaseUser) u)
+                        .findFirst()
+                        .orElseThrow();
+
+                return new User(client, userFull.fullUser(), minData);
+            }
+            case BaseUser.ID:
+                BaseUser baseUser = (BaseUser) possibleUser;
+
+                return new User(client, baseUser);
+            default:
+                throw new IllegalArgumentException("Unknown user type: " + possibleUser);
+        }
+    }
+
     public static MessageAction createMessageAction(MTProtoTelegramClient client, telegram4j.tl.MessageAction data) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageActionChatCreate.ID:

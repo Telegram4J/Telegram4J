@@ -1,5 +1,6 @@
 package telegram4j.mtproto;
 
+import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
 public class RpcException extends MTProtoException {
@@ -12,18 +13,23 @@ public class RpcException extends MTProtoException {
         this.error = error;
     }
 
+    static String prettyMethodName(TlMethod<?> method) {
+        String methodDomainName = method.getClass().getPackageName()
+                .replace("telegram4j.tl.request.", "");
+        String methodName = method.getClass().getSimpleName()
+                .replace("Immutable", "");
+
+        return methodDomainName + '.' + methodName;
+    }
+
     static RpcException create(RpcError error, DefaultMTProtoClient.RequestEntry request) {
         String orig = error.errorMessage();
         int argIdx = orig.indexOf("_X");
         String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
         String arg = argIdx != -1 ? orig.substring(argIdx) : null;
-        String methodDomainName = request.method.getClass().getPackageName()
-                .replace("telegram4j.tl.request.", "");
-        String methodName = request.method.getClass().getSimpleName()
-                .replace("Immutable", "");
 
-        String format = String.format("%s.%s returned code: %d, message: %s%s",
-                methodDomainName, methodName, error.errorCode(),
+        String format = String.format("%s returned code: %d, message: %s%s",
+                prettyMethodName(request.method), error.errorCode(),
                 message, arg != null ? ", param: " + arg : "");
 
         return new RpcException(format, error);

@@ -6,6 +6,7 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
+import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public class MTProtoOptions {
@@ -17,11 +18,13 @@ public class MTProtoOptions {
     private final Sinks.EmitFailureHandler emissionHandler;
     private final RetryBackoffSpec retry;
     private final RetryBackoffSpec authRetry;
+    private final IntPredicate gzipPackingPredicate;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<Transport> transport, StoreLayout storeLayout,
                           int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler,
-                          RetryBackoffSpec retry, RetryBackoffSpec authRetry) {
+                          RetryBackoffSpec retry, RetryBackoffSpec authRetry,
+                          IntPredicate gzipPackingPredicate) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
         this.transport = transport;
@@ -30,6 +33,7 @@ public class MTProtoOptions {
         this.emissionHandler = emissionHandler;
         this.retry = retry;
         this.authRetry = authRetry;
+        this.gzipPackingPredicate = gzipPackingPredicate;
     }
 
     public DataCenter getDatacenter() {
@@ -62,5 +66,9 @@ public class MTProtoOptions {
 
     public RetryBackoffSpec getAuthRetry() {
         return authRetry;
+    }
+
+    public IntPredicate getGzipPackingPredicate() {
+        return gzipPackingPredicate;
     }
 }

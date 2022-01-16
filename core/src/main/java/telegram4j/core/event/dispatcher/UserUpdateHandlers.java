@@ -65,7 +65,7 @@ class UserUpdateHandlers {
     // =====================
 
     static Flux<UpdateChannelUserTypingEvent> handleUpdateChannelUserTyping(StatefulUpdateContext<UpdateChannelUserTyping, Void> context) {
-        Id channelId = Id.ofChannel(context.getUpdate().channelId(), null);
+        Id channelId = Id.ofChannel(context.getUpdate().channelId(), Id.ACCESS_HASH_UNRESOLVED);
         Id fromId = Id.of(context.getUpdate().fromId());
 
         return Flux.just(new UpdateChannelUserTypingEvent(context.getClient(), channelId, fromId,
@@ -73,7 +73,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateChatUserTypingEvent> handleUpdateChatUserTyping(StatefulUpdateContext<UpdateChatUserTyping, Void> context) {
-        Id chatId = Id.ofChannel(context.getUpdate().chatId(), null);
+        Id chatId = Id.ofChannel(context.getUpdate().chatId(), Id.ACCESS_HASH_UNRESOLVED);
         Id fromId = Id.of(context.getUpdate().fromId());
 
         return Flux.just(new UpdateChatUserTypingEvent(context.getClient(), chatId,
@@ -83,14 +83,14 @@ class UserUpdateHandlers {
     static Flux<UpdateUserNameEvent> handleUpdateUserName(StatefulUpdateContext<UpdateUserName, UserNameFields> context) {
         UpdateUserName upd = context.getUpdate();
 
-        Id userId = Id.ofUser(upd.userId(), null);
+        Id userId = Id.ofUser(upd.userId(), Id.ACCESS_HASH_UNRESOLVED);
         UserNameFields old = context.getOld();
 
         return Flux.just(new UpdateUserNameEvent(context.getClient(), userId, upd.firstName(), upd.lastName(), upd.username(), old));
     }
 
     static Flux<UpdateUserPhoneEvent> handleUpdateUserPhone(StatefulUpdateContext<UpdateUserPhone, String> context) {
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id userId = Id.ofUser(context.getUpdate().userId(), Id.ACCESS_HASH_UNRESOLVED);
         String old = context.getOld();
 
         return Flux.just(new UpdateUserPhoneEvent(context.getClient(), userId, context.getUpdate().phone(), old));
@@ -99,7 +99,7 @@ class UserUpdateHandlers {
     static Flux<UpdateUserPhotoEvent> handleUpdateUserPhoto(StatefulUpdateContext<UpdateUserPhoto, UserProfilePhoto> context) {
         MTProtoTelegramClient client = context.getClient();
 
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id userId = Id.ofUser(context.getUpdate().userId(), Id.ACCESS_HASH_UNRESOLVED);
         Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
         var inputPeer = ImmutableInputPeerUser.of(context.getUpdate().userId(), -1); // TODO: resolve access_hash
         var currentPhoto = Optional.of(context.getUpdate().photo())
@@ -116,7 +116,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateUserStatusEvent> handleUpdateUserStatus(StatefulUpdateContext<UpdateUserStatus, UserStatus> context) {
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id userId = Id.ofUser(context.getUpdate().userId(), Id.ACCESS_HASH_UNRESOLVED);
         var currentStatus = createUserStatus(context.getClient(), context.getUpdate().status());
         var oldStatus = Optional.ofNullable(context.getOld())
                 .map(d -> createUserStatus(context.getClient(), d))
@@ -126,7 +126,7 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateUserTypingEvent> handleUpdateUserTyping(StatefulUpdateContext<UpdateUserTyping, Void> context) {
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
+        Id userId = Id.ofUser(context.getUpdate().userId(), Id.ACCESS_HASH_UNRESOLVED);
 
         return Flux.just(new UpdateUserTypingEvent(context.getClient(), userId, context.getUpdate().action()));
     }

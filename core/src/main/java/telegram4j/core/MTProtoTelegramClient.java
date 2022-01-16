@@ -5,6 +5,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.object.Id;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
+import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
@@ -14,7 +18,7 @@ import telegram4j.tl.upload.File;
 import java.util.Objects;
 import java.util.function.Function;
 
-public final class MTProtoTelegramClient {
+public final class MTProtoTelegramClient implements EntityRetriever {
     /** The supported api scheme version. */
     public static final int LAYER = 137;
 
@@ -23,16 +27,19 @@ public final class MTProtoTelegramClient {
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
     private final ServiceHolder serviceHolder;
+    private final EntityRetriever entityRetriever;
     private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authorizationResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
                           UpdatesHandlers updatesHandlers, ServiceHolder serviceHolder,
+                          Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authorizationResources = authorizationResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
+        this.entityRetriever = entityRetriever.apply(this);
         this.onDisconnect = onDisconnect;
 
         this.updatesManager = new UpdatesManager(this, updatesHandlers);
@@ -86,5 +93,29 @@ public final class MTProtoTelegramClient {
                 .map(FileReferenceId::asLocation)
                 .flatMap(loc -> serviceHolder.getMessageService()
                         .getFile(false, false, loc, progressor));
+    }
+
+    // EntityRetriever methods
+    // ==========================
+
+
+    @Override
+    public Mono<User> getUserMinById(Id userId) {
+        return entityRetriever.getUserMinById(userId);
+    }
+
+    @Override
+    public Mono<User> getUserFullById(Id userId) {
+        return entityRetriever.getUserFullById(userId);
+    }
+
+    @Override
+    public Mono<Chat> getChatMinById(Id chatId) {
+        return entityRetriever.getChatMinById(chatId);
+    }
+
+    @Override
+    public Mono<Chat> getChatFullById(Id chatId) {
+        return entityRetriever.getChatFullById(chatId);
     }
 }

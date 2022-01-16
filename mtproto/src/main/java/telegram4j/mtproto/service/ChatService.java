@@ -22,10 +22,25 @@ import telegram4j.tl.request.folders.EditPeerFolders;
 import telegram4j.tl.request.folders.ImmutableDeleteFolder;
 import telegram4j.tl.request.messages.*;
 
+import java.util.List;
+
+/** Rpc service with chat and channel related methods. */
 public class ChatService extends RpcService {
 
     public ChatService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
+    }
+
+    /**
+     * Retrieve minimal chat by given id.
+     *
+     * @param id The id of chat
+     * @return A {@link Mono} emitting on successful completion minimal information about chat
+     */
+    public Mono<Chat> getChat(long id) {
+        return getChats(List.of(id))
+                .ofType(BaseChats.class)
+                .map(c -> c.chats().get(0));
     }
 
     /**
@@ -142,14 +157,37 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableGetParticipant.of(channel, peer));
     }
 
-    public Mono<Chats> getChannels(Iterable<? extends InputChannel> ids) {
-        return client.sendAwait(GetChannels.builder()
-                .id(ids)
-                .build());
+    /**
+     * Retrieve minimal channel by given id.
+     *
+     * @param id The id of channel
+     * @return A {@link Mono} emitting on successful completion minimal information about channel
+     */
+    public Mono<Chat> getChannel(InputChannel id) {
+        return getChannels(List.of(id))
+                .ofType(BaseChats.class)
+                .map(chats -> chats.chats().get(0));
     }
 
-    public Mono<ChatFull> getFullChannel(InputChannel channel) {
-        return client.sendAwait(ImmutableGetFullChannel.of(channel));
+    /**
+     * Retrieve minimal channels by their ids.
+     *
+     * @param ids An iterable of channel id elements
+     * @return A {@link Mono} emitting on successful completion a list of
+     * minimal channels or slice of list if there are a lot of channels
+     */
+    public Mono<Chats> getChannels(Iterable<? extends InputChannel> ids) {
+        return client.sendAwait(GetChannels.builder().id(ids).build());
+    }
+
+    /**
+     * Retrieve detailed channel by given id.
+     *
+     * @param id The id of channel
+     * @return A {@link Mono} emitting on successful completion detailed information about channel
+     */
+    public Mono<ChatFull> getFullChannel(InputChannel id) {
+        return client.sendAwait(ImmutableGetFullChannel.of(id));
     }
 
     // TODO: check updates type

@@ -100,7 +100,7 @@ public final class AuthorizationHandler {
         }
 
         return Mono.fromRunnable(() -> onAuthSink.emitError(
-                new AuthorizationException("Failed to create an authorization key."),
+                new AuthorizationException("Failed to create an authorization key"),
                 Sinks.EmitFailureHandler.FAIL_FAST));
     }
 
@@ -205,7 +205,7 @@ public final class AuthorizationHandler {
         }
 
         ServerDHParams serverDHParams = context.getServerDHParams();
-        log.debug("Retrying dh params extending, attempt: {}.", context.getRetry());
+        log.debug("Retrying dh params extending, attempt: {}", context.getRetry());
         return handleServerDHParams(serverDHParams);
     }
 

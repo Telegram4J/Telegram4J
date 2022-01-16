@@ -16,6 +16,8 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
+import telegram4j.core.retriever.EntityRetriever;
+import telegram4j.core.retriever.RpcEntityRetriever;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
@@ -35,6 +37,7 @@ import telegram4j.tl.request.help.GetConfig;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public final class MTProtoBootstrap<O extends MTProtoOptions> {
@@ -49,7 +52,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private int acksSendThreshold = 3;
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
+    private IntPredicate gzipPackingPredicate;
 
+    private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
     private MTProtoClientManager mtProtoClientManager;
 
@@ -122,6 +127,16 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setEntityRetrieverFactory(Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory) {
+        this.entityRetrieverFactory = Objects.requireNonNull(entityRetrieverFactory, "entityRetrieverFactory");
+        return this;
+    }
+
+    public MTProtoBootstrap<O> setGzipPackingPredicate(IntPredicate gzipPackingPredicate) {
+        this.gzipPackingPredicate = Objects.requireNonNull(gzipPackingPredicate, "gzipPackingPredicate");
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -141,7 +156,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
                             storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
-                            initRetry(), initAuthRetry())));
+                            initRetry(), initAuthRetry(), initGzipPackingPredicate())));
 
             MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -149,7 +164,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authorizationResources, mtProtoClient,
                     mtProtoResources, updatesHandlers,
-                    serviceHolder, onDisconnect.asMono());
+                    serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
 
             Mono<Void> disconnect = Mono.fromRunnable(() -> {
                 eventDispatcher.shutdown();
@@ -304,5 +319,19 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private MTProtoClientManager initMtProtoClientManager() {
         return mtProtoClientManager != null ? mtProtoClientManager : new MTProtoClientManagerImpl();
+    }
+
+    private Function<MTProtoTelegramClient, EntityRetriever> initEntityRetrieverFactory() {
+        if (entityRetrieverFactory != null) {
+            return entityRetrieverFactory;
+        }
+        return RpcEntityRetriever::new;
+    }
+
+    private IntPredicate initGzipPackingPredicate() {
+        if (gzipPackingPredicate != null) {
+            return gzipPackingPredicate;
+        }
+        return i -> i >= 1024 * 16; // gzip packets if size is larger of 16kb
     }
 }
