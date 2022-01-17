@@ -358,14 +358,10 @@ public class UpdatesManager {
 
     static Id peerToId(InputPeer peer, long resolvedId) {
         switch (peer.identifier()) {
+            // InputPeerUserFromMessage or InputPeerChannelFromMessage currently cannot be mapped
             case InputPeerChannel.ID:
                 InputPeerChannel inputPeerChannel = (InputPeerChannel) peer;
                 return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
-            case InputPeerChannelFromMessage.ID:
-                var minInputPeerChannel = (InputPeerChannelFromMessage) peer;
-                long channelAccessHash0 = ((InputPeerChannel) minInputPeerChannel.peer()).accessHash();
-
-                return Id.ofChannel(minInputPeerChannel.channelId(), channelAccessHash0);
             case InputPeerChat.ID:
                 InputPeerChat inputPeerChat = (InputPeerChat) peer;
                 return Id.ofChat(inputPeerChat.chatId());
@@ -373,11 +369,6 @@ public class UpdatesManager {
             case InputPeerUser.ID:
                 InputPeerUser inputPeerUser = (InputPeerUser) peer;
                 return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
-            case InputPeerUserFromMessage.ID:
-                var minInputPeerUser = (InputPeerUserFromMessage) peer;
-                long channelAccessHash = ((InputPeerUser) minInputPeerUser.peer()).accessHash();
-
-                return Id.ofUser(minInputPeerUser.userId(), channelAccessHash);
             default: throw new IllegalArgumentException("Unknown input peer type: " + peer);
         }
     }

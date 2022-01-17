@@ -14,6 +14,7 @@ import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
+import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.updates.ImmutableState;
@@ -107,7 +108,7 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<InputPeer> resolvePeer(String username) {
+    public Mono<ResolvedPeer> resolvePeer(String username) {
         return delegate.resolvePeer(username);
     }
 

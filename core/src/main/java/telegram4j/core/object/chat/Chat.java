@@ -7,7 +7,7 @@ import telegram4j.core.spec.SendMessageSpec;
 import java.time.Duration;
 import java.util.Optional;
 
-public interface Chat extends TelegramObject {
+public interface Chat extends PeerEntity {
 
     Id getId();
 

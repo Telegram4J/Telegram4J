@@ -6,6 +6,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.object.Id;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
@@ -98,6 +99,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     // EntityRetriever methods
     // ==========================
 
+
+    @Override
+    public Mono<PeerEntity> resolveUsername(String username) {
+        return entityRetriever.resolveUsername(username);
+    }
 
     @Override
     public Mono<User> getUserMinById(Id userId) {

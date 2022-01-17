@@ -1,10 +1,10 @@
 package telegram4j.core.util;
 
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
+import telegram4j.core.object.*;
 import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.action.MessageActionChatCreate;
 import telegram4j.core.object.chat.Chat;
@@ -39,8 +39,10 @@ import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
 import telegram4j.tl.BaseChat;
+import telegram4j.tl.Channel;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
@@ -61,11 +63,11 @@ public final class EntityFactory {
                 return new UserStatus(client, UserStatus.Type.LAST_WEEK);
             case UserStatusOffline.ID:
                 UserStatusOffline userStatusOffline = (UserStatusOffline) data;
-                Instant wasOnlineTimestamp = Instant.ofEpochMilli(userStatusOffline.wasOnline());
+                Instant wasOnlineTimestamp = Instant.ofEpochSecond(userStatusOffline.wasOnline());
                 return new UserStatus(client, UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
             case UserStatusOnline.ID:
                 UserStatusOnline userStatusOnline = (UserStatusOnline) data;
-                Instant expiresTimestamp = Instant.ofEpochMilli(userStatusOnline.expires());
+                Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
                 return new UserStatus(client, UserStatus.Type.ONLINE, expiresTimestamp, null);
             case UserStatusRecently.ID:
                 return new UserStatus(client, UserStatus.Type.RECENTLY);
@@ -120,7 +122,8 @@ public final class EntityFactory {
                 // TODO: I haven't been able to figure out what chatFull.users() is for yet, so I'm just ignoring it
 
                 var minData = chatFull.chats().stream()
-                        .filter(c -> c.id() == chatFull.fullChat().id())
+                        .filter(c -> (c.identifier() == BaseChat.ID || c.identifier() == Channel.ID) &&
+                                c.id() == chatFull.fullChat().id())
                         .findFirst()
                         .orElseThrow();
 
@@ -272,6 +275,14 @@ public final class EntityFactory {
                 return new DocumentAttributeVideo(client, (telegram4j.tl.DocumentAttributeVideo) data);
             default:
                 throw new IllegalArgumentException("Unknown document attribute type: " + data);
+        }
+    }
+
+    public static PeerEntity createPeerEntity(MTProtoTelegramClient client, ResolvedPeer p) {
+        switch (p.peer().identifier()) {
+            case PeerChannel.ID: return createChat(client, p.chats().get(0));
+            case PeerUser.ID: return createUser(client, p.users().get(0));
+            default: throw new IllegalArgumentException("Unknown peer type: " + p.peer());
         }
     }
 }

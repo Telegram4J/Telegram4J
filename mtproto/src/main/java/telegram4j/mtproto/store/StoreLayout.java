@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.updates.State;
@@ -17,7 +18,7 @@ public interface StoreLayout {
 
     Mono<Long> getSelfId();
 
-    Mono<InputPeer> resolvePeer(String username);
+    Mono<ResolvedPeer> resolvePeer(String username);
 
     Mono<InputUser> resolveUser(long userId);
 

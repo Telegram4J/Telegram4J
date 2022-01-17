@@ -7,6 +7,7 @@ import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
@@ -20,6 +21,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
+import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 
 public class StoreLayoutImpl implements StoreLayout {
 
@@ -44,8 +46,35 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<InputPeer> resolvePeer(String username) {
-        return Mono.fromSupplier(() -> usernames.get(stripUsername(username)));
+    public Mono<ResolvedPeer> resolvePeer(String username) {
+        return Mono.fromSupplier(() -> usernames.get(stripUsername(username)))
+                .mapNotNull(p -> {
+                    long rawPeerId = getRawInputPeerId(p);
+                    switch (p.identifier()) {
+                        case InputPeerUser.ID:
+                            var userInfo = users.get(rawPeerId);
+                            if (userInfo == null) {
+                                return null;
+                            }
+
+                            return ResolvedPeer.builder()
+                                    .users(List.of(userInfo.min))
+                                    .peer(asPeer(p))
+                                    .build();
+                        case InputPeerChannel.ID:
+                            var channelInfo = chats.get(rawPeerId);
+                            if (channelInfo == null) {
+                                return null;
+                            }
+
+                            return ResolvedPeer.builder()
+                                    .chats(List.of(channelInfo.min))
+                                    .peer(asPeer(p))
+                                    .build();
+                        default:
+                            throw new IllegalStateException();
+                    }
+                });
     }
 
     @Override
@@ -321,7 +350,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload) {
         return Mono.fromSupplier(() -> saveUserFull(payload))
-                .then(Mono.empty()); // TODO: try to assemble such an object
+                .filter(userInfo -> userInfo.full != null)
+                .map(userInfo -> telegram4j.tl.users.UserFull.builder()
+                        .users(List.of(userInfo.min))
+                        .fullUser(Objects.requireNonNull(userInfo.full))
+                        .build());
     }
 
     @Override
@@ -336,7 +369,31 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
-        return Mono.empty();
+        return Mono.fromSupplier(() -> saveChatFull(payload))
+                .filter(chatInfo -> chatInfo.full != null)
+                .map(chatInfo -> telegram4j.tl.messages.ChatFull.builder()
+                        .chats(List.of(chatInfo.min))
+                        .fullChat(Objects.requireNonNull(chatInfo.full))
+                        .build());
+    }
+
+    @Nullable
+    private PartialFields<Chat, ChatFull> saveChatFull(telegram4j.tl.messages.ChatFull chat) {
+        ChatFull chat0 = copy(chat.fullChat());
+        Chat chat1 = copy(chat.chats().stream()
+                .filter(c -> isAccessible(c) && c.id() == chat0.id())
+                .findFirst()
+                .orElseThrow());
+
+        if (!isAccessible(chat1)) {
+            return null;
+        }
+
+        var old = chats.computeIfAbsent(chat0.id(), k -> new PartialFields<>(chat1, chat0));
+        chats.computeIfPresent(chat0.id(), (k, v) -> new PartialFields<>(chat1, chat0));
+        saveUsernamePeer(chat0);
+
+        return old;
     }
 
     @Nullable
@@ -352,18 +409,16 @@ public class StoreLayoutImpl implements StoreLayout {
             return null;
         }
 
-        var old = users.computeIfAbsent(user.fullUser().id(), k -> new PartialFields<>(user1, user0));
-        users.computeIfPresent(user.fullUser().id(), (k, v) -> new PartialFields<>(user1, user0));
+        var old = users.computeIfAbsent(user0.id(), k -> new PartialFields<>(user1, user0));
+        users.computeIfPresent(user0.id(), (k, v) -> new PartialFields<>(user1, user0));
         saveUsernamePeer(user1);
-
-        saveContacts(user.chats(), user.users());
 
         return old;
     }
 
     @Nullable
     private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserMin(User user) {
-        if (user.identifier() != BaseUser.ID || (!isAccessible(user) && chats.containsKey(user.id()))) {
+        if (user.identifier() != BaseUser.ID || !isAccessible(user)) {
             return null;
         }
 
@@ -412,38 +467,40 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    private void saveUsernamePeer(BaseUser user) {
-        String username = user.username();
-        Long accessHash = user.accessHash();
-        if (username != null) {
-            if (accessHash != null) {
-                usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user.id(), accessHash));
-            } else {
-                usernames.remove(stripUsername(username));
+    private void saveUsernamePeer(TlObject object) {
+        switch (object.identifier()) {
+            case BaseUser.ID: {
+                BaseUser user = (BaseUser) object;
+                String username = user.username();
+                long accessHash = Objects.requireNonNull(user.accessHash());
+                if (username != null) {
+                    usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user.id(), accessHash));
+                }
+                break;
+            }
+            case Channel.ID: {
+                Channel channel = (Channel) object;
+
+                String username = channel.username();
+                long accessHash = Objects.requireNonNull(channel.accessHash());
+                if (username != null) {
+                    usernames.put(stripUsername(username), ImmutableInputPeerChannel.of(channel.id(), accessHash));
+                }
             }
         }
     }
 
     @Nullable
     private PartialFields<Chat, ChatFull> saveChatMin(Chat chat) {
-        if (!isAccessible(chat) && chats.containsKey(chat.id())) {
+        if (!isAccessible(chat)) {
             return null;
         }
 
-        Chat cpy;
-        switch (chat.identifier()) {
-            case BaseChat.ID:
-                cpy = ImmutableBaseChat.copyOf((BaseChat) chat);
-                break;
-            case Channel.ID:
-                cpy = ImmutableChannel.copyOf((Channel) chat);
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown chat type: " + chat);
-        }
-
+        Chat cpy = copy(chat);
         var old = chats.computeIfAbsent(cpy.id(), k -> new PartialFields<>(cpy));
         chats.computeIfPresent(cpy.id(), (k, v) -> new PartialFields<>(cpy, v.full));
+        saveUsernamePeer(cpy);
+
         return old;
     }
 
@@ -458,6 +515,17 @@ public class StoreLayoutImpl implements StoreLayout {
 
         for (User user : users) {
             saveUserMin(user);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    static <T extends TlObject> T copy(T object) {
+        switch (object.identifier()) {
+            case BaseChat.ID: return (T) ImmutableBaseChat.copyOf((BaseChat) object);
+            case Channel.ID: return (T) ImmutableChannel.copyOf((Channel) object);
+            case BaseChatFull.ID: return (T) ImmutableBaseChatFull.copyOf((BaseChatFull) object);
+            case ChannelFull.ID: return (T) ImmutableChannelFull.copyOf((ChannelFull) object);
+            default: throw new IllegalArgumentException("Unknown entity type: " + object);
         }
     }
 
@@ -476,6 +544,19 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
+    private Peer asPeer(InputPeer peer) {
+        long rawPeerId = getRawInputPeerId(peer);
+        switch (peer.identifier()) {
+            case InputPeerChat.ID: return ImmutablePeerChat.of(rawPeerId);
+            case InputPeerChannel.ID:
+            case InputPeerChannelFromMessage.ID: return ImmutablePeerChannel.of(rawPeerId);
+            case InputPeerUser.ID:
+            case InputPeerUserFromMessage.ID: return ImmutablePeerUser.of(rawPeerId);
+            case InputPeerSelf.ID: return ImmutablePeerUser.of(selfId);
+            default: throw new IllegalStateException();
+        }
+    }
+
     private long getRawInputPeerId(InputPeer peer) {
         switch (peer.identifier()) {
             case InputPeerChat.ID: return ((InputPeerChat) peer).chatId();
@@ -486,12 +567,6 @@ public class StoreLayoutImpl implements StoreLayout {
             case InputPeerSelf.ID: return selfId;
             default: throw new IllegalStateException();
         }
-    }
-
-    static String stripUsername(String username) {
-        return username.toLowerCase().trim()
-                .replace(".", "")
-                .replace("@", "");
     }
 
     static class MessageId {

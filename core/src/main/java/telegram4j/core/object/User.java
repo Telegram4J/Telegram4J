@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -13,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class User implements TelegramObject {
+public class User implements PeerEntity {
 
     private final MTProtoTelegramClient client;
     private final BaseUser minData;
@@ -39,6 +40,10 @@ public class User implements TelegramObject {
 
     public EnumSet<Flag> getFlags() {
         return fullData != null ? Flag.fromUserFull(fullData, minData) : Flag.fromUserMin(minData);
+    }
+
+    public PrivateChat asPrivateChat() {
+        return new PrivateChat(client, this);
     }
 
     // MinUser fields

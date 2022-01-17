@@ -3,11 +3,13 @@ package telegram4j.core.retriever;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 public class RpcEntityRetriever implements EntityRetriever {
@@ -23,6 +25,15 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
+    public Mono<PeerEntity> resolveUsername(String username) {
+        return Mono.fromSupplier(() -> TlEntityUtil.stripUsername(username))
+                .flatMap(s -> storeLayout.resolvePeer(s)
+                        .switchIfEmpty(serviceHolder.getUserService()
+                                .resolveUsername(username)))
+                .map(p -> EntityFactory.createPeerEntity(client, p));
+    }
+
+    @Override
     public Mono<User> getUserMinById(Id userId) {
         if (userId.getType() != Id.Type.USER) {
             return Mono.error(new IllegalArgumentException("Incorrect id type, expected: "
@@ -31,7 +42,8 @@ public class RpcEntityRetriever implements EntityRetriever {
 
         return storeLayout.getUserMinById(userId.asLong())
                 .switchIfEmpty(asInputUser(userId).flatMap(serviceHolder.getUserService()::getUser))
-                .map(u -> new User(client, (BaseUser) u));
+                .ofType(BaseUser.class)
+                .map(u -> new User(client, u));
     }
 
     @Override
@@ -59,6 +71,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     }
                     return asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel);
                 }))
+                .ofType(telegram4j.tl.Chat.class)
                 .map(c -> EntityFactory.createChat(client, c));
     }
 

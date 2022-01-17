@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.*;
 import telegram4j.tl.help.UserInfo;
@@ -83,13 +84,7 @@ public class UserService extends RpcService {
      * info on users found by username and auxiliary data
      */
     public Mono<ResolvedPeer> resolveUsername(String username) {
-        return Mono.defer(() -> {
-            String corrected = username.toLowerCase().trim()
-                    .replace(".", "")
-                    .replace("@", "");
-
-            return client.sendAwait(ImmutableResolveUsername.of(corrected));
-        });
+        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))));
     }
 
     public Flux<Integer> getContactsIds(long hash) {

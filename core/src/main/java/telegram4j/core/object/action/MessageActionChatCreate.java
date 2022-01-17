@@ -1,5 +1,6 @@
 package telegram4j.core.object.action;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 
@@ -24,5 +25,25 @@ public class MessageActionChatCreate extends BaseMessageAction {
         return data.users().stream()
                 .map(l -> Id.ofUser(l, null))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MessageActionChatCreate that = (MessageActionChatCreate) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "MessageActionChatCreate{" +
+                "data=" + data +
+                '}';
     }
 }

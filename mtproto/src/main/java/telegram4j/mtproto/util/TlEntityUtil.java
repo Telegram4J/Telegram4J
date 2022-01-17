@@ -13,6 +13,12 @@ public class TlEntityUtil {
     private TlEntityUtil() {
     }
 
+    public static String stripUsername(String username) {
+        return username.toLowerCase().trim()
+                .replace(".", "")
+                .replace("@", "");
+    }
+
     public static long getRawPeerId(Peer peer) {
         switch (peer.identifier()) {
             case PeerChannel.ID: return ((PeerChannel) peer).channelId();

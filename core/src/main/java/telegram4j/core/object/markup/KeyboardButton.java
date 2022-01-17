@@ -1,5 +1,6 @@
 package telegram4j.core.object.markup;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.TelegramObject;
@@ -95,29 +96,84 @@ public class KeyboardButton implements TelegramObject {
         return Optional.empty();
     }
 
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        KeyboardButton that = (KeyboardButton) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "KeyboardButton{" +
+                "data=" + data +
+                '}';
+    }
+
     public enum Type {
+        /** Bot keyboard button. */
         DEFAULT,
 
+        /** Button to buy a product. */
         BUY,
 
+        /**
+         * Button to request a user to <a href="https://core.telegram.org/method/messages.acceptUrlAuth">authorize</a>
+         * via URL using <a href="https://telegram.org/blog/privacy-discussions-web-bots#meet-seamless-web-bots">Seamless Telegram Login</a>.
+         */
         INPUT_URH_AUTH,
 
+        /** Callback button. */
         CALLBACK,
 
+        /** Button to start a game. */
         GAME,
 
+        /** Button to request a user's geolocation. */
         REQUEST_GEO_LOCATION,
 
+        /** Button to request a user's phone number. */
         REQUEST_PHONE,
 
+        /**
+         * A button that allows the user to create and
+         * send a poll when pressed; available only in private.
+         */
         REQUEST_POLL,
 
+        /**
+         * Button to force a user to switch to inline mode Pressing the button
+         * will prompt the user to select one of their chats, open that chat and
+         * insert the bot‘s username and the specified inline query in the input field.
+         */
         SWITCH_INLINE,
 
+        /** URL embedded button. */
         URL,
 
         USER_PROFILE,
 
+        /**
+         * Button to request a user to authorize via URL
+         * using <a href="https://telegram.org/blog/privacy-discussions-web-bots#meet-seamless-web-bots">Seamless Telegram Login</a>.
+         * When the user clicks on such a button, {@link telegram4j.tl.request.messages.RequestUrlAuth}
+         * should be called, providing the {@link KeyboardButtonUrlAuth#buttonId()} and the ID of the container message.
+         * The returned {@link UrlAuthResultRequest} object will contain more details
+         * about the authorization request ({@link UrlAuthResultRequest#requestWriteAccess()}
+         * if the bot would like to send messages to the user along with the username of
+         * the bot which will be used for user authorization).
+         * Finally, the user can choose to call {@link telegram4j.tl.request.messages.AcceptUrlAuth} to
+         * get a {@link UrlAuthResultAccepted} with the URL to open instead of the {@code url}
+         * of this constructor, or a {@link UrlAuthResultDefault}, in which case the {@code url}
+         * of this constructor must be opened, instead. If the user refuses the
+         * authorization request but still wants to open the link, the {@code url} of this constructor must be used.
+         */
         URL_AUTH;
 
         public static Type of(telegram4j.tl.KeyboardButton data) {

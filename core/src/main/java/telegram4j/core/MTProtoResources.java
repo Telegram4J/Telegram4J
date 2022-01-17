@@ -4,6 +4,8 @@ import telegram4j.core.event.EventDispatcher;
 import telegram4j.mtproto.MTProtoClientManager;
 import telegram4j.mtproto.store.StoreLayout;
 
+import java.util.Objects;
+
 public class MTProtoResources {
     private final MTProtoClientManager clientManager;
     private final StoreLayout storeLayout;
@@ -11,9 +13,9 @@ public class MTProtoResources {
 
     public MTProtoResources(MTProtoClientManager clientManager, StoreLayout storeLayout,
                             EventDispatcher eventDispatcher) {
-        this.clientManager = clientManager;
-        this.storeLayout = storeLayout;
-        this.eventDispatcher = eventDispatcher;
+        this.clientManager = Objects.requireNonNull(clientManager, "clientManager");
+        this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
+        this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
     }
 
     public MTProtoClientManager getClientManager() {
