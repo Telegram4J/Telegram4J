@@ -198,7 +198,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
                                 Long id = quickAckTokens.get(val);
                                 if (id == null) {
-                                    log.warn("[C:0x{}] Unserialized quick acknowledge", id);
+                                    log.warn("[C:0x{}] Unserialized quick acknowledge", this.id);
                                     return Mono.empty();
                                 }
 

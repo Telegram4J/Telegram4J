@@ -46,14 +46,17 @@ class FileReferenceIdTest {
                         .build()))
                 .dcId(2)
                 .build());
+        var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2);
 
         var actChatPhoto = serialize(expChatPhoto);
         var actDocument = serialize(expDocument);
         var actPhoto = serialize(expPhoto);
+        var actStickerSet = serialize(expStickerSet);
 
         assertEquals(expChatPhoto, actChatPhoto);
         assertEquals(expDocument, actDocument);
         assertEquals(expPhoto, actPhoto);
+        assertEquals(expStickerSet, actStickerSet);
     }
 
     static FileReferenceId serialize(FileReferenceId ref) {

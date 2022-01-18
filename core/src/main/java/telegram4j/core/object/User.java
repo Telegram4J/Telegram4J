@@ -67,7 +67,7 @@ public class User implements PeerEntity {
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
                 .map(c -> new ChatPhoto(client, c, ImmutableInputPeerUser.of(minData.id(),
-                        Objects.requireNonNull(minData.accessHash())))); // TODO: fetch accessHash
+                        Objects.requireNonNull(minData.accessHash()))));
     }
 
     public Optional<Photo> getPhoto() {

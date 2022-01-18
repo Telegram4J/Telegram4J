@@ -209,23 +209,14 @@ public class BroadcastChannel extends BaseChannel {
         /** Whether the current user has left this channel. */
         LEFT(2),
 
-        /** Is this a channel? */
-        BROADCAST(5),
-
         /** Is this channel verified by telegram? */
         VERIFIED(7),
 
-        /** Is this a supergroup? */
-        MEGAGROUP(8),
-
-        /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()})ю */
+        /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()}). */
         RESTRICTED(9),
 
         /** Whether signatures are enabled (channels). */
         SIGNATURES(11),
-
-        /** See <a href="https://core.telegram.org/api/min">min</a> */
-        MIN(12),
 
         /** This channel/supergroup is probably a scam. */
         SCAM(19),
@@ -250,9 +241,6 @@ public class BroadcastChannel extends BaseChannel {
          * as a fake or scam: be careful when interacting with it.
          */
         FAKE(25),
-
-        /** Whether this <a href="https://core.telegram.org/api/channel">supergroup</a> is a gigagroup. */
-        GIGAGROUP(26),
 
         // TODO: not documented flag
         NOFORWARDS(27),

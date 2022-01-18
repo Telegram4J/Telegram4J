@@ -88,8 +88,8 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableEditChatPhoto.of(chatId, photo));
     }
 
-    public Mono<Updates> addChatUser(long chatId, InputUser user, int fwdLimit) {
-        return client.sendAwait(ImmutableAddChatUser.of(chatId, user, fwdLimit));
+    public Mono<Updates> addChatUser(long chatId, InputUser user, int forwardLimit) {
+        return client.sendAwait(ImmutableAddChatUser.of(chatId, user, forwardLimit));
     }
 
     public Mono<Updates> deleteChatUser(DeleteChatUser request) {

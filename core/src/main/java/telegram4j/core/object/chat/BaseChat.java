@@ -76,6 +76,7 @@ abstract class BaseChat implements Chat {
                             .replyToMsgId(spec.replyToMessageId().orElse(null))
                             .message(tuple.getT1())
                             .entities(tuple.getT2())
+                            // .sendAs(...)
                             // .replyMarkup(spec.replyMarkup().map(ReplyMarkup::getData).orElse(null))
                             .scheduleDate(spec.scheduleTimestamp()
                                     .map(Instant::getEpochSecond)
@@ -84,13 +85,5 @@ abstract class BaseChat implements Chat {
                             .build())
                     .map(e -> EntityFactory.createMessage(client, e, id));
         });
-    }
-
-    @Override
-    public String toString() {
-        return "BaseChat{" +
-                "id=" + id +
-                ", type=" + type +
-                '}';
     }
 }

@@ -147,6 +147,27 @@ public class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData).map(BaseChatFull::themeEmoticon);
     }
 
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        GroupChat groupChat = (GroupChat) o;
+        return minData.equals(groupChat.minData) && Objects.equals(fullData, groupChat.fullData);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(minData, fullData);
+    }
+
+    @Override
+    public String toString() {
+        return "GroupChat{" +
+                "minData=" + minData +
+                ", fullData=" + fullData +
+                '}';
+    }
+
     public enum Flag {
         // MinChat flags
 

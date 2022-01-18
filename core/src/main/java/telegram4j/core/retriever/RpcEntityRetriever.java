@@ -12,6 +12,8 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
+import java.util.Objects;
+
 public class RpcEntityRetriever implements EntityRetriever {
 
     private final MTProtoTelegramClient client;
@@ -19,7 +21,7 @@ public class RpcEntityRetriever implements EntityRetriever {
     private final StoreLayout storeLayout;
 
     public RpcEntityRetriever(MTProtoTelegramClient client) {
-        this.client = client;
+        this.client = Objects.requireNonNull(client, "client");
         this.serviceHolder = client.getServiceHolder();
         this.storeLayout = client.getMtProtoResources().getStoreLayout();
     }

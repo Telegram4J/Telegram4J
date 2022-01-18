@@ -14,6 +14,7 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.ExportedChatInvite;
@@ -29,7 +30,6 @@ import telegram4j.tl.request.upload.SaveBigFilePart;
 import telegram4j.tl.request.upload.SaveFilePart;
 import telegram4j.tl.storage.FileType;
 import telegram4j.tl.upload.BaseFile;
-import telegram4j.tl.upload.File;
 import telegram4j.tl.upload.FileCdnRedirect;
 import telegram4j.tl.upload.WebFile;
 
@@ -815,15 +815,14 @@ public class MessageService extends RpcService {
                 .then();
     }
 
-    public Mono<Void> getFile(boolean precise, boolean cdnSupported, InputFileLocation location,
-                              Function<File, ? extends Publisher<?>> progressor) {
+    public Mono<Void> getFile(FileReferenceId location, Function<BaseFile, ? extends Publisher<?>> progressor) {
         AtomicInteger offset = new AtomicInteger();
         AtomicBoolean complete = new AtomicBoolean();
-        int limit = PRECISE_LIMIT; // TODO
+        int limit = PRECISE_LIMIT;
         var headerRequest = GetFile.builder()
-                .precise(precise)
-                .cdnSupported(cdnSupported)
-                .location(location)
+                .precise(true)
+                .cdnSupported(false) // TODO
+                .location(location.asLocation())
                 .offset(offset.get())
                 .limit(limit)
                 .build();

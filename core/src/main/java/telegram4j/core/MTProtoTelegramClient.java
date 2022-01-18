@@ -14,7 +14,7 @@ import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
-import telegram4j.tl.upload.File;
+import telegram4j.tl.upload.BaseFile;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -89,11 +89,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return mtProtoResources.getEventDispatcher().on(type);
     }
 
-    public Mono<Void> getFile(String fileReferenceId, Function<File, ? extends Publisher<?>> progressor) {
+    public Mono<Void> getFile(String fileReferenceId, Function<BaseFile, ? extends Publisher<?>> progressor) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .map(FileReferenceId::asLocation)
                 .flatMap(loc -> serviceHolder.getMessageService()
-                        .getFile(false, false, loc, progressor));
+                        .getFile(loc, progressor));
     }
 
     // EntityRetriever methods

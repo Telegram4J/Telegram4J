@@ -60,6 +60,6 @@ public final class PrivateChat extends BaseChat {
     public String toString() {
         return "PrivateChat{" +
                 "user=" + user +
-                "} " + super.toString();
+                '}';
     }
 }

@@ -222,23 +222,14 @@ public class SupergroupChat extends BaseChannel {
         /** Whether the current user has left this channel. */
         LEFT(2),
 
-        /** Is this a channel? */
-        BROADCAST(5),
-
         /** Is this channel verified by telegram?. */
         VERIFIED(7),
-
-        /** Is this a supergroup? */
-        MEGAGROUP(8),
 
         /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()}) */
         RESTRICTED(9),
 
         /** Whether signatures are enabled (channels). */
         SIGNATURES(11),
-
-        /** See <a href="https://core.telegram.org/api/min">min</a> */
-        MIN(12),
 
         /** This channel/supergroup is probably a scam. */
         SCAM(19),

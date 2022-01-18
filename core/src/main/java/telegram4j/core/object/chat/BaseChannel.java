@@ -60,6 +60,6 @@ abstract class BaseChannel extends BaseChat implements Channel {
         return "BaseChannel{" +
                 "minData=" + minData +
                 ", fullData=" + fullData +
-                "} " + super.toString();
+                '}';
     }
 }

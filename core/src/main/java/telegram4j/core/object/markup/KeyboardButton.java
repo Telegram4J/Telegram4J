@@ -51,14 +51,17 @@ public class KeyboardButton implements TelegramObject {
     }
 
     public Optional<String> getUrl() {
-        return data.identifier() == KeyboardButtonSwitchInline.ID
-                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
-                : Optional.empty();
+        switch (data.identifier()) {
+            case KeyboardButtonUrl.ID: return Optional.of(((KeyboardButtonUrl) data).url());
+            case KeyboardButtonUrlAuth.ID: return Optional.of(((KeyboardButtonUrlAuth) data).url());
+            case InputKeyboardButtonUrlAuth.ID: return Optional.of(((InputKeyboardButtonUrlAuth) data).url());
+            default: return Optional.empty();
+        }
     }
 
     public Optional<String> getForwardText() {
-        return data.identifier() == KeyboardButtonSwitchInline.ID
-                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
+        return data.identifier() == KeyboardButtonUrlAuth.ID
+                ? Optional.ofNullable(((KeyboardButtonUrlAuth) data).fwdText())
                 : Optional.empty();
     }
 

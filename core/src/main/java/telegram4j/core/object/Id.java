@@ -10,10 +10,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 
 public final class Id {
-    // TODO: create access hash resolving
-    public static final long ACCESS_HASH_NOOP = 0;
-    public static final long ACCESS_HASH_UNAVAILABLE = -1;
-    public static final long ACCESS_HASH_UNRESOLVED = -2;
+    private static final long ACCESS_HASH_UNAVAILABLE = 0;
 
     private final Type type;
     private final long value;
@@ -26,7 +23,7 @@ public final class Id {
     }
 
     public static Id ofChat(long value) {
-        return new Id(Type.CHAT, value, ACCESS_HASH_NOOP);
+        return new Id(Type.CHAT, value, ACCESS_HASH_UNAVAILABLE);
     }
 
     public static Id ofChannel(long value, @Nullable Long accessHash) {
@@ -39,9 +36,9 @@ public final class Id {
 
     public static Id of(Peer peer) {
         switch (peer.identifier()) {
-            case PeerChannel.ID: return of(Type.CHANNEL, ((PeerChannel) peer).channelId(), ACCESS_HASH_UNRESOLVED);
-            case PeerChat.ID: return of(Type.CHAT, ((PeerChat) peer).chatId(), ACCESS_HASH_UNRESOLVED);
-            case PeerUser.ID: return of(Type.USER, ((PeerUser) peer).userId(), ACCESS_HASH_UNRESOLVED);
+            case PeerChannel.ID: return of(Type.CHANNEL, ((PeerChannel) peer).channelId(), ACCESS_HASH_UNAVAILABLE);
+            case PeerChat.ID: return of(Type.CHAT, ((PeerChat) peer).chatId(), ACCESS_HASH_UNAVAILABLE);
+            case PeerUser.ID: return of(Type.USER, ((PeerUser) peer).userId(), ACCESS_HASH_UNAVAILABLE);
             default: throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
@@ -71,9 +68,7 @@ public final class Id {
     }
 
     public OptionalLong getAccessHash() {
-        if (accessHash != ACCESS_HASH_UNAVAILABLE &&
-                accessHash != ACCESS_HASH_UNRESOLVED &&
-                accessHash != ACCESS_HASH_NOOP) {
+        if (accessHash != ACCESS_HASH_UNAVAILABLE) {
             return OptionalLong.of(accessHash);
         }
         return OptionalLong.empty();
