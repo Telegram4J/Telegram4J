@@ -1,11 +1,9 @@
 package telegram4j.core;
 
 import org.junit.jupiter.api.Test;
-import reactor.util.function.Tuple2;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,22 +11,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class EntityParserTest {
 
     @Test
-    void all() {
-        List<MessageEntity> exc = Arrays.asList(
-                ImmutableMessageEntityBold.of(1, 7),
-                ImmutableMessageEntityStrike.of(13, 3),
-                ImmutableMessageEntityMentionName.of(19, 24, 123456789),
-                ImmutableMessageEntityItalic.of(44, 1),
-                ImmutableMessageEntityUnderline.of(46, 2),
-                ImmutableMessageEntityCode.of(50, 9),
-                ImmutableMessageEntityTextUrl.of(65, 1, "https://google.com"),
-                ImmutableMessageEntityPre.of(67, 4, ""));
+    void markdownV2() {
+        var exc = List.of(
+                ImmutableMessageEntityBold.of(0, 12),
+                ImmutableMessageEntityItalic.of(51, 11),
+                ImmutableMessageEntityCode.of(78, 11),
+                ImmutableMessageEntityPre.of(94, 23, "java"),
+                ImmutableMessageEntityTextUrl.of(90, 3, "https://google.com"),
+                ImmutableMessageEntityMentionName.of(26, 24, 123456789),
+                ImmutableMessageEntityUnderline.of(63, 14),
+                ImmutableMessageEntityStrike.of(14, 11));
 
-        String s = "\\**Message*char ~123~ № [inline mention of a user](tg://user?id=123456789) _a_ __bc__  `code code` text " +
-                "[g](https://google.com) ```\nowo\n```";
+        String original = "**bold text\\*\\*** ~~strike text~~ [inline mention of a user](tg://user?id=123456789) " +
+                "_italic text_ __underline text__ `inline code` " +
+                "[url](https://google.com) ```java\n" +
+                "public class Clazz {}" +
+                "\n```";
 
-        Tuple2<String, List<MessageEntity>> tuple = EntityParser.parse(s, EntityParser.Mode.MARKDOWN_V2);
+        String striped = "bold text\\*\\* strike text inline mention of a user italic text underline text inline code url \n" +
+                "public class Clazz {}\n";
 
+        var tuple = EntityParserSupport.parse(
+                EntityParserSupport.MARKDOWN_V2.apply(original));
+
+        assertEquals(striped, tuple.getT1());
         assertEquals(exc, tuple.getT2());
     }
 }
