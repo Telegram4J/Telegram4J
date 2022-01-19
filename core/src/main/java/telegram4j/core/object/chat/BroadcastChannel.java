@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/** Represents an unlimited channel with messages broadcasting. */
 public class BroadcastChannel extends BaseChannel {
 
     public BroadcastChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
@@ -187,8 +188,10 @@ public class BroadcastChannel extends BaseChannel {
         return Optional.ofNullable(fullData).map(ChannelFull::pendingSuggestions);
     }
 
-    public Optional<Peer> getGroupCallDefaultJoinAs() {
-        return Optional.ofNullable(fullData).map(ChannelFull::groupcallDefaultJoinAs);
+    public Optional<Id> getGroupCallDefaultJoinAs() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::groupcallDefaultJoinAs)
+                .map(Id::of);
     }
 
     public Optional<String> getThemeEmoticon() {

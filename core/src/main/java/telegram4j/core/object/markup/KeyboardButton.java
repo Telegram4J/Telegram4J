@@ -181,32 +181,20 @@ public class KeyboardButton implements TelegramObject {
 
         public static Type of(telegram4j.tl.KeyboardButton data) {
             switch (data.identifier()) {
-                case BaseKeyboardButton.ID:
-                    return DEFAULT;
+                case BaseKeyboardButton.ID: return DEFAULT;
                 case KeyboardButtonUrlAuth.ID:
-                case InputKeyboardButtonUrlAuth.ID:
-                    return URL_AUTH;
+                case InputKeyboardButtonUrlAuth.ID: return URL_AUTH;
                 case KeyboardButtonUserProfile.ID:
-                case InputKeyboardButtonUserProfile.ID:
-                    return USER_PROFILE;
-                case KeyboardButtonBuy.ID:
-                    return BUY;
-                case KeyboardButtonCallback.ID:
-                    return CALLBACK;
-                case KeyboardButtonGame.ID:
-                    return GAME;
-                case KeyboardButtonRequestGeoLocation.ID:
-                    return REQUEST_GEO_LOCATION;
-                case KeyboardButtonRequestPhone.ID:
-                    return REQUEST_PHONE;
-                case KeyboardButtonRequestPoll.ID:
-                    return REQUEST_POLL;
-                case KeyboardButtonSwitchInline.ID:
-                    return SWITCH_INLINE;
-                case KeyboardButtonUrl.ID:
-                    return URL;
-                default:
-                    throw new IllegalStateException("Unexpected keyboard button type: " + data);
+                case InputKeyboardButtonUserProfile.ID: return USER_PROFILE;
+                case KeyboardButtonBuy.ID: return BUY;
+                case KeyboardButtonCallback.ID: return CALLBACK;
+                case KeyboardButtonGame.ID: return GAME;
+                case KeyboardButtonRequestGeoLocation.ID: return REQUEST_GEO_LOCATION;
+                case KeyboardButtonRequestPhone.ID: return REQUEST_PHONE;
+                case KeyboardButtonRequestPoll.ID: return REQUEST_POLL;
+                case KeyboardButtonSwitchInline.ID: return SWITCH_INLINE;
+                case KeyboardButtonUrl.ID: return URL;
+                default: throw new IllegalStateException("Unexpected keyboard button type: " + data);
             }
         }
     }

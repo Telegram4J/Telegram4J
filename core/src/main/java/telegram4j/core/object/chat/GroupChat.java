@@ -20,9 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-/**
- * Represents a basic group of 0-200 users (must be upgraded to a supergroup to accommodate more than 200 users).
- */
+/** Represents a basic group of 0-200 users (must be upgraded to a supergroup to accommodate more than 200 users). */
 public class GroupChat extends BaseChat {
 
     private final telegram4j.tl.BaseChat minData;

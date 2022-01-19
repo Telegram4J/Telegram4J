@@ -39,7 +39,7 @@ public class User implements PeerEntity {
     }
 
     public EnumSet<Flag> getFlags() {
-        return fullData != null ? Flag.fromUserFull(fullData, minData) : Flag.fromUserMin(minData);
+        return Flag.fromUserFull(fullData, minData);
     }
 
     public PrivateChat asPrivateChat() {
@@ -255,14 +255,16 @@ public class User implements PeerEntity {
             return flag;
         }
 
-        public static EnumSet<Flag> fromUserFull(telegram4j.tl.UserFull userFull, telegram4j.tl.User userMin) {
+        public static EnumSet<Flag> fromUserFull(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.User userMin) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
 
-            int flags = userFull.flags();
-            for (Flag value : values()) {
-                if (value.ordinal() >= VIDEO_CALLS_AVAILABLE.ordinal()) continue;
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
+            if (userFull != null) {
+                int flags = userFull.flags();
+                for (Flag value : values()) {
+                    if (value.ordinal() >= VIDEO_CALLS_AVAILABLE.ordinal()) continue;
+                    if ((flags & value.flag) != 0) {
+                        set.add(value);
+                    }
                 }
             }
 

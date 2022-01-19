@@ -7,8 +7,9 @@ import telegram4j.tl.ReplyMarkup;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.function.Function;
 
-@Value.Immutable
+@Value.Immutable(singleton = true)
 public interface EditMessageSpecDef extends Spec {
 
     default boolean noWebpage() {
@@ -25,5 +26,5 @@ public interface EditMessageSpecDef extends Spec {
 
     Optional<Instant> scheduleTimestamp();
 
-    Optional<EntityParser.Mode> mode();
+    Optional<Function<String, EntityParser>> parser();
 }

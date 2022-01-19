@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/** Represents a large group of 0-200,000 users. */
 public class SupergroupChat extends BaseChannel {
 
     public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
@@ -200,8 +201,10 @@ public class SupergroupChat extends BaseChannel {
         return Optional.ofNullable(fullData).map(ChannelFull::pendingSuggestions);
     }
 
-    public Optional<Peer> getGroupCallDefaultJoinAs() {
-        return Optional.ofNullable(fullData).map(ChannelFull::groupcallDefaultJoinAs);
+    public Optional<Id> getGroupCallDefaultJoinAs() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::groupcallDefaultJoinAs)
+                .map(Id::of);
     }
 
     public Optional<String> getThemeEmoticon() {

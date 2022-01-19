@@ -7,14 +7,31 @@ import telegram4j.core.spec.SendMessageSpec;
 import java.time.Duration;
 import java.util.Optional;
 
+/** The Telegram <a href="https://core.telegram.org/api/channel">chat</a> representation. */
 public interface Chat extends PeerEntity {
 
     Id getId();
 
+    /**
+     * Gets the type of chat.
+     *
+     * @return The {@link Type type} of chat.
+     */
     Type getType();
 
+    /**
+     * Gets the low quality chat photo, if present.
+     *
+     * @return The {@link ChatPhoto photo} of chat, if present.
+     */
     Optional<ChatPhoto> getMinPhoto();
 
+    /**
+     * Gets the normal chat photo, if present
+     * and if detailed information about chat is available.
+     *
+     * @return The {@link Photo photo} of chat, if present and available.
+     */
     Optional<Photo> getPhoto();
 
     Optional<Duration> getMessageAutoDeleteDuration();
@@ -25,11 +42,19 @@ public interface Chat extends PeerEntity {
 
     Mono<Message> sendMessage(SendMessageSpec spec);
 
+    /** All types of telegram chat. */
     enum Type {
+
+        /** Represents a {@link PrivateChat}. */
         PRIVATE,
+
+        /** Represents a {@link GroupChat}. */
         GROUP,
+
+        /** Represents a {@link SupergroupChat}. */
         SUPERGROUP,
-        CHANNEL,
-        UNKNOWN
+
+        /** Represents a {@link BroadcastChannel}. */
+        CHANNEL;
     }
 }

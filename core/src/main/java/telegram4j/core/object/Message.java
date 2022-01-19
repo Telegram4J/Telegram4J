@@ -9,7 +9,7 @@ import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
 import telegram4j.tl.request.messages.EditMessage;
 
@@ -167,15 +167,15 @@ public class Message implements TelegramObject {
 
     public Mono<Message> edit(EditMessageSpec spec) {
         return Mono.defer(() -> {
-            var tuple = spec.mode()
-                    .flatMap(m -> spec.message().map(s -> EntityParser.parse(s, m)))
+            var text = spec.parser()
+                    .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(parser.apply(s))))
                     .or(() -> spec.message().map(s -> Tuples.of(s, List.of())))
                     .orElse(null);
 
             return client.getServiceHolder().getMessageService()
                     .editMessage(EditMessage.builder()
-                            .message(tuple != null ? tuple.getT1() : null)
-                            .entities(tuple != null ? tuple.getT2() : null)
+                            .message(text != null ? text.getT1() : null)
+                            .entities(text != null ? text.getT2() : null)
                             .noWebpage(spec.noWebpage())
                             .id(getId())
                             .scheduleDate(spec.scheduleTimestamp()

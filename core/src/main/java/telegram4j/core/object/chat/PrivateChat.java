@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Represents a direct message chat. */
 public final class PrivateChat extends BaseChat {
 
     private final User user;
