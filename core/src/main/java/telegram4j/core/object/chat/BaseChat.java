@@ -63,6 +63,7 @@ abstract class BaseChat implements Chat {
     public Mono<Message> sendMessage(SendMessageSpec spec) {
         return Mono.defer(() -> {
             var text = spec.parser()
+                    .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                     .map(m -> EntityParserSupport.parse(m.apply(spec.message())))
                     .orElseGet(() -> Tuples.of(spec.message(), List.of()));
 

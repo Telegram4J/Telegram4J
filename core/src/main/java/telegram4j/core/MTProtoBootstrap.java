@@ -10,6 +10,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.tcp.TcpClient;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
@@ -18,6 +19,7 @@ import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
+import telegram4j.core.util.EntityParser;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
@@ -54,6 +56,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private RetryBackoffSpec authRetry;
     private IntPredicate gzipPackingPredicate;
 
+    @Nullable
+    private Function<String, EntityParser> defaultEntityParserFactory;
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
     private MTProtoClientManager mtProtoClientManager;
@@ -137,6 +141,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> setDefaultEntityParserFactory(Function<String, EntityParser> defaultEntityParserFactory) {
+        this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory, "defaultEntityParserFactory");
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -158,7 +167,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
                             initRetry(), initAuthRetry(), initGzipPackingPredicate())));
 
-            MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout, eventDispatcher);
+            MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout,
+                    eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
@@ -311,8 +321,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     private RetryBackoffSpec initAuthRetry() {
-        if (retry != null) {
-            return retry;
+        if (authRetry != null) {
+            return authRetry;
         }
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
     }
