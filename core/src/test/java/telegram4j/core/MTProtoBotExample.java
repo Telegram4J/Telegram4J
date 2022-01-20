@@ -8,6 +8,7 @@ import telegram4j.core.command.Command;
 import telegram4j.core.command.EchoCommand;
 import telegram4j.core.command.PingCommand;
 import telegram4j.core.command.ShrugCommand;
+import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.User;
@@ -35,8 +36,9 @@ public class MTProtoBotExample {
         String botAuthToken = System.getenv("T4J_TOKEN");
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
-                .setStoreLayout(new TestFileStoreLayout(ByteBufAllocator.DEFAULT, new StoreLayoutImpl()))
+                .setStoreLayout(new TestFileStoreLayout(ByteBufAllocator.DEFAULT, new StoreLayoutImpl(Function.identity())))
                 .withConnection(client -> {
+
                     Mono<Void> updateCommands = client.getServiceHolder().getBotService()
                             .getBotCommands(BotCommandScopeChats.instance(), "en")
                             .collectList()
@@ -71,7 +73,20 @@ public class MTProtoBotExample {
                                     .orElseGet(Mono::empty)))
                             .then();
 
-                    return Mono.when(updateCommands, listenMessages);
+                    Mono<Void> logEvents = client.on(Event.class)
+                            // .log("EVENTS")
+                            // .doOnError(e -> log.error("", e))
+                            .then();
+
+                    Mono<Void> test = client.on(SendMessageEvent.class)
+                            .filter(e -> e.getAuthor().map(a -> !a.getFlags().contains(User.Flag.BOT)).orElse(false))
+                            .next()
+                            // .flatMapMany(c -> client.getMessageById(c.getMessage().getChatId(),
+                            //         IdFields.MessageId.of(c.getMessage().getId())))
+                            .log()
+                            .then();
+
+                    return Mono.when(updateCommands, listenMessages, logEvents, test);
                 })
                 .block();
     }

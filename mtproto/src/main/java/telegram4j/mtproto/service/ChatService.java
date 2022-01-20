@@ -137,10 +137,7 @@ public class ChatService extends RpcService {
     }
 
     public Mono<Messages> getMessages(InputChannel channel, Iterable<? extends InputMessage> ids) {
-        return client.sendAwait(GetMessages.builder()
-                .channel(channel)
-                .id(ids)
-                .build());
+        return client.sendAwait(GetMessages.builder().channel(channel).id(ids).build());
     }
 
     public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,

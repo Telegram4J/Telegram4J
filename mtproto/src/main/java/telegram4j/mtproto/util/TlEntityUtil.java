@@ -1,10 +1,7 @@
 package telegram4j.mtproto.util;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.tl.Peer;
-import telegram4j.tl.PeerChannel;
-import telegram4j.tl.PeerChat;
-import telegram4j.tl.PeerUser;
+import telegram4j.tl.*;
 import telegram4j.tl.api.EmptyObject;
 import telegram4j.tl.api.TlObject;
 
@@ -25,6 +22,31 @@ public class TlEntityUtil {
             case PeerChat.ID: return ((PeerChat) peer).chatId();
             case PeerUser.ID: return ((PeerUser) peer).userId();
             default: throw new IllegalArgumentException("Unknown peer type: " + peer);
+        }
+    }
+
+    public static InputPeer toInputPeer(InputUser user) {
+        switch (user.identifier()) {
+            case InputUserFromMessage.ID:
+                InputUserFromMessage d = (InputUserFromMessage) user;
+                return ImmutableInputPeerUserFromMessage.of(d.peer(), d.msgId(), d.userId());
+            case InputUserSelf.ID: return InputPeerSelf.instance();
+            case BaseInputUser.ID:
+                BaseInputUser baseInputUser = (BaseInputUser) user;
+                return ImmutableInputPeerUser.of(baseInputUser.userId(), baseInputUser.accessHash());
+            default: throw new IllegalArgumentException("Unknown input user type: " + user);
+        }
+    }
+
+    public static InputPeer toInputPeer(InputChannel channel) {
+        switch (channel.identifier()) {
+            case InputChannelFromMessage.ID:
+                InputChannelFromMessage d = (InputChannelFromMessage) channel;
+                return ImmutableInputPeerChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
+            case BaseInputChannel.ID:
+                BaseInputChannel baseInputChannel = (BaseInputChannel) channel;
+                return ImmutableInputPeerChannel.of(baseInputChannel.channelId(), baseInputChannel.accessHash());
+            default: throw new IllegalArgumentException("Unknown input channel type: " + channel);
         }
     }
 
