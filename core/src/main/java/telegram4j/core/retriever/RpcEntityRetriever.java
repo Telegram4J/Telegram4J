@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
@@ -27,12 +28,24 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<PeerEntity> resolveUsername(String username) {
-        return Mono.fromSupplier(() -> TlEntityUtil.stripUsername(username))
-                .flatMap(s -> storeLayout.resolvePeer(s)
+    public Mono<PeerEntity> resolvePeer(PeerId peerId) {
+        Mono<PeerEntity> resolveById = Mono.justOrEmpty(peerId.asId())
+                .flatMap(id -> {
+                    switch (id.getType()) {
+                        case CHAT:
+                        case CHANNEL: return getChatMinById(id);
+                        case USER: return getUserMinById(id);
+                        default: return Mono.error(new IllegalStateException());
+                    }
+                });
+
+        return Mono.justOrEmpty(peerId.asUsername())
+                .map(TlEntityUtil::stripUsername)
+                .flatMap(username -> storeLayout.resolvePeer(username)
                         .switchIfEmpty(serviceHolder.getUserService()
                                 .resolveUsername(username)))
-                .map(p -> EntityFactory.createPeerEntity(client, p));
+                .map(p -> EntityFactory.createPeerEntity(client, p))
+                .switchIfEmpty(resolveById);
     }
 
     @Override

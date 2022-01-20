@@ -1,5 +1,7 @@
 package telegram4j.mtproto.store;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
@@ -18,6 +20,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
@@ -25,8 +28,8 @@ import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 
 public class StoreLayoutImpl implements StoreLayout {
 
-    private final ConcurrentMap<Integer, InputPeer> messagesByPeer = new ConcurrentHashMap<>();
-    private final ConcurrentMap<MessageId, Message> messages = new ConcurrentHashMap<>();
+    private final Cache<Integer, InputPeer> messagesByPeer;
+    private final Cache<MessageId, BaseMessageFields> messages;
     private final ConcurrentMap<Long, PartialFields<Chat, ChatFull>> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
@@ -34,6 +37,11 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private volatile long selfId;
     private volatile ImmutableState state;
+
+    public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
+        this.messagesByPeer = cacheFactory.apply(Caffeine.newBuilder()).build();
+        this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
+    }
 
     @Override
     public Mono<State> getCurrentState() {
@@ -51,6 +59,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 .mapNotNull(p -> {
                     long rawPeerId = getRawInputPeerId(p);
                     switch (p.identifier()) {
+                        case InputPeerSelf.ID:
                         case InputPeerUser.ID:
                             var userInfo = users.get(rawPeerId);
                             if (userInfo == null) {
@@ -103,7 +112,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Message> getMessageById(long chatId, int messageId) {
-        return Mono.fromSupplier(() -> messages.get(new MessageId(messageId, chatId)));
+        return Mono.fromSupplier(() -> messages.getIfPresent(new MessageId(messageId, chatId)));
     }
 
     @Override
@@ -164,7 +173,7 @@ public class StoreLayoutImpl implements StoreLayout {
             BaseMessageFields cast = (BaseMessageFields) message;
             MessageId key = new MessageId(cast.id(), getRawPeerId(cast.peerId()));
 
-            return messages.put(key, cast);
+            return messages.asMap().put(key, cast);
         });
     }
 
@@ -192,7 +201,7 @@ public class StoreLayoutImpl implements StoreLayout {
                     break;
                 case UpdateDeleteMessages.ID:
                     peer = update.messages().stream()
-                            .map(messagesByPeer::remove)
+                            .map(messagesByPeer.asMap()::remove)
                             .filter(Objects::nonNull)
                             .findFirst()
                             .orElse(InputPeerEmpty.instance());
@@ -208,7 +217,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
             var messages = update.messages().stream()
                     .map(id -> new MessageId(id, rawPeerId))
-                    .map(this.messages::remove)
+                    .map(this.messages.asMap()::remove)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
@@ -474,7 +483,17 @@ public class StoreLayoutImpl implements StoreLayout {
                 String username = user.username();
                 long accessHash = Objects.requireNonNull(user.accessHash());
                 if (username != null) {
-                    usernames.put(stripUsername(username), ImmutableInputPeerUser.of(user.id(), accessHash));
+                    InputPeer peer = user.self()
+                            ? InputPeerSelf.instance()
+                            : ImmutableInputPeerUser.of(user.id(), accessHash);
+
+                    // add special tags for indexing
+                    if (user.self()) {
+                        usernames.putIfAbsent("me", InputPeerSelf.instance());
+                        usernames.putIfAbsent("self", InputPeerSelf.instance());
+                    }
+
+                    usernames.put(stripUsername(username), peer);
                 }
                 break;
             }

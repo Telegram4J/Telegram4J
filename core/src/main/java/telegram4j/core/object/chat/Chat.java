@@ -1,7 +1,9 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.object.*;
+import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMessageSpec;
 
 import java.time.Duration;
@@ -41,6 +43,8 @@ public interface Chat extends PeerEntity {
     // Interaction methods
 
     Mono<Message> sendMessage(SendMessageSpec spec);
+
+    Flux<Message> forwardMessages(ForwardMessagesSpec spec);
 
     /** All types of telegram chat. */
     enum Type {

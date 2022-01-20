@@ -1,8 +1,8 @@
 package telegram4j.mtproto.store;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.InputPeer;
-import telegram4j.tl.Message;
 
 import java.util.List;
 import java.util.Objects;
@@ -10,9 +10,9 @@ import java.util.Objects;
 public class ResolvedDeletedMessages {
 
     private final InputPeer peer;
-    private final List<Message> messages;
+    private final List<BaseMessageFields> messages;
 
-    public ResolvedDeletedMessages(InputPeer peer, List<Message> messages) {
+    public ResolvedDeletedMessages(InputPeer peer, List<BaseMessageFields> messages) {
         this.peer = Objects.requireNonNull(peer, "peer");
         this.messages = Objects.requireNonNull(messages, "messages");
     }
@@ -21,7 +21,7 @@ public class ResolvedDeletedMessages {
         return peer;
     }
 
-    public List<Message> getMessages() {
+    public List<BaseMessageFields> getMessages() {
         return messages;
     }
 

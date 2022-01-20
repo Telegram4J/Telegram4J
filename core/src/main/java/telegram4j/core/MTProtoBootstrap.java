@@ -303,7 +303,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     private StoreLayout initStoreLayout() {
-        return storeLayout != null ? storeLayout : new StoreLayoutImpl();
+        if (storeLayout != null) {
+            return storeLayout;
+        }
+        return new StoreLayoutImpl(c -> c.maximumSize(1000));
     }
 
     private DataCenter initDataCenter() {

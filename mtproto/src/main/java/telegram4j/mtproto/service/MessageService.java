@@ -55,9 +55,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
-        return client.sendAwait(GetMessages.builder()
-                .id(ids)
-                .build());
+        return client.sendAwait(GetMessages.builder().id(ids).build());
     }
 
     public Mono<Dialogs> getDialogs(GetDialogs request) {

@@ -1,23 +1,27 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.User;
+import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.tl.ImmutableInputPeerChannel;
-import telegram4j.tl.ImmutableInputPeerChat;
-import telegram4j.tl.ImmutableInputPeerUser;
-import telegram4j.tl.InputPeer;
+import telegram4j.tl.*;
+import telegram4j.tl.request.messages.ForwardMessages;
 import telegram4j.tl.request.messages.SendMessage;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /** This class provides default implementation of {@link Chat} methods. */
 abstract class BaseChat implements Chat {
@@ -59,6 +63,28 @@ abstract class BaseChat implements Chat {
         }
     }
 
+    protected static InputPeer asInputPeer(PeerEntity entity) {
+        if (entity instanceof GroupChat) {
+            GroupChat groupChat = (GroupChat) entity;
+
+            return ImmutableInputPeerChat.of(groupChat.getId().asLong());
+        } else if (entity instanceof Channel) {
+            Channel channel = (Channel) entity;
+
+            Id channelId = channel.getId();
+            return ImmutableInputPeerChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow());
+        }
+        // or user
+
+        User user = (User) entity;
+        if (user.getFlags().contains(User.Flag.SELF)) {
+            return InputPeerSelf.instance();
+        }
+
+        Id userId = user.getId();
+        return ImmutableInputPeerUser.of(userId.asLong(), userId.getAccessHash().orElseThrow());
+    }
+
     @Override
     public Mono<Message> sendMessage(SendMessageSpec spec) {
         return Mono.defer(() -> {
@@ -78,8 +104,6 @@ abstract class BaseChat implements Chat {
                             .replyToMsgId(spec.replyToMessageId().orElse(null))
                             .message(text.getT1())
                             .entities(text.getT2())
-                            // .sendAs(...)
-                            // .replyMarkup(spec.replyMarkup().map(ReplyMarkup::getData).orElse(null))
                             .scheduleDate(spec.scheduleTimestamp()
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
@@ -87,5 +111,37 @@ abstract class BaseChat implements Chat {
                             .build())
                     .map(e -> EntityFactory.createMessage(client, e, id));
         });
+    }
+
+    @Override
+    public Flux<Message> forwardMessages(ForwardMessagesSpec spec) {
+        return client.resolvePeer(spec.toPeer())
+                .zipWith(Mono.justOrEmpty(spec.sendAs())
+                        .flatMap(client::resolvePeer)
+                        .map(BaseChat::asInputPeer)
+                        .defaultIfEmpty(InputPeerEmpty.instance()))
+                .flatMapMany(TupleUtils.function((toPeer, sendAs) -> client.getServiceHolder()
+                        .getMessageService()
+                        .forwardMessages(ForwardMessages.builder()
+                                .id(spec.ids())
+                                .randomId(CryptoUtil.random.longs(spec.ids().size())
+                                        .boxed()
+                                        .collect(Collectors.toList()))
+                                .silent(spec.silent())
+                                .background(spec.background())
+                                .withMyScore(spec.withMyScore())
+                                .dropAuthor(spec.dropAuthor())
+                                .dropMediaCaptions(spec.dropMediaCaptions())
+                                .noforwards(spec.noForwards())
+                                .fromPeer(getIdAsPeer())
+                                .silent(spec.silent())
+                                .toPeer(asInputPeer(toPeer))
+                                .sendAs(sendAs.identifier() == InputPeerEmpty.ID ? null : sendAs)
+                                .scheduleDate(spec.scheduleTimestamp()
+                                        .map(Instant::getEpochSecond)
+                                        .map(Math::toIntExact)
+                                        .orElse(null))
+                                .build())
+                        .map(e -> EntityFactory.createMessage(client, e, toPeer.getId()))));
     }
 }
