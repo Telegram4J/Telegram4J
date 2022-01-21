@@ -11,6 +11,8 @@ import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
+import telegram4j.tl.messages.BaseMessages;
+import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
@@ -111,8 +113,69 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> getMessageById(long chatId, int messageId) {
-        return Mono.fromSupplier(() -> messages.getIfPresent(new MessageId(messageId, chatId)));
+    public Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId) {
+        return Mono.fromSupplier(() -> {
+            long rawId = getRawInputPeerId(peerId);
+            BaseMessageFields message;
+            switch (messageId.identifier()) {
+                case InputMessageID.ID:
+                    InputMessageID d = (InputMessageID) messageId;
+                    message = messages.getIfPresent(new MessageId(d.id(), rawId));
+                    break;
+                case InputMessageReplyTo.ID:
+                    InputMessageReplyTo r = (InputMessageReplyTo) messageId;
+                    message = messages.getIfPresent(new MessageId(r.id(), rawId));
+                    break;
+                case InputMessagePinned.ID:
+                    if (isChatInputPeer(peerId)) {
+                        message = Optional.ofNullable(chats.get(rawId))
+                                .map(PartialFields::getFull)
+                                // TODO: why parser doesnt pull up pinnedMsgId method??
+                                .map(c -> c.identifier() == ChannelFull.ID
+                                        ? ((ChannelFull) c).pinnedMsgId()
+                                        : ((BaseChatFull) c).pinnedMsgId())
+                                .map(i -> messages.getIfPresent(new MessageId(i, rawId)))
+                                .orElse(null);
+                        break;
+                    }
+
+                    message = Optional.ofNullable(users.get(rawId))
+                            .map(PartialFields::getFull)
+                            .map(ImmutableUserFull::pinnedMsgId)
+                            .map(i -> messages.getIfPresent(new MessageId(i, rawId)))
+                            .orElse(null);
+                    break;
+                case InputMessageCallbackQuery.ID:
+                    // TODO
+                default:
+                    throw new IllegalArgumentException("Unknown input message type: " + messageId);
+            }
+
+            if (message == null) {
+                return null;
+            }
+
+            var builder = BaseMessages.builder()
+                    .addMessage(message);
+
+            // add author of message
+            Optional.ofNullable(message.fromId())
+                    .map(p -> users.get(TlEntityUtil.getRawPeerId(p)))
+                    .map(PartialFields::getMin)
+                    .ifPresent(builder::addUser);
+
+            // add user if message from dm
+            Optional.ofNullable(users.get(TlEntityUtil.getRawPeerId(message.peerId())))
+                    .map(PartialFields::getMin)
+                    .ifPresent(builder::addUser);
+
+            // add chat if possible
+            Optional.ofNullable(chats.get(TlEntityUtil.getRawPeerId(message.peerId())))
+                    .map(PartialFields::getMin)
+                    .ifPresent(builder::addChat);
+
+            return builder.build();
+        });
     }
 
     @Override
@@ -140,7 +203,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromSupplier(() -> users.get(userId))
                 .filter(userInfo -> userInfo.full != null)
                 .map(userInfo -> telegram4j.tl.users.UserFull.builder()
-                        .users(List.of(userInfo.min))
+                        .addUser(userInfo.min)
                         .fullUser(Objects.requireNonNull(userInfo.full))
                         .build());
     }
@@ -213,8 +276,8 @@ public class StoreLayoutImpl implements StoreLayout {
             if (peer.identifier() == InputPeerEmpty.ID) {
                 return null;
             }
-            long rawPeerId = getRawInputPeerId(peer);
 
+            long rawPeerId = getRawInputPeerId(peer);
             var messages = update.messages().stream()
                     .map(id -> new MessageId(id, rawPeerId))
                     .map(this.messages.asMap()::remove)
@@ -437,6 +500,15 @@ public class StoreLayoutImpl implements StoreLayout {
         saveUsernamePeer(user0);
 
         return old;
+    }
+
+    private boolean isChatInputPeer(InputPeer peer) {
+        switch (peer.identifier()) {
+            case InputPeerChannel.ID:
+            case InputPeerChannelFromMessage.ID:
+            case InputPeerChat.ID: return true;
+            default: return false;
+        }
     }
 
     private InputPeer getInputPeer(Peer peer) {

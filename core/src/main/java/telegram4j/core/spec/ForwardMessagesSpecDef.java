@@ -36,8 +36,6 @@ interface ForwardMessagesSpecDef extends Spec {
 
     List<Integer> ids();
 
-    PeerId toPeer();
-
     Optional<Instant> scheduleTimestamp();
 
     Optional<PeerId> sendAs();

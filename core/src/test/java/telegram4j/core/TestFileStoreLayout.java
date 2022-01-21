@@ -17,6 +17,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
+import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
@@ -123,8 +124,8 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> getMessageById(long chatId, int messageId) {
-        return delegate.getMessageById(chatId, messageId);
+    public Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId) {
+        return delegate.getMessageById(peerId, messageId);
     }
 
     @Override

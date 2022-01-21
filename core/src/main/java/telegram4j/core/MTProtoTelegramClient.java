@@ -3,6 +3,7 @@ package telegram4j.core;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.object.Id;
@@ -11,6 +12,7 @@ import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
+import telegram4j.core.spec.IdFields;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
@@ -99,7 +101,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     // EntityRetriever methods
     // ==========================
 
-
     @Override
     public Mono<PeerEntity> resolvePeer(PeerId peerId) {
         return entityRetriever.resolvePeer(peerId);
@@ -123,5 +124,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
         return entityRetriever.getChatFullById(chatId);
+    }
+
+    @Override
+    public Mono<AuxiliaryMessages> getMessageById(Id chatId, IdFields.MessageId messageId) {
+        return entityRetriever.getMessageById(chatId, messageId);
     }
 }

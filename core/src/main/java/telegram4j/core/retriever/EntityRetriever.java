@@ -1,11 +1,13 @@
 package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.spec.IdFields;
 
 /** Interface to accessing telegram entities. */
 public interface EntityRetriever {
@@ -57,4 +59,16 @@ public interface EntityRetriever {
      * the {@link Chat} with detailed information.
      */
     Mono<Chat> getChatFullById(Id chatId);
+
+    /**
+     * Retrieve message with auxiliary data by the specified chat and message ids.
+     *
+     * @implSpec Auxiliary data must contain chat and author if available.
+     *
+     * @param chatId The id of chat.
+     * @param messageId The id of message.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link AuxiliaryMessages} with auxiliary data.
+     */
+    Mono<AuxiliaryMessages> getMessageById(Id chatId, IdFields.MessageId messageId);
 }

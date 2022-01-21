@@ -33,7 +33,7 @@ interface SendMessageSpecDef extends Spec {
     Optional<Function<String, EntityParser>> parser();
 
     // TODO
-    // Optional<ReplyMarkup> replyMarkup();
+    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
 
     // Optional<List<MessageEntity>> entities();
 

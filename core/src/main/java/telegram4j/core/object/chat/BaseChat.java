@@ -5,11 +5,11 @@ import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
+import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
+import telegram4j.core.spec.MessageFields;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
@@ -104,6 +104,7 @@ abstract class BaseChat implements Chat {
                             .replyToMsgId(spec.replyToMessageId().orElse(null))
                             .message(text.getT1())
                             .entities(text.getT2())
+                            .replyMarkup(spec.replyMarkup().map(MessageFields.ReplyMarkupSpec::asData).orElse(null))
                             .scheduleDate(spec.scheduleTimestamp()
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
@@ -114,13 +115,13 @@ abstract class BaseChat implements Chat {
     }
 
     @Override
-    public Flux<Message> forwardMessages(ForwardMessagesSpec spec) {
-        return client.resolvePeer(spec.toPeer())
+    public Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer) {
+        return client.resolvePeer(toPeer)
                 .zipWith(Mono.justOrEmpty(spec.sendAs())
                         .flatMap(client::resolvePeer)
                         .map(BaseChat::asInputPeer)
                         .defaultIfEmpty(InputPeerEmpty.instance()))
-                .flatMapMany(TupleUtils.function((toPeer, sendAs) -> client.getServiceHolder()
+                .flatMapMany(TupleUtils.function((toPeerRe, sendAs) -> client.getServiceHolder()
                         .getMessageService()
                         .forwardMessages(ForwardMessages.builder()
                                 .id(spec.ids())
@@ -135,13 +136,13 @@ abstract class BaseChat implements Chat {
                                 .noforwards(spec.noForwards())
                                 .fromPeer(getIdAsPeer())
                                 .silent(spec.silent())
-                                .toPeer(asInputPeer(toPeer))
+                                .toPeer(asInputPeer(toPeerRe))
                                 .sendAs(sendAs.identifier() == InputPeerEmpty.ID ? null : sendAs)
                                 .scheduleDate(spec.scheduleTimestamp()
                                         .map(Instant::getEpochSecond)
                                         .map(Math::toIntExact)
                                         .orElse(null))
                                 .build())
-                        .map(e -> EntityFactory.createMessage(client, e, toPeer.getId()))));
+                        .map(e -> EntityFactory.createMessage(client, e, toPeerRe.getId()))));
     }
 }

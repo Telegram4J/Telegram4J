@@ -14,6 +14,11 @@ public final class ReplyKeyboardHide extends ReplyMarkup {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public Type getType() {
+        return Type.of(data);
+    }
+
     public boolean isSelective() {
         return data.selective();
     }

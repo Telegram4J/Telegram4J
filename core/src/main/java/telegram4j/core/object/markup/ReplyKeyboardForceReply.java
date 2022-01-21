@@ -15,6 +15,11 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public Type getType() {
+        return Type.of(data);
+    }
+
     public boolean isSingleUse() {
         return data.singleUse();
     }

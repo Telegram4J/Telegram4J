@@ -44,7 +44,7 @@ public interface Chat extends PeerEntity {
 
     Mono<Message> sendMessage(SendMessageSpec spec);
 
-    Flux<Message> forwardMessages(ForwardMessagesSpec spec);
+    Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
 
     /** All types of telegram chat. */
     enum Type {

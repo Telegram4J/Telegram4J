@@ -16,6 +16,11 @@ public final class ReplyInlineMarkup extends ReplyMarkup {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public Type getType() {
+        return Type.of(data);
+    }
+
     public List<List<KeyboardButton>> getRows() {
         return data.rows().stream()
                 .map(r -> r.buttons().stream()

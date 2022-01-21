@@ -11,12 +11,12 @@ public final class PeerId {
     @Nullable
     private final Id id;
 
-    PeerId(String username) {
+    private PeerId(String username) {
         this.username = Objects.requireNonNull(username, "username");
         this.id = null;
     }
 
-    PeerId(Id id) {
+    private PeerId(Id id) {
         this.id = Objects.requireNonNull(id, "id");
         this.username = null;
     }

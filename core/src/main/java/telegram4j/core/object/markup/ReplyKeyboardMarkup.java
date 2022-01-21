@@ -17,6 +17,11 @@ public final class ReplyKeyboardMarkup extends ReplyMarkup {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public Type getType() {
+        return Type.of(data);
+    }
+
     public boolean isResize() {
         return data.resize();
     }

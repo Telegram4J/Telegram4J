@@ -50,6 +50,12 @@ public class KeyboardButton implements TelegramObject {
                 : Optional.empty();
     }
 
+    public Optional<Boolean> isSamePeer() {
+        return data.identifier() == KeyboardButtonSwitchInline.ID
+                ? Optional.of(((KeyboardButtonSwitchInline) data).samePeer())
+                : Optional.empty();
+    }
+
     public Optional<String> getUrl() {
         switch (data.identifier()) {
             case KeyboardButtonUrl.ID: return Optional.of(((KeyboardButtonUrl) data).url());
@@ -162,6 +168,8 @@ public class KeyboardButton implements TelegramObject {
 
         USER_PROFILE,
 
+        INPUT_USER_PROFILE,
+
         /**
          * Button to request a user to authorize via URL
          * using <a href="https://telegram.org/blog/privacy-discussions-web-bots#meet-seamless-web-bots">Seamless Telegram Login</a>.
@@ -182,10 +190,10 @@ public class KeyboardButton implements TelegramObject {
         public static Type of(telegram4j.tl.KeyboardButton data) {
             switch (data.identifier()) {
                 case BaseKeyboardButton.ID: return DEFAULT;
-                case KeyboardButtonUrlAuth.ID:
-                case InputKeyboardButtonUrlAuth.ID: return URL_AUTH;
-                case KeyboardButtonUserProfile.ID:
-                case InputKeyboardButtonUserProfile.ID: return USER_PROFILE;
+                case KeyboardButtonUrlAuth.ID: return URL_AUTH;
+                case InputKeyboardButtonUrlAuth.ID: return INPUT_URH_AUTH;
+                case KeyboardButtonUserProfile.ID: return USER_PROFILE;
+                case InputKeyboardButtonUserProfile.ID: return INPUT_USER_PROFILE;
                 case KeyboardButtonBuy.ID: return BUY;
                 case KeyboardButtonCallback.ID: return CALLBACK;
                 case KeyboardButtonGame.ID: return GAME;

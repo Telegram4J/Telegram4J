@@ -7,6 +7,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
+import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
 
@@ -24,7 +25,7 @@ public interface StoreLayout {
 
     Mono<InputChannel> resolveChannel(long channelId);
 
-    Mono<Message> getMessageById(long chatId, int messageId);
+    Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId);
 
     Mono<Chat> getChatMinById(long chatId);
 
