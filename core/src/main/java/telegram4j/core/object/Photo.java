@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.VideoSize;
@@ -57,8 +58,8 @@ public class Photo implements TelegramObject {
         return data.accessHash();
     }
 
-    public byte[] getFileReference() {
-        return data.fileReference();
+    public String getFileReference() {
+        return ByteBufUtil.hexDump(data.fileReference());
     }
 
     public Instant getTimestamp() {

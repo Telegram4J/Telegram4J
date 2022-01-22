@@ -17,6 +17,8 @@ import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.tl.ImmutableBaseInputChannel;
+import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.upload.BaseFile;
 
 import java.util.Objects;
@@ -96,6 +98,27 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
                 .flatMap(loc -> serviceHolder.getMessageService()
                         .getFile(loc, progressor));
+    }
+
+    public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
+        return serviceHolder.getMessageService().deleteMessages(revoke, ids);
+    }
+
+    public Mono<AffectedMessages> deleteChannelMessages(Id channelId, Iterable<Integer> ids) {
+        if (channelId.getType() != Id.Type.CHANNEL) {
+            return Mono.error(new IllegalArgumentException("Channel id type must be CHANNEL"));
+        }
+
+        return Mono.defer(() -> {
+            if (channelId.getAccessHash().isEmpty()) {
+                return mtProtoResources.getStoreLayout()
+                        .resolveChannel(channelId.asLong());
+            }
+            return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(),
+                    channelId.getAccessHash().orElseThrow()));
+        })
+        .flatMap(p -> serviceHolder.getChatService()
+                .deleteMessages(p, ids));
     }
 
     // EntityRetriever methods

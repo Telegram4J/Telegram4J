@@ -2,15 +2,14 @@ package telegram4j.mtproto.file;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.base64.Base64Dialect;
-import io.netty.util.internal.EmptyArrays;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Objects;
 
 public class FileReferenceId {
@@ -20,14 +19,14 @@ public class FileReferenceId {
     private final int dcId;
     private final long photoId;
     private final long accessHash;
-    private final byte[] fileReference;
+    private final String fileReference;
     private final InputPeer peerId;
     private final String thumbSizeType;
     private final InputStickerSet stickerSet;
     private final int thumbVersion;
 
     FileReferenceId(Type fileType, PhotoSizeType sizeType, int dcId, long photoId, long accessHash,
-                    byte[] fileReference, InputPeer peerId, String thumbSizeType,
+                    String fileReference, InputPeer peerId, String thumbSizeType,
                     InputStickerSet stickerSet, int thumbVersion) {
         this.fileType = Objects.requireNonNull(fileType, "fileType");
         this.sizeType = Objects.requireNonNull(sizeType, "sizeType");
@@ -46,7 +45,7 @@ public class FileReferenceId {
         String firstThumbSize = thumbs != null ? thumbs.get(0).type() : "";
 
         return new FileReferenceId(Type.DOCUMENT, PhotoSizeType.UNKNOWN, document.dcId(), document.id(), document.accessHash(),
-                document.fileReference(), InputPeerEmpty.instance(),
+                ByteBufUtil.hexDump(document.fileReference()), InputPeerEmpty.instance(),
                 firstThumbSize, InputStickerSetEmpty.instance(), -1);
     }
 
@@ -56,20 +55,20 @@ public class FileReferenceId {
         }
 
         return new FileReferenceId(Type.CHAT_PHOTO, sizeType, chatPhoto.dcId(), chatPhoto.photoId(), -1,
-                EmptyArrays.EMPTY_BYTES, peer, "", InputStickerSetEmpty.instance(), -1);
+                "", peer, "", InputStickerSetEmpty.instance(), -1);
     }
 
     public static FileReferenceId ofPhoto(BasePhoto photo) {
         var firstPhotoSize = photo.sizes().get(0);
 
         return new FileReferenceId(Type.PHOTO, PhotoSizeType.UNKNOWN, photo.dcId(), photo.id(), photo.accessHash(),
-                photo.fileReference(), InputPeerEmpty.instance(),
+                ByteBufUtil.hexDump(photo.fileReference()), InputPeerEmpty.instance(),
                 firstPhotoSize.type(), InputStickerSetEmpty.instance(), -1);
     }
 
     public static FileReferenceId ofStickerSet(InputStickerSet stickerSet, int version) {
         return new FileReferenceId(Type.STICKER_SET_THUMB, PhotoSizeType.UNKNOWN, -1, -1, -1,
-                EmptyArrays.EMPTY_BYTES, InputPeerEmpty.instance(), "", stickerSet, version);
+                "", InputPeerEmpty.instance(), "", stickerSet, version);
     }
 
     public static FileReferenceId deserialize(String str) {
@@ -85,7 +84,7 @@ public class FileReferenceId {
                 long photoId = buf.readLongLE();
                 long accessHash = buf.readLongLE();
 
-                byte[] fileReference = TlSerialUtil.deserializeBytes(buf);
+                String fileReference = TlSerialUtil.deserializeString(buf);
                 String thumbSizeType = TlSerialUtil.deserializeString(buf);
 
                 return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, dcId, photoId, accessHash,
@@ -99,15 +98,14 @@ public class FileReferenceId {
                 InputPeer peerId = TlDeserializer.deserialize(buf);
 
                 return new FileReferenceId(fileType, sizeType, dcId, photoId, -1,
-                        EmptyArrays.EMPTY_BYTES, peerId,
-                        "", InputStickerSetEmpty.instance(), -1);
+                        "", peerId, "",
+                        InputStickerSetEmpty.instance(), -1);
             case STICKER_SET_THUMB:
                 int thumbVersion = buf.readIntLE();
                 InputStickerSet stickerSet = TlDeserializer.deserialize(buf);
 
                 return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, -1, -1, -1,
-                        EmptyArrays.EMPTY_BYTES, InputPeerEmpty.instance(),
-                        "", stickerSet, thumbVersion);
+                        "", InputPeerEmpty.instance(), "", stickerSet, thumbVersion);
             default:
                 throw new IllegalStateException("Malformed file reference id.");
         }
@@ -133,8 +131,7 @@ public class FileReferenceId {
         return accessHash;
     }
 
-    // TODO: it can be changed and it's terrible
-    public byte[] getFileReference() {
+    public String getFileReference() {
         return fileReference;
     }
 
@@ -153,7 +150,7 @@ public class FileReferenceId {
         switch (fileType) {
             case DOCUMENT:
             case PHOTO:
-                ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
+                ByteBuf fileReferenceBuf = TlSerialUtil.serializeString(alloc, fileReference);
                 ByteBuf thumbSizeTypeBuf = TlSerialUtil.serializeString(alloc, thumbSizeType);
 
                 buf.writeIntLE(dcId);
@@ -204,7 +201,7 @@ public class FileReferenceId {
             case PHOTO:
                 return InputPhotoFileLocation.builder()
                         .accessHash(accessHash)
-                        .fileReference(fileReference)
+                        .fileReference(ByteBufUtil.decodeHexDump(fileReference))
                         .id(photoId)
                         .thumbSize(thumbSizeType)
                         .build();
@@ -216,7 +213,7 @@ public class FileReferenceId {
             case DOCUMENT:
                 return InputDocumentFileLocation.builder()
                         .accessHash(accessHash)
-                        .fileReference(fileReference)
+                        .fileReference(ByteBufUtil.decodeHexDump(fileReference))
                         .id(photoId)
                         .thumbSize(thumbSizeType)
                         .build();
@@ -230,19 +227,17 @@ public class FileReferenceId {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         FileReferenceId that = (FileReferenceId) o;
-        return dcId == that.dcId && photoId == that.photoId
-                && accessHash == that.accessHash && thumbVersion == that.thumbVersion
+        return dcId == that.dcId && photoId == that.photoId &&
+                accessHash == that.accessHash && thumbVersion == that.thumbVersion
                 && fileType == that.fileType && sizeType == that.sizeType
-                && Arrays.equals(fileReference, that.fileReference) && peerId.equals(that.peerId)
+                && fileReference.equals(that.fileReference) && peerId.equals(that.peerId)
                 && thumbSizeType.equals(that.thumbSizeType) && stickerSet.equals(that.stickerSet);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(fileType, sizeType, dcId, photoId,
-                accessHash, peerId, thumbSizeType, stickerSet, thumbVersion);
-        result = 31 * result + Arrays.hashCode(fileReference);
-        return result;
+        return Objects.hash(fileType, sizeType, dcId, photoId, accessHash,
+                fileReference, peerId, thumbSizeType, stickerSet, thumbVersion);
     }
 
     public enum PhotoSizeType {

@@ -13,7 +13,7 @@ public final class EntityParserSupport {
 
     public static final Function<String, EntityParser> MARKDOWN_V2 = MarkdownV2EntityParser::new;
 
-    public static Tuple2<String, List<MessageEntity>> parse(EntityParser parser) {
+    public static Tuple2<String, List<telegram4j.tl.MessageEntity>> parse(EntityParser parser) {
         List<EntityToken> tokens = new LinkedList<>();
         EntityToken t;
         while ((t = parser.nextToken()) != EntityToken.UNKNOWN) {

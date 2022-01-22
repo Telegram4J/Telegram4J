@@ -11,6 +11,7 @@ import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
+import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
 
 import java.time.Duration;
@@ -188,6 +189,17 @@ public class Message implements TelegramObject {
                             .peer(getChatIdAsPeer())
                             .build())
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
+        });
+    }
+
+    public Mono<AffectedMessages> delete(boolean revoke) {
+        return Mono.defer(() -> {
+            switch (resolvedChatId.getType()) {
+                case CHAT:
+                case USER: return client.deleteMessages(revoke, List.of(getId()));
+                case CHANNEL: return client.deleteChannelMessages(resolvedChatId, List.of(getId()));
+                default: throw new IllegalStateException();
+            }
         });
     }
 

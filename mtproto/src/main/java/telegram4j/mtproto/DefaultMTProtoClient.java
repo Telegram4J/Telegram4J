@@ -199,6 +199,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 Long id = quickAckTokens.get(val);
                                 if (id == null) {
                                     log.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
+                                    quickAckTokens.clear();
                                     return Mono.empty();
                                 }
 
@@ -292,6 +293,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     .writeBytes(data);
                             data.release();
 
+                            if (rpcLog.isDebugEnabled()) {
+                                rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(tuple.method));
+                            }
+
                             return FutureMono.from(connection.channel()
                                     .writeAndFlush(transport.encode(payload)));
                         }
@@ -382,7 +387,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() -> state.emitNext(State.AUTHORIZATION_BEGIN, FAIL_FAST))
                     .then(authHandler.start())
                     .checkpoint("Authorization key generation")
-                    .then(onAuthSink.asMono().retryWhen(authRetry()))
+                    .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
                     .doOnNext(auth -> {
                         state.emitNext(State.AUTHORIZATION_END, FAIL_FAST);
                         serverSalt = authContext.getServerSalt(); // apply temporal salt
@@ -435,9 +440,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
-    private Retry authRetry() {
+    private Retry authRetry(AuthorizationHandler authHandler) {
         return options.getAuthRetry()
                 .filter(t -> t instanceof AuthorizationException)
+                .doBeforeRetryAsync(v -> authHandler.start())
                 .onRetryExhaustedThrow((spec, signal) -> {
                     state.emitNext(State.CLOSED, emissionHandler);
                     return new MTProtoException("Failed to generate auth key (" +
@@ -786,11 +792,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 return this;
             }
             return new RequestEntry(sink, method, messageId);
-        }
-
-        @Override
-        public String toString() {
-            return method.toString();
         }
     }
 

@@ -67,6 +67,10 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetHistory.of(peer, offsetId, offsetDate, addOffset, limit, maxId, minId, hash));
     }
 
+    public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
+        return client.sendAwait(DeleteMessages.builder().revoke(revoke).id(ids).build());
+    }
+
     public Mono<Messages> search(Search request) {
         return client.sendAwait(request);
     }
@@ -162,9 +166,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<AffectedMessages> readMessageContents(Iterable<Integer> ids) {
-        return client.sendAwait(ReadMessageContents.builder()
-                .id(ids)
-                .build());
+        return client.sendAwait(ReadMessageContents.builder().id(ids).build());
     }
 
     public Mono<Stickers> getStickers(String emoticon, long hash) {
@@ -283,9 +285,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<PeerDialogs> getPeerDialogs(Iterable<? extends InputDialogPeer> peers) {
-        return client.sendAwait(GetPeerDialogs.builder()
-                .peers(peers)
-                .build());
+        return client.sendAwait(GetPeerDialogs.builder().peers(peers).build());
     }
 
     public Mono<Boolean> saveDraft(SaveDraft request) {
@@ -302,9 +302,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<Boolean> readFeaturedStickers(Iterable<Long> ids) {
-        return client.sendAwait(ReadFeaturedStickers.builder()
-                .id(ids)
-                .build());
+        return client.sendAwait(ReadFeaturedStickers.builder().id(ids).build());
     }
 
     public Mono<RecentStickers> getRecentStickers(boolean attached, long hash) {
@@ -323,9 +321,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<Boolean> clearRecentStickers(boolean attached) {
-        return client.sendAwait(ClearRecentStickers.builder()
-                .attached(attached)
-                .build());
+        return client.sendAwait(ClearRecentStickers.builder().attached(attached).build());
     }
 
     public Mono<ArchivedStickers> getArchivedStickers(boolean marks, long offsetId, int limit) {

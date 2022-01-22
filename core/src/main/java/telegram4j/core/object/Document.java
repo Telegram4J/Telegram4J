@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufUtil;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.DocumentAttribute;
@@ -47,8 +48,8 @@ public class Document implements TelegramObject {
         return data.accessHash();
     }
 
-    public byte[] getFileReference() {
-        return data.fileReference();
+    public String getFileReference() {
+        return ByteBufUtil.hexDump(data.fileReference());
     }
 
     public int getDate() {
