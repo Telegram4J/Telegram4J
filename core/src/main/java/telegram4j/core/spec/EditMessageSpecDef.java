@@ -12,6 +12,7 @@ import java.util.function.Function;
 @Value.Immutable(singleton = true)
 public interface EditMessageSpecDef extends Spec {
 
+    @Value.Default
     default boolean noWebpage() {
         return false;
     }

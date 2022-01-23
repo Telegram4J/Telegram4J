@@ -13,6 +13,7 @@ import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.Messages;
+import telegram4j.tl.request.auth.SignIn;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
@@ -207,6 +208,11 @@ public class StoreLayoutImpl implements StoreLayout {
                         .addUser(userInfo.min)
                         .fullUser(Objects.requireNonNull(userInfo.full))
                         .build());
+    }
+
+    @Override
+    public Mono<SignIn> getSignInInfo(String phoneNumber) {
+        return Mono.empty(); // unsupported
     }
 
     @Override
@@ -416,6 +422,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
         return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
+    }
+
+    @Override
+    public Mono<Void> updateSignInInfo(SignIn signInInfo) {
+        return Mono.empty(); // unsupported
     }
 
     @Override

@@ -10,18 +10,22 @@ import java.util.function.Function;
 @Value.Immutable
 interface SendMessageSpecDef extends Spec {
 
+    @Value.Default
     default boolean noWebpage() {
         return false;
     }
 
+    @Value.Default
     default boolean silent() {
         return false;
     }
 
+    @Value.Default
     default boolean background() {
         return false;
     }
 
+    @Value.Default
     default boolean clearDraft() {
         return false;
     }

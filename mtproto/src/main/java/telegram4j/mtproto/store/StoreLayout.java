@@ -8,6 +8,7 @@ import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
+import telegram4j.tl.request.auth.SignIn;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
 
@@ -34,6 +35,8 @@ public interface StoreLayout {
     Mono<User> getUserMinById(long userId);
 
     Mono<UserFull> getUserFullById(long userId);
+
+    Mono<SignIn> getSignInInfo(String phoneNumber);
 
     Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
 
@@ -81,7 +84,9 @@ public interface StoreLayout {
 
     Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
 
-    // common update methods
+    Mono<Void> updateSignInInfo(SignIn signInInfo);
+
+    // common request methods
 
     Mono<User> onUserUpdate(User payload);
 

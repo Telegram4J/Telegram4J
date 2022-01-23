@@ -28,12 +28,9 @@ import telegram4j.mtproto.transport.IntermediateTransport;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.EmissionHandlers;
 import telegram4j.tl.InputUserSelf;
-import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
-import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
-import telegram4j.tl.request.auth.ImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 
 import java.time.Duration;
@@ -47,7 +44,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
-    private final AuthorizationResources authorizationResources;
+    private final AuthorizationResources authResources;
 
     private TcpClient tcpClient;
     private Supplier<Transport> transport;
@@ -67,13 +64,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EventDispatcher eventDispatcher;
     private DataCenter dataCenter;
 
-    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authorizationResources) {
+    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authResources) {
         this.optionsModifier = optionsModifier;
-        this.authorizationResources = authorizationResources;
+        this.authResources = authResources;
     }
 
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
-        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authorizationResources);
+        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authResources);
     }
 
     public MTProtoBootstrap<O> setStoreLayout(StoreLayout storeLayout) {
@@ -172,7 +169,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
-                    authorizationResources, mtProtoClient,
+                    authResources, mtProtoClient,
                     mtProtoResources, updatesHandlers,
                     serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
 
@@ -223,7 +220,34 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                 .layer(MTProtoTelegramClient.LAYER)
                                                 .query(initConnection())
                                                 .build())
-                                        .then(mtProtoClient.sendAwait(importAuthorization()))
+                                        .then(Mono.defer(() -> {
+                                            switch (authResources.getType()) {
+                                                case BOT:
+                                                    return telegramClient.getServiceHolder()
+                                                            .getAuthService()
+                                                            .importBotAuthorization(0, authResources.getAppId(), authResources.getAppHash(),
+                                                                    authResources.getBotAuthToken().orElseThrow())
+                                                            .then();
+                                                case USER:
+
+                                                    String phoneNumber = authResources.getPhoneNumber().orElseThrow();
+                                                    var authHandler = authResources.getAuthHandler().orElseThrow();
+                                                    return telegramClient.getMtProtoResources()
+                                                            .getStoreLayout()
+                                                            .getSignInInfo(phoneNumber)
+                                                            .switchIfEmpty(authHandler.apply(telegramClient))
+                                                            .flatMap(signIn -> telegramClient.getServiceHolder()
+                                                                    .getAuthService()
+                                                                    .signIn(phoneNumber, signIn.phoneCodeHash(), signIn.phoneCode())
+                                                                    .and(telegramClient.getMtProtoResources()
+                                                                            .getStoreLayout()
+                                                                            .updateSignInInfo(signIn)))
+                                                            .then();
+
+                                                default:
+                                                    return Mono.error(new IllegalStateException());
+                                            }
+                                        }))
                                         .then(fetchSelfId)
                                         .then(telegramClient.getUpdatesManager().fillGap())
                                         .thenReturn(telegramClient) // FIXME: reconnections drop signals
@@ -241,23 +265,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     // Resources initialization
     // ==========================
 
-    private TlMethod<Authorization> importAuthorization() {
-        switch (authorizationResources.getType()) {
-            case BOT:
-                return ImportBotAuthorization.builder()
-                        .flags(0)
-                        .apiId(authorizationResources.getAppId())
-                        .apiHash(authorizationResources.getAppHash())
-                        .botAuthToken(authorizationResources.getBotAuthToken()
-                                .orElseThrow())
-                        .build();
-            case USER:
-                throw new UnsupportedOperationException("User authorization hasn't yet implemented.");
-            default:
-                throw new IllegalStateException();
-        }
-    }
-
     private InitConnection<TlObject> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
@@ -265,7 +272,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
         var initConnection = InitConnection.builder()
                 .query(GetConfig.instance())
-                .apiId(authorizationResources.getAppId())
+                .apiId(authResources.getAppId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())
                 .langCode(params.getLangCode())

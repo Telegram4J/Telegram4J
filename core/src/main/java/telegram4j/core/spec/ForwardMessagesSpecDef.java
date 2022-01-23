@@ -10,26 +10,32 @@ import java.util.Optional;
 @Value.Immutable
 interface ForwardMessagesSpecDef extends Spec {
 
+    @Value.Default
     default boolean silent() {
         return false;
     }
 
+    @Value.Default
     default boolean background() {
         return false;
     }
 
+    @Value.Default
     default boolean withMyScore() {
         return false;
     }
 
+    @Value.Default
     default boolean dropAuthor() {
         return false;
     }
 
+    @Value.Default
     default boolean dropMediaCaptions() {
         return false;
     }
 
+    @Value.Default
     default boolean noForwards() {
         return false;
     }

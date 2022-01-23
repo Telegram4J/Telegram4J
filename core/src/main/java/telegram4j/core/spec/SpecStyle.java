@@ -17,7 +17,6 @@ import java.lang.annotation.Target;
         allMandatoryParameters = true,
         depluralize = true,
         instance = "create",
-        defaultAsDefault = true,
         jdkOnly = true
 )
 public @interface SpecStyle {
