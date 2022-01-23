@@ -2,14 +2,13 @@ package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlSerialUtil;
 
 import java.math.BigInteger;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
 
 public final class PublicRsaKey {
     private final BigInteger modulus;
@@ -20,7 +19,7 @@ public final class PublicRsaKey {
     static {
 
         publicKeys = Map.of(
-                // dc 2
+                // prod dc 2
                 // -----BEGIN PUBLIC KEY-----
                 // MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAruw2yP/BCcsJliRoW5eB
                 // VBVle9dtjJw+OYED160Wybum9SXtBBLXriwt4rROd9csv0t0OHCaTmRqBcQ0J8fx

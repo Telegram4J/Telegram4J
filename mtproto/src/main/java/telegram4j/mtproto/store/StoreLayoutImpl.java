@@ -164,13 +164,14 @@ public class StoreLayoutImpl implements StoreLayout {
                     .map(PartialFields::getMin)
                     .ifPresent(builder::addUser);
 
+            long chatId = getRawPeerId(message.peerId());
             // add user if message from dm
-            Optional.ofNullable(users.get(TlEntityUtil.getRawPeerId(message.peerId())))
+            Optional.ofNullable(users.get(chatId))
                     .map(PartialFields::getMin)
                     .ifPresent(builder::addUser);
 
             // add chat if possible
-            Optional.ofNullable(chats.get(TlEntityUtil.getRawPeerId(message.peerId())))
+            Optional.ofNullable(chats.get(chatId))
                     .map(PartialFields::getMin)
                     .ifPresent(builder::addChat);
 
@@ -212,6 +213,9 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authorizationKeys.get(dc));
     }
+
+    // Updates methods
+    // ==================
 
     @Override
     public Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {

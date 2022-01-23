@@ -6,12 +6,12 @@ import telegram4j.core.object.TelegramObject;
 
 import java.util.Objects;
 
-public class MaskCoords implements TelegramObject {
+public class MaskCoordinates implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.MaskCoords data;
 
-    public MaskCoords(MTProtoTelegramClient client, telegram4j.tl.MaskCoords data) {
+    public MaskCoordinates(MTProtoTelegramClient client, telegram4j.tl.MaskCoords data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
     }
@@ -41,7 +41,7 @@ public class MaskCoords implements TelegramObject {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MaskCoords that = (MaskCoords) o;
+        MaskCoordinates that = (MaskCoordinates) o;
         return data.equals(that.data);
     }
 

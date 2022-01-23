@@ -29,8 +29,8 @@ public class DocumentAttributeSticker extends BaseDocumentAttribute {
         return data.stickerset();
     }
 
-    public Optional<MaskCoords> getMaskCoords() {
-        return Optional.ofNullable(data.maskCoords()).map(d -> new MaskCoords(client, d));
+    public Optional<MaskCoordinates> getMaskCoords() {
+        return Optional.ofNullable(data.maskCoords()).map(d -> new MaskCoordinates(client, d));
     }
 
     @Override

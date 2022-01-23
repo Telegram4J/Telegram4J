@@ -3,7 +3,6 @@ package telegram4j.mtproto.service;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.util.Objects;
@@ -25,18 +24,6 @@ public abstract class RpcService {
         return storeLayout;
     }
 
-    public Mono<InputPeer> getInputPeer(Peer peer) {
-        return Mono.defer(() -> {
-            long id = TlEntityUtil.getRawPeerId(peer);
-            switch (peer.identifier()) {
-                case PeerChannel.ID: return getInputPeerChannel(id);
-                case PeerChat.ID: return getInputPeerChat(id);
-                case PeerUser.ID: return getInputPeerUser(id);
-                default: return Mono.error(new IllegalArgumentException("Unknown peer type: " + peer));
-            }
-        });
-    }
-
     protected Mono<Peer> toPeer(InputPeer inputPeer) {
         return Mono.defer(() -> {
             switch (inputPeer.identifier()) {
@@ -50,7 +37,6 @@ public abstract class RpcService {
                 case InputPeerChannel.ID:
                     InputPeerChannel inputPeerChannel = (InputPeerChannel) inputPeer;
                     return Mono.just(ImmutablePeerChannel.of(inputPeerChannel.channelId()));
-                // TODO: test this
                 case InputPeerChannelFromMessage.ID:
                     InputPeerChannelFromMessage inputPeerChannelFromMessage = (InputPeerChannelFromMessage) inputPeer;
                     return Mono.just(ImmutablePeerChannel.of(inputPeerChannelFromMessage.channelId()));
@@ -60,7 +46,6 @@ public abstract class RpcService {
                 case InputPeerUser.ID:
                     InputPeerUser inputPeerUser = (InputPeerUser) inputPeer;
                     return Mono.just(ImmutablePeerUser.of(inputPeerUser.userId()));
-                // TODO: test this
                 case InputPeerUserFromMessage.ID:
                     InputPeerUserFromMessage inputPeerUserFromMessage = (InputPeerUserFromMessage) inputPeer;
                     return Mono.just(ImmutablePeerUser.of(inputPeerUserFromMessage.userId()));
@@ -69,29 +54,6 @@ public abstract class RpcService {
                             + Integer.toHexString(inputPeer.identifier())));
             }
         });
-    }
-
-    protected Mono<InputPeer> getInputPeerUser(long id) {
-        return storeLayout.getSelfId()
-                .filter(selfId -> selfId == id)
-                .<InputPeer>map(selfId -> InputPeerSelf.instance())
-                .switchIfEmpty(storeLayout.getUserMinById(id)
-                        .ofType(BaseUser.class)
-                        .flatMap(user -> Mono.justOrEmpty(user.accessHash())
-                                .map(accessHash -> ImmutableInputPeerUser.of(user.id(), accessHash))));
-    }
-
-    protected Mono<InputPeerChat> getInputPeerChat(long id) {
-        return storeLayout.getChatMinById(id)
-                .ofType(BaseChat.class)
-                .map(chat -> ImmutableInputPeerChat.of(chat.id()));
-    }
-
-    protected Mono<InputPeerChannel> getInputPeerChannel(long id) {
-        return storeLayout.getChatMinById(id)
-                .ofType(Channel.class)
-                .flatMap(user -> Mono.justOrEmpty(user.accessHash())
-                        .map(accessHash -> ImmutableInputPeerChannel.of(user.id(), accessHash)));
     }
 
     protected static long calculatePaginationHash(Iterable<Long> ids) {

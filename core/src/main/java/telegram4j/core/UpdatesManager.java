@@ -4,7 +4,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
@@ -13,6 +12,7 @@ import telegram4j.core.object.Id;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.request.updates.GetChannelDifference;
@@ -220,9 +220,14 @@ public class UpdatesManager {
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
                                         long id = getRawPeerId(data.peerId());
+                                        var selfUser = usersMap.values().stream()
+                                                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                                                .map(b -> (BaseUser) b)
+                                                .findFirst()
+                                                .orElse(null);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
-                                                .map(c -> EntityFactory.createChat(client, c))
+                                                .map(c -> EntityFactory.createChat(client, c, selfUser))
                                                 .orElse(null);
 
                                         var user = Optional.ofNullable(data.fromId())
@@ -233,9 +238,7 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(client.getServiceHolder()
-                                                        .getMessageService().getInputPeer(data.peerId())
-                                                        .map(p -> peerToId(p, id)))
+                                                .switchIfEmpty(toId(data.peerId()))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat, user));
                                     });
@@ -254,7 +257,7 @@ public class UpdatesManager {
 
                                         Integer cpts0 = u.pts();
                                         int cpts = cpts0 != null ? cpts0 : -1;
-                                        int limit = client.getAuthorizationResources().getType() == Type.BOT
+                                        int limit = client.isBot()
                                                 ? MAX_BOT_CHANNEL_DIFFERENCE
                                                 : MAX_CHANNEL_DIFFERENCE;
                                         if (cpts == -1) {
@@ -295,11 +298,15 @@ public class UpdatesManager {
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
-                                        Peer peer = data.peerId();
-                                        long id = getRawPeerId(peer);
+                                        long id = getRawPeerId(data.peerId());
+                                        var selfUser = usersMap.values().stream()
+                                                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                                                .map(b -> (BaseUser) b)
+                                                .findFirst()
+                                                .orElse(null);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
-                                                .map(c -> EntityFactory.createChat(client, c))
+                                                .map(c -> EntityFactory.createChat(client, c, selfUser))
                                                 .orElse(null);
 
                                         var user = Optional.ofNullable(data.fromId())
@@ -310,9 +317,7 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(client.getServiceHolder()
-                                                        .getMessageService().getInputPeer(peer)
-                                                        .map(p -> peerToId(p, id)))
+                                                .switchIfEmpty(toId(data.peerId()))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat, user));
                                     });
@@ -356,20 +361,34 @@ public class UpdatesManager {
         }
     }
 
-    static Id peerToId(InputPeer peer, long resolvedId) {
-        switch (peer.identifier()) {
-            // InputPeerUserFromMessage or InputPeerChannelFromMessage currently cannot be mapped
-            case InputPeerChannel.ID:
-                InputPeerChannel inputPeerChannel = (InputPeerChannel) peer;
-                return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
-            case InputPeerChat.ID:
-                InputPeerChat inputPeerChat = (InputPeerChat) peer;
-                return Id.ofChat(inputPeerChat.chatId());
-            case InputPeerSelf.ID: return Id.ofUser(resolvedId, null);
-            case InputPeerUser.ID:
-                InputPeerUser inputPeerUser = (InputPeerUser) peer;
-                return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
-            default: throw new IllegalArgumentException("Unknown input peer type: " + peer);
-        }
+    private Mono<Id> toId(Peer peer) {
+        long id = TlEntityUtil.getRawPeerId(peer);
+        return Mono.defer(() -> {
+            switch (peer.identifier()) {
+                case PeerChannel.ID: return client.getMtProtoResources().getStoreLayout()
+                        .resolveChannel(id).map(TlEntityUtil::toInputPeer);
+                case PeerChat.ID:
+                    return Mono.just(ImmutableInputPeerChat.of(id));
+                case PeerUser.ID: return client.getMtProtoResources()
+                        .getStoreLayout().resolveUser(id);
+                default: return Mono.error(new IllegalArgumentException("Unknown peer type: " + peer));
+            }
+        })
+        .map(inputPeer -> {
+            switch (peer.identifier()) {
+                // InputPeerUserFromMessage or InputPeerChannelFromMessage currently cannot be mapped
+                case InputPeerChannel.ID:
+                    InputPeerChannel inputPeerChannel = (InputPeerChannel) peer;
+                    return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
+                case InputPeerChat.ID:
+                    InputPeerChat inputPeerChat = (InputPeerChat) peer;
+                    return Id.ofChat(inputPeerChat.chatId());
+                case InputPeerSelf.ID: return Id.ofUser(id, null);
+                case InputPeerUser.ID:
+                    InputPeerUser inputPeerUser = (InputPeerUser) peer;
+                    return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
+                default: throw new IllegalArgumentException("Unknown input peer type: " + peer);
+            }
+        });
     }
 }
