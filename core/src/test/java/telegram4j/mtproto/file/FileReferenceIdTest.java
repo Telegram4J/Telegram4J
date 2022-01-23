@@ -14,8 +14,8 @@ class FileReferenceIdTest {
 
     @Test
     void chatPhoto() {
-        var expChatPhoto = ofChatPhoto(InputPeerSelf.instance(),
-                ImmutableBaseUserProfilePhoto.of(1337, 2), PhotoSizeType.CHAT_PHOTO_BIG);
+        var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(1337, 2),
+                PhotoSizeType.CHAT_PHOTO_BIG, -1, InputPeerSelf.instance());
         var expDocument = ofDocument(BaseDocument.builder()
                 .id(1337)
                 .accessHash(-1111)
@@ -32,7 +32,7 @@ class FileReferenceIdTest {
                 .mimeType("")
                 .size(-1)
                 .attributes(List.of())
-                .build());
+                .build(), -1, InputPeerEmpty.instance());
         var expPhoto = ofPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
@@ -45,7 +45,7 @@ class FileReferenceIdTest {
                         .size(-1)
                         .build()))
                 .dcId(2)
-                .build());
+                .build(), -1, InputPeerEmpty.instance());
         var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2);
 
         var actChatPhoto = serialize(expChatPhoto);

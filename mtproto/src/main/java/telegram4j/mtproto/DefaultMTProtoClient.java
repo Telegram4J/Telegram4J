@@ -1,5 +1,7 @@
 package telegram4j.mtproto;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
@@ -29,7 +31,6 @@ import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
-import telegram4j.tl.request.mtproto.ImmutableGetFutureSalts;
 import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
 import telegram4j.tl.request.mtproto.Ping;
 import telegram4j.tl.request.mtproto.PingDelayDisconnect;
@@ -43,6 +44,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -57,7 +59,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
     private static final Throwable RETRY = new RetryConnectException();
-    private static final Duration FUTURE_SALT_QUERY_PERIOD = Duration.ofMinutes(45);
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
     private static final int PING_TIMEOUT = (int) (PING_QUERY_PERIOD.getSeconds() + 10);
 
@@ -93,7 +94,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentMap<Long, RequestEntry> requests = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Integer, Long> quickAckTokens = new ConcurrentHashMap<>();
+    private final Cache<Integer, Long> quickAckTokens = Caffeine.newBuilder()
+            .expireAfterWrite(2, TimeUnit.MINUTES)
+            .build();
 
     DefaultMTProtoClient(Type type, DataCenter dataCenter, MTProtoOptions options) {
         this.type = type;
@@ -196,10 +199,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             int val = payload.readIntLE();
                             payload.release();
                             if (val != 0 && transport.supportQuickAck()) { // quick acknowledge
-                                Long id = quickAckTokens.get(val);
+                                Long id = quickAckTokens.getIfPresent(val);
                                 if (id == null) {
                                     log.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
-                                    quickAckTokens.clear();
                                     return Mono.empty();
                                 }
 
@@ -207,11 +209,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     rpcLog.debug("[C:0x{}, M:0x{}] Handling quick ack", this.id, Long.toHexString(id));
                                 }
 
-                                quickAckTokens.remove(val);
+                                quickAckTokens.invalidate(val);
                                 return Mono.empty();
                             } else { // The error code writes as negative int32
-                                TransportException exc = TransportException.create(val * -1);
-                                if (authKey == null && val == -404) { // retry authorization
+                                val *= -1;
+                                TransportException exc = TransportException.create(val);
+                                if (authKey == null && val == 404) { // retry authorization
                                     onAuthSink.emitError(new AuthorizationException(exc), FAIL_FAST);
                                     return Mono.empty();
                                 }
@@ -367,29 +370,16 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .flatMap(obj -> handleServiceMessage(obj, lastMessageId))
                     .then();
 
-            Mono<Void> futureSaltSchedule = futureSaltEmitter.ticks()
-                    .flatMap(tick -> sendAwait(ImmutableGetFutureSalts.of(1)))
-                    .doOnNext(futureSalts -> {
-                        FutureSalt salt = futureSalts.salts().get(0);
-                        int delaySeconds = salt.validUntil() - futureSalts.now() - 900;
-                        serverSalt = salt.salt();
-
-                        log.debug("[C:0x{}] Delaying future salt for {} seconds", id, delaySeconds);
-
-                        futureSaltEmitter.start(Duration.ofSeconds(delaySeconds), FUTURE_SALT_QUERY_PERIOD);
-                    })
-                    .then();
-
             Mono<Void> ping = pingEmitter.ticks()
                     .flatMap(tick -> send(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT)))
                     .then();
 
-            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() -> state.emitNext(State.AUTHORIZATION_BEGIN, FAIL_FAST))
+            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() -> state.emitNext(State.AUTHORIZATION_BEGIN, emissionHandler))
                     .then(authHandler.start())
                     .checkpoint("Authorization key generation")
                     .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
                     .doOnNext(auth -> {
-                        state.emitNext(State.AUTHORIZATION_END, FAIL_FAST);
+                        state.emitNext(State.AUTHORIZATION_END, emissionHandler);
                         serverSalt = authContext.getServerSalt(); // apply temporal salt
                     })
                     .flatMap(key -> storeLayout.updateAuthorizationKey(key).thenReturn(key));
@@ -402,11 +392,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> startSchedule = Mono.defer(() -> {
-                futureSaltEmitter.start(FUTURE_SALT_QUERY_PERIOD);
                 pingEmitter.start(PING_QUERY_PERIOD);
-                state.emitNext(State.CONNECTED, FAIL_FAST);
+                state.emitNext(State.CONNECTED, emissionHandler);
                 log.info("[C:0x{}] Connected to datacenter.", id);
-                return Mono.when(futureSaltSchedule, ping);
+                return ping;
             });
 
             return Mono.zip(inboundHandler, outboundHandler, stateHandler, authHandlerFuture,
@@ -433,7 +422,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         .retryWhen(options.getRetry()
                 .filter(t -> !close && (t == RETRY || t instanceof AbortedException || t instanceof IOException))
                 .doAfterRetry(signal -> {
-                    state.emitNext(State.RECONNECT, FAIL_FAST);
+                    state.emitNext(State.RECONNECT, emissionHandler);
                     log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetries());
                 }))
         .onErrorResume(t -> Mono.empty())
