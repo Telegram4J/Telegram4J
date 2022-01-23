@@ -6,7 +6,6 @@ import io.netty.buffer.ByteBufAllocator;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class IntermediateTransport implements Transport {
-    public static final int QUICK_ACK_MASK = 1 << 31;
     public static final int ID = 0xeeeeeeee;
 
     private final AtomicInteger size = new AtomicInteger(-1);
@@ -58,28 +57,22 @@ public class IntermediateTransport implements Transport {
 
     @Override
     public boolean canDecode(ByteBuf payload) {
-        payload.markReaderIndex();
-        try {
-            int length = payload.readIntLE();
-            int payloadLength = payload.readableBytes();
+        int length = payload.getIntLE(0);
+        int payloadLength = payload.readableBytes() - 4;
 
-            if (quickAck && (length & QUICK_ACK_MASK) != 0) {
-                return true;
-            }
-
-            if (payloadLength != length) { // is a part of stream
-                if (size.compareAndSet(-1, length)) { // header of a stream
-                    completed.set(payloadLength);
-                    return false;
-                }
-
-                // payload.readableBytes() + 4 need because reader index has already moved
-                return completed.addAndGet(payloadLength + 4) == size.get();
-            }
+        if (quickAck && size.get() == -1 && (length & QUICK_ACK_MASK) != 0) {
             return true;
-        } finally {
-            payload.resetReaderIndex();
         }
+
+        if (length != payloadLength) { // is a part of stream
+            if (size.compareAndSet(-1, length)) { // header of a stream
+                completed.set(payloadLength);
+                return false;
+            }
+
+            return completed.addAndGet(payloadLength + 4) == size.get();
+        }
+        return size.get() == -1;
     }
 
     @Override

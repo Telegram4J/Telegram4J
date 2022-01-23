@@ -23,7 +23,8 @@ public class AuthService extends RpcService {
     }
 
     public Mono<Authorization> signIn(String phoneNumber, String phoneNumberHash, String phoneCode) {
-        return client.sendAwait(ImmutableSignIn.of(phoneNumber, phoneNumberHash, phoneCode));
+        return Mono.defer(() -> client.sendAwait(ImmutableSignIn.of(phoneNumber.replaceAll("\\s+\\+", ""),
+                phoneNumberHash, phoneCode)));
     }
 
     public Mono<LoggedOut> logOut() {

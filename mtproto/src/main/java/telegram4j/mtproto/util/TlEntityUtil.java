@@ -32,8 +32,8 @@ public class TlEntityUtil {
                 return ImmutableInputPeerUserFromMessage.of(d.peer(), d.msgId(), d.userId());
             case InputUserSelf.ID: return InputPeerSelf.instance();
             case BaseInputUser.ID:
-                BaseInputUser baseInputUser = (BaseInputUser) user;
-                return ImmutableInputPeerUser.of(baseInputUser.userId(), baseInputUser.accessHash());
+                BaseInputUser v = (BaseInputUser) user;
+                return ImmutableInputPeerUser.of(v.userId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input user type: " + user);
         }
     }
@@ -44,9 +44,34 @@ public class TlEntityUtil {
                 InputChannelFromMessage d = (InputChannelFromMessage) channel;
                 return ImmutableInputPeerChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
             case BaseInputChannel.ID:
-                BaseInputChannel baseInputChannel = (BaseInputChannel) channel;
-                return ImmutableInputPeerChannel.of(baseInputChannel.channelId(), baseInputChannel.accessHash());
+                BaseInputChannel v = (BaseInputChannel) channel;
+                return ImmutableInputPeerChannel.of(v.channelId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input channel type: " + channel);
+        }
+    }
+
+    public static InputUser toInputUser(InputPeer peer) {
+        switch (peer.identifier()) {
+            case InputPeerUserFromMessage.ID:
+                InputPeerUserFromMessage d = (InputPeerUserFromMessage) peer;
+                return ImmutableInputUserFromMessage.of(d.peer(), d.msgId(), d.userId());
+            case InputPeerSelf.ID: return InputUserSelf.instance();
+            case InputPeerUser.ID:
+                InputPeerUser v = (InputPeerUser) peer;
+                return ImmutableBaseInputUser.of(v.userId(), v.accessHash());
+            default: throw new IllegalArgumentException("Unknown input peer user type: " + peer);
+        }
+    }
+
+    public static InputChannel toInputChannel(InputPeer peer) {
+        switch (peer.identifier()) {
+            case InputPeerChannelFromMessage.ID:
+                InputPeerChannelFromMessage d = (InputPeerChannelFromMessage) peer;
+                return ImmutableInputChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
+            case InputPeerChannel.ID:
+                InputPeerChannel v = (InputPeerChannel) peer;
+                return ImmutableBaseInputChannel.of(v.channelId(), v.accessHash());
+            default: throw new IllegalArgumentException("Unknown input peer channel type: " + peer);
         }
     }
 

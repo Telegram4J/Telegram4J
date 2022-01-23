@@ -6,10 +6,10 @@ import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
 
-import javax.crypto.Cipher;
 import java.math.BigInteger;
-import java.security.*;
-import java.security.spec.RSAPublicKeySpec;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 public final class CryptoUtil {
 
@@ -137,15 +137,7 @@ public final class CryptoUtil {
     }
 
     public static byte[] rsaEncrypt(byte[] src, PublicRsaKey key) {
-        try {
-            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-            PublicKey publicKey = keyFactory.generatePublic(new RSAPublicKeySpec(key.getModulus(), key.getExponent()));
-            Cipher cipher = Cipher.getInstance("RSA/ECB/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-            return cipher.doFinal(src);
-        } catch (Exception e) {
-            throw Exceptions.propagate(e);
-        }
+        return toByteArray(fromByteArray(src).modPow(key.getExponent(), key.getModulus()));
     }
 
     public static byte[] sha256Digest(byte[]... bytes) {

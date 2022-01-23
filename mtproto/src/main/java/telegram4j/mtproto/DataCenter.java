@@ -3,7 +3,7 @@ package telegram4j.mtproto;
 import java.util.List;
 import java.util.Objects;
 
-/** Identifier of the Telegram datacenter. */
+/** Identifier of the Telegram datacenter with IP address and port. */
 public final class DataCenter {
     private final int id;
     private final String address;

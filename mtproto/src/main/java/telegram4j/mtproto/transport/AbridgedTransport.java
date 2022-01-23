@@ -53,28 +53,23 @@ public class AbridgedTransport implements Transport {
 
     @Override
     public boolean canDecode(ByteBuf payload) {
-        payload.markReaderIndex();
-        try {
-            int partialLength = payload.readUnsignedByte();
-            if (partialLength == 0x7f) {
-                partialLength = payload.readUnsignedMediumLE();
-            }
-
-            int length = partialLength * 4;
-            int payloadLength = payload.readableBytes();
-            if (length != payloadLength) {
-                if (size.get() == -1) {
-                    size.set(length);
-                    completed.set(payloadLength);
-                    return false;
-                }
-
-                return completed.addAndGet(payloadLength + (partialLength == 0x7f ? 4 : 1)) == size.get();
-            }
-            return true;
-        } finally {
-            payload.resetReaderIndex();
+        int partialLength = payload.getByte(0);
+        if (partialLength == 0x7f) {
+            partialLength = payload.getUnsignedMediumLE(1);
         }
+
+        int pad = partialLength == 0x7f ? 4 : 1;
+        int length = partialLength * 4;
+        int payloadLength = payload.readableBytes() - pad;
+        if (length != payloadLength) {
+            if (size.compareAndSet(-1, partialLength)) {
+                completed.set(payloadLength);
+                return false;
+            }
+
+            return completed.addAndGet(payloadLength + pad) == size.get();
+        }
+        return size.get() == -1;
     }
 
     @Override
@@ -83,5 +78,6 @@ public class AbridgedTransport implements Transport {
     }
 
     @Override
-    public void setQuickAckState(boolean enable) {}
+    public void setQuickAckState(boolean enable) {
+    }
 }
