@@ -16,10 +16,13 @@ public class Game implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.Game data;
+    private final int messageId;
 
-    public Game(MTProtoTelegramClient client, telegram4j.tl.Game data) {
+    public Game(MTProtoTelegramClient client, telegram4j.tl.Game data, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+
+        this.messageId = messageId;
     }
 
     @Override
@@ -48,15 +51,13 @@ public class Game implements TelegramObject {
     }
 
     public Optional<Photo> getPhoto() {
-        return Optional.of(data.photo())
-                .map(p -> TlEntityUtil.unmapEmpty(p, BasePhoto.class))
-                .map(p -> new Photo(client, p));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
+                .map(p -> new Photo(client, p, messageId));
     }
 
     public Optional<Document> getDocument() {
-        return Optional.ofNullable(data.document())
-                .map(d -> TlEntityUtil.unmapEmpty(d, BaseDocument.class))
-                .map(d -> new Document(client, d));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
+                .map(d -> new Document(client, d, messageId));
     }
 
     @Override

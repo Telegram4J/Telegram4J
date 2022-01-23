@@ -43,7 +43,7 @@ public class User implements PeerEntity {
     }
 
     public PrivateChat asPrivateChat() {
-        return new PrivateChat(client, this);
+        return new PrivateChat(client, this, null);
     }
 
     // MinUser fields
@@ -67,13 +67,14 @@ public class User implements PeerEntity {
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
                 .map(c -> new ChatPhoto(client, c, ImmutableInputPeerUser.of(minData.id(),
-                        Objects.requireNonNull(minData.accessHash()))));
+                        Objects.requireNonNull(minData.accessHash())), -1));
     }
 
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d));
+                .map(d -> new Photo(client, d, ImmutableInputPeerUser.of(minData.id(),
+                        Objects.requireNonNull(minData.accessHash())), -1));
     }
 
     public Optional<UserStatus> getStatus() {
@@ -99,6 +100,7 @@ public class User implements PeerEntity {
         return Optional.ofNullable(minData.langCode());
     }
 
+    @Override
     public Id getId() {
         return Id.ofUser(minData.id(), minData.accessHash());
     }

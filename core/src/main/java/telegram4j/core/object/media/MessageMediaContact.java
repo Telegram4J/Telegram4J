@@ -9,8 +9,8 @@ public class MessageMediaContact extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaContact data;
 
-    public MessageMediaContact(MTProtoTelegramClient client, telegram4j.tl.MessageMediaContact data) {
-        super(client, Type.CONTACT);
+    public MessageMediaContact(MTProtoTelegramClient client, telegram4j.tl.MessageMediaContact data, int messageId) {
+        super(client, Type.CONTACT, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 

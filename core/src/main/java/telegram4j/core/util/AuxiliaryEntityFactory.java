@@ -26,7 +26,7 @@ public final class AuxiliaryEntityFactory {
                 ChannelMessages data0 = (ChannelMessages) data;
 
                 var chatsMap = data0.chats().stream()
-                        .map(d -> EntityFactory.createChat(client, d))
+                        .map(d -> EntityFactory.createChat(client, d, null))
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .map(d -> EntityFactory.createUser(client, d))
@@ -53,7 +53,7 @@ public final class AuxiliaryEntityFactory {
                 BaseMessages data0 = (BaseMessages) data;
 
                 var chatsMap = data0.chats().stream()
-                        .map(d -> EntityFactory.createChat(client, d))
+                        .map(d -> EntityFactory.createChat(client, d, null))
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .map(d -> EntityFactory.createUser(client, d))

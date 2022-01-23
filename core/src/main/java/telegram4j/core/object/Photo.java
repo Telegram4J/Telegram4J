@@ -8,6 +8,8 @@ import telegram4j.core.object.media.VideoSize;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.BasePhoto;
+import telegram4j.tl.InputPeer;
+import telegram4j.tl.InputPeerEmpty;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,17 +22,23 @@ public class Photo implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final BasePhoto data;
 
-    private final String smallFileReferenceId;
-    private final String bigFileReferenceId;
+    private final String fileReferenceId;
 
-    public Photo(MTProtoTelegramClient client, BasePhoto data) {
+    public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId) {
+        this(client, data, InputPeerEmpty.instance(), messageId);
+    }
+
+    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer peer, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
 
-        this.smallFileReferenceId = FileReferenceId.ofPhoto(data)
-                .serialize(ByteBufAllocator.DEFAULT);
-        this.bigFileReferenceId = FileReferenceId.ofPhoto(data)
-                .serialize(ByteBufAllocator.DEFAULT);
+        if (peer.identifier() != InputPeerEmpty.ID) {
+            this.fileReferenceId = FileReferenceId.ofChatPhoto(data, -1, peer)
+                    .serialize(ByteBufAllocator.DEFAULT);
+        } else {
+            this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, peer)
+                    .serialize(ByteBufAllocator.DEFAULT);
+        }
     }
 
     @Override
@@ -38,12 +46,8 @@ public class Photo implements TelegramObject {
         return client;
     }
 
-    public String getSmallFileReferenceId() {
-        return smallFileReferenceId;
-    }
-
-    public String getBigFileReferenceId() {
-        return bigFileReferenceId;
+    public String getFileReferenceId() {
+        return fileReferenceId;
     }
 
     public boolean isHasStickers() {

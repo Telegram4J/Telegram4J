@@ -12,14 +12,13 @@ public class MessageMediaVenue extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaVenue data;
 
-    public MessageMediaVenue(MTProtoTelegramClient client, telegram4j.tl.MessageMediaVenue data) {
-        super(client, Type.VENUE);
+    public MessageMediaVenue(MTProtoTelegramClient client, telegram4j.tl.MessageMediaVenue data, int messageId) {
+        super(client, Type.VENUE, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 
     public Optional<GeoPoint> getGeo() {
-        return Optional.of(data.geo())
-                .map(d -> TlEntityUtil.unmapEmpty(d, BaseGeoPoint.class))
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class))
                 .map(d -> new GeoPoint(client, d));
     }
 

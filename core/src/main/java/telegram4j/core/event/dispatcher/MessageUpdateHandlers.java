@@ -50,17 +50,22 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        var chatData = context.getChats().get(getRawPeerId(message.peerId()));
-        var userData = Optional.ofNullable(message.fromId())
+        long chatId = getRawPeerId(message.peerId());
+        BaseUser selfUser = context.getUsers().values().stream()
+                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                .map(b -> (BaseUser) b)
+                .findFirst()
+                .orElse(null);
+        Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
+                .or(() -> Optional.ofNullable(context.getUsers().get(chatId))
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u))
+                .map(c -> EntityFactory.createChat(client, c, selfUser))
+                .orElse(null);
+        User user = Optional.ofNullable(message.fromId())
                 .map(p -> context.getUsers().get(getRawPeerId(p)))
                 .filter(u -> u.identifier() == BaseUser.ID)
-                .map(u -> (BaseUser) u);
-        Chat chat = Optional.<TlObject>ofNullable(chatData)
-                .or(() -> userData)
-                .map(c -> EntityFactory.createChat(client, c))
-                .orElse(null);
-        User user = userData
-                .map(d -> new User(client, d))
+                .map(d -> new User(client, (BaseUser) d))
                 .orElse(null);
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)
@@ -75,14 +80,17 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        var chatData = context.getChats().get(getRawPeerId(message.peerId()));
-        var userData = Optional.ofNullable(message.fromId())
-                .map(p -> context.getUsers().get(getRawPeerId(p)))
-                .filter(u -> u.identifier() == BaseUser.ID)
-                .map(u -> (BaseUser) u);
-        Chat chat = Optional.<TlObject>ofNullable(chatData)
-                .or(() -> userData)
-                .map(c -> EntityFactory.createChat(client, c))
+        long chatId = getRawPeerId(message.peerId());
+        var selfUser = context.getUsers().values().stream()
+                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                .map(b -> (BaseUser) b)
+                .findFirst()
+                .orElse(null);
+        Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
+                .or(() -> Optional.ofNullable(context.getUsers().get(chatId))
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u))
+                .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .orElse(null);
         Id resolvedId = Optional.ofNullable(chat)
                 .map(Chat::getId)

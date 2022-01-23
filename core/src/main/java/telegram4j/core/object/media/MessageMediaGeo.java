@@ -12,14 +12,13 @@ public class MessageMediaGeo extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaGeo data;
 
-    public MessageMediaGeo(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGeo data) {
-        super(client, Type.GEO);
+    public MessageMediaGeo(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGeo data, int messageId) {
+        super(client, Type.GEO, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 
     public Optional<GeoPoint> getGeo() {
-        return Optional.of(data.geo())
-                .map(d -> TlEntityUtil.unmapEmpty(d, BaseGeoPoint.class))
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class))
                 .map(d -> new GeoPoint(client, d));
     }
 }

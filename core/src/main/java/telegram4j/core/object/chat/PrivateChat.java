@@ -14,14 +14,30 @@ import java.util.Optional;
 public final class PrivateChat extends BaseChat {
 
     private final User user;
+    private final User selfUser;
 
-    public PrivateChat(MTProtoTelegramClient client, User user) {
+    public PrivateChat(MTProtoTelegramClient client, User user, @Nullable User selfUser) {
         super(client, user.getId(), Type.PRIVATE);
         this.user = Objects.requireNonNull(user, "user");
+        this.selfUser = selfUser;
     }
 
+    /**
+     * Gets the interlocutor user.
+     *
+     * @return The {@link User} interlocutor.
+     */
     public User getUser() {
         return user;
+    }
+
+    /**
+     * Gets the self user, if present.
+     *
+     * @return The self {@link User} of DM.
+     */
+    public Optional<User> getSelfUser() {
+        return Optional.ofNullable(selfUser);
     }
 
     @Override
@@ -49,18 +65,19 @@ public final class PrivateChat extends BaseChat {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         PrivateChat that = (PrivateChat) o;
-        return user.equals(that.user);
+        return user.equals(that.user) && Objects.equals(selfUser, that.selfUser);
     }
 
     @Override
     public int hashCode() {
-        return user.hashCode();
+        return Objects.hash(user, selfUser);
     }
 
     @Override
     public String toString() {
         return "PrivateChat{" +
                 "user=" + user +
+                ", selfUser=" + selfUser +
                 '}';
     }
 }

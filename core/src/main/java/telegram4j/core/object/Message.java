@@ -103,7 +103,7 @@ public class Message implements TelegramObject {
     public Optional<MessageMedia> getMedia() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::media)
-                .map(d -> EntityFactory.createMessageMedia(client, d));
+                .map(d -> EntityFactory.createMessageMedia(client, d, getId()));
     }
 
     public Optional<ReplyMarkup> getReplyMarkup() {

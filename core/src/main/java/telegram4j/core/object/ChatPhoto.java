@@ -16,13 +16,15 @@ public class ChatPhoto implements TelegramObject {
     private final String smallFileReferenceId;
     private final String bigFileReferenceId;
 
-    public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer) {
+    public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
 
-        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(peer, data, FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL)
+        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data,
+                        FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL, messageId, peer)
                 .serialize(ByteBufAllocator.DEFAULT);
-        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(peer, data, FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG)
+        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data,
+                        FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG, messageId, peer)
                 .serialize(ByteBufAllocator.DEFAULT);
     }
 

@@ -13,15 +13,14 @@ public class MessageMediaDocument extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaDocument data;
 
-    public MessageMediaDocument(MTProtoTelegramClient client, telegram4j.tl.MessageMediaDocument data) {
-        super(client, Type.DOCUMENT);
+    public MessageMediaDocument(MTProtoTelegramClient client, telegram4j.tl.MessageMediaDocument data, int messageId) {
+        super(client, Type.DOCUMENT, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 
     public Optional<Document> getDocument() {
-        return Optional.ofNullable(data.document())
-                .map(d -> TlEntityUtil.unmapEmpty(d, BaseDocument.class))
-                .map(d -> new Document(client, d));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
+                .map(d -> new Document(client, d, messageId));
     }
 
     public Optional<Duration> getAutoDeleteDuration() {

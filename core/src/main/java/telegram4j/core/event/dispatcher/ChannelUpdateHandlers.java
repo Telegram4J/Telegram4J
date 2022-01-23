@@ -32,7 +32,7 @@ class ChannelUpdateHandlers {
         UpdateChannelParticipant upd = context.getUpdate();
 
         Channel channel = Optional.ofNullable(context.getChats().get(upd.channelId()))
-                .map(d -> EntityFactory.createChat(context.getClient(), d))
+                .map(d -> EntityFactory.createChat(context.getClient(), d, null))
                 .map(c -> (Channel) c)
                 .orElseThrow();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))

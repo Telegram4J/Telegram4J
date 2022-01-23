@@ -93,10 +93,10 @@ public class RpcEntityRetriever implements EntityRetriever {
                     return asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel);
                 }))
                 .ofType(telegram4j.tl.Chat.class)
-                .map(c -> EntityFactory.createChat(client, c));
+                .map(c -> EntityFactory.createChat(client, c, null));
     }
 
-    @Override
+    @Override // TODO: or also try fetch user?
     public Mono<Chat> getChatFullById(Id chatId) {
         if (chatId.getType() == Id.Type.USER) {
             return Mono.error(new IllegalArgumentException("Incorrect id type, expected: [CHANNEL, CHAT], but given: USER"));
@@ -109,7 +109,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     }
                     return asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getFullChannel);
                 }))
-                .map(c -> EntityFactory.createChat(client, c));
+                .map(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override

@@ -41,16 +41,15 @@ public class GroupChat extends BaseChat {
 
     @Override
     public Optional<ChatPhoto> getMinPhoto() {
-        return Optional.of(minData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, getIdAsPeer()));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
+                .map(d -> new ChatPhoto(client, d, getIdAsPeer(), -1));
     }
 
     @Override
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d));
+                .map(d -> new Photo(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
     }
 
     @Override

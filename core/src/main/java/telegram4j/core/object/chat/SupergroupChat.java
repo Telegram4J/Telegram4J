@@ -2,18 +2,11 @@ package telegram4j.core.object.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ChannelLocation;
-import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.ChatPhoto;
-import telegram4j.core.object.ExportedChatInvite;
-import telegram4j.core.object.PeerNotifySettings;
-import telegram4j.core.object.Photo;
-import telegram4j.core.object.RestrictionReason;
-import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.*;
+import telegram4j.tl.BaseChannelLocation;
+import telegram4j.tl.ChannelFull;
+import telegram4j.tl.InputGroupCall;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -31,31 +24,6 @@ public class SupergroupChat extends BaseChannel {
 
     public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
         super(client, Id.ofChannel(minData.id(), minData.accessHash()), Type.SUPERGROUP, fullData, minData);
-    }
-
-    @Override
-    public Optional<Integer> getPinnedMessageId() {
-        return Optional.ofNullable(fullData).map(ChannelFull::pinnedMsgId);
-    }
-
-    @Override
-    public Optional<ChatPhoto> getMinPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, getIdAsPeer()));
-    }
-
-    @Override
-    public Optional<Photo> getPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d));
-    }
-
-    @Override
-    public Optional<Duration> getMessageAutoDeleteDuration() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::ttlPeriod)
-                .map(Duration::ofSeconds);
     }
 
     // ChannelMin fields

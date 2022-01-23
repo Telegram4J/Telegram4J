@@ -104,11 +104,11 @@ class UserUpdateHandlers {
         var inputPeer = ImmutableInputPeerUser.of(context.getUpdate().userId(), -1); // TODO: resolve access_hash
         var currentPhoto = Optional.of(context.getUpdate().photo())
                 .map(d -> unmapEmpty(d, ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d, inputPeer))
+                .map(d -> new ChatPhoto(client, d, inputPeer, -1))
                 .orElse(null);
         var oldPhoto = Optional.ofNullable(context.getOld())
                 .map(d -> unmapEmpty(d, ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d, inputPeer))
+                .map(d -> new ChatPhoto(client, d, inputPeer, -1))
                 .orElse(null);
 
         return Flux.just(new UpdateUserPhotoEvent(context.getClient(), userId, timestamp,

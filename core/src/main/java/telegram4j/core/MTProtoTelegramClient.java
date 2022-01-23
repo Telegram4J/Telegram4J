@@ -17,18 +17,18 @@ import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.tl.CodeSettings;
 import telegram4j.tl.ImmutableBaseInputChannel;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.upload.BaseFile;
 
-import java.util.Objects;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
     /** The supported api scheme version. */
     public static final int LAYER = 137;
 
-    private final AuthorizationResources authorizationResources;
+    private final AuthorizationResources authResources;
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
@@ -36,12 +36,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final EntityRetriever entityRetriever;
     private final Mono<Void> onDisconnect;
 
-    MTProtoTelegramClient(AuthorizationResources authorizationResources,
+    MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
                           UpdatesHandlers updatesHandlers, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
-        this.authorizationResources = authorizationResources;
+        this.authResources = authResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
@@ -52,22 +52,23 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
-        Objects.requireNonNull(botAuthToken, "botAuthToken");
-        return new MTProtoBootstrap<>(Function.identity(),
-                new AuthorizationResources(appId, appHash, botAuthToken, AuthorizationResources.Type.BOT));
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, botAuthToken));
     }
 
-    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash) {
-        return new MTProtoBootstrap<>(Function.identity(),
-                new AuthorizationResources(appId, appHash, null, AuthorizationResources.Type.USER));
+    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String phoneNumber, CodeSettings settings) {
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, phoneNumber, settings));
     }
 
     public UpdatesManager getUpdatesManager() {
         return updatesManager;
     }
 
-    public AuthorizationResources getAuthorizationResources() {
-        return authorizationResources;
+    public boolean isBot() {
+        return authResources.getType() == AuthorizationResources.Type.BOT;
+    }
+
+    public AuthorizationResources authResources() {
+        return authResources;
     }
 
     public MTProtoResources getMtProtoResources() {

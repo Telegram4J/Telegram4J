@@ -8,10 +8,13 @@ public class BaseMessageMedia implements MessageMedia {
 
     protected final MTProtoTelegramClient client;
     protected final Type type;
+    protected final int messageId;
 
-    public BaseMessageMedia(MTProtoTelegramClient client, Type type) {
+    public BaseMessageMedia(MTProtoTelegramClient client, Type type, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.type = Objects.requireNonNull(type, "type");
+
+        this.messageId = messageId;
     }
 
     @Override

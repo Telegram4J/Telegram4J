@@ -9,8 +9,8 @@ public class MessageMediaInvoice extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaInvoice data;
 
-    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data) {
-        super(client, Type.INVOICE);
+    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data, int messageId) {
+        super(client, Type.INVOICE, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 

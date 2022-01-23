@@ -10,8 +10,8 @@ public class MessageMediaPoll extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaPoll data;
 
-    public MessageMediaPoll(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPoll data) {
-        super(client, Type.POLL);
+    public MessageMediaPoll(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPoll data, int messageId) {
+        super(client, Type.POLL, messageId);
         this.data = Objects.requireNonNull(data, "data");
     }
 
