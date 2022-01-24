@@ -2,7 +2,8 @@ package telegram4j.mtproto.auth;
 
 import telegram4j.mtproto.DataCenter;
 
-import static telegram4j.mtproto.util.CryptoUtil.*;
+import static telegram4j.mtproto.util.CryptoUtil.sha1Digest;
+import static telegram4j.mtproto.util.CryptoUtil.substring;
 
 public class AuthorizationKeyHolder {
     private final DataCenter dc;

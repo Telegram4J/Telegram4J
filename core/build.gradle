@@ -7,9 +7,5 @@ dependencies {
     testImplementation "ch.qos.logback:logback-classic:$logback_version"
     testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
 
-    if (JavaVersion.current().isJava8()) {
-        compileOnly "com.google.code.findbugs:annotations:$findbugs_version"
-    } else {
-        compileOnly "javax.annotation:javax.annotation-api:$javax_annotation"
-    }
+    compileOnly "javax.annotation:javax.annotation-api:$javax_annotation"
 }

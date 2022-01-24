@@ -5,9 +5,6 @@ import telegram4j.tl.mtproto.ServerDHParams;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static telegram4j.mtproto.util.CryptoUtil.sha1Digest;
-import static telegram4j.mtproto.util.CryptoUtil.substring;
-
 public final class AuthorizationContext {
     private volatile byte[] nonce;
     private volatile byte[] newNonce;

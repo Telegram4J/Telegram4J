@@ -12,7 +12,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class StickerSet implements TelegramObject {
-
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.StickerSet data;
 
