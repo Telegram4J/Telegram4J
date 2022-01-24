@@ -20,7 +20,10 @@ import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
 import telegram4j.core.util.EntityParser;
-import telegram4j.mtproto.*;
+import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DefaultMTProtoClient;
+import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
@@ -57,7 +60,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<String, EntityParser> defaultEntityParserFactory;
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
     private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
-    private MTProtoClientManager mtProtoClientManager;
 
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
@@ -113,11 +115,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setUpdatesHandlers(MTProtoClientManager mtProtoClientManager) {
-        this.mtProtoClientManager = Objects.requireNonNull(mtProtoClientManager, "mtProtoClientManager");
-        return this;
-    }
-
     public MTProtoBootstrap<O> setRetry(RetryBackoffSpec retry) {
         this.retry = Objects.requireNonNull(retry, "retry");
         return this;
@@ -156,7 +153,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return Mono.create(sink -> {
             StoreLayout storeLayout = initStoreLayout();
             EventDispatcher eventDispatcher = initEventDispatcher();
-            MTProtoClientManager mtProtoClientManager = initMtProtoClientManager();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
@@ -164,8 +160,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
                             initRetry(), initAuthRetry(), initGzipPackingPredicate())));
 
-            MTProtoResources mtProtoResources = new MTProtoResources(mtProtoClientManager, storeLayout,
-                    eventDispatcher, defaultEntityParserFactory);
+            MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
@@ -199,15 +194,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
                         switch (state) {
-                            case CLOSED:
-                                mtProtoClientManager.remove(mtProtoClient.getDatacenter());
-
-                                return Mono.just(mtProtoClientManager.activeCount())
-                                        .filter(i -> i == 0)
-                                        .flatMap(ig -> disconnect);
+                            case CLOSED: return disconnect;
                             case CONNECTED:
-                                mtProtoClientManager.add(mtProtoClient);
-
                                 Mono<Void> fetchSelfId = storeLayout.getSelfId()
                                         .filter(l -> l != 0)
                                         .switchIfEmpty(serviceHolder.getUserService()
@@ -335,10 +323,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return authRetry;
         }
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
-    }
-
-    private MTProtoClientManager initMtProtoClientManager() {
-        return mtProtoClientManager != null ? mtProtoClientManager : new MTProtoClientManagerImpl();
     }
 
     private Function<MTProtoTelegramClient, EntityRetriever> initEntityRetrieverFactory() {

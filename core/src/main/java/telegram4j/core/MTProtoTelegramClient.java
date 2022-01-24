@@ -87,7 +87,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     public Mono<Void> disconnect() {
-        return mtProtoResources.getClientManager().close();
+        return mtProtoClient.close();
     }
 
     public Mono<Void> onDisconnect() {
