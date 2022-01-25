@@ -29,7 +29,7 @@ public class DocumentAttributeSticker extends BaseDocumentAttribute {
         return data.stickerset();
     }
 
-    public Optional<MaskCoordinates> getMaskCoords() {
+    public Optional<MaskCoordinates> getMaskCoordinates() {
         return Optional.ofNullable(data.maskCoords()).map(d -> new MaskCoordinates(client, d));
     }
 

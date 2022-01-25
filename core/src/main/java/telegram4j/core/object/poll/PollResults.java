@@ -51,7 +51,7 @@ public class PollResults implements TelegramObject {
     public Optional<List<MessageEntity>> getSolutionEntities() {
         return Optional.ofNullable(data.solutionEntities())
                 .map(l -> l.stream()
-                        .map(d -> new MessageEntity(client, d, getSolution().orElseThrow()))
+                        .map(d -> new MessageEntity(client, d, Objects.requireNonNull(data.solution())))
                         .collect(Collectors.toList()));
     }
 

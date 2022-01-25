@@ -18,8 +18,6 @@ import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
-import telegram4j.tl.request.auth.ImmutableSignIn;
-import telegram4j.tl.request.auth.SignIn;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
@@ -40,7 +38,6 @@ public class TestFileStoreLayout implements StoreLayout {
 
     private volatile AuthorizationKeyHolder authorizationKey;
     private volatile ImmutableState state;
-    private volatile ImmutableSignIn signIn;
 
     public TestFileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
         this.allocator = allocator;
@@ -63,7 +60,7 @@ public class TestFileStoreLayout implements StoreLayout {
                     byte[] authKey = TlSerialUtil.deserializeBytes(buf);
                     byte[] authKeyId = TlSerialUtil.deserializeBytes(buf);
                     this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
-                    this.signIn = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
+                    buf.release();
 
                     return new AuthorizationKeyHolder(dc, authKey, authKeyId);
                 }));
@@ -72,12 +69,6 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
         return Mono.fromRunnable(() -> this.authorizationKey = authorizationKey)
-                .and(save());
-    }
-
-    @Override
-    public Mono<Void> updateSignInInfo(SignIn signInInfo) {
-        return Mono.fromRunnable(() -> this.signIn = ImmutableSignIn.copyOf(signInInfo))
                 .and(save());
     }
 
@@ -92,8 +83,7 @@ public class TestFileStoreLayout implements StoreLayout {
             ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKey());
             ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKeyId());
             ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
-            ByteBuf signInBuf = this.signIn != null ? TlSerializer.serialize(allocator, signIn) : Unpooled.EMPTY_BUFFER;
-            ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state, signInBuf);
+            ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
 
             Path fileName = Path.of(String.format(DB_FILE, authorizationKey.getDc().getId()));
             try {
@@ -157,11 +147,6 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<UserFull> getUserFullById(long userId) {
         return delegate.getUserFullById(userId);
-    }
-
-    @Override
-    public Mono<SignIn> getSignInInfo(String phoneNumber) {
-        return Mono.fromSupplier(() -> signIn); // TODO: check phone number?
     }
 
     @Override

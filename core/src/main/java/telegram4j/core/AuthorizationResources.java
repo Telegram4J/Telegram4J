@@ -1,9 +1,8 @@
 package telegram4j.core;
 
-import reactor.core.publisher.Mono;
+import org.reactivestreams.Publisher;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.CodeSettings;
-import telegram4j.tl.request.auth.SignIn;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -19,7 +18,7 @@ public class AuthorizationResources {
     @Nullable
     private final CodeSettings settings;
     @Nullable
-    private final Function<MTProtoTelegramClient, Mono<SignIn>> authHandler;
+    private final Function<MTProtoTelegramClient, Publisher<?>> authHandler;
     private final Type type;
 
     AuthorizationResources(int appId, String appHash, String botAuthToken) {
@@ -34,7 +33,7 @@ public class AuthorizationResources {
     }
 
     AuthorizationResources(int appId, String appHash, String phoneNumber, CodeSettings settings,
-                           Function<MTProtoTelegramClient, Mono<SignIn>> authHandler) {
+                           Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
         this.appId = appId;
         this.appHash = Objects.requireNonNull(appHash, "appHash");
         this.phoneNumber = Objects.requireNonNull(phoneNumber, "phoneNumber");
@@ -65,7 +64,7 @@ public class AuthorizationResources {
         return Optional.ofNullable(settings);
     }
 
-    public Optional<Function<MTProtoTelegramClient, Mono<SignIn>>> getAuthHandler() {
+    public Optional<Function<MTProtoTelegramClient, Publisher<?>>> getAuthHandler() {
         return Optional.ofNullable(authHandler);
     }
 

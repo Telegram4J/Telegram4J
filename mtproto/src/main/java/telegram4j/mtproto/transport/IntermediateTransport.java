@@ -84,4 +84,10 @@ public class IntermediateTransport implements Transport {
     public void setQuickAckState(boolean enable) {
         this.quickAck = enable;
     }
+
+    @Override
+    public void discard() {
+        size.set(-1);
+        completed.set(-1);
+    }
 }

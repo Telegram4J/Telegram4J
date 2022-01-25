@@ -149,7 +149,6 @@ public class RpcEntityRetriever implements EntityRetriever {
 
     private Mono<InputChannel> asInputChannel(Id channelId) {
         if (channelId.getAccessHash().isEmpty()) {
-            // it may be unnecessary, because there is no channel in the storage
             return storeLayout.resolveChannel(channelId.asLong());
         }
         return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow()));

@@ -83,9 +83,11 @@ public class UpdatesManager {
         return client.getServiceHolder()
         .getUpdatesService().getState()
         .flatMap(state -> {
-            if (date == -1) {
+            if (date == -1 || pts == -1 || seq == -1 || qts == -1) {
                 return client.getMtProtoResources().getStoreLayout()
                         .getCurrentState()
+                        .filter(s -> s.qts() != -1 && s.seq() != -1
+                                && s.pts() != -1 && s.date() != -1)
                         .defaultIfEmpty(state)
                         .doOnNext(this::applyStateLocal)
                         .thenReturn(state);

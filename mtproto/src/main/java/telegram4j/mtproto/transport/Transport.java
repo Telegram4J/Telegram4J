@@ -55,4 +55,7 @@ public interface Transport {
      * @param enable The new state.
      */
     void setQuickAckState(boolean enable);
+
+    /** Discard current byte stream window. */
+    void discard();
 }

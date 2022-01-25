@@ -202,6 +202,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 Long id = quickAckTokens.getIfPresent(val);
                                 if (id == null) {
                                     log.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
+                                    transport.discard();
                                     return Mono.empty();
                                 }
 
@@ -374,7 +375,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .flatMap(tick -> send(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT)))
                     .then();
 
-            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() -> state.emitNext(State.AUTHORIZATION_BEGIN, emissionHandler))
+            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() ->
+                    state.emitNext(State.AUTHORIZATION_BEGIN, emissionHandler))
                     .then(authHandler.start())
                     .checkpoint("Authorization key generation")
                     .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))

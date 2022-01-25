@@ -14,6 +14,7 @@ import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
+import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
@@ -34,6 +35,7 @@ import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
+import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 
 import java.time.Duration;
@@ -162,6 +164,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
+            var initConnection = initConnection();
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
@@ -181,14 +184,16 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         sink.success();
                         onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                     })
-                    .subscribe());
+                    .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
+                            () -> log.debug("MTProto client completed")));
 
             composite.add(mtProtoClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
                     .checkpoint("Event dispatch handler.")
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
-                    .subscribe());
+                    .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t),
+                            () -> log.debug("Event dispatcher completed")));
 
             composite.add(mtProtoClient.state()
                     .takeUntilOther(onDisconnect.asMono())
@@ -196,7 +201,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         switch (state) {
                             case CLOSED: return disconnect;
                             case CONNECTED:
-                                Mono<Void> fetchSelfId = storeLayout.getSelfId()
+                                Mono<Void> fetchSelf = storeLayout.getSelfId()
                                         .filter(l -> l != 0)
                                         .switchIfEmpty(serviceHolder.getUserService()
                                                 .getFullUser(InputUserSelf.instance())
@@ -206,37 +211,20 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
                                 return mtProtoClient.sendAwait(InvokeWithLayer.builder()
                                                 .layer(MTProtoTelegramClient.LAYER)
-                                                .query(initConnection())
+                                                .query(initConnection)
                                                 .build())
                                         .then(Mono.defer(() -> {
-                                            switch (authResources.getType()) {
-                                                case BOT:
-                                                    return telegramClient.getServiceHolder()
-                                                            .getAuthService()
-                                                            .importBotAuthorization(0, authResources.getAppId(), authResources.getAppHash(),
-                                                                    authResources.getBotAuthToken().orElseThrow())
-                                                            .then();
-                                                case USER:
-
-                                                    String phoneNumber = authResources.getPhoneNumber().orElseThrow();
-                                                    var authHandler = authResources.getAuthHandler().orElseThrow();
-                                                    return telegramClient.getMtProtoResources()
-                                                            .getStoreLayout()
-                                                            .getSignInInfo(phoneNumber)
-                                                            .switchIfEmpty(authHandler.apply(telegramClient))
-                                                            .flatMap(signIn -> telegramClient.getServiceHolder()
-                                                                    .getAuthService()
-                                                                    .signIn(phoneNumber, signIn.phoneCodeHash(), signIn.phoneCode())
-                                                                    .and(telegramClient.getMtProtoResources()
-                                                                            .getStoreLayout()
-                                                                            .updateSignInInfo(signIn)))
-                                                            .then();
-
-                                                default:
-                                                    return Mono.error(new IllegalStateException());
+                                            if (authResources.getType() == Type.USER) {
+                                                // delegate all auth work to the user and trigger authorization only if auth key is new
+                                                return storeLayout.getAuthorizationKey(mtProtoClient.getDatacenter())
+                                                        .switchIfEmpty(Flux.from(authResources.getAuthHandler()
+                                                                .orElseThrow().apply(telegramClient))
+                                                                .then(Mono.empty()))
+                                                        .then();
                                             }
+                                            return Mono.empty();
                                         }))
-                                        .then(fetchSelfId)
+                                        .then(fetchSelf)
                                         .then(telegramClient.getUpdatesManager().fillGap())
                                         .thenReturn(telegramClient) // FIXME: reconnections drop signals
                                         .doOnNext(sink::success);
@@ -244,7 +232,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                 return Mono.empty();
                         }
                     })
-                    .subscribe());
+                    .subscribe(null, t -> log.error("State handler terminated with an error", t),
+                            () -> log.debug("State handler completed")));
 
             sink.onCancel(composite);
         });
@@ -259,7 +248,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 : InitConnectionParams.getDefault();
 
         var initConnection = InitConnection.builder()
-                .query(GetConfig.instance())
                 .apiId(authResources.getAppId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())
@@ -267,6 +255,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .langPack(params.getLangPack())
                 .systemVersion(params.getSystemVersion())
                 .systemLangCode(params.getSystemLangCode());
+
+        if (authResources.getType() == Type.BOT) {
+            initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getAppId(),
+                    authResources.getAppHash(), authResources.getBotAuthToken().orElseThrow()));
+        } else {
+            initConnection.query(GetConfig.instance());
+        }
 
         params.getProxy().ifPresent(initConnection::proxy);
         params.getParams().ifPresent(initConnection::params);

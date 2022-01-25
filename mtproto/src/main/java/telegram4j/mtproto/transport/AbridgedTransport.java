@@ -80,4 +80,10 @@ public class AbridgedTransport implements Transport {
     @Override
     public void setQuickAckState(boolean enable) {
     }
+
+    @Override
+    public void discard() {
+        size.set(-1);
+        completed.set(-1);
+    }
 }
