@@ -4,7 +4,6 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.media.DocumentAttribute;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.VideoSize;
 import telegram4j.core.util.EntityFactory;
@@ -21,12 +20,16 @@ public class Document implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final BaseDocument data;
+    @Nullable
+    private final String fileName;
 
     private final String fileReferenceId;
 
-    public Document(MTProtoTelegramClient client, BaseDocument data, int messageId) {
+    public Document(MTProtoTelegramClient client, BaseDocument data,
+                    @Nullable String fileName, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        this.fileName = fileName;
 
         this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, InputPeerEmpty.instance())
                 .serialize(ByteBufAllocator.DEFAULT);
@@ -83,10 +86,8 @@ public class Document implements TelegramObject {
         return data.dcId();
     }
 
-    public List<DocumentAttribute> getAttributes() {
-        return data.attributes().stream()
-                .map(d -> EntityFactory.createDocumentAttribute(client, d))
-                .collect(Collectors.toList());
+    public Optional<String> getFileName() {
+        return Optional.ofNullable(fileName);
     }
 
     @Override
@@ -100,5 +101,14 @@ public class Document implements TelegramObject {
     @Override
     public int hashCode() {
         return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "Document{" +
+                "data=" + data +
+                ", fileName='" + fileName + '\'' +
+                ", fileReferenceId='" + fileReferenceId + '\'' +
+                '}';
     }
 }

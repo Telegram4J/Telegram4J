@@ -5,6 +5,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
@@ -57,7 +58,7 @@ public class Game implements TelegramObject {
 
     public Optional<Document> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                .map(d -> new Document(client, d, messageId));
+                .map(d -> EntityFactory.createDocument(client, d, messageId));
     }
 
     @Override

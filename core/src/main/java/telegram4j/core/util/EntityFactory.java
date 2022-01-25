@@ -2,6 +2,7 @@ package telegram4j.core.util;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Document;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
@@ -259,6 +260,57 @@ public final class EntityFactory {
             default:
                 throw new IllegalArgumentException("Unknown photo size type: " + data);
         }
+    }
+
+    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocument data, int messageId) {
+        boolean animated = false;
+        boolean hasStickers = false;
+        telegram4j.tl.DocumentAttributeVideo videoData = null;
+        telegram4j.tl.DocumentAttributeAudio audioData = null;
+        telegram4j.tl.DocumentAttributeSticker stickerData = null;
+        telegram4j.tl.DocumentAttributeImageSize sizeData = null;
+        String fileName = null;
+        for (var a : data.attributes()) {
+            switch (a.identifier()) {
+                case telegram4j.tl.DocumentAttributeHasStickers.ID:
+                    hasStickers = true;
+                    break;
+                case telegram4j.tl.DocumentAttributeAnimated.ID:
+                    animated = true;
+                    break;
+                case telegram4j.tl.DocumentAttributeAudio.ID:
+                    audioData = (telegram4j.tl.DocumentAttributeAudio) a;
+                    break;
+                case telegram4j.tl.DocumentAttributeFilename.ID:
+                    fileName = ((telegram4j.tl.DocumentAttributeFilename) a).fileName();
+                    break;
+                case telegram4j.tl.DocumentAttributeImageSize.ID:
+                    sizeData = (telegram4j.tl.DocumentAttributeImageSize) a;
+                    break;
+                case telegram4j.tl.DocumentAttributeSticker.ID:
+                    stickerData = (telegram4j.tl.DocumentAttributeSticker) a;
+                    break;
+                case telegram4j.tl.DocumentAttributeVideo.ID:
+                    videoData = (telegram4j.tl.DocumentAttributeVideo) a;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown document attribute type: " + a);
+            }
+        }
+
+        if (stickerData != null) {
+            return new Sticker(client, data, fileName, messageId, stickerData, sizeData);
+        }
+
+        if (audioData != null) {
+            return new Audio(client, data, fileName, messageId, audioData);
+        }
+
+        if (videoData != null) {
+            return new Video(client, data, fileName, messageId, videoData, hasStickers, animated);
+        }
+
+        return new Document(client, data, fileName, messageId);
     }
 
     public static DocumentAttribute createDocumentAttribute(MTProtoTelegramClient client, telegram4j.tl.DocumentAttribute data) {

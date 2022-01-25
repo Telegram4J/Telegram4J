@@ -2,6 +2,7 @@ package telegram4j.core.object.media;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 
@@ -20,7 +21,7 @@ public class MessageMediaDocument extends BaseMessageMedia {
 
     public Optional<Document> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                .map(d -> new Document(client, d, messageId));
+                .map(d -> EntityFactory.createDocument(client, d, messageId));
     }
 
     public Optional<Duration> getAutoDeleteDuration() {
