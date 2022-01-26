@@ -36,7 +36,7 @@ import telegram4j.tl.api.TlObject;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
-import telegram4j.tl.request.help.GetConfig;
+import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -260,7 +260,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getAppId(),
                     authResources.getAppHash(), authResources.getBotAuthToken().orElseThrow()));
         } else {
-            initConnection.query(GetConfig.instance());
+            initConnection.query(GetState.instance());
         }
 
         params.getProxy().ifPresent(initConnection::proxy);

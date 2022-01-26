@@ -26,7 +26,10 @@ import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
-import telegram4j.tl.*;
+import telegram4j.tl.TlDeserializer;
+import telegram4j.tl.TlSerialUtil;
+import telegram4j.tl.TlSerializer;
+import telegram4j.tl.Updates;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
@@ -202,7 +205,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 Long id = quickAckTokens.getIfPresent(val);
                                 if (id == null) {
                                     log.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
-                                    transport.discard();
                                     return Mono.empty();
                                 }
 
@@ -302,7 +304,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             }
 
                             return FutureMono.from(connection.channel()
-                                    .writeAndFlush(transport.encode(payload)));
+                                    .writeAndFlush(transport.encode(payload, false)));
                         }
 
                         if (options.getGzipPackingPredicate().test(data.readableBytes())) {
@@ -332,10 +334,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         byte[] plainDataB = toByteArray(plainData);
                         byte[] msgKeyLarge = sha256Digest(Arrays.copyOfRange(authKey, 88, 120), plainDataB);
 
+                        boolean quickAck = false;
                         if (transport.supportQuickAck() && tuple.method.identifier() != Ping.ID
-                                && tuple.method.identifier() != PingDelayDisconnect.ID) {
-                            int quickAck = readIntLE(msgKeyLarge) | QUICK_ACK_MASK;
-                            quickAckTokens.put(quickAck, tuple.messageId);
+                                && tuple.method.identifier() != PingDelayDisconnect.ID
+                                && tuple.method.identifier() != MsgsAck.ID) {
+                            int quickAckToken = readIntLE(msgKeyLarge) | QUICK_ACK_MASK;
+                            quickAckTokens.put(quickAckToken, tuple.messageId);
+                            quickAck = true;
                         }
 
                         byte[] messageKey = Arrays.copyOfRange(msgKeyLarge, 8, 24);
@@ -355,7 +360,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         }
 
                         return FutureMono.from(connection.channel()
-                                .writeAndFlush(transport.encode(payload)));
+                                .writeAndFlush(transport.encode(payload, quickAck)));
                     })
                     .then();
 
@@ -410,6 +415,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             log.error("[C:0x" + id + "] Unexpected client exception", t);
                         }
                     })
+                    .onErrorResume(t -> Mono.empty())
                     .then();
         })
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
@@ -427,7 +433,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     state.emitNext(State.RECONNECT, emissionHandler);
                     log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetries());
                 }))
-        .onErrorResume(t -> Mono.empty())
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
@@ -573,18 +578,33 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof Pong) {
             Pong pong = (Pong) obj;
             messageId = pong.msgId();
+            if (rpcLog.isTraceEnabled()) {
+                rpcLog.trace("[C:0x{}, M:0x{}] Receiving pong", id, Long.toHexString(messageId));
+            }
+
+            resolve(messageId, obj);
+            return Mono.empty();
+        }
+
+        if (obj instanceof FutureSalts) {
+            FutureSalts futureSalts = (FutureSalts) obj;
+            messageId = futureSalts.reqMsgId();
+            if (rpcLog.isTraceEnabled()) {
+                rpcLog.trace("[C:0x{}, M:0x{}] Receiving future salts", id, Long.toHexString(messageId));
+            }
+
             resolve(messageId, obj);
             return Mono.empty();
         }
 
         if (obj instanceof RpcResult) {
             RpcResult rpcResult = (RpcResult) obj;
-            if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Handling RPC result", id, Long.toHexString(rpcResult.reqMsgId()));
-            }
-
             messageId = rpcResult.reqMsgId();
             obj = rpcResult.result();
+
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[C:0x{}, M:0x{}] Handling RPC result", id, Long.toHexString(messageId));
+            }
 
             if (obj instanceof GzipPacked) {
                 GzipPacked gzipPacked = (GzipPacked) obj;
@@ -603,11 +623,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     .map(l -> String.format("0x%x", l))
                                     .collect(Collectors.joining(", ")));
                 }
-            }
-
-            if (obj instanceof FutureSalts) {
-                FutureSalts futureSalts = (FutureSalts) obj;
-                messageId = futureSalts.reqMsgId();
             }
 
             RequestEntry req = requests.get(messageId);
@@ -637,6 +652,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
             }
 
             resolve(messageId, obj);
+            if (transport.supportQuickAck()) { // already ack'ed
+                return Mono.empty();
+            }
+
             return acknowledgmentMessage(messageId);
         }
 
@@ -690,7 +709,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
         }
 
-        if (isNotPartialUpdates(obj)) {
+        if (obj instanceof Updates) {
             Updates updates = (Updates) obj;
             if (rpcLog.isTraceEnabled()) {
                 rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
@@ -703,10 +722,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private Mono<Void> acknowledgmentMessage(long messageId) {
-        if (transport.supportQuickAck()) {
-            return Mono.empty();
-        }
-
         if (!Objects.equals(acknowledgments.peek(), messageId)){
             acknowledgments.add(messageId);
         }
@@ -742,12 +757,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             return null;
         });
-    }
-
-    static boolean isNotPartialUpdates(Object obj) {
-        return obj instanceof Updates && !(obj instanceof UpdateShortMessage) &&
-                !(obj instanceof UpdateShortSentMessage) &&
-                !(obj instanceof UpdateShortChatMessage);
     }
 
     static boolean isContentRelated(TlObject object) {

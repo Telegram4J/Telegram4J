@@ -17,7 +17,7 @@ public class AbridgedTransport implements Transport {
     }
 
     @Override
-    public ByteBuf encode(ByteBuf payload) {
+    public ByteBuf encode(ByteBuf payload, boolean quickAck) {
         try {
             int length = payload.readableBytes() / 4;
             ByteBuf buf = payload.alloc().buffer((length >= 0x7f ? 4 : 1) + payload.readableBytes());
@@ -81,9 +81,4 @@ public class AbridgedTransport implements Transport {
     public void setQuickAckState(boolean enable) {
     }
 
-    @Override
-    public void discard() {
-        size.set(-1);
-        completed.set(-1);
-    }
 }

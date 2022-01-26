@@ -23,11 +23,11 @@ public class IntermediateTransport implements Transport {
     }
 
     @Override
-    public ByteBuf encode(ByteBuf payload) {
+    public ByteBuf encode(ByteBuf payload, boolean quickAck) {
         try {
             int size = payload.readableBytes();
             int packetSize = size;
-            if (quickAck) {
+            if (this.quickAck && quickAck) {
                 packetSize |= QUICK_ACK_MASK;
             }
 
@@ -85,9 +85,4 @@ public class IntermediateTransport implements Transport {
         this.quickAck = enable;
     }
 
-    @Override
-    public void discard() {
-        size.set(-1);
-        completed.set(-1);
-    }
 }

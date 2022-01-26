@@ -2,6 +2,7 @@ package telegram4j.core;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.core.event.dispatcher.UpdateContext;
@@ -15,6 +16,7 @@ import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.*;
@@ -107,60 +109,126 @@ public class UpdatesManager {
             case UpdatesTooLong.ID:
                 return getDifference();
             case UpdateShort.ID: {
-                UpdateShort updateShort = (UpdateShort) updates;
+                UpdateShort data = (UpdateShort) updates;
 
-                Flux<Event> preApply = Flux.empty();
-                date = updateShort.date();
+                date = data.date();
 
-                return preApply.concatWith(updatesHandlers.handle(UpdateContext.create(client, updateShort.update())));
+                return updatesHandlers.handle(UpdateContext.create(client, data.update()));
             }
             case BaseUpdates.ID: {
-                BaseUpdates baseUpdates = (BaseUpdates) updates;
+                BaseUpdates data = (BaseUpdates) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                int updSeq = baseUpdates.seq();
+                int updSeq = data.seq();
                 if (updSeq != 0 && seq + 1 < updSeq) {
+                    log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", updSeq, updSeq + 1, seq);
                     preApply = getDifference();
+                } else if (updSeq != 0 && seq + 1 > updSeq) {
+                    return Flux.empty();
                 }
 
-                var usersMap = baseUpdates.users().stream()
+                var usersMap = data.users().stream()
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
-                var chatsMap = baseUpdates.chats().stream()
+                var chatsMap = data.chats().stream()
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                date = baseUpdates.date();
+                date = data.date();
 
-                Flux<Event> events = Flux.fromIterable(baseUpdates.updates())
+                Flux<Event> events = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
                 return preApply.concatWith(events);
             }
             case UpdatesCombined.ID: {
-                UpdatesCombined updatesCombined = (UpdatesCombined) updates;
+                UpdatesCombined data = (UpdatesCombined) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                int seqBegin = updatesCombined.seqStart();
+                int seqBegin = data.seqStart();
                 if (seqBegin != 0 && seq + 1 < seqBegin) {
+                    log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, data.seq(), seq);
                     preApply = getDifference();
+                } else if (seqBegin != 0 && seq + 1 > seqBegin) {
+                    return Flux.empty();
                 }
 
-                var usersMap = updatesCombined.users().stream()
+                var usersMap = data.users().stream()
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
-                var chatsMap = updatesCombined.chats().stream()
+                var chatsMap = data.chats().stream()
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                seq = updatesCombined.seq();
-                date = updatesCombined.date();
+                seq = data.seq();
+                date = data.date();
 
-                Flux<Event> events0 = Flux.fromIterable(updatesCombined.updates())
+                Flux<Event> events0 = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
                 return preApply.concatWith(events0);
             }
+            case UpdateShortChatMessage.ID: {
+                UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
+
+                var message = BaseMessage.builder()
+                        .out(data.out())
+                        .mentioned(data.mentioned())
+                        .mediaUnread(data.mediaUnread())
+                        .silent(data.silent())
+                        .id(data.id())
+                        .date(data.date())
+                        .fromId(ImmutablePeerUser.of(data.fromId()))
+                        .peerId(ImmutablePeerUser.of(data.chatId()))
+                        .fwdFrom(data.fwdFrom())
+                        .viaBotId(data.viaBotId())
+                        .replyTo(data.replyTo())
+                        .entities(data.entities())
+                        .ttlPeriod(data.ttlPeriod())
+                        .message(data.message());
+
+                return updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                        .message(message.build())
+                        .pts(data.pts())
+                        .ptsCount(data.ptsCount())
+                        .build()));
+            }
+            case UpdateShortMessage.ID: {
+                UpdateShortMessage data = (UpdateShortMessage) updates;
+
+                var message = BaseMessage.builder()
+                        .out(data.out())
+                        .mentioned(data.mentioned())
+                        .mediaUnread(data.mediaUnread())
+                        .silent(data.silent())
+                        .id(data.id())
+                        .date(data.date())
+                        .fwdFrom(data.fwdFrom())
+                        .viaBotId(data.viaBotId())
+                        .replyTo(data.replyTo())
+                        .entities(data.entities())
+                        .ttlPeriod(data.ttlPeriod())
+                        .message(data.message());
+
+                return client.getMtProtoResources()
+                        .getStoreLayout()
+                        .getSelfId()
+                        .map(selfId -> {
+                            if (data.out()) {
+                                message.peerId(ImmutablePeerUser.of(data.userId()));
+                                message.fromId(ImmutablePeerUser.of(selfId));
+                            } else {
+                                message.peerId(ImmutablePeerUser.of(selfId));
+                                message.fromId(ImmutablePeerUser.of(data.userId()));
+                            }
+                            return message.build();
+                        })
+                        .flatMapMany(msg -> updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                                .message(msg)
+                                .pts(data.pts())
+                                .ptsCount(data.ptsCount())
+                                .build())));
+            }
             default:
-                return Flux.empty();
+                return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates));
         }
     }
 
@@ -201,12 +269,13 @@ public class UpdatesManager {
                     }
 
                     switch (difference.identifier()) {
-                        case DifferenceEmpty.ID:
-                            DifferenceEmpty empty = (DifferenceEmpty) difference;
+                        case DifferenceEmpty.ID: {
+                            DifferenceEmpty data = (DifferenceEmpty) difference;
 
-                            this.seq = empty.seq();
-                            this.date = empty.date();
+                            this.seq = data.seq();
+                            this.date = data.date();
                             return Mono.empty();
+                        }
                         case BaseDifference.ID: {
                             BaseDifference difference0 = (BaseDifference) difference;
 
@@ -249,22 +318,37 @@ public class UpdatesManager {
                                             .filter(u -> u.identifier() == UpdateChannelTooLong.ID)
                                             .map(u -> (UpdateChannelTooLong) u)
                                             .findFirst())
-                                    .flatMapMany(u -> {
+                                    .zipWhen(u -> client.getMtProtoResources()
+                                            .getStoreLayout()
+                                            .getChatFullById(u.channelId())
+                                            .map(ChatFull::fullChat)
+                                            .ofType(ChannelFull.class)
+                                            .map(ChannelFull::pts)
+                                            .defaultIfEmpty(-1))
+                                    .filter(TupleUtils.predicate((u, c) -> c == -1 || u.pts() == null ||
+                                            Objects.requireNonNull(u.pts()) > c))
+                                    .flatMapMany(TupleUtils.function((u, cpts) -> {
                                         InputChannel id = Optional.ofNullable(chatsMap.get(u.channelId()))
-                                                .filter(c -> c.identifier() == Channel.ID)
-                                                .map(c -> (Channel) c)
-                                                .map(c -> ImmutableBaseInputChannel.of(c.id(),
-                                                        Objects.requireNonNull(c.accessHash())))
+                                                .filter(ch -> ch.identifier() == Channel.ID)
+                                                .map(ch -> (Channel) ch)
+                                                .map(ch -> ImmutableBaseInputChannel.of(ch.id(),
+                                                        Objects.requireNonNull(ch.accessHash())))
                                                 .orElseThrow();
 
-                                        Integer cpts0 = u.pts();
-                                        int cpts = cpts0 != null ? cpts0 : -1;
+                                        Integer upts = u.pts();
+                                        int dpts;
+                                        if (cpts != -1) {
+                                            dpts = cpts;
+                                        } else {
+                                            dpts = upts != null ? upts : -1;
+                                        }
+
                                         int limit = client.isBot()
                                                 ? MAX_BOT_CHANNEL_DIFFERENCE
                                                 : MAX_CHANNEL_DIFFERENCE;
-                                        if (cpts == -1) {
+                                        if (dpts == -1) {
                                             limit = MIN_CHANNEL_DIFFERENCE;
-                                            cpts = 1;
+                                            dpts = 1;
                                         }
 
                                         return client.getServiceHolder()
@@ -272,12 +356,12 @@ public class UpdatesManager {
                                                 .getChannelDifference(GetChannelDifference.builder()
                                                         .force(true)
                                                         .channel(id)
-                                                        .pts(cpts)
+                                                        .pts(dpts)
                                                         .filter(ChannelMessagesFilterEmpty.instance())
                                                         .limit(limit)
                                                         .build())
                                                 .flatMapMany(this::handleChannelDifference);
-                                    });
+                                    }));
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(

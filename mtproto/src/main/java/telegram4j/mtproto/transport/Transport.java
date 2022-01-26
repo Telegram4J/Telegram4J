@@ -22,9 +22,10 @@ public interface Transport {
      * Gets wrapped payload.
      *
      * @param payload The original buffer payload.
+     * @param quickAck The state of quick ack.
      * @return The wrapped payload.
      */
-    ByteBuf encode(ByteBuf payload);
+    ByteBuf encode(ByteBuf payload, boolean quickAck);
 
     /**
      * Gets unwrapped payload.
@@ -55,7 +56,4 @@ public interface Transport {
      * @param enable The new state.
      */
     void setQuickAckState(boolean enable);
-
-    /** Discard current byte stream window. */
-    void discard();
 }
