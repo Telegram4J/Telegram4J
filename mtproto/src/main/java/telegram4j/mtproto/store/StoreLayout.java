@@ -92,4 +92,6 @@ public interface StoreLayout {
     Mono<Chat> onChatUpdate(Chat payload);
 
     Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
+
+    Mono<ResolvedPeer> onResolvedPeer(ResolvedPeer payload);
 }

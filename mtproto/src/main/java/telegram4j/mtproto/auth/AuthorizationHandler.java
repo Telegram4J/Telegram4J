@@ -75,7 +75,7 @@ public final class AuthorizationHandler {
         if (obj instanceof DhGenRetry) {
             DhGenRetry dhGenRetry = (DhGenRetry) obj;
             return handleDhGenRetry(dhGenRetry)
-                    .then(Mono.error(new IllegalArgumentException()));
+                    .then(Mono.error(new AuthorizationException("Dh gen retry")));
         }
 
         if (obj instanceof DhGenFail) {

@@ -10,12 +10,16 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.MessageFields;
+import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
+import telegram4j.core.spec.media.InputMediaPollSpec;
+import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.request.messages.ForwardMessages;
+import telegram4j.tl.request.messages.SendMedia;
 import telegram4j.tl.request.messages.SendMessage;
 
 import java.time.Instant;
@@ -144,5 +148,49 @@ abstract class BaseChat implements Chat {
                                         .orElse(null))
                                 .build())
                         .map(e -> EntityFactory.createMessage(client, e, toPeerRe.getId()))));
+    }
+
+    @Override
+    public Mono<Message> sendMedia(SendMediaSpec spec) {
+        return Mono.justOrEmpty(spec.sendAs())
+                .flatMap(client::resolvePeer)
+                .map(BaseChat::asInputPeer)
+                .defaultIfEmpty(InputPeerEmpty.instance())
+                .zipWith(Mono.fromSupplier(() -> awareEntityParser(spec.media())))
+                .flatMap(TupleUtils.function((sendAs, media) -> client.getServiceHolder()
+                        .getMessageService()
+                        .sendMedia(SendMedia.builder()
+                                .media(media.asData())
+                                .randomId(CryptoUtil.random.nextLong())
+                                .silent(spec.silent())
+                                .background(spec.background())
+                                .clearDraft(spec.clearDraft())
+                                .noforwards(spec.noForwards())
+                                .peer(getIdAsPeer())
+                                .silent(spec.silent())
+                                .message(spec.message())
+                                .sendAs(sendAs.identifier() == InputPeerEmpty.ID ? null : sendAs)
+                                .scheduleDate(spec.scheduleTimestamp()
+                                        .map(Instant::getEpochSecond)
+                                        .map(Math::toIntExact)
+                                        .orElse(null))
+                                .build())
+                        .map(e -> EntityFactory.createMessage(client, e, id))));
+    }
+
+    private InputMediaSpec awareEntityParser(InputMediaSpec spec) {
+        if (spec.type() == InputMediaSpec.Type.POLL) {
+            InputMediaPollSpec media = (InputMediaPollSpec) spec;
+
+            return media.withParser(media.parser().or(() -> client.getMtProtoResources().getDefaultEntityParser()));
+        }
+        return spec;
+    }
+
+    @Override
+    public Mono<MessageMedia> uploadMedia(InputMediaSpec spec) {
+        return Mono.fromSupplier(() -> awareEntityParser(spec))
+                .flatMap(media -> client.getServiceHolder().getMessageService()
+                        .uploadMedia(getIdAsPeer(), media.asData()));
     }
 }

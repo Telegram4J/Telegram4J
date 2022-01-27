@@ -453,6 +453,38 @@ public class StoreLayoutImpl implements StoreLayout {
                         .build());
     }
 
+    @Override
+    public Mono<ResolvedPeer> onResolvedPeer(ResolvedPeer payload) {
+        return Mono.fromSupplier(() -> {
+            long rawPeerId = getRawPeerId(payload.peer());
+            var old = ResolvedPeer.builder()
+                    .peer(payload.peer());
+            switch (payload.peer().identifier()) {
+                case PeerChannel.ID:
+                case PeerChat.ID:
+                    var chatInfo = chats.get(rawPeerId);
+                    if (chatInfo == null) {
+                        return null;
+                    }
+
+                    old.addChat(chatInfo.min);
+                    break;
+                case PeerUser.ID:
+                    var userInfo = users.get(rawPeerId);
+                    if (userInfo == null) {
+                        return null;
+                    }
+
+                    old.addUser(userInfo.min);
+                    break;
+                default: throw new IllegalStateException();
+            }
+
+            saveContacts(payload.chats(), payload.users());
+            return old.build();
+        });
+    }
+
     @Nullable
     private PartialFields<Chat, ChatFull> saveChatFull(telegram4j.tl.messages.ChatFull chat) {
         ChatFull chat0 = copy(chat.fullChat());

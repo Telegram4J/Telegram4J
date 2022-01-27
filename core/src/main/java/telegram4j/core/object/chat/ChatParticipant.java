@@ -26,15 +26,18 @@ public class ChatParticipant implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final TlObject data;
+    private final Id chatId;
 
-    public ChatParticipant(MTProtoTelegramClient client, telegram4j.tl.ChannelParticipant data) {
+    public ChatParticipant(MTProtoTelegramClient client, ChannelParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        this.chatId = Objects.requireNonNull(chatId, "chatId");
     }
 
-    public ChatParticipant(MTProtoTelegramClient client, telegram4j.tl.ChatParticipant data) {
+    public ChatParticipant(MTProtoTelegramClient client, telegram4j.tl.ChatParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        this.chatId = Objects.requireNonNull(chatId, "chatId");
     }
 
     @Override
@@ -44,6 +47,10 @@ public class ChatParticipant implements TelegramObject {
 
     public Status getStatus() {
         return Status.of(data);
+    }
+
+    public Id getChatId() {
+        return chatId;
     }
 
     public Id getUserId() {

@@ -13,7 +13,6 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** Represents a large group of 0-200,000 users. */
 public class SupergroupChat extends BaseChannel {
@@ -30,17 +29,6 @@ public class SupergroupChat extends BaseChannel {
 
     public EnumSet<Flag> getFlags() {
         return Flag.of(fullData, minData);
-    }
-
-    public Instant getCreateTimestamp() {
-        return Instant.ofEpochSecond(minData.date());
-    }
-
-    public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData.restrictionReason())
-                .map(list -> list.stream()
-                        .map(d -> new RestrictionReason(client, d))
-                        .collect(Collectors.toList()));
     }
 
     public Optional<EnumSet<ChatAdminRights>> getAdminRights() {
@@ -89,24 +77,10 @@ public class SupergroupChat extends BaseChannel {
         return Optional.ofNullable(fullData).map(ChannelFull::unreadCount);
     }
 
-    public Optional<PeerNotifySettings> getNotifySettings() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::notifySettings)
-                .map(d -> new PeerNotifySettings(client, d));
-    }
-
     public Optional<ExportedChatInvite> getExportedInvite() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::exportedInvite)
                 .map(d -> new ExportedChatInvite(client, d));
-    }
-
-    public Optional<List<BotInfo>> getBotInfo() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::botInfo)
-                .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d))
-                        .collect(Collectors.toList()));
     }
 
     public Optional<Id> getMigratedFromChatId() {
@@ -117,12 +91,6 @@ public class SupergroupChat extends BaseChannel {
 
     public Optional<Integer> getMigratedFromMaxId() {
         return Optional.ofNullable(fullData).map(ChannelFull::migratedFromMaxId);
-    }
-
-    public Optional<StickerSet> getStickerSet() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::stickerset)
-                .map(d -> new StickerSet(client, d));
     }
 
     public Optional<Integer> getAvailableMinId() {

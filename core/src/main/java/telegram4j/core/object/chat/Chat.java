@@ -4,7 +4,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
+import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
+import telegram4j.core.spec.media.InputMediaSpec;
+import telegram4j.tl.MessageMedia;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -36,15 +39,40 @@ public interface Chat extends PeerEntity {
      */
     Optional<Photo> getPhoto();
 
+    /**
+     * Gets a message auto delete duration which
+     * can be added to {@link Message#getCreateTimestamp()} to get
+     * delete timestamp, if present.
+     *
+     * @return The {@link Duration} of message auto delete timer, if present.
+     */
     Optional<Duration> getMessageAutoDeleteDuration();
 
+    /**
+     * Gets id of pinned message, if present
+     * and if detailed information about chat is available.
+     *
+     * @return The {@link Id} of pinned message, if present and available.
+     */
     Optional<Integer> getPinnedMessageId();
+
+    /**
+     * Gets notify settings of chat, if present
+     * and if detailed information about chat is available.
+     *
+     * @return The {@link PeerNotifySettings} of chat, if present and available.
+     */
+    Optional<PeerNotifySettings> getNotifySettings();
 
     // Interaction methods
 
     Mono<Message> sendMessage(SendMessageSpec spec);
 
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
+
+    Mono<Message> sendMedia(SendMediaSpec spec);
+
+    Mono<MessageMedia> uploadMedia(InputMediaSpec spec);
 
     /** All types of telegram chat. */
     enum Type {

@@ -3,6 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ChatPhoto;
+import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
 
@@ -34,7 +35,7 @@ public final class PrivateChat extends BaseChat {
     /**
      * Gets the self user, if present.
      *
-     * @return The self {@link User} of DM.
+     * @return The self {@link User} of DM, if present.
      */
     public Optional<User> getSelfUser() {
         return Optional.ofNullable(selfUser);
@@ -58,6 +59,11 @@ public final class PrivateChat extends BaseChat {
     @Override
     public Optional<Integer> getPinnedMessageId() {
         return user.getPinnedMessageId();
+    }
+
+    @Override
+    public Optional<PeerNotifySettings> getNotifySettings() {
+        return user.getNotifySettings();
     }
 
     @Override

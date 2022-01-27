@@ -306,6 +306,14 @@ public class FileReferenceId {
         return result;
     }
 
+    public BaseInputDocument asInputDocument() {
+        if (fileType != Type.DOCUMENT) {
+            throw new IllegalStateException("Cant create input document from file reference id.");
+        }
+
+        return ImmutableBaseInputDocument.of(photoId, accessHash, fileReference);
+    }
+
     public enum PhotoSizeType {
         UNKNOWN,
         CHAT_PHOTO_SMALL,

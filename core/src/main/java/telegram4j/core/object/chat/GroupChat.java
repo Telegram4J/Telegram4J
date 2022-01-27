@@ -5,11 +5,11 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
+import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.ExportedChatInvite;
-import telegram4j.tl.PeerNotifySettings;
 import telegram4j.tl.*;
 
 import java.time.Duration;
@@ -110,12 +110,17 @@ public class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData).map(BaseChatFull::participants);
     }
 
+    @Override
     public Optional<PeerNotifySettings> getNotifySettings() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::notifySettings);
+        return Optional.ofNullable(fullData)
+                .map(BaseChatFull::notifySettings)
+                .map(d -> new PeerNotifySettings(client, d));
     }
 
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::exportedInvite);
+        return Optional.ofNullable(fullData)
+                .map(BaseChatFull::exportedInvite)
+                .map(d -> new ExportedChatInvite(client, d));
     }
 
     public Optional<List<BotInfo>> getBotInfo() {

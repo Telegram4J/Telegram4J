@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.ChannelParticipantUpdateEvent;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.Id;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
@@ -35,6 +36,7 @@ class ChannelUpdateHandlers {
                 .map(d -> EntityFactory.createChat(context.getClient(), d, null))
                 .map(c -> (Channel) c)
                 .orElseThrow();
+        Id chatId = channel.getId();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
                 .map(d -> new User(context.getClient(), (BaseUser) d))
@@ -48,10 +50,10 @@ class ChannelUpdateHandlers {
                 .orElse(null);
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
-                .map(d -> new ChatParticipant(context.getClient(), d))
+                .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                 .orElse(null);
         ChatParticipant currentParticipant = Optional.ofNullable(upd.newParticipant())
-                .map(d -> new ChatParticipant(context.getClient(), d))
+                .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                 .orElse(null);
 
         return Flux.just(new ChannelParticipantUpdateEvent(context.getClient(),

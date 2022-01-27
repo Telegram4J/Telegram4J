@@ -264,4 +264,9 @@ public class TestFileStoreLayout implements StoreLayout {
     public Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
         return delegate.onChatUpdate(payload);
     }
+
+    @Override
+    public Mono<ResolvedPeer> onResolvedPeer(ResolvedPeer payload) {
+        return delegate.onResolvedPeer(payload);
+    }
 }

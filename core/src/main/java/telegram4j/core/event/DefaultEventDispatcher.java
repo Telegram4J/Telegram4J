@@ -7,6 +7,7 @@ import telegram4j.core.event.domain.Event;
 
 import java.util.Objects;
 
+/** Default event dispatcher implementation based on {@link Sinks.Many} processor. */
 public class DefaultEventDispatcher implements EventDispatcher {
     private final Scheduler eventScheduler;
     private final Sinks.Many<Event> sink;

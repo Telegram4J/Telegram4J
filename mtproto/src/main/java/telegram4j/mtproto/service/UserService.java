@@ -84,7 +84,8 @@ public class UserService extends RpcService {
      * info on users found by username and auxiliary data
      */
     public Mono<ResolvedPeer> resolveUsername(String username) {
-        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))));
+        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))))
+                .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
     }
 
     public Flux<Integer> getContactsIds(long hash) {

@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.*;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.Id;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.GroupChat;
@@ -121,6 +122,7 @@ class ChatUpdateHandlers {
                 .map(d -> EntityFactory.createChat(context.getClient(), d, null))
                 .map(c -> (GroupChat) c)
                 .orElseThrow();
+        Id chatId = chat.getId();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
                 .filter(u -> u.identifier() == BaseUser.ID)
                 .map(d -> new User(context.getClient(), (BaseUser) d))
@@ -130,10 +132,10 @@ class ChatUpdateHandlers {
                 .map(d -> new User(context.getClient(), (BaseUser) d))
                 .orElseThrow();
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
-                .map(d -> new ChatParticipant(context.getClient(), d))
+                .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                 .orElse(null);
         ChatParticipant currentParticipant = Optional.ofNullable(upd.newParticipant())
-                .map(d -> new ChatParticipant(context.getClient(), d))
+                .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                 .orElse(null);
 
         return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), timestamp,
@@ -151,8 +153,9 @@ class ChatUpdateHandlers {
                         .map(d -> EntityFactory.createChat(context.getClient(), d, null))
                         .map(c -> (GroupChat) c)
                         .orElseThrow();
+                Id chatId = chat.getId();
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
-                        .map(d -> new ChatParticipant(context.getClient(), d))
+                        .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                         .orElse(null);
 
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, selfParticipant, null, null));
@@ -163,8 +166,9 @@ class ChatUpdateHandlers {
                         .map(d -> EntityFactory.createChat(context.getClient(), d, null))
                         .map(c -> (GroupChat) c)
                         .orElseThrow();
+                Id chatId = chat.getId();
                 var participants = upd.participants().stream()
-                        .map(d -> new ChatParticipant(context.getClient(), d))
+                        .map(d -> new ChatParticipant(context.getClient(), d, chatId))
                         .collect(Collectors.toList());
                 int version = upd.version();
 
