@@ -3,6 +3,7 @@ package telegram4j.mtproto.service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -24,6 +25,8 @@ import telegram4j.tl.users.UserFull;
 
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class UserService extends RpcService {
 
@@ -194,17 +197,22 @@ public class UserService extends RpcService {
 
     // Methods from PhotoService
 
-    public Mono<Photo> updateProfilePhoto(InputPhoto photo) {
-        return client.sendAwait(ImmutableUpdateProfilePhoto.of(photo));
+    public Mono<Photo> updateProfilePhoto(String photoFileReferenceId) {
+        return Mono.defer(() -> client.sendAwait(ImmutableUpdateProfilePhoto.of(
+                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto())));
     }
 
     public Mono<Photo> uploadProfilePhoto(UploadProfilePhoto request) {
         return client.sendAwait(request);
     }
 
-    public Flux<Long> deletePhotos(Iterable<? extends InputPhoto> photos) {
-        return client.sendAwait(DeletePhotos.builder().id(photos).build())
-                .flatMapIterable(Function.identity());
+    public Flux<Long> deletePhotos(Iterable<String> photosFileReferenceIds) {
+        return Flux.defer(() -> client.sendAwait(DeletePhotos.builder().id(
+                StreamSupport.stream(photosFileReferenceIds.spliterator(), false)
+                        .map(FileReferenceId::deserialize)
+                        .map(FileReferenceId::asInputPhoto)
+                        .collect(Collectors.toList())).build())
+                .flatMapIterable(Function.identity()));
     }
 
     public Mono<Photos> getUserPhotos(InputUser id, int offset, long maxId, int limit) {

@@ -161,7 +161,8 @@ public class Message implements TelegramObject {
     public Optional<MessageAction> getAction() {
         return Optional.ofNullable(serviceData)
                 .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
-                .map(e -> EntityFactory.createMessageAction(client, e));
+                .map(e -> EntityFactory.createMessageAction(client, e,
+                        getChatIdAsPeer(), getId()));
     }
 
     // Interaction methods

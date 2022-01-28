@@ -249,8 +249,9 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetSavedGifs.of(hash));
     }
 
-    public Mono<Boolean> saveGif(InputDocument document, boolean unsave) {
-        return client.sendAwait(ImmutableSaveGif.of(document, unsave));
+    public Mono<Boolean> saveGif(String documentFileReferenceId, boolean unsave) {
+        return Mono.defer(() -> client.sendAwait(ImmutableSaveGif.of(
+                FileReferenceId.deserialize(documentFileReferenceId).asInputDocument(), unsave)));
     }
 
     public Mono<BotResults> getInlineBotResults(InputUser bot, InputPeer peer, @Nullable InputGeoPoint geoPoint,
@@ -312,12 +313,12 @@ public class MessageService extends RpcService {
                 .build());
     }
 
-    public Mono<Boolean> saveRecentSticker(boolean attached, InputDocument document, boolean unsave) {
-        return client.sendAwait(SaveRecentSticker.builder()
+    public Mono<Boolean> saveRecentSticker(boolean attached, String documentFileReferenceId, boolean unsave) {
+        return Mono.defer(() -> client.sendAwait(SaveRecentSticker.builder()
                 .attached(attached)
-                .id(document)
+                .id(FileReferenceId.deserialize(documentFileReferenceId).asInputDocument())
                 .unsave(unsave)
-                .build());
+                .build()));
     }
 
     public Mono<Boolean> clearRecentStickers(boolean attached) {
@@ -419,8 +420,9 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetFavedStickers.of(hash));
     }
 
-    public Mono<Boolean> faveSticker(InputDocument document, boolean unfave) {
-        return client.sendAwait(ImmutableFaveSticker.of(document, unfave));
+    public Mono<Boolean> faveSticker(String documentFileReferenceId, boolean unfave) {
+        return Mono.defer(() -> client.sendAwait(ImmutableFaveSticker.of(
+                FileReferenceId.deserialize(documentFileReferenceId).asInputDocument(), unfave)));
     }
 
     public Mono<Messages> getUnreadMentions(InputPeer peer, int offsetId, int addOffset, int limit, int maxId, int minId) {

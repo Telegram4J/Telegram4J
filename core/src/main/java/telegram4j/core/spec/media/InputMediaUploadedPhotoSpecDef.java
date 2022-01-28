@@ -28,8 +28,7 @@ interface InputMediaUploadedPhotoSpecDef extends InputMediaSpec {
     default InputMediaUploadedPhoto asData() {
         var stickers = stickers()
                 .map(list -> list.stream()
-                        .map(s -> FileReferenceId.deserialize(s)
-                                .asInputDocument())
+                        .map(s -> FileReferenceId.deserialize(s).asInputDocument())
                         .collect(Collectors.toList()))
                 .orElse(null);
 

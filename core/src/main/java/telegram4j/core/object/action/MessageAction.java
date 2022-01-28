@@ -29,6 +29,9 @@ public interface MessageAction extends TelegramObject {
         /** A user joined the chat via an invitation link. */
         CHAT_JOINED_BY_LINK,
 
+        /** A user joined the chat via a request link. */
+        CHAT_JOINED_BY_REQUEST,
+
         /** The channel was created. */
         CHANNEL_CREATE,
 
@@ -60,7 +63,7 @@ public interface MessageAction extends TelegramObject {
         SCREENSHOT_TAKEN,
 
         /** Custom action (most likely not supported by the current layer, an upgrade might be needed). */
-        CUSTOM_ACTION,
+        CUSTOM,
 
         /**
          * The domain name of the website on which the user has logged in.

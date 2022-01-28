@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.InputDocument;
 import telegram4j.tl.InputStickerSet;
@@ -20,12 +21,14 @@ public class StickersService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<StickerSetWithDocuments> removeStickerFromSet(InputDocument sticker) {
-        return client.sendAwait(ImmutableRemoveStickerFromSet.of(sticker));
+    public Mono<StickerSetWithDocuments> removeStickerFromSet(String stickerFileReferenceId) {
+        return Mono.defer(() -> client.sendAwait(ImmutableRemoveStickerFromSet.of(
+                FileReferenceId.deserialize(stickerFileReferenceId).asInputDocument())));
     }
 
-    public Mono<StickerSetWithDocuments> changeStickerPosition(InputDocument sticker, int position) {
-        return client.sendAwait(ImmutableChangeStickerPosition.of(sticker, position));
+    public Mono<StickerSetWithDocuments> changeStickerPosition(String stickerFileReferenceId, int position) {
+        return Mono.defer(() -> client.sendAwait(ImmutableChangeStickerPosition.of(
+                FileReferenceId.deserialize(stickerFileReferenceId).asInputDocument(), position)));
     }
 
     public Mono<StickerSetWithDocuments> addStickerToSet(InputStickerSet stickerSet, InputStickerSetItem sticker) {

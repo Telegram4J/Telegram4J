@@ -1,6 +1,7 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
+import reactor.util.function.Tuples;
 import telegram4j.core.util.EntityParser;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.InputMediaPoll;
@@ -28,15 +29,16 @@ interface InputMediaPollSpecDef extends InputMediaSpec {
 
     @Override
     default InputMediaPoll asData() {
-        var formattedText = parser()
+        var text = parser()
                 .flatMap(p -> solution().map(s -> EntityParserSupport.parse(p.apply(s))))
+                .or(() -> solution().map(s -> Tuples.of(s, List.of())))
                 .orElse(null);
 
         return InputMediaPoll.builder()
                 .poll(poll())
                 .correctAnswers(correctAnswers().orElse(null))
-                .solution(formattedText != null ? formattedText.getT1() : null)
-                .solutionEntities(formattedText != null ? formattedText.getT2() : null)
+                .solution(text != null ? text.getT1() : null)
+                .solutionEntities(text != null ? text.getT2() : null)
                 .build();
     }
 }

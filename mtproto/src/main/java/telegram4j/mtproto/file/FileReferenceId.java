@@ -301,17 +301,26 @@ public class FileReferenceId {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(fileType, sizeType, dcId, photoId, accessHash, thumbSizeType, stickerSet, thumbVersion, messageId, peer);
+        int result = Objects.hash(fileType, sizeType, dcId, photoId, accessHash,
+                thumbSizeType, stickerSet, thumbVersion, messageId, peer);
         result = 31 * result + Arrays.hashCode(fileReference);
         return result;
     }
 
-    public BaseInputDocument asInputDocument() {
+    public ImmutableBaseInputDocument asInputDocument() {
         if (fileType != Type.DOCUMENT) {
             throw new IllegalStateException("Cant create input document from file reference id.");
         }
 
         return ImmutableBaseInputDocument.of(photoId, accessHash, fileReference);
+    }
+
+    public ImmutableBaseInputPhoto asInputPhoto() {
+        if (fileType != Type.PHOTO) {
+            throw new IllegalStateException("Cant create input document from file reference id.");
+        }
+
+        return ImmutableBaseInputPhoto.of(photoId, accessHash, fileReference);
     }
 
     public enum PhotoSizeType {

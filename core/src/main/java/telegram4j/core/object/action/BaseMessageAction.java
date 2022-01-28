@@ -4,11 +4,11 @@ import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
-abstract class BaseMessageAction implements MessageAction {
+public class BaseMessageAction implements MessageAction {
     private final MTProtoTelegramClient client;
     private final Type type;
 
-    protected BaseMessageAction(MTProtoTelegramClient client, Type type) {
+    public BaseMessageAction(MTProtoTelegramClient client, Type type) {
         this.client = Objects.requireNonNull(client, "client");
         this.type = Objects.requireNonNull(type, "type");
     }

@@ -23,8 +23,6 @@ public interface EditMessageSpecDef extends Spec {
 
     Optional<ReplyMarkup> replyMarkup();
 
-    // Optional<List<MessageEntity>> entities();
-
     Optional<Instant> scheduleTimestamp();
 
     Optional<Function<String, EntityParser>> parser();

@@ -4,14 +4,15 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
-import telegram4j.tl.account.*;
 import telegram4j.tl.account.AutoDownloadSettings;
+import telegram4j.tl.account.*;
 import telegram4j.tl.auth.SentCode;
-import telegram4j.tl.request.account.*;
 import telegram4j.tl.request.account.ImmutableUpdateNotifySettings;
 import telegram4j.tl.request.account.UpdateTheme;
+import telegram4j.tl.request.account.*;
 
 import java.util.function.Function;
 
@@ -278,15 +279,16 @@ public class AccountService extends RpcService {
                 .build());
     }
 
-    public Mono<Theme> createTheme(String slug, String title,
-                                   @Nullable InputDocument document,
+    public Mono<Theme> createTheme(String slug, String title, @Nullable String documentFileReferenceId,
                                    @Nullable Iterable<? extends InputThemeSettings> settings) {
-        return client.sendAwait(CreateTheme.builder()
+        return Mono.defer(() -> client.sendAwait(CreateTheme.builder()
                 .slug(slug)
                 .title(title)
-                .document(document)
+                .document(documentFileReferenceId != null
+                        ? FileReferenceId.deserialize(documentFileReferenceId)
+                        .asInputDocument() : null)
                 .settings(settings)
-                .build());
+                .build()));
     }
 
     public Mono<Theme> updateTheme(UpdateTheme request) {
@@ -332,8 +334,10 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableSetGlobalPrivacySettings.of(settings));
     }
 
-    public Mono<Boolean> reportProfilePhoto(InputPeer peer, InputPhoto photo, ReportReason reason, String message) {
-        return client.sendAwait(ImmutableReportProfilePhoto.of(peer, photo, reason, message));
+    public Mono<Boolean> reportProfilePhoto(InputPeer peer, String photoFileReferenceId,
+                                            ReportReason reason, String message) {
+        return Mono.defer(() -> client.sendAwait(ImmutableReportProfilePhoto.of(peer,
+                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto(), reason, message)));
     }
 
     public Mono<Boolean> declinePasswordReset() {

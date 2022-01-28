@@ -17,7 +17,6 @@ import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
-import telegram4j.tl.CodeSettings;
 import telegram4j.tl.ImmutableBaseInputChannel;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.upload.BaseFile;
@@ -55,10 +54,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, botAuthToken));
     }
 
-    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String phoneNumber, CodeSettings settings,
+    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash,
                                                           Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash,
-                phoneNumber, settings, authHandler));
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, authHandler));
     }
 
     public UpdatesManager getUpdatesManager() {
