@@ -9,7 +9,7 @@ import telegram4j.core.object.media.VideoSize;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.BaseDocument;
-import telegram4j.tl.InputPeerEmpty;
+import telegram4j.tl.InputPeer;
 
 import java.util.List;
 import java.util.Objects;
@@ -26,12 +26,12 @@ public class Document implements TelegramObject {
     private final String fileReferenceId;
 
     public Document(MTProtoTelegramClient client, BaseDocument data,
-                    @Nullable String fileName, int messageId) {
+                    @Nullable String fileName, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
         this.fileName = fileName;
 
-        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, InputPeerEmpty.instance())
+        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer)
                 .serialize(ByteBufAllocator.DEFAULT);
     }
 

@@ -10,12 +10,14 @@ import java.math.BigInteger;
 import java.util.Map;
 import java.util.Objects;
 
+/** RSA exponent and modulus number tuple. */
 public final class PublicRsaKey {
     private final BigInteger modulus;
     private final BigInteger exponent;
 
     private static final BigInteger commonExponent = new BigInteger("010001", 16);
 
+    /** Known Telegram DC/CDN rsa keys. */
     public static final Map<Long, PublicRsaKey> publicKeys;
 
     static {
@@ -176,26 +178,53 @@ public final class PublicRsaKey {
         this.exponent = exponent;
     }
 
+    /**
+     * Compute a reversed tail of last 64 be bits from serialized key sha 1 hash,
+     * which uses in DH gen.
+     *
+     * @param alloc The byte buf allocator, that's need to create temp buffers.
+     * @param key The RSA key.
+     * @return The reversed tail in {@literal long} number of key hash.
+     */
     public static long computeTail(ByteBufAllocator alloc, PublicRsaKey key) {
         ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.modulus));
         ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.exponent));
 
         ByteBuf conc = Unpooled.wrappedBuffer(modulusBytes, exponentBytes);
-        byte[] sha1 = CryptoUtil.sha1Digest(CryptoUtil.toByteArray(conc));
-        byte[] tail = CryptoUtil.substring(sha1, sha1.length - 8, 8);
+        ByteBuf sha1 = CryptoUtil.sha1Digest(conc);
+        conc.release();
+
+        ByteBuf tail = sha1.slice(sha1.readableBytes() - 8, 8);
         CryptoUtil.reverse(tail);
 
-        return Unpooled.wrappedBuffer(tail).readLong();
+        return tail.readLong();
     }
 
+    /**
+     * Create new rsa key with given exponent and modulus.
+     *
+     * @param exponent The exponent number.
+     * @param modulus The modulus number.
+     * @return The new rsa key.
+     */
     public static PublicRsaKey create(BigInteger exponent, BigInteger modulus) {
         return new PublicRsaKey(exponent, modulus);
     }
 
+    /**
+     * Gets a modulus number of rsa key.
+     *
+     * @return The modulus number.
+     */
     public BigInteger getModulus() {
         return modulus;
     }
 
+    /**
+     * Gets an exponent number of rsa key.
+     *
+     * @return The exponent number.
+     */
     public BigInteger getExponent() {
         return exponent;
     }

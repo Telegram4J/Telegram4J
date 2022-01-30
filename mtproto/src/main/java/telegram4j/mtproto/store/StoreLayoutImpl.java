@@ -61,6 +61,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 .mapNotNull(p -> {
                     long rawPeerId = getRawInputPeerId(p);
                     switch (p.identifier()) {
+                        case InputPeerUserFromMessage.ID:
                         case InputPeerSelf.ID:
                         case InputPeerUser.ID:
                             var userInfo = users.get(rawPeerId);
@@ -72,6 +73,7 @@ public class StoreLayoutImpl implements StoreLayout {
                                     .users(List.of(userInfo.min))
                                     .peer(asPeer(p))
                                     .build();
+                        case InputPeerChannelFromMessage.ID:
                         case InputPeerChannel.ID:
                             var channelInfo = chats.get(rawPeerId);
                             if (channelInfo == null) {

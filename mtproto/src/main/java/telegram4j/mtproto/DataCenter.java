@@ -74,18 +74,41 @@ public final class DataCenter {
         this.port = port;
     }
 
+    /**
+     * Create new datacenter identifier from given id, address and port.
+     *
+     * @param id The identifier of server.
+     * @param address The ipv4/ipv6 address of server.
+     * @param port The port of server.
+     * @return The new datacenter identifier.
+     */
     public static DataCenter create(int id, String address, int port) {
         return new DataCenter(id, address, port);
     }
 
+    /**
+     * Gets an identifier of server.
+     *
+     * @return The identifier of server.
+     */
     public int getId() {
         return id;
     }
 
+    /**
+     * Gets an ipv4/ipv6 address of server.
+     *
+     * @return The ipv4/ipv6 address of server.
+     */
     public String getAddress() {
         return address;
     }
 
+    /**
+     * Gets a port of server.
+     *
+     * @return The port of server.
+     */
     public int getPort() {
         return port;
     }

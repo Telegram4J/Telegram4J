@@ -1,5 +1,6 @@
 package telegram4j.core.object.media;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.GeoPoint;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -12,8 +13,8 @@ public class MessageMediaGeoLive extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaGeoLive data;
 
-    public MessageMediaGeoLive(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGeoLive data, int messageId) {
-        super(client, Type.GEO_LIVE, messageId);
+    public MessageMediaGeoLive(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGeoLive data) {
+        super(client, Type.GEO_LIVE);
         this.data = Objects.requireNonNull(data, "data");
     }
 
@@ -32,5 +33,25 @@ public class MessageMediaGeoLive extends BaseMessageMedia {
 
     public Optional<Integer> getProximityNotificationRadius() {
         return Optional.ofNullable(data.proximityNotificationRadius());
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MessageMediaGeoLive that = (MessageMediaGeoLive) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "MessageMediaGeoLive{" +
+                "data=" + data +
+                '}';
     }
 }

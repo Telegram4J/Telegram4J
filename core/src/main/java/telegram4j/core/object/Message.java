@@ -103,7 +103,8 @@ public class Message implements TelegramObject {
     public Optional<MessageMedia> getMedia() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::media)
-                .map(d -> EntityFactory.createMessageMedia(client, d, getId()));
+                .map(d -> EntityFactory.createMessageMedia(client, d,
+                        getId(), getChatIdAsPeer()));
     }
 
     public Optional<ReplyMarkup> getReplyMarkup() {
@@ -234,10 +235,7 @@ public class Message implements TelegramObject {
 
     @Override
     public String toString() {
-        return "Message{" +
-                "data=" + getBaseData() +
-                ", resolvedChatId=" + resolvedChatId +
-                "}";
+        return "Message{data=" + getBaseData() + "}";
     }
 
     public enum Flag {

@@ -1,9 +1,11 @@
 package telegram4j.core.object.media;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Photo;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BasePhoto;
+import telegram4j.tl.InputPeer;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -12,10 +14,15 @@ import java.util.Optional;
 public class MessageMediaPhoto extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaPhoto data;
+    private final int messageId;
+    private final InputPeer peer;
 
-    public MessageMediaPhoto(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPhoto data, int messageId) {
-        super(client, Type.PHOTO, messageId);
+    public MessageMediaPhoto(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPhoto data,
+                             int messageId, InputPeer peer) {
+        super(client, Type.PHOTO);
         this.data = Objects.requireNonNull(data, "data");
+        this.messageId = messageId;
+        this.peer = Objects.requireNonNull(peer, "peer");
     }
 
     public Optional<Photo> photo() {
@@ -25,5 +32,25 @@ public class MessageMediaPhoto extends BaseMessageMedia {
 
     public Optional<Duration> getAutoDeleteDuration() {
         return Optional.ofNullable(data.ttlSeconds()).map(Duration::ofSeconds);
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MessageMediaPhoto that = (MessageMediaPhoto) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "MessageMediaPhoto{" +
+                "data=" + data +
+                '}';
     }
 }

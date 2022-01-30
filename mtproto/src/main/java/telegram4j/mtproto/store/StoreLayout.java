@@ -13,28 +13,107 @@ import telegram4j.tl.users.UserFull;
 
 import java.util.Map;
 
+/** Storage interface for interacting with tl entities and session information. */
 public interface StoreLayout {
 
+    /**
+     * Retrieve local updates state.
+     *
+     * @return A {@link Mono} emitting on successful completion the {@link State}
+     * object with info about local updates state.
+     */
     Mono<State> getCurrentState();
 
+    /**
+     * Retrieve self user id.
+     *
+     * @return A {@link Mono} emitting on successful completion a self user id.
+     */
     Mono<Long> getSelfId();
 
+    /**
+     * Search channel or user by the specified username
+     * and compute container with minimal found info.
+     *
+     * @implSpec the implementation must support <b>me</b> and <b>self</b>
+     * aliases to retrieve information about itself.
+     *
+     * @param username The username of channel or user.
+     * @return A {@link Mono} emitting on successful completion
+     * a container with minimal information about found peer.
+     */
     Mono<ResolvedPeer> resolvePeer(String username);
 
+    /**
+     * Resolve input user id from specified user id.
+     * This method can be used to get access hash
+     * or to check if id equals self id.
+     *
+     * @param userId The id of user.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link BaseInputUser} with access hash
+     * or {@link InputUserFromMessage} if user is min
+     * and the storage isn't associated with bot.
+     */
     Mono<InputUser> resolveUser(long userId);
 
+    /**
+     * Resolve input channel id from specified channel id.
+     * This method can be used to get access hash.
+     *
+     * @param channelId The id of channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link BaseInputChannel} with access hash
+     * or {@link InputChannelFromMessage} if channel is min
+     * and the storage isn't associated with bot.
+     */
     Mono<InputChannel> resolveChannel(long channelId);
 
+    // TODO: make batch-compatible
     Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId);
 
+    /**
+     * Retrieve minimal chat/channel information by specified id.
+     *
+     * @param chatId The id of chat/channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link BaseChat} or {@link Channel} object.
+     */
     Mono<Chat> getChatMinById(long chatId);
 
+    /**
+     * Retrieve detailed chat/channel information by specified id.
+     *
+     * @param chatId The id of chat/channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatFull} container with detailed and minimal information about chat/channel.
+     */
     Mono<ChatFull> getChatFullById(long chatId);
 
+    /**
+     * Retrieve minimal user information by specified id.
+     *
+     * @param userId The id of user.
+     * @return A {@link Mono} emitting on successful completion the {@link BaseUser} object.
+     */
     Mono<User> getUserMinById(long userId);
 
+    /**
+     * Retrieve detailed user information by specified id.
+     *
+     * @param userId The id of user.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link UserFull} container with detailed and minimal information about user.
+     */
     Mono<UserFull> getUserFullById(long userId);
 
+    /**
+     * Retrieve auth key holder, associated with specified dc.
+     *
+     * @param dc The id of datacenter.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link AuthorizationKeyHolder} object with auth key and id.
+     */
     Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
 
     // message updates

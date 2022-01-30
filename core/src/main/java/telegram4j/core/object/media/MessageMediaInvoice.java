@@ -1,5 +1,6 @@
 package telegram4j.core.object.media;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
@@ -9,8 +10,8 @@ public class MessageMediaInvoice extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaInvoice data;
 
-    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data, int messageId) {
-        super(client, Type.INVOICE, messageId);
+    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data) {
+        super(client, Type.INVOICE);
         this.data = Objects.requireNonNull(data, "data");
     }
 
@@ -48,5 +49,25 @@ public class MessageMediaInvoice extends BaseMessageMedia {
 
     public String getStartParam() {
         return data.startParam();
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        MessageMediaInvoice that = (MessageMediaInvoice) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "MessageMediaInvoice{" +
+                "data=" + data +
+                '}';
     }
 }

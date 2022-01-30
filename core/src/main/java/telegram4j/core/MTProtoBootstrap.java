@@ -21,10 +21,7 @@ import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
 import telegram4j.core.util.EntityParser;
-import telegram4j.mtproto.DataCenter;
-import telegram4j.mtproto.DefaultMTProtoClient;
-import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.MTProtoOptions;
+import telegram4j.mtproto.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
@@ -201,6 +198,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         switch (state) {
                             case CLOSED: return disconnect;
                             case CONNECTED:
+                                // delegate all auth work to the user and trigger authorization only if auth key is new
+                                Mono<Void> userAuth = Flux.from(authResources.getAuthHandler()
+                                                .orElseThrow().apply(telegramClient))
+                                        .then();
+
                                 Mono<Void> fetchSelf = storeLayout.getSelfId()
                                         .filter(l -> l != 0)
                                         .switchIfEmpty(serviceHolder.getUserService()
@@ -213,17 +215,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                 .layer(MTProtoTelegramClient.LAYER)
                                                 .query(initConnection)
                                                 .build())
-                                        .then(Mono.defer(() -> {
-                                            if (authResources.getType() == Type.USER) {
-                                                // delegate all auth work to the user and trigger authorization only if auth key is new
-                                                return storeLayout.getAuthorizationKey(mtProtoClient.getDatacenter())
-                                                        .switchIfEmpty(Flux.from(authResources.getAuthHandler()
-                                                                .orElseThrow().apply(telegramClient))
-                                                                .then(Mono.empty()))
-                                                        .then();
-                                            }
-                                            return Mono.empty();
-                                        }))
+                                        // The best way to check that authorization is needed
+                                        .retryWhen(Retry.indefinitely()
+                                                .filter(e -> authResources.getType() == Type.USER &&
+                                                        e instanceof RpcException &&
+                                                        ((RpcException) e).getError().errorCode() == 401)
+                                                .doBeforeRetryAsync(signal -> userAuth))
                                         .then(fetchSelf)
                                         .then(telegramClient.getUpdatesManager().fillGap())
                                         .thenReturn(telegramClient) // FIXME: reconnections drop signals

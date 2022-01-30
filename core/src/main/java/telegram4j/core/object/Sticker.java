@@ -3,10 +3,7 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.MaskCoordinates;
-import telegram4j.tl.BaseDocument;
-import telegram4j.tl.DocumentAttributeImageSize;
-import telegram4j.tl.DocumentAttributeSticker;
-import telegram4j.tl.InputStickerSet;
+import telegram4j.tl.*;
 
 import java.util.Optional;
 
@@ -16,8 +13,8 @@ public class Sticker extends Document {
     private final DocumentAttributeImageSize sizeData;
 
     public Sticker(MTProtoTelegramClient client, BaseDocument data, @Nullable String fileName, int messageId,
-                   DocumentAttributeSticker stickerData, DocumentAttributeImageSize sizeData) {
-        super(client, data, fileName, messageId);
+                   InputPeer peer, DocumentAttributeSticker stickerData, DocumentAttributeImageSize sizeData) {
+        super(client, data, fileName, messageId, peer);
         this.stickerData = stickerData;
         this.sizeData = sizeData;
     }

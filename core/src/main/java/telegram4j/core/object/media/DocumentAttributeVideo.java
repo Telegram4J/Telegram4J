@@ -39,13 +39,19 @@ public class DocumentAttributeVideo extends BaseDocumentAttribute {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         DocumentAttributeVideo that = (DocumentAttributeVideo) o;
         return data.equals(that.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), data);
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "DocumentAttributeVideo{" +
+                "data=" + data +
+                '}';
     }
 }

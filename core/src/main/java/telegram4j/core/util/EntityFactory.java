@@ -259,32 +259,33 @@ public final class EntityFactory {
         }
     }
 
-    public static MessageMedia createMessageMedia(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data, int messageId) {
+    public static MessageMedia createMessageMedia(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data,
+                                                  int messageId, InputPeer peer) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageMediaPhoto.ID:
-                return new MessageMediaPhoto(client, (telegram4j.tl.MessageMediaPhoto) data, messageId);
+                return new MessageMediaPhoto(client, (telegram4j.tl.MessageMediaPhoto) data, messageId, peer);
             case telegram4j.tl.MessageMediaGeo.ID:
-                return new MessageMediaGeo(client, (telegram4j.tl.MessageMediaGeo) data, messageId);
+                return new MessageMediaGeo(client, (telegram4j.tl.MessageMediaGeo) data);
             case telegram4j.tl.MessageMediaContact.ID:
-                return new MessageMediaContact(client, (telegram4j.tl.MessageMediaContact) data, messageId);
+                return new MessageMediaContact(client, (telegram4j.tl.MessageMediaContact) data);
             case telegram4j.tl.MessageMediaUnsupported.ID:
-                return new BaseMessageMedia(client, MessageMedia.Type.UNSUPPORTED, messageId);
+                return new BaseMessageMedia(client, MessageMedia.Type.UNSUPPORTED);
             case telegram4j.tl.MessageMediaDocument.ID:
-                return new MessageMediaDocument(client, (telegram4j.tl.MessageMediaDocument) data, messageId);
+                return new MessageMediaDocument(client, (telegram4j.tl.MessageMediaDocument) data, messageId, peer);
             case telegram4j.tl.MessageMediaWebPage.ID:
-                return new MessageMediaWebPage(client, (telegram4j.tl.MessageMediaWebPage) data, messageId);
+                return new MessageMediaWebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
             case telegram4j.tl.MessageMediaVenue.ID:
-                return new MessageMediaVenue(client, (telegram4j.tl.MessageMediaVenue) data, messageId);
+                return new MessageMediaVenue(client, (telegram4j.tl.MessageMediaVenue) data);
             case telegram4j.tl.MessageMediaGame.ID:
-                return new MessageMediaGame(client, (telegram4j.tl.MessageMediaGame) data, messageId);
+                return new MessageMediaGame(client, (telegram4j.tl.MessageMediaGame) data, messageId, peer);
             case telegram4j.tl.MessageMediaInvoice.ID:
-                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data, messageId);
+                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data);
             case telegram4j.tl.MessageMediaGeoLive.ID:
-                return new MessageMediaGeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data, messageId);
+                return new MessageMediaGeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
             case telegram4j.tl.MessageMediaPoll.ID:
-                return new MessageMediaPoll(client, (telegram4j.tl.MessageMediaPoll) data, messageId);
+                return new MessageMediaPoll(client, (telegram4j.tl.MessageMediaPoll) data);
             case telegram4j.tl.MessageMediaDice.ID:
-                return new MessageMediaDice(client, (telegram4j.tl.MessageMediaDice) data, messageId);
+                return new MessageMediaDice(client, (telegram4j.tl.MessageMediaDice) data);
             default:
                 throw new IllegalArgumentException("Unknown message action type: " + data);
         }
@@ -322,7 +323,8 @@ public final class EntityFactory {
         }
     }
 
-    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocument data, int messageId) {
+    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocument data,
+                                          int messageId, InputPeer peer) {
         boolean animated = false;
         boolean hasStickers = false;
         telegram4j.tl.DocumentAttributeVideo videoData = null;
@@ -359,18 +361,19 @@ public final class EntityFactory {
         }
 
         if (stickerData != null) {
-            return new Sticker(client, data, fileName, messageId, stickerData, sizeData);
+            return new Sticker(client, data, fileName, messageId, peer, stickerData, sizeData);
         }
 
         if (audioData != null) {
-            return new Audio(client, data, fileName, messageId, audioData);
+            return new Audio(client, data, fileName, messageId, peer, audioData);
         }
 
         if (videoData != null) {
-            return new Video(client, data, fileName, messageId, videoData, hasStickers, animated);
+            return new Video(client, data, fileName, messageId, peer,
+                    videoData, hasStickers, animated);
         }
 
-        return new Document(client, data, fileName, messageId);
+        return new Document(client, data, fileName, messageId, peer);
     }
 
     public static DocumentAttribute createDocumentAttribute(MTProtoTelegramClient client, telegram4j.tl.DocumentAttribute data) {

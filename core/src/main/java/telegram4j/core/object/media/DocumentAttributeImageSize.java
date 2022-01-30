@@ -26,20 +26,19 @@ public class DocumentAttributeImageSize extends BaseDocumentAttribute {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         DocumentAttributeImageSize that = (DocumentAttributeImageSize) o;
         return data.equals(that.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), data);
+        return data.hashCode();
     }
 
     @Override
     public String toString() {
         return "DocumentAttributeImageSize{" +
                 "data=" + data +
-                "} " + super.toString();
+                '}';
     }
 }
