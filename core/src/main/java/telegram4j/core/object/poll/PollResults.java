@@ -2,8 +2,10 @@ package telegram4j.core.object.poll;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Id;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.tl.InputPeer;
 
 import java.util.List;
 import java.util.Objects;
@@ -25,10 +27,23 @@ public class PollResults implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets whether poll results is minimal and if {@literal true}, option
+     * chosen by the <i>current</i> user is not included.
+     * For getting detailed information about poll results use
+     * {@link telegram4j.mtproto.service.MessageService#getPollResults(InputPeer, int)} method.
+     *
+     * @return Whether poll results in minimal.
+     */
     public boolean isMin() {
         return data.min();
     }
 
+    /**
+     * Gets list of poll answer results, if present.
+     *
+     * @return List of poll answer results, if present.
+     */
     public Optional<List<PollAnswerVoters>> getResults() {
         return Optional.ofNullable(data.results())
                 .map(l -> l.stream()
@@ -36,18 +51,41 @@ public class PollResults implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets total number of voted users, if present.
+     *
+     * @return The total number of voted users, if present.
+     */
     public Optional<Integer> getTotalVoters() {
         return Optional.ofNullable(data.totalVoters());
     }
 
-    public Optional<List<Long>> getRecentVoters() {
-        return Optional.ofNullable(data.recentVoters());
+    /**
+     * Gets list of the last users that recently voted in the poll, if present.
+     *
+     * @return List of the last users that recently voted in the poll, if present.
+     */
+    public Optional<List<Id>> getRecentVoters() {
+        return Optional.ofNullable(data.recentVoters())
+                .map(l -> l.stream()
+                        .map(i -> Id.ofUser(i, null))
+                        .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets the explanation of quiz solution, if poll is quiz.
+     *
+     * @return The explanation of quiz solution, if poll is quiz.
+     */
     public Optional<String> getSolution() {
         return Optional.ofNullable(data.solution());
     }
 
+    /**
+     * Gets list of message entities of the explanation quiz solution, if poll is quiz.
+     *
+     * @return The list of message entities of the explanation quiz solution, if poll is quiz.
+     */
     public Optional<List<MessageEntity>> getSolutionEntities() {
         return Optional.ofNullable(data.solutionEntities())
                 .map(l -> l.stream()

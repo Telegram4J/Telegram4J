@@ -22,10 +22,7 @@ public class StatsService extends RpcService {
     }
 
     public Mono<StatsGraph> loadAsyncGraph(String token, @Nullable Long x) {
-        return client.sendAwait(LoadAsyncGraph.builder()
-                .token(token)
-                .x(x)
-                .build());
+        return client.sendAwait(LoadAsyncGraph.builder().token(token).x(x).build());
     }
 
     public Mono<MegagroupStats> getMegagroupStats(GetMegagroupStats request) {

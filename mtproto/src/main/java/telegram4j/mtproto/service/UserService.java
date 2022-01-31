@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
@@ -40,6 +41,7 @@ public class UserService extends RpcService {
      * @param userId The id of user
      * @return A {@link Mono} emitting on successful completion minimal information about user
      */
+    @BotCompatible
     public Mono<User> getUser(InputUser userId) {
         return getUsers(List.of(userId)).next();
     }
@@ -50,6 +52,7 @@ public class UserService extends RpcService {
      * @param userIds An iterable of user id elements
      * @return A {@link Flux} emitting minimal users
      */
+    @BotCompatible
     public Flux<User> getUsers(Iterable<? extends InputUser> userIds) {
         return client.sendAwait(GetUsers.builder().addAllId(userIds).build())
                 .flatMapIterable(Function.identity())
@@ -64,6 +67,7 @@ public class UserService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * detailed info about user and auxiliary data
      */
+    @BotCompatible
     public Mono<UserFull> getFullUser(InputUser id) {
         return client.sendAwait(ImmutableGetFullUser.of(id))
                 .flatMap(u -> storeLayout.onUserUpdate(u).thenReturn(u));
@@ -86,6 +90,7 @@ public class UserService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * info on users found by username and auxiliary data
      */
+    @BotCompatible
     public Mono<ResolvedPeer> resolveUsername(String username) {
         return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))))
                 .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
@@ -215,6 +220,7 @@ public class UserService extends RpcService {
                 .flatMapIterable(Function.identity()));
     }
 
+    @BotCompatible
     public Mono<Photos> getUserPhotos(InputUser id, int offset, long maxId, int limit) {
         return client.sendAwait(ImmutableGetUserPhotos.of(id, offset, maxId, limit));
     }

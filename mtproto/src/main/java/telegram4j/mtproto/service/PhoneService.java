@@ -5,9 +5,9 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
-import telegram4j.tl.phone.*;
 import telegram4j.tl.phone.GroupCall;
 import telegram4j.tl.phone.PhoneCall;
+import telegram4j.tl.phone.*;
 import telegram4j.tl.request.phone.*;
 
 import java.util.function.Function;
@@ -19,8 +19,7 @@ public class PhoneService extends RpcService {
     }
 
     public Mono<String> getCallConfig() {
-        return client.sendAwait(GetCallConfig.instance())
-                .map(DataJSON::data);
+        return client.sendAwait(GetCallConfig.instance()).map(DataJSON::data);
     }
 
     public Mono<PhoneCall> requestCall(RequestCall request) {

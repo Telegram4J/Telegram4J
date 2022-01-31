@@ -1,6 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.CodeSettings;
@@ -27,6 +28,7 @@ public class AuthService extends RpcService {
                 phoneNumberHash, phoneCode)));
     }
 
+    @BotCompatible
     public Mono<LoggedOut> logOut() {
         return client.sendAwait(LogOut.instance());
     }
@@ -35,18 +37,22 @@ public class AuthService extends RpcService {
         return client.sendAwait(ResetAuthorizations.instance());
     }
 
+    @BotCompatible
     public Mono<ExportedAuthorization> exportAuthorization(int dcId) {
         return client.sendAwait(ImmutableExportAuthorization.of(dcId));
     }
 
+    @BotCompatible
     public Mono<Authorization> importAuthorization(int dcId, byte[] bytes) {
         return client.sendAwait(ImmutableImportAuthorization.of(dcId, bytes));
     }
 
+    @BotCompatible
     public Mono<Boolean> bindTempAuthKey(long permAuthKeyId, long nonce, int expiresAt, byte[] encryptedMessage) {
         return client.sendAwait(ImmutableBindTempAuthKey.of(permAuthKeyId, nonce, expiresAt, encryptedMessage));
     }
 
+    @BotCompatible
     public Mono<Authorization> importBotAuthorization(int flags, int appId, String apiHash, String botAuthToken) {
         return client.sendAwait(ImmutableImportBotAuthorization.of(flags, appId, apiHash, botAuthToken));
     }

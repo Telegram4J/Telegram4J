@@ -6,6 +6,7 @@ import telegram4j.core.object.TelegramObject;
 
 import java.util.Objects;
 
+/** Poll answer object with custom parameter ({@link #getOption}) and text. */
 public class PollAnswer implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -21,10 +22,20 @@ public class PollAnswer implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets the non-formatted answer text.
+     *
+     * @return The answer text.
+     */
     public String getText() {
         return data.text();
     }
 
+    /**
+     * Gets the answer parameter that indicates answer.
+     *
+     * @return The answer parameter in bytes.
+     */
     public byte[] getOption() {
         return data.option();
     }

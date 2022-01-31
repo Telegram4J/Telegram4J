@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Simplified version of the {@link UserStatus user status}. */
 public class UserStatus implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -29,14 +30,29 @@ public class UserStatus implements TelegramObject {
         this.wasOnlineTimestamp = wasOnlineTimestamp;
     }
 
+    /**
+     * Gets the type of status.
+     *
+     * @return The {@link Type} of status.
+     */
     public Type getType() {
         return type;
     }
 
+    /**
+     * Gets the timestamp when this status will be expired, if {@link #getType()} is {@link Type#ONLINE}.
+     *
+     * @return The timestamp when this status will be expired, if {@link #getType()} is {@link Type#ONLINE}.
+     */
     public Optional<Instant> getExpiresTimestamp() {
         return Optional.ofNullable(expiresTimestamp);
     }
 
+    /**
+     * Gets the timestamp of the last user online status, if {@link #getType()} is {@link Type#OFFLINE}.
+     *
+     * @return The timestamp of the last user online status, if {@link #getType()} is {@link Type#OFFLINE}.
+     */
     public Optional<Instant> getWasOnlineTimestamp() {
         return Optional.ofNullable(wasOnlineTimestamp);
     }
@@ -69,6 +85,7 @@ public class UserStatus implements TelegramObject {
                 '}';
     }
 
+    /** Available types of user status. */
     public enum Type {
 
         /** User status has not been set yet. */

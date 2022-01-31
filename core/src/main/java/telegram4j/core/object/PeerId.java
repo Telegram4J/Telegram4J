@@ -5,6 +5,10 @@ import reactor.util.annotation.Nullable;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Identifier that's contains the {@link Id id} or {@link String username} of a peer entity.
+ * For now, used in specs and resolve methods.
+ */
 public final class PeerId {
     @Nullable
     private final String username;
@@ -21,10 +25,23 @@ public final class PeerId {
         this.username = null;
     }
 
+    /**
+     * Constructs a {@code PeerId} from given {@link Id} of a peer entity.
+     *
+     * @param id The id of a peer entity.
+     * @return The new {@code PeerId} from given id.
+     */
     public static PeerId of(Id id) {
         return new PeerId(id);
     }
 
+    /**
+     * Constructs a {@code PeerId} from given peer entity's username.
+     *
+     * @throws IllegalArgumentException If username doesn't start from {@literal @} char.
+     * @param username The username of a peer entity.
+     * @return The new {@code PeerId} from given username.
+     */
     public static PeerId of(String username) {
         if (!username.startsWith("@")) {
             throw new IllegalArgumentException("Malformed peer id.");
@@ -32,10 +49,20 @@ public final class PeerId {
         return new PeerId(username);
     }
 
+    /**
+     * Gets a username value variant, if present.
+     *
+     * @return The peer entity's username, if present.
+     */
     public Optional<String> asUsername() {
         return Optional.ofNullable(username);
     }
 
+    /**
+     * Gets a id value variant, if present.
+     *
+     * @return The id of peer entity, if present.
+     */
     public Optional<Id> asId() {
         return Optional.ofNullable(id);
     }

@@ -4,13 +4,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.help.*;
 import telegram4j.tl.request.help.*;
-import telegram4j.tl.request.langpack.GetStrings;
-import telegram4j.tl.request.langpack.ImmutableGetLangPack;
 
 import java.util.function.Function;
 
@@ -20,6 +19,7 @@ public class HelpService extends RpcService {
         super(client, storeLayout);
     }
 
+    @BotCompatible
     public Mono<Config> getConfig() {
         return client.sendAwait(GetConfig.instance());
     }
@@ -60,6 +60,7 @@ public class HelpService extends RpcService {
         return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdates, message));
     }
 
+    @BotCompatible
     public Flux<CdnPublicKey> getCdnConfig() {
         return client.sendAwait(GetCdnConfig.instance())
                 .map(CdnConfig::publicKeys)

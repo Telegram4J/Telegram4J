@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.BotCommand;
@@ -12,6 +13,7 @@ import telegram4j.tl.request.bots.*;
 
 import java.util.function.Function;
 
+@BotCompatible
 public class BotService extends RpcService {
 
     public BotService(MTProtoClient client, StoreLayout storeLayout) {
@@ -23,8 +25,8 @@ public class BotService extends RpcService {
                 .map(DataJSON::data);
     }
 
-    public Mono<Boolean> answerWebhookJsonQuery(long queryId, String data) {
-        return client.sendAwait(ImmutableAnswerWebhookJSONQuery.of(queryId, ImmutableDataJSON.of(data)));
+    public Mono<Boolean> answerWebhookJsonQuery(long queryId, String dataJson) {
+        return client.sendAwait(ImmutableAnswerWebhookJSONQuery.of(queryId, ImmutableDataJSON.of(dataJson)));
     }
 
     public Mono<Boolean> setBotCommands(BotCommandScope scope, String langCode, Iterable<? extends BotCommand> commands) {
