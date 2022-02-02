@@ -36,7 +36,7 @@ public class TestFileStoreLayout implements StoreLayout {
     private final ByteBufAllocator allocator;
     private final StoreLayout delegate;
 
-    private volatile AuthorizationKeyHolder authorizationKey;
+    private volatile AuthorizationKeyHolder authKey;
     private volatile ImmutableState state;
 
     public TestFileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
@@ -46,8 +46,9 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.justOrEmpty(authorizationKey)
+        return Mono.justOrEmpty(authKey)
                 .subscribeOn(Schedulers.boundedElastic())
+                .publishOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromCallable(() -> {
                     Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
                     if (!Files.exists(fileName)) {
@@ -57,8 +58,8 @@ public class TestFileStoreLayout implements StoreLayout {
                     log.debug("Loading session information from the file store for dc №{}.", dc.getId());
                     String lines = String.join("", Files.readAllLines(fileName));
                     ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
-                    byte[] authKey = TlSerialUtil.deserializeBytes(buf);
-                    byte[] authKeyId = TlSerialUtil.deserializeBytes(buf);
+                    ByteBuf authKey = TlSerialUtil.deserializeBuf(buf);
+                    ByteBuf authKeyId = TlSerialUtil.deserializeBuf(buf);
                     this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
                     buf.release();
 
@@ -67,25 +68,33 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
-        return Mono.fromRunnable(() -> this.authorizationKey = authorizationKey)
-                .and(save());
+    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authKey) {
+        return Mono.defer(() -> {
+                    var old = this.authKey;
+                    this.authKey = authKey;
+
+                    if (!authKey.equals(old)) {
+                        return save();
+                    }
+                    return Mono.empty();
+                })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     private Mono<Void> save() {
         return Mono.fromCallable(() -> {
-            if (authorizationKey == null) {
+            if (authKey == null) {
                 return null;
             }
 
-            log.debug("Saving session information to file store for dc №{}.", authorizationKey.getDc().getId());
+            log.debug("Saving session information to file store for dc №{}.", authKey.getDc().getId());
 
-            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKey());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, authorizationKey.getAuthKeyId());
+            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey().copy());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId().copy());
             ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
             ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
 
-            Path fileName = Path.of(String.format(DB_FILE, authorizationKey.getDc().getId()));
+            Path fileName = Path.of(String.format(DB_FILE, this.authKey.getDc().getId()));
             try {
                 Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
             } finally {
@@ -236,8 +245,15 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<Void> updateState(State state) {
-        return Mono.fromRunnable(() -> this.state = ImmutableState.copyOf(state))
-                .and(save());
+        return Mono.defer(() -> {
+                    State old = this.state;
+                    this.state = ImmutableState.copyOf(state);
+
+                    if (!state.equals(old)) {
+                        return save();
+                    }
+                    return Mono.empty();
+                });
     }
 
     @Override

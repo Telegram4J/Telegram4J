@@ -12,6 +12,7 @@ import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
@@ -54,6 +55,12 @@ public class MessageService extends RpcService {
         super(client, storeLayout);
     }
 
+    @BotCompatible
+    public Mono<Messages> getMessages(InputChannel channel, Iterable<? extends InputMessage> ids) {
+        return client.sendAwait(telegram4j.tl.request.channels.GetMessages.builder().channel(channel).id(ids).build());
+    }
+
+    @BotCompatible
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
         return client.sendAwait(GetMessages.builder().id(ids).build());
     }
@@ -67,8 +74,14 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetHistory.of(peer, offsetId, offsetDate, addOffset, limit, maxId, minId, hash));
     }
 
+    @BotCompatible
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
         return client.sendAwait(DeleteMessages.builder().revoke(revoke).id(ids).build());
+    }
+
+    @BotCompatible
+    public Mono<AffectedMessages> deleteMessages(InputChannel channel, Iterable<Integer> ids) {
+        return client.sendAwait(telegram4j.tl.request.channels.DeleteMessages.builder().channel(channel).id(ids).build());
     }
 
     public Mono<Messages> search(Search request) {
@@ -88,6 +101,7 @@ public class MessageService extends RpcService {
                 .flatMapIterable(Function.identity());
     }
 
+    @BotCompatible
     public Mono<Boolean> setTyping(InputPeer peer, @Nullable Integer topMsgId, SendMessageAction action) {
         return client.sendAwait(SetTyping.builder()
                 .peer(peer)
@@ -96,6 +110,7 @@ public class MessageService extends RpcService {
                 .build());
     }
 
+    @BotCompatible
     public Flux<Message> forwardMessages(ForwardMessages request) {
         return client.sendAwait(request)
                 .ofType(BaseUpdates.class)
@@ -225,7 +240,6 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableEditChatAdmin.of(chatId, user, isAdmin));
     }
 
-    // Not for bots
     public Mono<Updates> migrateChat(long chatId) {
         return client.sendAwait(ImmutableMigrateChat.of(chatId));
     }
@@ -269,10 +283,11 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<MessageEditData> getMessageEditData(InputPeer peer, int id) {
-        return client.sendAwait(ImmutableGetMessageEditData.of(peer, id));
+    public Mono<Boolean> getMessageEditData(InputPeer peer, int id) {
+        return client.sendAwait(ImmutableGetMessageEditData.of(peer, id)).map(MessageEditData::caption);
     }
 
+    @BotCompatible
     public Mono<Boolean> editInlineBotMessage(EditInlineBotMessage request) {
         return client.sendAwait(request);
     }
@@ -281,6 +296,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
+    @BotCompatible
     public Mono<Boolean> setBotCallbackAnswer(SetBotCallbackAnswer request) {
         return client.sendAwait(request);
     }
@@ -391,6 +407,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetPinnedDialogs.of(folderId));
     }
 
+    @BotCompatible
     public Mono<Boolean> setBotShippingResults(long queryId, @Nullable String error,
                                                @Nullable Iterable<? extends ShippingOption> shippingOptions) {
         return client.sendAwait(SetBotShippingResults.builder()
@@ -400,6 +417,7 @@ public class MessageService extends RpcService {
                 .build());
     }
 
+    @BotCompatible
     public Mono<Boolean> setBotPrecheckoutResults(boolean success, long queryId, @Nullable String error) {
         return client.sendAwait(SetBotPrecheckoutResults.builder()
                 .success(success)
@@ -408,6 +426,7 @@ public class MessageService extends RpcService {
                 .build());
     }
 
+    @BotCompatible
     public Mono<MessageMedia> uploadMedia(InputPeer peer, InputMedia media) {
         return client.sendAwait(ImmutableUploadMedia.of(peer, media));
     }
@@ -437,6 +456,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetRecentLocations.of(peer, limit, hash));
     }
 
+    @BotCompatible
     public Mono<Updates> sendMultiMedia(SendMultiMedia request) {
         return client.sendAwait(request);
     }
@@ -494,10 +514,12 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetOnlines.of(peer)).map(ChatOnlines::onlines);
     }
 
+    @BotCompatible
     public Mono<Boolean> editChatAbout(InputPeer peer, String about) {
         return client.sendAwait(ImmutableEditChatAbout.of(peer, about));
     }
 
+    @BotCompatible
     public Mono<Updates> editChatDefaultBannedRights(InputPeer peer, ChatBannedRights rights) {
         return client.sendAwait(ImmutableEditChatDefaultBannedRights.of(peer, rights));
     }
@@ -507,14 +529,12 @@ public class MessageService extends RpcService {
     }
 
     public Flux<EmojiLanguage> getEmojiKeywordsLanguages(Iterable<String> langCodes) {
-        return client.sendAwait(GetEmojiKeywordsLanguages.builder()
-                        .langCodes(langCodes)
-                        .build())
+        return client.sendAwait(GetEmojiKeywordsLanguages.builder().langCodes(langCodes).build())
                 .flatMapIterable(Function.identity());
     }
 
-    public Mono<EmojiURL> getEmojiUrl(String langCode) {
-        return client.sendAwait(ImmutableGetEmojiURL.of(langCode));
+    public Mono<String> getEmojiUrl(String langCode) {
+        return client.sendAwait(ImmutableGetEmojiURL.of(langCode)).map(EmojiURL::url);
     }
 
     public Flux<SearchCounter> getSearchCounters(InputPeer peer, Iterable<? extends MessagesFilter> filters) {
@@ -601,9 +621,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<Boolean> updateDialogFiltersOrder(Iterable<Integer> order) {
-        return client.sendAwait(UpdateDialogFiltersOrder.builder()
-                .order(order)
-                .build());
+        return client.sendAwait(UpdateDialogFiltersOrder.builder().order(order).build());
     }
 
     public Mono<FeaturedStickers> getOldFeaturedStickers(int offset, int limit, long hash) {
@@ -612,7 +630,8 @@ public class MessageService extends RpcService {
 
     public Mono<Messages> getReplies(InputPeer peer, int msgId, int offsetId, int offsetDate,
                                      int addOffset, int limit, int maxId, int minId, long hash) {
-        return client.sendAwait(ImmutableGetReplies.of(peer, msgId, offsetId, offsetDate, addOffset, limit, maxId, minId, hash));
+        return client.sendAwait(ImmutableGetReplies.of(peer, msgId, offsetId, offsetDate,
+                addOffset, limit, maxId, minId, hash));
     }
 
     public Mono<DiscussionMessage> getDiscussionMessage(InputPeer peer, int msgId) {
@@ -700,6 +719,7 @@ public class MessageService extends RpcService {
 
     // Upload methods
 
+    @BotCompatible
     public Mono<InputFile> saveFile(ByteBuf data, String name) {
         long fileId = CryptoUtil.random.nextLong();
         int parts = (int) Math.ceil((float) data.readableBytes() / PART_SIZE);
@@ -811,6 +831,7 @@ public class MessageService extends RpcService {
                 .then();
     }
 
+    @BotCompatible
     public Mono<Void> getFile(FileReferenceId location, Function<BaseFile, ? extends Publisher<?>> progressor) {
         AtomicInteger offset = new AtomicInteger();
         AtomicBoolean complete = new AtomicBoolean();
@@ -859,6 +880,7 @@ public class MessageService extends RpcService {
 
     // Message interactions
 
+    @BotCompatible
     public Mono<Message> sendMessage(SendMessage request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
@@ -871,6 +893,7 @@ public class MessageService extends RpcService {
                 }));
     }
 
+    @BotCompatible
     public Mono<Message> sendMedia(SendMedia request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
@@ -883,6 +906,7 @@ public class MessageService extends RpcService {
                 }));
     }
 
+    @BotCompatible
     public Mono<Message> editMessage(EditMessage request) {
         return client.sendAwait(request)
                 .map(updates -> {

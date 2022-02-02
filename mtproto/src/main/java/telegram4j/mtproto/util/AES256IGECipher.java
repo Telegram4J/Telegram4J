@@ -20,7 +20,6 @@ public final class AES256IGECipher {
         initCipher(delegate, encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
     }
 
-    // TODO: replace byte[] usages to netty's ByteBuf
     public byte[] encrypt(byte[] data) {
         int blockSize = delegate.getBlockSize();
         byte[] encrypted = new byte[data.length];

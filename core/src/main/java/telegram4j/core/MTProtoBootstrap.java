@@ -199,8 +199,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             case CLOSED: return disconnect;
                             case CONNECTED:
                                 // delegate all auth work to the user and trigger authorization only if auth key is new
-                                Mono<Void> userAuth = Flux.from(authResources.getAuthHandler()
-                                                .orElseThrow().apply(telegramClient))
+                                Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
+                                        .flatMapMany(f -> Flux.from(f.apply(telegramClient)))
                                         .then();
 
                                 Mono<Void> fetchSelf = storeLayout.getSelfId()

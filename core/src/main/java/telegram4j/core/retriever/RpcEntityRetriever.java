@@ -119,7 +119,7 @@ public class RpcEntityRetriever implements EntityRetriever {
             switch (chatId.getType()) {
                 case CHANNEL:
                     return asInputChannel(chatId).flatMap(p -> client.getServiceHolder()
-                            .getChatService()
+                            .getMessageService()
                             .getMessages(p, List.of(inputMessage)));
                 case CHAT:
                 case USER:

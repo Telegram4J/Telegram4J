@@ -10,13 +10,13 @@ import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
-import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
+import telegram4j.tl.messages.ImmutableChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.*;
@@ -47,38 +47,6 @@ public class UpdatesManager {
     public UpdatesManager(MTProtoTelegramClient client, UpdatesHandlers updatesHandlers) {
         this.client = Objects.requireNonNull(client, "client");
         this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
-    }
-
-    public int getPts() {
-        return pts;
-    }
-
-    public int getQts() {
-        return qts;
-    }
-
-    public int getDate() {
-        return date;
-    }
-
-    public int getSeq() {
-        return seq;
-    }
-
-    public void setPts(int pts) {
-        this.pts = pts;
-    }
-
-    public void setQts(int qts) {
-        this.qts = qts;
-    }
-
-    public void setDate(int date) {
-        this.date = date;
-    }
-
-    public void setSeq(int seq) {
-        this.seq = seq;
     }
 
     public Mono<Void> fillGap() {
@@ -132,7 +100,10 @@ public class UpdatesManager {
                 var chatsMap = data.chats().stream()
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                date = data.date();
+                if (updSeq != 0 && data.date() != 0) {
+                    seq = updSeq;
+                    date = data.date();
+                }
 
                 Flux<Event> events = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
@@ -157,8 +128,10 @@ public class UpdatesManager {
                 var chatsMap = data.chats().stream()
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                seq = data.seq();
-                date = data.date();
+                if (data.seq() != 0 && data.date() != 0) {
+                    seq = data.seq();
+                    date = data.date();
+                }
 
                 Flux<Event> events0 = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
@@ -287,31 +260,41 @@ public class UpdatesManager {
                             var usersMap = difference0.users().stream()
                                     .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
+                            var selfUser = usersMap.values().stream()
+                                    .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                                    .map(b -> (BaseUser) b)
+                                    .findFirst()
+                                    .orElse(null);
+
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
                                         long id = getRawPeerId(data.peerId());
-                                        var selfUser = usersMap.values().stream()
-                                                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                                                .map(b -> (BaseUser) b)
-                                                .findFirst()
-                                                .orElse(null);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                                                 .orElse(null);
 
-                                        var user = Optional.ofNullable(data.fromId())
-                                                .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
-                                                .map(p -> usersMap.get(getRawPeerId(p)))
-                                                .filter(u -> u.identifier() == BaseUser.ID)
-                                                .map(d -> new User(client, (BaseUser) d))
+                                        var author = Optional.ofNullable(data.fromId())
+                                                .flatMap(p -> {
+                                                    long rawId = getRawPeerId(p);
+                                                    switch (p.identifier()) {
+                                                        case PeerUser.ID:
+                                                            return Optional.ofNullable(usersMap.get(rawId))
+                                                                    .map(u -> EntityFactory.createUser(client, u));
+                                                        case PeerChat.ID:
+                                                        case PeerChannel.ID:
+                                                            return Optional.ofNullable(chatsMap.get(rawId))
+                                                                    .map(c -> EntityFactory.createChat(client, c, null));
+                                                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                                    }
+                                                })
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
                                                 .switchIfEmpty(toId(data.peerId()))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
-                                                .map(m -> new SendMessageEvent(client, m, chat, user));
+                                                .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
 
                             Flux<Event> applyChannelDifference = Mono.justOrEmpty(difference0.otherUpdates().stream()
@@ -328,12 +311,13 @@ public class UpdatesManager {
                                     .filter(TupleUtils.predicate((u, c) -> c == -1 || u.pts() == null ||
                                             Objects.requireNonNull(u.pts()) > c))
                                     .flatMapMany(TupleUtils.function((u, cpts) -> {
-                                        InputChannel id = Optional.ofNullable(chatsMap.get(u.channelId()))
+                                        var channel = Optional.ofNullable(chatsMap.get(u.channelId()))
                                                 .filter(ch -> ch.identifier() == Channel.ID)
                                                 .map(ch -> (Channel) ch)
-                                                .map(ch -> ImmutableBaseInputChannel.of(ch.id(),
-                                                        Objects.requireNonNull(ch.accessHash())))
                                                 .orElseThrow();
+
+                                        InputChannel id = ImmutableBaseInputChannel.of(channel.id(),
+                                                Objects.requireNonNull(channel.accessHash()));
 
                                         Integer upts = u.pts();
                                         int dpts;
@@ -360,7 +344,7 @@ public class UpdatesManager {
                                                         .filter(ChannelMessagesFilterEmpty.instance())
                                                         .limit(limit)
                                                         .build())
-                                                .flatMapMany(this::handleChannelDifference);
+                                                .flatMapMany(diff -> handleChannelDifference(diff, channel.id()));
                                     }));
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
@@ -381,31 +365,41 @@ public class UpdatesManager {
                             var usersMap = difference0.users().stream()
                                     .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
+                            var selfUser = usersMap.values().stream()
+                                    .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                                    .map(b -> (BaseUser) b)
+                                    .findFirst()
+                                    .orElse(null);
+
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
                                     .flatMap(data -> {
                                         long id = getRawPeerId(data.peerId());
-                                        var selfUser = usersMap.values().stream()
-                                                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                                                .map(b -> (BaseUser) b)
-                                                .findFirst()
-                                                .orElse(null);
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
                                                 .or(() -> Optional.ofNullable(usersMap.get(id)))
                                                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                                                 .orElse(null);
 
-                                        var user = Optional.ofNullable(data.fromId())
-                                                .filter(u -> u.identifier() == InputPeerUser.ID) // TODO: check other variants
-                                                .map(p -> usersMap.get(getRawPeerId(p)))
-                                                .filter(u -> u.identifier() == BaseUser.ID)
-                                                .map(d -> new User(client, (BaseUser) d))
+                                        var author = Optional.ofNullable(data.fromId())
+                                                .flatMap(p -> {
+                                                    long rawId = getRawPeerId(p);
+                                                    switch (p.identifier()) {
+                                                        case PeerUser.ID:
+                                                            return Optional.ofNullable(usersMap.get(rawId))
+                                                                    .map(u -> EntityFactory.createUser(client, u));
+                                                        case PeerChat.ID:
+                                                        case PeerChannel.ID:
+                                                            return Optional.ofNullable(chatsMap.get(rawId))
+                                                                    .map(c -> EntityFactory.createChat(client, c, null));
+                                                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                                    }
+                                                })
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
                                                 .switchIfEmpty(toId(data.peerId()))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
-                                                .map(m -> new SendMessageEvent(client, m, chat, user));
+                                                .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
 
                             State intermediateState = difference0.intermediateState();
@@ -424,23 +418,168 @@ public class UpdatesManager {
                 });
     }
 
-    private Flux<Event> handleChannelDifference(ChannelDifference diff) {
+    private Flux<Event> handleChannelDifference(ChannelDifference diff, long id) {
         if (log.isTraceEnabled()) {
             log.trace("channel difference: {}", diff);
         }
+
+        // TODO: untested
+        // int newPts;
+        // int limit = client.isBot()
+        //         ? MAX_BOT_CHANNEL_DIFFERENCE
+        //         : MAX_CHANNEL_DIFFERENCE;
+        //
+        // switch (diff.identifier()) {
+        //     case BaseChannelDifference.ID:
+        //         newPts = ((BaseChannelDifference) diff).pts();
+        //         break;
+        //     case ChannelDifferenceEmpty.ID:
+        //         newPts = ((ChannelDifferenceEmpty) diff).pts();
+        //         break;
+        //     case ChannelDifferenceTooLong.ID:
+        //         ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
+        //         if (diff0.dialog().identifier() == BaseDialog.ID) {
+        //             BaseDialog dialog = (BaseDialog) diff0;
+        //             Integer pts = dialog.pts();
+        //
+        //             newPts = pts != null ? pts : 1;
+        //         } else {
+        //             newPts = -1;
+        //             limit = MIN_CHANNEL_DIFFERENCE;
+        //         }
+        //         break;
+        //     default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
+        // }
+
         switch (diff.identifier()) {
-            // TODO: deal with the processing and checking of pts updates
             case BaseChannelDifference.ID: {
                 BaseChannelDifference diff0 = (BaseChannelDifference) diff;
-                return Flux.empty();
+
+                var chatsMap = diff0.chats().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+                var usersMap = diff0.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+
+                var selfUser = usersMap.values().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                        .map(b -> (BaseUser) b)
+                        .findFirst()
+                        .orElse(null);
+
+                Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
+                        .ofType(BaseMessageFields.class)
+                        .flatMap(data -> {
+                            var chat = Optional.ofNullable(data.fromId())
+                                    .flatMap(p -> {
+                                        long rawId = getRawPeerId(p);
+                                        switch (p.identifier()) {
+                                            case PeerUser.ID:
+                                                return Optional.ofNullable(usersMap.get(rawId))
+                                                        .map(v -> EntityFactory.createChat(client, v, selfUser));
+                                            case PeerChat.ID:
+                                            case PeerChannel.ID:
+                                                return Optional.ofNullable(chatsMap.get(rawId))
+                                                        .map(c -> EntityFactory.createChat(client, c, null));
+                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                        }
+                                    })
+                                    .orElse(null);
+
+                            var author = Optional.ofNullable(data.fromId())
+                                    .flatMap(p -> {
+                                        long rawId = getRawPeerId(p);
+                                        switch (p.identifier()) {
+                                            case PeerUser.ID:
+                                                return Optional.ofNullable(usersMap.get(rawId))
+                                                        .map(u -> EntityFactory.createUser(client, u));
+                                            case PeerChat.ID:
+                                            case PeerChannel.ID:
+                                                return Optional.ofNullable(chatsMap.get(rawId))
+                                                        .map(c -> EntityFactory.createChat(client, c, null));
+                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                        }
+                                    })
+                                    .orElse(null);
+
+                            return Mono.justOrEmpty(chat)
+                                    .map(Chat::getId)
+                                    .switchIfEmpty(toId(data.peerId()))
+                                    .map(i -> EntityFactory.createMessage(client, data, i))
+                                    .map(m -> new SendMessageEvent(client, m, chat, author));
+                        });
+
+                return Flux.fromIterable(diff0.otherUpdates())
+                        .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                                client, chatsMap, usersMap, update)))
+                        .concatWith(messageCreateEvents);
             }
             case ChannelDifferenceEmpty.ID: {
                 ChannelDifferenceEmpty diff0 = (ChannelDifferenceEmpty) diff;
-                return Flux.empty();
+
+                return client.getMtProtoResources().getStoreLayout()
+                        .getChatFullById(id)
+                        .map(c -> ImmutableChatFull.copyOf(c)
+                                .withFullChat(ImmutableChannelFull.copyOf((ChannelFull) c.fullChat())
+                                        .withPts(diff0.pts())))
+                        .flatMap(c -> client.getMtProtoResources().getStoreLayout()
+                                .onChatUpdate(c))
+                        .thenMany(Flux.empty());
             }
             case ChannelDifferenceTooLong.ID: {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
-                return Flux.empty();
+
+                var chatsMap = diff0.chats().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+                var usersMap = diff0.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+
+                var selfUser = usersMap.values().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
+                        .map(b -> (BaseUser) b)
+                        .findFirst()
+                        .orElse(null);
+
+                return Flux.fromIterable(diff0.messages())
+                        .ofType(BaseMessageFields.class)
+                        .flatMap(data -> {
+                            var chat = Optional.ofNullable(data.fromId())
+                                    .flatMap(p -> {
+                                        long rawId = getRawPeerId(p);
+                                        switch (p.identifier()) {
+                                            case PeerUser.ID:
+                                                return Optional.ofNullable(usersMap.get(rawId))
+                                                        .map(v -> EntityFactory.createChat(client, v, selfUser));
+                                            case PeerChat.ID:
+                                            case PeerChannel.ID:
+                                                return Optional.ofNullable(chatsMap.get(rawId))
+                                                        .map(c -> EntityFactory.createChat(client, c, null));
+                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                        }
+                                    })
+                                    .orElse(null);
+
+                            var author = Optional.ofNullable(data.fromId())
+                                    .flatMap(p -> {
+                                        long rawId = getRawPeerId(p);
+                                        switch (p.identifier()) {
+                                            case PeerUser.ID:
+                                                return Optional.ofNullable(usersMap.get(rawId))
+                                                        .map(u -> EntityFactory.createUser(client, u));
+                                            case PeerChat.ID:
+                                            case PeerChannel.ID:
+                                                return Optional.ofNullable(chatsMap.get(rawId))
+                                                        .map(c -> EntityFactory.createChat(client, c, null));
+                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                        }
+                                    })
+                                    .orElse(null);
+
+                            return Mono.justOrEmpty(chat)
+                                    .map(Chat::getId)
+                                    .switchIfEmpty(toId(data.peerId()))
+                                    .map(i -> EntityFactory.createMessage(client, data, i))
+                                    .map(m -> new SendMessageEvent(client, m, chat, author));
+                        });
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown channel difference type: " + diff));
@@ -461,19 +600,19 @@ public class UpdatesManager {
             }
         })
         .map(inputPeer -> {
-            switch (peer.identifier()) {
+            switch (inputPeer.identifier()) {
                 // InputPeerUserFromMessage or InputPeerChannelFromMessage currently cannot be mapped
                 case InputPeerChannel.ID:
-                    InputPeerChannel inputPeerChannel = (InputPeerChannel) peer;
+                    InputPeerChannel inputPeerChannel = (InputPeerChannel) inputPeer;
                     return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
                 case InputPeerChat.ID:
-                    InputPeerChat inputPeerChat = (InputPeerChat) peer;
+                    InputPeerChat inputPeerChat = (InputPeerChat) inputPeer;
                     return Id.ofChat(inputPeerChat.chatId());
                 case InputPeerSelf.ID: return Id.ofUser(id, null);
                 case InputPeerUser.ID:
-                    InputPeerUser inputPeerUser = (InputPeerUser) peer;
+                    InputPeerUser inputPeerUser = (InputPeerUser) inputPeer;
                     return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
-                default: throw new IllegalArgumentException("Unknown input peer type: " + peer);
+                default: throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
             }
         });
     }

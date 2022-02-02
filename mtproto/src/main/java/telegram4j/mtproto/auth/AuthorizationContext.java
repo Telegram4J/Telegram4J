@@ -1,49 +1,52 @@
 package telegram4j.mtproto.auth;
 
+import io.netty.buffer.ByteBuf;
 import telegram4j.tl.mtproto.ServerDHParams;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.netty.util.ReferenceCountUtil.safeRelease;
+
 public final class AuthorizationContext {
-    private volatile byte[] nonce;
-    private volatile byte[] newNonce;
-    private volatile byte[] serverNonce;
-    private volatile byte[] authKey;
+    private volatile ByteBuf nonce;
+    private volatile ByteBuf newNonce;
+    private volatile ByteBuf serverNonce;
+    private volatile ByteBuf authKey;
     private volatile long serverSalt;
-    private volatile byte[] authAuxHash;
+    private volatile ByteBuf authAuxHash;
     private volatile ServerDHParams serverDHParams;
     private final AtomicInteger retry = new AtomicInteger();
 
-    public byte[] getNonce() {
+    public ByteBuf getNonce() {
         return nonce;
     }
 
-    public void setNonce(byte[] nonce) {
+    public void setNonce(ByteBuf nonce) {
         this.nonce = Objects.requireNonNull(nonce, "nonce");
     }
 
-    public byte[] getNewNonce() {
+    public ByteBuf getNewNonce() {
         return newNonce;
     }
 
-    public void setNewNonce(byte[] newNonce) {
+    public void setNewNonce(ByteBuf newNonce) {
         this.newNonce = Objects.requireNonNull(newNonce, "newNonce");
     }
 
-    public byte[] getServerNonce() {
+    public ByteBuf getServerNonce() {
         return serverNonce;
     }
 
-    public void setServerNonce(byte[] serverNonce) {
+    public void setServerNonce(ByteBuf serverNonce) {
         this.serverNonce = Objects.requireNonNull(serverNonce, "serverNonce");
     }
 
-    public byte[] getAuthKey() {
+    public ByteBuf getAuthKey() {
         return authKey;
     }
 
-    public void setAuthKey(byte[] authKey) {
+    public void setAuthKey(ByteBuf authKey) {
         this.authKey = Objects.requireNonNull(authKey, "authKey");
     }
 
@@ -55,11 +58,11 @@ public final class AuthorizationContext {
         this.serverSalt = serverSalt;
     }
 
-    public byte[] getAuthAuxHash() {
+    public ByteBuf getAuthAuxHash() {
         return authAuxHash;
     }
 
-    public void setAuthAuxHash(byte[] authAuxHash) {
+    public void setAuthAuxHash(ByteBuf authAuxHash) {
         this.authAuxHash = Objects.requireNonNull(authAuxHash, "authAuxHash");
     }
 
@@ -76,6 +79,12 @@ public final class AuthorizationContext {
     }
 
     public void clear() {
+        safeRelease(nonce);
+        safeRelease(newNonce);
+        safeRelease(serverNonce);
+        safeRelease(authKey);
+        safeRelease(authAuxHash);
+
         nonce = null;
         newNonce = null;
         serverNonce = null;

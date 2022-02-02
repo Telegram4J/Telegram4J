@@ -15,11 +15,18 @@ public class RpcException extends MTProtoException {
 
     static String prettyMethodName(TlMethod<?> method) {
         String methodDomainName = method.getClass().getPackageName()
-                .replace("telegram4j.tl.request.", "");
+                .replace("telegram4j.tl.request", "");
+        if (methodDomainName.startsWith(".")) {
+            methodDomainName = methodDomainName.substring(1);
+        }
+        if (!methodDomainName.isEmpty()) {
+            methodDomainName += ".";
+        }
+
         String methodName = method.getClass().getSimpleName()
                 .replace("Immutable", "");
 
-        return methodDomainName + '.' + methodName;
+        return methodDomainName + methodName;
     }
 
     static RpcException create(RpcError error, DefaultMTProtoClient.RequestEntry request) {

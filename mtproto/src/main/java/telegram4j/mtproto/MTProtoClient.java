@@ -100,6 +100,8 @@ public interface MTProtoClient {
         /** The state in which the client must fully shutdown without the possibility of resuming. */
         CLOSED,
 
+        CONFIGURED,
+
         /**
          * The state in which the client is connected to
          * the dc and ready to send and receive packets.

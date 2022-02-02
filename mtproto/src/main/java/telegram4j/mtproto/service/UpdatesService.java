@@ -1,6 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.request.updates.GetChannelDifference;
@@ -10,6 +11,7 @@ import telegram4j.tl.updates.ChannelDifference;
 import telegram4j.tl.updates.Difference;
 import telegram4j.tl.updates.State;
 
+@BotCompatible
 public class UpdatesService extends RpcService {
 
     public UpdatesService(MTProtoClient client, StoreLayout storeLayout) {
@@ -17,9 +19,7 @@ public class UpdatesService extends RpcService {
     }
 
     public Mono<State> getState() {
-        return client.sendAwait(GetState.instance())
-                .flatMap(s -> storeLayout.updateState(s)
-                        .thenReturn(s));
+        return client.sendAwait(GetState.instance());
     }
 
     public Mono<Difference> getDifference(GetDifference request) {

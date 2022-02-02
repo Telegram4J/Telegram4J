@@ -8,7 +8,6 @@ import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
@@ -62,10 +61,18 @@ class MessageUpdateHandlers {
                         .map(u -> (BaseUser) u))
                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .orElse(null);
-        User user = Optional.ofNullable(message.fromId())
-                .map(p -> context.getUsers().get(getRawPeerId(p)))
-                .filter(u -> u.identifier() == BaseUser.ID)
-                .map(d -> new User(client, (BaseUser) d))
+        var author = Optional.ofNullable(message.fromId())
+                .flatMap(p -> {
+                    long rawId = getRawPeerId(p);
+                    switch (p.identifier()) {
+                        case PeerUser.ID: return Optional.ofNullable(context.getUsers().get(rawId))
+                                .map(u -> EntityFactory.createUser(client, u));
+                        case PeerChat.ID:
+                        case PeerChannel.ID: return Optional.ofNullable(context.getChats().get(rawId))
+                                .map(u -> EntityFactory.createChat(client, u, null));
+                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                    }
+                })
                 .orElse(null);
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)
@@ -73,7 +80,7 @@ class MessageUpdateHandlers {
 
         Message newMessage = EntityFactory.createMessage(client, message, resolvedChatId);
 
-        return Flux.just(new SendMessageEvent(client, newMessage, chat, user));
+        return Flux.just(new SendMessageEvent(client, newMessage, chat, author));
     }
 
     static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
@@ -92,6 +99,19 @@ class MessageUpdateHandlers {
                         .map(u -> (BaseUser) u))
                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .orElse(null);
+        var author = Optional.ofNullable(message.fromId())
+                .flatMap(p -> {
+                    long rawId = getRawPeerId(p);
+                    switch (p.identifier()) {
+                        case PeerUser.ID: return Optional.ofNullable(context.getUsers().get(rawId))
+                                .map(u -> EntityFactory.createUser(client, u));
+                        case PeerChat.ID:
+                        case PeerChannel.ID: return Optional.ofNullable(context.getChats().get(rawId))
+                                .map(u -> EntityFactory.createChat(client, u, null));
+                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                    }
+                })
+                .orElse(null);
         Id resolvedId = Optional.ofNullable(chat)
                 .map(Chat::getId)
                 .orElseGet(() -> Id.of(message.peerId()));
@@ -100,7 +120,7 @@ class MessageUpdateHandlers {
                 .orElse(null);
         Message newMessage = EntityFactory.createMessage(client, message, resolvedId);
 
-        return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat));
+        return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat, author));
     }
 
     public static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {

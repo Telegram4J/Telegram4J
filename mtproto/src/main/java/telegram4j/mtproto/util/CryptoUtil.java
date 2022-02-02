@@ -5,6 +5,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
+import telegram4j.tl.TlSerialUtil;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -46,11 +47,17 @@ public final class CryptoUtil {
         return new BigInteger(1, data);
     }
 
+    public static ByteBuf toByteBuf(BigInteger val) {
+        ByteBuf res = Unpooled.wrappedBuffer(val.toByteArray());
+        if (res.getByte(0) == 0) {
+            return res.slice(1, res.readableBytes() - 1);
+        }
+        return res;
+    }
+
     public static byte[] toByteArray(ByteBuf buf) {
         try {
-            byte[] data = new byte[buf.readableBytes()];
-            buf.readBytes(data);
-            return data;
+            return TlSerialUtil.readBytes(buf, buf.readableBytes());
         } finally {
             ReferenceCountUtil.safeRelease(buf);
         }
@@ -136,32 +143,22 @@ public final class CryptoUtil {
         return Math.min(n / g, g);
     }
 
-    public static byte[] rsaEncrypt(byte[] src, PublicRsaKey key) {
-        return toByteArray(fromByteArray(src).modPow(key.getExponent(), key.getModulus()));
-    }
-
-    public static byte[] sha256Digest(byte[]... bytes) {
+    public static ByteBuf sha256Digest(ByteBuf... bufs) {
         MessageDigest sha256 = SHA256.get();
         sha256.reset();
-        for (byte[] b : bytes) {
-            sha256.update(b);
+        for (ByteBuf b : bufs) {
+            sha256.update(b.nioBuffer());
         }
-        return sha256.digest();
+        return Unpooled.wrappedBuffer(sha256.digest());
     }
 
-    public static byte[] sha1Digest(byte[] bytes) {
+    public static ByteBuf sha1Digest(ByteBuf... bufs) {
         MessageDigest sha1 = SHA1.get();
         sha1.reset();
-        return sha1.digest(bytes);
-    }
-
-    public static byte[] sha1Digest(byte[]... bytes) {
-        MessageDigest sha1 = SHA1.get();
-        sha1.reset();
-        for (byte[] b : bytes) {
-            sha1.update(b);
+        for (ByteBuf b : bufs) {
+            sha1.update(b.nioBuffer());
         }
-        return sha1.digest();
+        return Unpooled.wrappedBuffer(sha1.digest());
     }
 
     public static byte[] substring(byte[] src, int start, int len) {
@@ -170,82 +167,68 @@ public final class CryptoUtil {
         return res;
     }
 
-    public static byte[] alignKeyZero(byte[] src, int size) {
-        if (src.length == size) {
+    public static ByteBuf rsaEncrypt(ByteBuf src, PublicRsaKey key) {
+        BigInteger num = fromByteArray(toByteArray(src));
+        return toByteBuf(num.modPow(key.getExponent(), key.getModulus()));
+    }
+
+    public static ByteBuf alignKeyZero(ByteBuf src, int size) {
+        if (src.readableBytes() == size) {
             return src;
         }
 
-        if (src.length > size) {
-            return substring(src, src.length - size, size);
+        if (src.readableBytes() > size) {
+            return src.slice(src.readableBytes() - size, size);
         }
-        return concat(new byte[size - src.length], src);
+        ByteBuf align = Unpooled.wrappedBuffer(new byte[size - src.readableBytes()]);
+        return Unpooled.wrappedBuffer(align, src);
     }
 
-    public static byte[] xor(byte[] a, byte[] b) {
-        byte[] res = new byte[a.length];
-        for (int i = 0; i < a.length; i++) {
-            res[i] = (byte) (a[i] ^ b[i]);
+    public static ByteBuf xor(ByteBuf a, ByteBuf b) {
+        ByteBuf res = a.alloc().buffer(a.readableBytes());
+        for (int i = 0, n = a.readableBytes(); i < n; i++) {
+            res.writeByte((byte) (a.getByte(i) ^ b.getByte(i)));
         }
         return res;
     }
 
-    public static byte[] align(byte[] src, int factor) {
-        if (src.length % factor == 0) {
+    public static ByteBuf align(ByteBuf src, int factor) {
+        if (src.readableBytes() % factor == 0) {
             return src;
         }
 
-        int padding = factor - src.length % factor;
-        return concat(src, random.generateSeed(padding));
+        int padding = factor - src.readableBytes() % factor;
+        return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(random.generateSeed(padding)));
     }
 
-    public static long readLongLE(byte[] bytes) {
-        return (long) bytes[0] & 0xff |
-                ((long) bytes[1] & 0xff) << 8 |
-                ((long) bytes[2] & 0xff) << 16 |
-                ((long) bytes[3] & 0xff) << 24 |
-                ((long) bytes[4] & 0xff) << 32 |
-                ((long) bytes[5] & 0xff) << 40 |
-                ((long) bytes[6] & 0xff) << 48 |
-                ((long) bytes[7] & 0xff) << 56;
-    }
-
-    public static int readIntLE(byte[] bytes) {
-        return (int) bytes[0] & 0xff |
-                ((int) bytes[1] & 0xff) << 8 |
-                ((int) bytes[2] & 0xff) << 16 |
-                ((int) bytes[3] & 0xff) << 24;
-    }
-
-    public static void reverse(byte[] bytes) {
-        for (int i = 0, mid = bytes.length >> 1, j = bytes.length - 1; i < mid; i++, j--) {
-            byte ib = bytes[i];
-            byte jb = bytes[j];
-            bytes[i] = jb;
-            bytes[j] = ib;
+    public static void reverse(ByteBuf data) {
+        int n = data.readableBytes();
+        for (int i = 0, mid = n >> 1, j = n - 1; i < mid; i++, j--) {
+            byte ib = data.getByte(i);
+            byte jb = data.getByte(j);
+            data.setByte(i, jb);
+            data.setByte(j, ib);
         }
     }
 
-    public static AES256IGECipher createAesCipher(byte[] messageKey, ByteBuf authKeyBuf, boolean server) {
+    public static AES256IGECipher createAesCipher(ByteBuf messageKey, ByteBuf authKey, boolean server) {
         int x = server ? 8 : 0;
 
-        ByteBuf sha256a = Unpooled.wrappedBuffer(sha256Digest(
-                messageKey, toByteArray(authKeyBuf.retainedSlice(x, 36))));
+        ByteBuf sha256a = sha256Digest(messageKey, authKey.slice(x, 36));
+        ByteBuf sha256b = sha256Digest(authKey.slice(x + 40, 36), messageKey);
 
-        ByteBuf sha256b = Unpooled.wrappedBuffer(sha256Digest(
-                toByteArray(authKeyBuf.retainedSlice(x + 40, 36)), messageKey));
+        ByteBuf aesKey = Unpooled.wrappedBuffer(
+                sha256a.retainedSlice(0, 8),
+                sha256b.retainedSlice(8, 16),
+                sha256a.retainedSlice(24, 8));
 
-        byte[] aesKey = concat(
-                toByteArray(sha256a.retainedSlice(0, 8)),
-                toByteArray(sha256b.retainedSlice(8, 16)),
-                toByteArray(sha256a.retainedSlice(24, 8)));
-
-        byte[] aesIV = concat(
-                toByteArray(sha256b.retainedSlice(0, 8)),
-                toByteArray(sha256a.retainedSlice(8, 16)),
-                toByteArray(sha256b.retainedSlice(24, 8)));
+        ByteBuf aesIV = Unpooled.wrappedBuffer(
+                sha256b.retainedSlice(0, 8),
+                sha256a.retainedSlice(8, 16),
+                sha256b.retainedSlice(24, 8));
         sha256a.release();
         sha256b.release();
 
-        return new AES256IGECipher(!server, aesKey, aesIV);
+        return new AES256IGECipher(!server, toByteArray(aesKey), toByteArray(aesIV));
     }
 }

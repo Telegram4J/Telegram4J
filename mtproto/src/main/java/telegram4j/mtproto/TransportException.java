@@ -11,6 +11,14 @@ public class TransportException extends MTProtoException {
         this.code = code;
     }
 
+    public static boolean isError(int code) {
+        switch (code) {
+            case -404:
+            case -420: return true;
+            default: return false;
+        }
+    }
+
     public static TransportException create(int code) {
         String message = null;
 

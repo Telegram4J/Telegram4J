@@ -3,6 +3,7 @@ package telegram4j.mtproto.service;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
@@ -11,8 +12,6 @@ import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.channels.ChannelParticipants;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.*;
-import telegram4j.tl.request.channels.DeleteMessages;
-import telegram4j.tl.request.channels.GetMessages;
 import telegram4j.tl.request.channels.ImmutableDeleteHistory;
 import telegram4j.tl.request.channels.ImmutableReadHistory;
 import telegram4j.tl.request.channels.ReadMessageContents;
@@ -37,6 +36,7 @@ public class ChatService extends RpcService {
      * @param id The id of chat
      * @return A {@link Mono} emitting on successful completion minimal information about chat
      */
+    @BotCompatible
     public Mono<Chat> getChat(long id) {
         return getChats(List.of(id))
                 .ofType(BaseChats.class)
@@ -50,6 +50,7 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion a list of
      * minimal chats or slice of list if there are a lot of chats
      */
+    @BotCompatible
     public Mono<Chats> getChats(Iterable<Long> ids) {
         return client.sendAwait(GetChats.builder().id(ids).build());
     }
@@ -61,6 +62,7 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * detailed info about chat and auxiliary data
      */
+    @BotCompatible
     public Mono<ChatFull> getFullChat(long chatId) {
         return client.sendAwait(ImmutableGetFullChat.of(chatId))
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
@@ -121,13 +123,6 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableReadHistory.of(channel, maxId));
     }
 
-    public Mono<AffectedMessages> deleteMessages(InputChannel channel, Iterable<Integer> ids) {
-        return client.sendAwait(DeleteMessages.builder()
-                .channel(channel)
-                .id(ids)
-                .build());
-    }
-
     public Mono<Boolean> reportSpam(InputChannel channel, InputPeer participant, Iterable<Integer> ids) {
         return client.sendAwait(ReportSpam.builder()
                 .channel(channel)
@@ -136,15 +131,13 @@ public class ChatService extends RpcService {
                 .build());
     }
 
-    public Mono<Messages> getMessages(InputChannel channel, Iterable<? extends InputMessage> ids) {
-        return client.sendAwait(GetMessages.builder().channel(channel).id(ids).build());
-    }
-
+    @BotCompatible
     public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
                                                      int offset, int limit, Iterable<Long> ids) {
         return getParticipants(channel, filter, offset, limit, calculatePaginationHash(ids));
     }
 
+    @BotCompatible
     public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
                                                      int offset, int limit, long hash) {
         return client.sendAwait(ImmutableGetParticipants.of(channel, filter, offset, limit, hash));
@@ -160,6 +153,7 @@ public class ChatService extends RpcService {
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion minimal information about channel
      */
+    @BotCompatible
     public Mono<Chat> getChannel(InputChannel id) {
         return getChannels(List.of(id))
                 .ofType(BaseChats.class)
@@ -173,6 +167,7 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion a list of
      * minimal channels or slice of list if there are a lot of channels
      */
+    @BotCompatible
     public Mono<Chats> getChannels(Iterable<? extends InputChannel> ids) {
         return client.sendAwait(GetChannels.builder().id(ids).build());
     }
@@ -183,6 +178,7 @@ public class ChatService extends RpcService {
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion detailed information about channel
      */
+    @BotCompatible
     public Mono<ChatFull> getFullChannel(InputChannel id) {
         return client.sendAwait(ImmutableGetFullChannel.of(id));
     }
@@ -206,7 +202,6 @@ public class ChatService extends RpcService {
 
     /**
      * Check if a username is free and can be assigned to a channel/supergroup
-     * @apiNote This method not available for bots.
      *
      * @param channel the channel/supergroup that will assign the specified username
      * @param username the username to check
@@ -218,7 +213,6 @@ public class ChatService extends RpcService {
 
     /**
      * Change the username of a supergroup/channel.
-     * @apiNote This method not available for bots.
      *
      * @param channel the channel/supergroup that will assign the specified username
      * @param username the username to update
@@ -232,6 +226,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableJoinChannel.of(channel));
     }
 
+    @BotCompatible
     public Mono<Updates> leaveChannel(InputChannel channel) {
         return client.sendAwait(ImmutableLeaveChannel.of(channel));
     }
@@ -264,8 +259,8 @@ public class ChatService extends RpcService {
     }
 
     public Mono<AdminLogResults> getAdminLog(InputChannel channel, String query, @Nullable ChannelAdminLogEventsFilter filter,
-                                             @Nullable Iterable<? extends InputUser> admins, long maxId, long minId,
-                                             int limit) {
+                                             @Nullable Iterable<? extends InputUser> admins,
+                                             long maxId, long minId, int limit) {
         return client.sendAwait(GetAdminLog.builder()
                 .channel(channel)
                 .q(query)
@@ -277,6 +272,7 @@ public class ChatService extends RpcService {
                 .build());
     }
 
+    @BotCompatible
     public Mono<Boolean> setStickers(InputChannel channel, InputStickerSet stickerSet) {
         return client.sendAwait(ImmutableSetStickers.of(channel, stickerSet));
     }

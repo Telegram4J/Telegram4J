@@ -118,7 +118,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(),
                     channelId.getAccessHash().orElseThrow()));
         })
-        .flatMap(p -> serviceHolder.getChatService()
+        .flatMap(p -> serviceHolder.getMessageService()
                 .deleteMessages(p, ids));
     }
 
