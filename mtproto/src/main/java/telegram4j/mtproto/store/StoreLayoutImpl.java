@@ -16,21 +16,18 @@ import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 
 public class StoreLayoutImpl implements StoreLayout {
 
-    private final Cache<Integer, InputPeer> messagesByPeer;
     private final Cache<MessageId, BaseMessageFields> messages;
     private final ConcurrentMap<Long, PartialFields<Chat, ChatFull>> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
@@ -41,7 +38,6 @@ public class StoreLayoutImpl implements StoreLayout {
     private volatile ImmutableState state;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
-        this.messagesByPeer = cacheFactory.apply(Caffeine.newBuilder()).build();
         this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
     }
 
@@ -59,34 +55,16 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<ResolvedPeer> resolvePeer(String username) {
         return Mono.fromSupplier(() -> usernames.get(stripUsername(username)))
                 .mapNotNull(p -> {
-                    long rawPeerId = getRawInputPeerId(p);
-                    switch (p.identifier()) {
-                        case InputPeerUserFromMessage.ID:
-                        case InputPeerSelf.ID:
-                        case InputPeerUser.ID:
-                            var userInfo = users.get(rawPeerId);
-                            if (userInfo == null) {
-                                return null;
-                            }
+                    Peer peer = asPeer(p);
+                    List<User> user = new ArrayList<>(1);
+                    List<Chat> chat = new ArrayList<>(1);
+                    addContact(peer, chat, user);
 
-                            return ResolvedPeer.builder()
-                                    .users(List.of(userInfo.min))
-                                    .peer(asPeer(p))
-                                    .build();
-                        case InputPeerChannelFromMessage.ID:
-                        case InputPeerChannel.ID:
-                            var channelInfo = chats.get(rawPeerId);
-                            if (channelInfo == null) {
-                                return null;
-                            }
-
-                            return ResolvedPeer.builder()
-                                    .chats(List.of(channelInfo.min))
-                                    .peer(asPeer(p))
-                                    .build();
-                        default:
-                            throw new IllegalStateException();
-                    }
+                    return ResolvedPeer.builder()
+                            .users(user)
+                            .chats(chat)
+                            .peer(peer)
+                            .build();
                 });
     }
 
@@ -115,69 +93,88 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId) {
+    public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
         return Mono.fromSupplier(() -> {
-            long rawId = getRawInputPeerId(peerId);
-            BaseMessageFields message;
-            switch (messageId.identifier()) {
-                case InputMessageID.ID:
-                    InputMessageID d = (InputMessageID) messageId;
-                    message = messages.getIfPresent(new MessageId(d.id(), rawId));
-                    break;
-                case InputMessageReplyTo.ID:
-                    InputMessageReplyTo r = (InputMessageReplyTo) messageId;
-                    message = messages.getIfPresent(new MessageId(r.id(), rawId));
-                    break;
-                case InputMessagePinned.ID:
-                    if (isChatInputPeer(peerId)) {
-                        message = Optional.ofNullable(chats.get(rawId))
-                                .map(PartialFields::getFull)
-                                // TODO: why parser doesnt pull up pinnedMsgId method??
-                                .map(c -> c.identifier() == ChannelFull.ID
-                                        ? ((ChannelFull) c).pinnedMsgId()
-                                        : ((BaseChatFull) c).pinnedMsgId())
-                                .map(i -> messages.getIfPresent(new MessageId(i, rawId)))
-                                .orElse(null);
-                        break;
-                    }
+            var ids = StreamSupport.stream(messageIds.spliterator(), false)
+                    // Search must match what the server gives out,
+                    // and the server does not return anything when sending this id.
+                    .filter(i -> i.identifier() != InputMessagePinned.ID)
+                    .map(id -> {
+                        switch (id.identifier()) {
+                            case InputMessageID.ID: return ((InputMessageID) id).id();
+                            case InputMessageReplyTo.ID: return ((InputMessageReplyTo) id).id();
+                            case InputMessageCallbackQuery.ID:
+                                // TODO
+                            default:
+                                throw new IllegalArgumentException("Unknown message id type: " + id);
+                        }
+                    })
+                    .map(i -> new MessageId(i, -1))
+                    .collect(Collectors.toSet());
 
-                    message = Optional.ofNullable(users.get(rawId))
-                            .map(PartialFields::getFull)
-                            .map(ImmutableUserFull::pinnedMsgId)
-                            .map(i -> messages.getIfPresent(new MessageId(i, rawId)))
-                            .orElse(null);
-                    break;
-                case InputMessageCallbackQuery.ID:
-                    // TODO
-                default:
-                    throw new IllegalArgumentException("Unknown input message type: " + messageId);
+            var messages = this.messages.getAllPresent(ids).values();
+
+            Set<User> users = new HashSet<>();
+            Set<Chat> chats = new HashSet<>();
+            for (var message : messages) {
+                addContact(message.peerId(), chats, users);
+                Peer fromId = message.fromId();
+                if (fromId != null) {
+                    addContact(fromId, chats, users);
+                }
             }
 
-            if (message == null) {
-                return null;
+            return BaseMessages.builder()
+                    .messages(messages)
+                    .chats(chats)
+                    .users(users)
+                    .build();
+        });
+    }
+
+    @Override
+    public Mono<Messages> getMessages(long channelId, Iterable<? extends InputMessage> messageIds) {
+        return Mono.fromSupplier(() -> {
+            var ids = StreamSupport.stream(messageIds.spliterator(), false)
+                    .map(id -> {
+                        switch (id.identifier()) {
+                            case InputMessageID.ID: return ((InputMessageID) id).id();
+                            case InputMessageReplyTo.ID: return ((InputMessageReplyTo) id).id();
+                            case InputMessagePinned.ID:
+                                return Optional.ofNullable(this.chats.get(channelId))
+                                        .map(PartialFields::getFull)
+                                        // TODO: why parser doesnt pull up #pinnedMsgId method?
+                                        .map(c -> c.identifier() == ChannelFull.ID
+                                                ? ((ChannelFull) c).pinnedMsgId()
+                                                : ((BaseChatFull) c).pinnedMsgId())
+                                        .orElse(null);
+                            case InputMessageCallbackQuery.ID:
+                                // TODO
+                            default:
+                                throw new IllegalArgumentException("Unknown message id type: " + id);
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .map(i -> new MessageId(i, channelId))
+                    .collect(Collectors.toSet());
+
+            var messages = this.messages.getAllPresent(ids).values();
+
+            Set<User> users = new HashSet<>();
+            Set<Chat> chats = new HashSet<>();
+            for (var message : messages) {
+                addContact(message.peerId(), chats, users);
+                Peer fromId = message.fromId();
+                if (fromId != null) {
+                    addContact(fromId, chats, users);
+                }
             }
 
-            var builder = BaseMessages.builder()
-                    .addMessage(message);
-
-            // add author of message
-            Optional.ofNullable(message.fromId())
-                    .map(p -> users.get(TlEntityUtil.getRawPeerId(p)))
-                    .map(PartialFields::getMin)
-                    .ifPresent(builder::addUser);
-
-            long chatId = getRawPeerId(message.peerId());
-            // add user if message from dm
-            Optional.ofNullable(users.get(chatId))
-                    .map(PartialFields::getMin)
-                    .ifPresent(builder::addUser);
-
-            // add chat if possible
-            Optional.ofNullable(chats.get(chatId))
-                    .map(PartialFields::getMin)
-                    .ifPresent(builder::addChat);
-
-            return builder.build();
+            return BaseMessages.builder()
+                    .messages(messages)
+                    .chats(chats)
+                    .users(users)
+                    .build();
         });
     }
 
@@ -224,14 +221,9 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromRunnable(() -> {
             saveContacts(chats, users);
             BaseMessageFields cast = (BaseMessageFields) message;
-            long chatId = getRawPeerId(cast.peerId());
-            InputPeer inputPeer = getInputPeer(cast.peerId());
-            MessageId key = new MessageId(cast.id(), chatId);
+            MessageId key = MessageId.create(cast);
 
             messages.put(key, cast);
-            if (inputPeer.identifier() != InputPeerEmpty.ID) {
-                messagesByPeer.put(cast.id(), inputPeer);
-            }
         });
     }
 
@@ -240,7 +232,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromSupplier(() -> {
             saveContacts(chats, users);
             BaseMessageFields cast = (BaseMessageFields) message;
-            MessageId key = new MessageId(cast.id(), getRawPeerId(cast.peerId()));
+            MessageId key = MessageId.create(cast);
 
             return messages.asMap().put(key, cast);
         });
@@ -270,8 +262,10 @@ public class StoreLayoutImpl implements StoreLayout {
                     break;
                 case UpdateDeleteMessages.ID:
                     peer = update.messages().stream()
-                            .map(messagesByPeer.asMap()::remove)
+                            .map(i -> new MessageId(i, -1))
+                            .map(messages.asMap()::remove)
                             .filter(Objects::nonNull)
+                            .map(m -> getInputPeer(m.peerId()))
                             .findFirst()
                             .orElse(InputPeerEmpty.instance());
                     break;
@@ -279,11 +273,24 @@ public class StoreLayoutImpl implements StoreLayout {
                     throw new IllegalStateException();
             }
 
-            if (peer.identifier() == InputPeerEmpty.ID) {
-                return null;
+            long rawPeerId;
+            switch (peer.identifier()) {
+                case InputPeerEmpty.ID:
+                    return null;
+                case InputPeerChannel.ID:
+                case InputPeerChannelFromMessage.ID:
+                    rawPeerId = getRawInputPeerId(peer);
+                    break;
+                case InputPeerChat.ID:
+                case InputPeerSelf.ID:
+                case InputPeerUser.ID:
+                case InputPeerUserFromMessage.ID:
+                    rawPeerId = -1;
+                    break;
+                default:
+                    throw new IllegalStateException();
             }
 
-            long rawPeerId = getRawInputPeerId(peer);
             var messages = update.messages().stream()
                     .map(id -> new MessageId(id, rawPeerId))
                     .map(this.messages.asMap()::remove)
@@ -698,9 +705,40 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
+    private void addContact(Peer peer, Collection<Chat> chats, Collection<User> users) {
+        long rawPeerId = getRawPeerId(peer);
+        switch (peer.identifier()) {
+            case PeerChat.ID:
+            case PeerChannel.ID:
+                var chatInfo = this.chats.get(rawPeerId);
+                if (chatInfo != null) {
+                    chats.add(chatInfo.min);
+                }
+                break;
+            case PeerUser.ID:
+                var userInfo = this.users.get(rawPeerId);
+                if (userInfo != null) {
+                    users.add(userInfo.min);
+                }
+                break;
+            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
+        }
+    }
+
     static class MessageId {
         private final int messageId;
         private final long chatId;
+
+        static MessageId create(BaseMessageFields message) {
+            switch (message.peerId().identifier()) {
+                case PeerChannel.ID:
+                    return new MessageId(message.id(), ((PeerChannel) message.peerId()).channelId());
+                case PeerChat.ID:
+                case PeerUser.ID:
+                    return new MessageId(message.id(), -1);
+                default: throw new IllegalArgumentException("Unknown peer type: " + message.peerId());
+            }
+        }
 
         MessageId(int messageId, long chatId) {
             this.messageId = messageId;

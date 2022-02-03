@@ -13,7 +13,11 @@ import telegram4j.tl.users.UserFull;
 
 import java.util.Map;
 
-/** Storage interface for interacting with tl entities and session information. */
+/**
+ * Storage interface for interacting with tl entities and session information.
+ * Due to message ids specific differ from user to user,
+ * the storage cannot be used by more than one user.
+ */
 public interface StoreLayout {
 
     /**
@@ -69,8 +73,25 @@ public interface StoreLayout {
      */
     Mono<InputChannel> resolveChannel(long channelId);
 
-    // TODO: make batch-compatible
-    Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId);
+    /**
+     * Retrieve user/group chat's messages with auxiliary data by given ids.
+     * Ids with type {@link InputMessagePinned} will be ignored.
+     *
+     * @param messageIds An iterable of message id elements.
+     * @return A {@link Mono} emitting on successful completion
+     * the container with found messages and auxiliary data.
+     */
+    Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds);
+
+    /**
+     * Retrieve channel's messages with auxiliary data by given ids.
+     *
+     * @param channelId The id of channel.
+     * @param messageIds An iterable of message id elements.
+     * @return A {@link Mono} emitting on successful completion
+     * the container with found messages and auxiliary data.
+     */
+    Mono<Messages> getMessages(long channelId, Iterable<? extends InputMessage> messageIds);
 
     /**
      * Retrieve minimal chat/channel information by specified id.

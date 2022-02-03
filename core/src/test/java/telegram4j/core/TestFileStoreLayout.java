@@ -63,7 +63,9 @@ public class TestFileStoreLayout implements StoreLayout {
                     this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
                     buf.release();
 
-                    return new AuthorizationKeyHolder(dc, authKey, authKeyId);
+                    var holder = new AuthorizationKeyHolder(dc, authKey, authKeyId);
+                    this.authKey = holder;
+                    return holder;
                 }));
     }
 
@@ -89,8 +91,8 @@ public class TestFileStoreLayout implements StoreLayout {
 
             log.debug("Saving session information to file store for dc №{}.", authKey.getDc().getId());
 
-            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey().copy());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId().copy());
+            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId());
             ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
             ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
 
@@ -134,8 +136,13 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Messages> getMessageById(InputPeer peerId, InputMessage messageId) {
-        return delegate.getMessageById(peerId, messageId);
+    public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
+        return delegate.getMessages(messageIds);
+    }
+
+    @Override
+    public Mono<Messages> getMessages(long channelId, Iterable<? extends InputMessage> messageIds) {
+        return delegate.getMessages(channelId, messageIds);
     }
 
     @Override
@@ -247,9 +254,8 @@ public class TestFileStoreLayout implements StoreLayout {
     public Mono<Void> updateState(State state) {
         return Mono.defer(() -> {
                     State old = this.state;
-                    this.state = ImmutableState.copyOf(state);
-
                     if (!state.equals(old)) {
+                        this.state = ImmutableState.copyOf(state);
                         return save();
                     }
                     return Mono.empty();

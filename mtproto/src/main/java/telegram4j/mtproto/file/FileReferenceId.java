@@ -17,7 +17,7 @@ import java.util.Objects;
 /**
  * File reference wrapper, which can be serialized to base 64 url string
  * via {@link #serialize(ByteBufAllocator)} and deserialized {@link #deserialize(String)}.
- * For compatibility with rpc method can be mapped to {@code InputPhoto}/{@code InputDocument}, {@code InputFileLocation}.
+ * For compatibility with rpc methods can be mapped to {@code InputPhoto}/{@code InputDocument}, {@code InputFileLocation}.
  */
 public class FileReferenceId {
 

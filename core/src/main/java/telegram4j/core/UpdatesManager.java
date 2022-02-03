@@ -62,10 +62,9 @@ public class UpdatesManager {
                         .doOnNext(this::applyStateLocal)
                         .thenReturn(state);
             }
-            return Mono.just(state);
+            return Mono.just(state)
+                    .flatMap(this::applyState);
         })
-        .flatMap(client.getMtProtoResources()
-                .getStoreLayout()::updateState)
         .thenMany(getDifference())
         .doOnNext(client.getMtProtoResources()
                 .getEventDispatcher()::publish)
@@ -217,11 +216,11 @@ public class UpdatesManager {
 
     private Mono<Void> applyState(State state) {
         return Mono.defer(() -> {
-            if (pts == state.pts() && qts == state.qts() && state.seq() == seq) {
+            if (pts == state.pts() && qts == state.qts() && seq == state.seq()) {
                 return Mono.empty();
             }
-            applyStateLocal(state);
 
+            applyStateLocal(state);
             return client.getMtProtoResources()
                     .getStoreLayout()
                     .updateState(state);
@@ -404,13 +403,12 @@ public class UpdatesManager {
 
                             State intermediateState = difference0.intermediateState();
 
+                            applyStateLocal(intermediateState);
                             return Flux.fromIterable(difference0.otherUpdates())
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                             client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents)
-                                    .transform(f -> getDifference(intermediateState.pts(),
-                                            intermediateState.qts(), intermediateState.date())
-                                            .concatWith(f));
+                                    .transform(f -> f.concatWith(getDifference()));
                         }
                         default:
                             return Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));

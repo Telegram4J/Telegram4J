@@ -80,5 +80,4 @@ public class AbridgedTransport implements Transport {
     @Override
     public void setQuickAckState(boolean enable) {
     }
-
 }

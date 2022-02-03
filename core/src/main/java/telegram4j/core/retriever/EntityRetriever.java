@@ -61,14 +61,26 @@ public interface EntityRetriever {
     Mono<Chat> getChatFullById(Id chatId);
 
     /**
-     * Retrieve message with auxiliary data by the specified chat and message ids.
+     * Retrieve messages from user/group chats with auxiliary data by the specified message ids.
+     * Ids with {@link IdFields.MessageId#type()} {@code == IdFields.MessageId.Type.PINNED} will be ignored.
      *
      * @implSpec Auxiliary data must contain chat and author if available.
      *
-     * @param chatId The id of chat.
-     * @param messageId The id of message.
+     * @param messageIds An iterable of message id elements.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link AuxiliaryMessages} with auxiliary data.
+     * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
      */
-    Mono<AuxiliaryMessages> getMessageById(Id chatId, IdFields.MessageId messageId);
+    Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends IdFields.MessageId> messageIds);
+
+    /**
+     * Retrieve messages from channel with auxiliary data by the specified channel id and message ids.
+     *
+     * @implSpec Auxiliary data must contain chat and author if available.
+     *
+     * @param channelId The id of chat.
+     * @param messageIds An iterable of message id elements.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
+     */
+    Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds);
 }

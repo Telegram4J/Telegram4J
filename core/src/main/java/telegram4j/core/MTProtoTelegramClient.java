@@ -151,7 +151,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessageById(Id chatId, IdFields.MessageId messageId) {
-        return entityRetriever.getMessageById(chatId, messageId);
+    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends IdFields.MessageId> messageIds) {
+        return entityRetriever.getMessagesById(messageIds);
+    }
+
+    @Override
+    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds) {
+        return entityRetriever.getMessagesById(channelId, messageIds);
     }
 }

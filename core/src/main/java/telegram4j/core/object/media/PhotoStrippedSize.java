@@ -1,6 +1,8 @@
 package telegram4j.core.object.media;
 
+import io.netty.buffer.ByteBuf;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.util.TlEntityUtil;
 
 import java.util.Objects;
 
@@ -26,5 +28,9 @@ public class PhotoStrippedSize implements PhotoSize {
 
     public byte[] getContent() {
         return data.bytes();
+    }
+
+    public ByteBuf getExpandedContent() {
+        return TlEntityUtil.expandInlineThumb(data.bytes());
     }
 }

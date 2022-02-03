@@ -60,6 +60,11 @@ public class Message implements TelegramObject {
         return baseData != null ? Flag.of(baseData) : Flag.of(Objects.requireNonNull(serviceData));
     }
 
+    /**
+     * Gets the id of message for <i>current</i> user if message from DM or group chat or for channel.
+     *
+     * @return The id of message.
+     */
     public int getId() {
         return getBaseData().id();
     }

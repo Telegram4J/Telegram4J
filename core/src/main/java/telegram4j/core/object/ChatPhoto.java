@@ -1,8 +1,10 @@
 package telegram4j.core.object;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatPhotoFields;
 import telegram4j.tl.InputPeer;
 
@@ -47,6 +49,10 @@ public class ChatPhoto implements TelegramObject {
 
     public long getPhotoId() {
         return data.photoId();
+    }
+
+    public Optional<ByteBuf> getExpandedStrippedThumb() {
+        return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
     }
 
     public Optional<byte[]> getStrippedThumb() {
