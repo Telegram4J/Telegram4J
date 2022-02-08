@@ -6,6 +6,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -62,7 +63,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private static final int maxMissedPong = 3;
     private static final Throwable RETRY = new RetryConnectException();
-    private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5/*30*/);
+    private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
     private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(30);
     private static final int PING_TIMEOUT = (int) PING_QUERY_PERIOD.multipliedBy(2).getSeconds();
 
@@ -76,6 +77,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final Sinks.Many<TlObject> rpcReceiver;
     private final Sinks.Many<Updates> updates;
     private final Sinks.Many<RequestEntry> outbound;
+    private final Sinks.Many<TlMethod<?>> authOutbound;
     private final ResettableInterval pingEmitter;
     private final ResettableInterval ackEmitter;
     private final Sinks.Many<State> state;
@@ -83,17 +85,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final String id = Integer.toHexString(hashCode());
     private final MTProtoOptions options;
 
-    private volatile boolean reset = false;
-    private volatile boolean close = false;        // needed for detecting close and disconnect states
-
     private volatile long lastPing;
     private final AtomicLong lastPong = new AtomicLong();
-    private final AtomicLong missedPong = new AtomicLong();
+    private final AtomicInteger missedPong = new AtomicInteger();
 
     private volatile long sessionId = random.nextLong();
     private volatile Sinks.Empty<Void> closeHook;
     private volatile AuthorizationKeyHolder authKey;
     private volatile Connection connection;
+    private volatile boolean close;
     private volatile long timeOffset;
     private volatile long serverSalt;
     private volatile long lastMessageId;
@@ -120,10 +120,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
         this.outbound = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+        this.authOutbound = Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
         this.state = Sinks.many().replay()
                 .latestOrDefault(State.RECONNECT);
-        this.ackEmitter = new ResettableInterval(Schedulers.boundedElastic());
-        this.pingEmitter = new ResettableInterval(Schedulers.boundedElastic());
+        this.ackEmitter = new ResettableInterval(Schedulers.parallel());
+        this.pingEmitter = new ResettableInterval(Schedulers.parallel());
     }
 
     public DefaultMTProtoClient(MTProtoOptions options) {
@@ -159,7 +161,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> stateHandler = state.asFlux()
                     .flatMap(state -> {
-                        log.debug("debug: {}", state);
+                        log.debug("Updating state: {}", state);
+
                         switch (state) {
                             case AUTHORIZATION_END:
                             case AUTHORIZATION_BEGIN:
@@ -177,10 +180,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 log.debug("[C:0x{}] Disconnected from the datacenter {}", id, dataCenter);
                                 return Mono.fromRunnable(connection::dispose)
                                         .onErrorResume(t -> Mono.empty());
-                            case CONNECTED:
-                                reset = false;
-
-                                return Mono.empty();
                             case DISCONNECTED:
                                 ackEmitter.dispose();
                                 pingEmitter.dispose();
@@ -252,11 +251,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         long longAuthKeyId = authKey.getAuthKeyId().getLongLE(0);
                         if (authKeyId != longAuthKeyId) {
-                            throw new IllegalStateException("Incorrect auth key id. Received: "
-                                    + authKeyId + ", but excepted: " + longAuthKeyId);
+                            throw new IllegalStateException("Incorrect auth key id. Received: 0x"
+                                    + Long.toHexString(authKeyId) + ", but excepted: 0x"
+                                    + Long.toHexString(longAuthKeyId));
                         }
 
-                        ByteBuf messageKey = buf.readBytes(Long.BYTES * 2);
+                        ByteBuf messageKey = buf.readRetainedSlice(Long.BYTES * 2);
 
                         ByteBuf authKey = this.authKey.getAuthKey();
                         AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
@@ -290,39 +290,28 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         updateTimeOffset(messageId >> 32);
                         lastMessageId = messageId;
 
-                        ByteBuf payload = decrypted.readBytes(length);
-                        decrypted.release();
+                        ByteBuf payload = decrypted.readSlice(length);
                         TlObject obj = TlDeserializer.deserialize(payload);
                         payload.release();
 
                         rpcReceiver.emitNext(obj, options.getEmissionHandler());
                     })
+                    .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                     .then();
 
-            Mono<Void> outboundHandler = outbound.asFlux()
-                    .flatMap(tuple -> isMtprotoRequest(tuple.method)
-                            ? Mono.just(tuple) : Mono.just(tuple).delayUntil(t -> onConnect))
-                    .flatMap(tuple -> {
+            Flux<RequestEntry> payloadFlux = outbound.asFlux()
+                    .filter(e -> !isContentRelated(e.method))
+                    .delayUntil(e -> onConnect);
+
+            // Perhaps it's better to wrap it in a message container via .buffer(Duration), but there are difficulties with packaging
+            Flux<RequestEntry> rpcFlux = outbound.asFlux()
+                    .filter(e -> isContentRelated(e.method));
+
+            Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, payloadFlux)
+                    .map(tuple -> {
+                        long messageId = getMessageId();
+                        requests.put(messageId, tuple);
                         ByteBuf data = TlSerializer.serialize(alloc, tuple.method);
-                        if (isMtprotoRequest(tuple.method)) {
-                            ByteBuf payload = alloc.buffer(20 + data.readableBytes())
-                                    .writeLongLE(0) // auth key id
-                                    .writeLongLE(tuple.messageId)
-                                    .writeIntLE(data.readableBytes())
-                                    .writeBytes(data);
-                            data.release();
-
-                            if (rpcLog.isDebugEnabled()) {
-                                rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(tuple.method));
-                            }
-
-                            return FutureMono.from(connection.channel()
-                                    .writeAndFlush(transport.encode(payload, false)));
-                        }
-
-                        if (reset) {
-                            tuple = tuple.withMessageId(getMessageId());
-                        }
 
                         if (options.getGzipPackingPredicate().test(data.readableBytes())) {
                             data = TlSerializer.serialize(alloc, ImmutableGzipPacked.of(
@@ -338,7 +327,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         ByteBuf plainData = alloc.buffer(32 + data.readableBytes() + padding)
                                 .writeLongLE(serverSalt)
                                 .writeLongLE(sessionId)
-                                .writeLongLE(tuple.messageId)
+                                .writeLongLE(messageId)
                                 .writeIntLE(seqNo)
                                 .writeIntLE(data.readableBytes())
                                 .writeBytes(data)
@@ -351,11 +340,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         ByteBuf messageKeyHash = sha256Digest(authKey.slice(88, 32), plainData);
 
                         boolean quickAck = false;
-                        if (transport.supportQuickAck() && tuple.method.identifier() != Ping.ID
-                                && tuple.method.identifier() != PingDelayDisconnect.ID
-                                && tuple.method.identifier() != MsgsAck.ID) {
+                        if (transport.supportQuickAck() && !isContentRelated(tuple.method)) {
                             int quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
-                            quickAckTokens.put(quickAckToken, tuple.messageId);
+                            quickAckTokens.put(quickAckToken, messageId);
                             quickAck = true;
                         }
 
@@ -367,12 +354,32 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         if (rpcLog.isDebugEnabled()) {
                             rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
-                                    Long.toHexString(tuple.messageId), prettyMethodName(tuple.method));
+                                    Long.toHexString(messageId), prettyMethodName(tuple.method));
                         }
 
-                        return FutureMono.from(connection.channel()
-                                .writeAndFlush(transport.encode(payload, quickAck)));
-                    })
+                        return transport.encode(payload, quickAck);
+                    });
+
+            Flux<ByteBuf> authFlux = authOutbound.asFlux()
+                    .map(method -> {
+                        ByteBuf data = TlSerializer.serialize(alloc, method);
+                        ByteBuf payload = alloc.buffer(20 + data.readableBytes())
+                                .writeLongLE(0) // auth key id
+                                .writeLongLE(getMessageId()) // Message id in the auth requests doesn't allow receiving payload
+                                .writeIntLE(data.readableBytes())
+                                .writeBytes(data);
+                        data.release();
+
+                        if (rpcLog.isDebugEnabled()) {
+                            rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(method));
+                        }
+
+                        return transport.encode(payload, false);
+                    });
+
+            Mono<Void> outboundHandler = Flux.merge(authFlux, outboundFlux)
+                    .flatMap(b -> FutureMono.from(connection.channel().writeAndFlush(b)))
+                    .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                     .then();
 
             AuthorizationHandler authHandler = new AuthorizationHandler(this, authContext, onAuthSink, alloc);
@@ -399,7 +406,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 lastGeneratedMessageId = lastMessageId = 0;
 
                                 log.debug("[C:0x{}] Session updated due server forgot it", id);
-                                reset = true;
                                 state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
 
                                 return Mono.empty();
@@ -443,14 +449,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 return Mono.when(ping, ack);
             });
 
-            Mono<Void> a = state.asFlux()
+            Mono<Void> initialize = state.asFlux()
                     .filter(s -> s == State.CONFIGURED)
+                    .next()
                     .flatMap(s -> awaitKey.then(startSchedule))
                     .then();
 
             return Mono.zip(inboundHandler, outboundHandler, stateHandler,
-                            authHandlerFuture, rpcHandlerFuture, a)
-                    .doOnError(t -> t != RETRY, t -> {
+                            authHandlerFuture, rpcHandlerFuture, initialize)
+                    .doOnError(t -> t != RETRY && !(t instanceof AbortedException) && !(t instanceof IOException), t -> {
                         if (t instanceof TransportException) {
                             TransportException t0 = (TransportException) t;
                             log.error("[C:0x" + id + "] Transport exception, code: " + t0.getCode(), t0);
@@ -472,7 +479,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
-    private Mono<Void> reconnect() {
+    private <T> Mono<T> reconnect() {
         return Mono.defer(() -> {
             if (close) {
                 return Mono.empty();
@@ -480,7 +487,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
             return Mono.error(RETRY);
-            // return Mono.empty();
         });
     }
 
@@ -521,13 +527,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
     @Override
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
         return Mono.defer(() -> {
-            long messageId = getMessageId();
-
             Sinks.One<R> res = Sinks.one();
-            RequestEntry tuple = new RequestEntry(res, method, messageId);
-            if (method.identifier() != MsgsAck.ID) {
-                requests.put(messageId, tuple);
-            } else {
+            RequestEntry tuple = new RequestEntry(res, method);
+            if (method.identifier() == MsgsAck.ID) {
                 res.emitEmpty(FAIL_FAST);
             }
 
@@ -538,10 +540,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public Mono<Void> send(TlMethod<?> method) {
-        return Mono.fromRunnable(() -> {
-            RequestEntry tuple = new RequestEntry(Sinks.one(), method, getMessageId());
-            outbound.emitNext(tuple, options.getEmissionHandler());
-        });
+        return Mono.fromRunnable(() -> authOutbound.emitNext(method, options.getEmissionHandler()));
     }
 
     @Override
@@ -646,7 +645,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             obj = rpcResult.result();
 
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Handling RPC result", id, Long.toHexString(messageId));
+                rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
             }
 
             if (obj instanceof GzipPacked) {
@@ -676,17 +675,14 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             rpcError.errorMessage().lastIndexOf('_') + 1);
                     Duration delay = Duration.ofSeconds(Integer.parseInt(arg));
 
-                    long messageId0 = messageId;
                     if (rpcLog.isDebugEnabled()) {
-                        rpcLog.debug("[C:0x{}, M:0x{}] Delaying resend for {}", id, Long.toHexString(messageId0), delay);
+                        rpcLog.debug("[C:0x{}, M:0x{}] Delaying resend for {}", id, Long.toHexString(messageId), delay);
                     }
 
                     // Need resend with delay.
-                    return Mono.fromSupplier(() -> requests.get(messageId0))
-                            .doOnNext(t -> requests.remove(messageId0))
+                    requests.remove(messageId);
+                    return Mono.justOrEmpty(req)
                             .delayElement(delay)
-                            .map(t -> t.withMessageId(getMessageId()))
-                            .doOnNext(t -> requests.put(t.messageId, t))
                             .doOnNext(tuple -> outbound.emitNext(tuple, options.getEmissionHandler()))
                             .then();
                 }
@@ -705,7 +701,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof MessageContainer) {
             MessageContainer messageContainer = (MessageContainer) obj;
             if (rpcLog.isTraceEnabled()) {
-                rpcLog.debug("[C:0x{}] Handling message container: {}", id, messageContainer);
+                rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer);
             } else if (rpcLog.isDebugEnabled()) {
                 rpcLog.debug("[C:0x{}] Handling message container", id);
             }
@@ -718,7 +714,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
         if (obj instanceof NewSession) {
             NewSession newSession = (NewSession) obj;
-            rpcLog.debug("[C:0x{}] Handling new session salt creation", id);
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[C:0x{}] Receiving new session creation, new server salt: 0x{}",
+                        id, Long.toHexString(newSession.serverSalt()));
+            }
 
             serverSalt = newSession.serverSalt();
 
@@ -728,13 +727,22 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof BadMsgNotification) {
             BadMsgNotification badMsgNotification = (BadMsgNotification) obj;
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}] Handling notification: {}", id, badMsgNotification);
+                if (badMsgNotification.errorCode() == 48) {
+                    BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;
+                    rpcLog.debug("[C:0x{}, M:0x{}] Updating server salt, seqno: {}, new server salt: 0x{}", id,
+                            Long.toHexString(badServerSalt.badMsgId()), badServerSalt.badMsgSeqno(),
+                            Long.toHexString(badServerSalt.newServerSalt()));
+                } else {
+                    rpcLog.debug("[C:0x{}, M:0x{}] Receiving notification, code: {}, seqno: {}", id,
+                            Long.toHexString(badMsgNotification.badMsgId()), badMsgNotification.errorCode(),
+                            badMsgNotification.badMsgSeqno());
+                }
             }
 
             switch (badMsgNotification.errorCode()) {
                 case 16: // msg_id too low
                 case 17: // msg_id too high
-                    if (updateTimeOffset(lastMessageId)) {
+                    if (updateTimeOffset(messageId)) {
                         timeOffset = 0;
                         lastGeneratedMessageId = 0;
                     }
@@ -745,10 +753,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     break;
             }
 
-            return Mono.fromSupplier(() -> requests.get(badMsgNotification.badMsgId()))
-                    .doOnNext(t -> requests.remove(badMsgNotification.badMsgId()))
-                    .map(t -> t.withMessageId(getMessageId()))
-                    .doOnNext(t -> requests.put(t.messageId, t))
+            return Mono.fromSupplier(() -> requests.remove(badMsgNotification.badMsgId()))
                     .doOnNext(tuple -> outbound.emitNext(tuple, options.getEmissionHandler()))
                     .then();
         }
@@ -790,7 +795,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .collect(Collectors.joining(", ")));
         }
 
-        return send(MsgsAck.builder().msgIds(acknowledgments).build())
+        return sendAwait(MsgsAck.builder().msgIds(acknowledgments).build())
                 .and(Mono.fromRunnable(acknowledgments::clear));
     }
 
@@ -823,27 +828,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
         }
     }
 
-    static boolean isMtprotoRequest(TlMethod<?> method) {
-        return !(method instanceof Ping) && !(method instanceof PingDelayDisconnect)
-                && !(method instanceof MsgsAck) && method instanceof MTProtoObject;
-    }
-
     static class RequestEntry {
         final Sinks.One<?> sink;
         final TlMethod<?> method;
-        final long messageId;
 
-        RequestEntry(Sinks.One<?> sink, TlMethod<?> method, long messageId) {
+        RequestEntry(Sinks.One<?> sink, TlMethod<?> method) {
             this.sink = sink;
             this.method = method;
-            this.messageId = messageId;
-        }
-
-        RequestEntry withMessageId(long messageId) {
-            if (messageId == this.messageId) {
-                return this;
-            }
-            return new RequestEntry(sink, method, messageId);
         }
     }
 
