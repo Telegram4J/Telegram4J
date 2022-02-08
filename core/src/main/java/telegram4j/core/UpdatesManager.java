@@ -2,6 +2,7 @@ package telegram4j.core;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -12,15 +13,19 @@ import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.ResettableInterval;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.ImmutableChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
+import telegram4j.tl.request.updates.ImmutableGetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.*;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -35,9 +40,11 @@ public class UpdatesManager {
     private static final int MIN_CHANNEL_DIFFERENCE = 1;
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
     private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
+    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(15);
 
     private final MTProtoTelegramClient client;
     private final UpdatesHandlers updatesHandlers;
+    private final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel());
 
     private volatile int pts = -1;
     private volatile int qts = -1;
@@ -47,6 +54,14 @@ public class UpdatesManager {
     public UpdatesManager(MTProtoTelegramClient client, UpdatesHandlers updatesHandlers) {
         this.client = Objects.requireNonNull(client, "client");
         this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
+    }
+
+    public Mono<Void> start() {
+        Mono<Void> checkinInterval = stateInterval.ticks()
+                .flatMap(t -> fillGap())
+                .then();
+
+        return Mono.when(checkinInterval);
     }
 
     public Mono<Void> fillGap() {
@@ -62,8 +77,7 @@ public class UpdatesManager {
                         .doOnNext(this::applyStateLocal)
                         .thenReturn(state);
             }
-            return Mono.just(state)
-                    .flatMap(this::applyState);
+            return applyState(state);
         })
         .thenMany(getDifference())
         .doOnNext(client.getMtProtoResources()
@@ -220,6 +234,10 @@ public class UpdatesManager {
                 return Mono.empty();
             }
 
+            if (log.isDebugEnabled()) {
+                log.debug("Updating state, old: {}, new: {}",
+                        ImmutableState.of(pts, qts, date, seq, -1), state);
+            }
             applyStateLocal(state);
             return client.getMtProtoResources()
                     .getStoreLayout()
@@ -232,6 +250,11 @@ public class UpdatesManager {
     }
 
     private Flux<Event> getDifference(int pts, int qts, int date) {
+        if (log.isDebugEnabled()) {
+            log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+        }
+
+        stateInterval.start(DEFAULT_CHECKIN, DEFAULT_CHECKIN);
         return client.getServiceHolder()
                 .getUpdatesService()
                 .getDifference(ImmutableGetDifference.of(pts, date, qts))
@@ -334,16 +357,22 @@ public class UpdatesManager {
                                             dpts = 1;
                                         }
 
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", channel.id(), dpts, limit);
+                                        }
+
+                                        var request = GetChannelDifference.builder()
+                                                .force(true)
+                                                .channel(id)
+                                                .pts(dpts)
+                                                .filter(ChannelMessagesFilterEmpty.instance())
+                                                .limit(limit)
+                                                .build();
+
                                         return client.getServiceHolder()
                                                 .getUpdatesService()
-                                                .getChannelDifference(GetChannelDifference.builder()
-                                                        .force(true)
-                                                        .channel(id)
-                                                        .pts(dpts)
-                                                        .filter(ChannelMessagesFilterEmpty.instance())
-                                                        .limit(limit)
-                                                        .build())
-                                                .flatMapMany(diff -> handleChannelDifference(diff, channel.id()));
+                                                .getChannelDifference(request)
+                                                .flatMapMany(diff -> handleChannelDifference(request, diff));
                                     }));
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
@@ -416,38 +445,60 @@ public class UpdatesManager {
                 });
     }
 
-    private Flux<Event> handleChannelDifference(ChannelDifference diff, long id) {
+    private Flux<Event> handleChannelDifference(GetChannelDifference request, ChannelDifference diff) {
         if (log.isTraceEnabled()) {
             log.trace("channel difference: {}", diff);
         }
 
-        // TODO: untested
-        // int newPts;
-        // int limit = client.isBot()
-        //         ? MAX_BOT_CHANNEL_DIFFERENCE
-        //         : MAX_CHANNEL_DIFFERENCE;
-        //
-        // switch (diff.identifier()) {
-        //     case BaseChannelDifference.ID:
-        //         newPts = ((BaseChannelDifference) diff).pts();
-        //         break;
-        //     case ChannelDifferenceEmpty.ID:
-        //         newPts = ((ChannelDifferenceEmpty) diff).pts();
-        //         break;
-        //     case ChannelDifferenceTooLong.ID:
-        //         ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
-        //         if (diff0.dialog().identifier() == BaseDialog.ID) {
-        //             BaseDialog dialog = (BaseDialog) diff0;
-        //             Integer pts = dialog.pts();
-        //
-        //             newPts = pts != null ? pts : 1;
-        //         } else {
-        //             newPts = -1;
-        //             limit = MIN_CHANNEL_DIFFERENCE;
-        //         }
-        //         break;
-        //     default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
-        // }
+        int newPts;
+        switch (diff.identifier()) {
+            case BaseChannelDifference.ID:
+                newPts = ((BaseChannelDifference) diff).pts();
+                break;
+            case ChannelDifferenceEmpty.ID:
+                newPts = ((ChannelDifferenceEmpty) diff).pts();
+                break;
+            case ChannelDifferenceTooLong.ID:
+                ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
+                if (diff0.dialog().identifier() == BaseDialog.ID) {
+                    BaseDialog dialog = (BaseDialog) diff0;
+                    Integer pts = dialog.pts();
+                    newPts = pts != null ? pts : 1;
+                } else {
+                    newPts = 1;
+                }
+                break;
+            default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
+        }
+
+        long channelId = ((BaseInputChannel) request.channel()).channelId();
+        Mono<Void> updatePts = client.getMtProtoResources()
+                .getStoreLayout().getChatFullById(channelId)
+                .map(c -> ImmutableChatFull.copyOf(c)
+                        .withFullChat(ImmutableChannelFull.copyOf((ChannelFull) c.fullChat())
+                                .withPts(newPts)))
+                .flatMap(c -> client.getMtProtoResources()
+                        .getStoreLayout().onChatUpdate(c))
+                .then();
+
+        Flux<Event> refetchDifference = Flux.defer(() -> {
+            if (diff.finalState()) {
+                return Flux.empty();
+            }
+
+            if (log.isDebugEnabled()) {
+                log.debug("Getting non-final channel difference, channel: {}, pts: {}, limit: {}",
+                        channelId, newPts, request.limit());
+            }
+
+            var updRequest = ImmutableGetChannelDifference.copyOf(request)
+                    .withPts(newPts);
+
+            return client.getServiceHolder()
+                    .getUpdatesService()
+                    .getChannelDifference(updRequest)
+                    .flatMapMany(d -> handleChannelDifference(updRequest, d));
+        });
 
         switch (diff.identifier()) {
             case BaseChannelDifference.ID: {
@@ -506,22 +557,16 @@ public class UpdatesManager {
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
 
-                return Flux.fromIterable(diff0.otherUpdates())
+                return updatePts.thenMany(Flux.fromIterable(diff0.otherUpdates()))
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
-                        .concatWith(messageCreateEvents);
+                        .concatWith(messageCreateEvents)
+                        .concatWith(refetchDifference);
             }
             case ChannelDifferenceEmpty.ID: {
                 ChannelDifferenceEmpty diff0 = (ChannelDifferenceEmpty) diff;
 
-                return client.getMtProtoResources().getStoreLayout()
-                        .getChatFullById(id)
-                        .map(c -> ImmutableChatFull.copyOf(c)
-                                .withFullChat(ImmutableChannelFull.copyOf((ChannelFull) c.fullChat())
-                                        .withPts(diff0.pts())))
-                        .flatMap(c -> client.getMtProtoResources().getStoreLayout()
-                                .onChatUpdate(c))
-                        .thenMany(Flux.empty());
+                return updatePts.thenMany(Flux.empty());
             }
             case ChannelDifferenceTooLong.ID: {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
@@ -537,7 +582,7 @@ public class UpdatesManager {
                         .findFirst()
                         .orElse(null);
 
-                return Flux.fromIterable(diff0.messages())
+                Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
                         .ofType(BaseMessageFields.class)
                         .flatMap(data -> {
                             var chat = Optional.ofNullable(data.fromId())
@@ -551,7 +596,8 @@ public class UpdatesManager {
                                             case PeerChannel.ID:
                                                 return Optional.ofNullable(chatsMap.get(rawId))
                                                         .map(c -> EntityFactory.createChat(client, c, null));
-                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                            default:
+                                                throw new IllegalArgumentException("Unknown peer type: " + p);
                                         }
                                     })
                                     .orElse(null);
@@ -567,7 +613,8 @@ public class UpdatesManager {
                                             case PeerChannel.ID:
                                                 return Optional.ofNullable(chatsMap.get(rawId))
                                                         .map(c -> EntityFactory.createChat(client, c, null));
-                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                                            default:
+                                                throw new IllegalArgumentException("Unknown peer type: " + p);
                                         }
                                     })
                                     .orElse(null);
@@ -578,6 +625,9 @@ public class UpdatesManager {
                                     .map(i -> EntityFactory.createMessage(client, data, i))
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
+
+                return updatePts.thenMany(messageCreateEvents)
+                        .concatWith(refetchDifference);
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown channel difference type: " + diff));
@@ -613,5 +663,9 @@ public class UpdatesManager {
                 default: throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
             }
         });
+    }
+
+    public void shutdown() {
+        stateInterval.dispose();
     }
 }

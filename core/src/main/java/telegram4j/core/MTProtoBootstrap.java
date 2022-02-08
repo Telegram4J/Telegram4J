@@ -161,7 +161,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
-            var initConnection = initConnection();
+            var invokeWithLayout = InvokeWithLayer.builder()
+                    .layer(MTProtoTelegramClient.LAYER)
+                    .query(initConnection())
+                    .build();
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
@@ -170,6 +173,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             Mono<Void> disconnect = Mono.fromRunnable(() -> {
                 eventDispatcher.shutdown();
+                telegramClient.getUpdatesManager().shutdown();
                 onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                 log.info("All mtproto clients disconnected.");
             });
@@ -192,6 +196,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t),
                             () -> log.debug("Event dispatcher completed")));
 
+            composite.add(telegramClient.getUpdatesManager().start().subscribe(null,
+                    t -> log.error("Updates manager terminated with an error", t),
+                    () -> log.debug("Updates manager completed")));
+
             composite.add(mtProtoClient.state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
@@ -211,10 +219,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                 .then(Mono.empty()))
                                         .then();
 
-                                return mtProtoClient.sendAwait(InvokeWithLayer.builder()
-                                                .layer(MTProtoTelegramClient.LAYER)
-                                                .query(initConnection)
-                                                .build())
+                                return mtProtoClient.sendAwait(invokeWithLayout)
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(e -> authResources.getType() == Type.USER &&
@@ -245,7 +250,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 : InitConnectionParams.getDefault();
 
         var initConnection = InitConnection.builder()
-                .apiId(authResources.getAppId())
+                .apiId(authResources.getApiId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())
                 .langCode(params.getLangCode())
@@ -254,8 +259,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .systemLangCode(params.getSystemLangCode());
 
         if (authResources.getType() == Type.BOT) {
-            initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getAppId(),
-                    authResources.getAppHash(), authResources.getBotAuthToken().orElseThrow()));
+            initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getApiId(),
+                    authResources.getApiHash(), authResources.getBotAuthToken().orElseThrow()));
         } else {
             initConnection.query(GetState.instance());
         }
@@ -307,7 +312,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (retry != null) {
             return retry;
         }
-        return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(10));
+        return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(5));
     }
 
     private RetryBackoffSpec initAuthRetry() {
