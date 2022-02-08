@@ -2,8 +2,13 @@ package telegram4j.core.object.media;
 
 import telegram4j.core.object.TelegramObject;
 
-/** Photo size representation. */
+/** Thumbnail type of document/photo. */
 public interface PhotoSize extends TelegramObject {
 
+    /**
+     * Gets a <a href="https://core.telegram.org/api/files#image-thumbnail-types">type</a> of thumbnail
+     *
+     * @return The type of thumbnail.
+     */
     String getType();
 }

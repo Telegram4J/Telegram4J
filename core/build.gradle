@@ -1,5 +1,5 @@
 dependencies {
-    implementation project(":mtproto")
+    api project(":mtproto")
 
     compileOnly "org.immutables:value:$immutables_version"
     annotationProcessor "org.immutables:value:$immutables_version"

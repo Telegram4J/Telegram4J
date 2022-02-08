@@ -9,26 +9,26 @@ import java.util.function.Function;
 
 /** Settings of user and bot auth resources. */
 public class AuthorizationResources {
-    private final int appId;
-    private final String appHash;
+    private final int apiId;
+    private final String apiHash;
     @Nullable
     private final String botAuthToken;
     @Nullable
     private final Function<MTProtoTelegramClient, Publisher<?>> authHandler;
     private final Type type;
 
-    AuthorizationResources(int appId, String appHash, String botAuthToken) {
-        this.appId = appId;
-        this.appHash = Objects.requireNonNull(appHash, "appHash");
+    AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
+        this.apiId = apiId;
+        this.apiHash = Objects.requireNonNull(apiHash, "appHash");
         this.botAuthToken = Objects.requireNonNull(botAuthToken, "botAuthToken");
         this.type = Type.BOT;
 
         this.authHandler = null;
     }
 
-    AuthorizationResources(int appId, String appHash, Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
-        this.appId = appId;
-        this.appHash = Objects.requireNonNull(appHash, "appHash");
+    AuthorizationResources(int apiId, String apiHash, Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
+        this.apiId = apiId;
+        this.apiHash = Objects.requireNonNull(apiHash, "appHash");
         this.authHandler = Objects.requireNonNull(authHandler, "authHandler");
         this.type = Type.USER;
 
@@ -40,8 +40,8 @@ public class AuthorizationResources {
      *
      * @return An api id of application.
      */
-    public int getAppId() {
-        return appId;
+    public int getApiId() {
+        return apiId;
     }
 
     /**
@@ -49,8 +49,8 @@ public class AuthorizationResources {
      *
      * @return An api hash of application.
      */
-    public String getAppHash() {
-        return appHash;
+    public String getApiHash() {
+        return apiHash;
     }
 
     /**

@@ -20,6 +20,7 @@ public class Document implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final BaseDocument data;
+    private final String fileReference;
     @Nullable
     private final String fileName;
 
@@ -29,6 +30,7 @@ public class Document implements TelegramObject {
                     @Nullable String fileName, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        this.fileReference = ByteBufUtil.hexDump(data.fileReference());
         this.fileName = fileName;
 
         this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer)
@@ -53,7 +55,7 @@ public class Document implements TelegramObject {
     }
 
     public String getFileReference() {
-        return ByteBufUtil.hexDump(data.fileReference());
+        return fileReference;
     }
 
     public int getDate() {

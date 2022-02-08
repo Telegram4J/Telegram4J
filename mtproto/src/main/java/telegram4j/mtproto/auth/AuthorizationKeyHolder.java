@@ -41,7 +41,7 @@ public class AuthorizationKeyHolder {
         this.dc = dc;
         this.value = value.asReadOnly();
         ByteBuf authKeyHash = sha1Digest(value);
-        this.id = authKeyHash.retainedSlice(authKeyHash.readableBytes() - 8, 8).asReadOnly();
+        this.id = authKeyHash.slice(authKeyHash.readableBytes() - 8, 8).asReadOnly();
     }
 
     /**

@@ -100,6 +100,7 @@ public interface MTProtoClient {
         /** The state in which the client must fully shutdown without the possibility of resuming. */
         CLOSED,
 
+        /** The state indicates client's willingness to send requests, i.e. after sending a transport id. */
         CONFIGURED,
 
         /**

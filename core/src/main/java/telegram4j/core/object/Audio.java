@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Inferred from {@link BaseDocument#attributes()} type of audio document or voice message. */
 public class Audio extends Document {
 
     private final telegram4j.tl.DocumentAttributeAudio audioData;
@@ -19,22 +20,47 @@ public class Audio extends Document {
         this.audioData = Objects.requireNonNull(audioData, "audioData");
     }
 
+    /**
+     * Gets whether audio document is a voice message.
+     *
+     * @return Whether audio document is a voice message.
+     */
     public boolean isVoice() {
         return audioData.voice();
     }
 
+    /**
+     * Gets duration of audio document.
+     *
+     * @return The duration of document.
+     */
     public Duration getDuration() {
         return Duration.ofSeconds(audioData.duration());
     }
 
+    /**
+     * Gets name of song, if it's audio document and name present.
+     *
+     * @return The name of song, if it's audio document and name present.
+     */
     public Optional<String> getTitle() {
         return Optional.ofNullable(audioData.title());
     }
 
+    /**
+     * Gets name of performer, if it's audio document and name present.
+     *
+     * @return The name of performer, if it's audio document and name present.
+     */
     public Optional<String> getPerformer() {
         return Optional.ofNullable(audioData.performer());
     }
 
+    /**
+     * Gets waveform of voice message, if it is and present.
+     *
+     * @return The waveform of voice message, if it is and present.
+     */
     public Optional<byte[]> getWaveform() {
         return Optional.ofNullable(audioData.waveform());
     }

@@ -46,8 +46,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.justOrEmpty(authKey)
-                .subscribeOn(Schedulers.boundedElastic())
+        return Mono.fromSupplier(() -> authKey)
                 .publishOn(Schedulers.boundedElastic())
                 .switchIfEmpty(Mono.fromCallable(() -> {
                     Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
@@ -72,15 +71,13 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authKey) {
         return Mono.defer(() -> {
-                    var old = this.authKey;
-                    this.authKey = authKey;
-
-                    if (!authKey.equals(old)) {
-                        return save();
-                    }
-                    return Mono.empty();
-                })
-                .subscribeOn(Schedulers.boundedElastic());
+            if (!authKey.equals(this.authKey)) {
+                this.authKey = authKey;
+                return save();
+            }
+            return Mono.empty();
+        })
+        .subscribeOn(Schedulers.boundedElastic());
     }
 
     private Mono<Void> save() {
@@ -91,8 +88,8 @@ public class TestFileStoreLayout implements StoreLayout {
 
             log.debug("Saving session information to file store for dc №{}.", authKey.getDc().getId());
 
-            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId());
+            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey().retainedDuplicate());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId().retainedDuplicate());
             ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
             ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
 
@@ -112,7 +109,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<State> getCurrentState() {
-        return Mono.justOrEmpty(state);
+        return Mono.fromSupplier(() -> state);
     }
 
     @Override
@@ -253,13 +250,13 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateState(State state) {
         return Mono.defer(() -> {
-                    State old = this.state;
-                    if (!state.equals(old)) {
-                        this.state = ImmutableState.copyOf(state);
-                        return save();
-                    }
-                    return Mono.empty();
-                });
+            if (!state.equals(this.state)) {
+                this.state = ImmutableState.copyOf(state);
+                return save();
+            }
+            return Mono.empty();
+        })
+        .publishOn(Schedulers.boundedElastic());
     }
 
     @Override

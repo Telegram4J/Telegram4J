@@ -21,6 +21,10 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+/**
+ * Default implementation of {@code EntityRetriever}, which
+ * first tries to get entity from {@link StoreLayout} and secondary retrieves from Telegram RPC.
+ */
 public class RpcEntityRetriever implements EntityRetriever {
 
     private final MTProtoTelegramClient client;

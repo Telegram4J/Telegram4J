@@ -50,13 +50,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         this.updatesManager = new UpdatesManager(this, updatesHandlers);
     }
 
-    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash, String botAuthToken) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, botAuthToken));
+    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, String botAuthToken) {
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, botAuthToken));
     }
 
-    public static MTProtoBootstrap<MTProtoOptions> create(int appId, String appHash,
+    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash,
                                                           Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(appId, appHash, authHandler));
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, authHandler));
     }
 
     public UpdatesManager getUpdatesManager() {

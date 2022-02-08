@@ -59,7 +59,7 @@ public class ChatPhoto implements TelegramObject {
         return Optional.ofNullable(data.strippedThumb());
     }
 
-    public int getDc() {
+    public int getDcId() {
         return data.dcId();
     }
 }

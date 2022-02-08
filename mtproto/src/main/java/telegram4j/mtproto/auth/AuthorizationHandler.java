@@ -235,6 +235,9 @@ public final class AuthorizationHandler {
             });
         }
 
+        newNonceHash1.release();
+        newNonceHash.release();
+
         ByteBuf xorBuf = xor(context.getNewNonce().slice(0, 8),
                 context.getServerNonce().slice(0, 8));
         long serverSalt = xorBuf.readLongLE();
@@ -243,8 +246,7 @@ public final class AuthorizationHandler {
         context.setServerSalt(serverSalt);
 
         log.debug("Auth key generation completed!");
-        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(client.getDatacenter(),
-                context.getAuthKey().retain());
+        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(client.getDatacenter(), context.getAuthKey().retain());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
         return Mono.empty();
     }
@@ -266,6 +268,9 @@ public final class AuthorizationHandler {
                         Sinks.EmitFailureHandler.FAIL_FAST);
             });
         }
+
+        newNonceHash2.release();
+        newNonceHash.release();
 
         ServerDHParams serverDHParams = context.getServerDHParams();
         log.debug("Retrying dh params extending, attempt: {}", context.getRetry());
@@ -289,6 +294,9 @@ public final class AuthorizationHandler {
                         Sinks.EmitFailureHandler.FAIL_FAST);
             });
         }
+
+        newNonceHash3.release();
+        newNonceHash.release();
 
         return Mono.fromRunnable(() -> onAuthSink.emitError(
                 new AuthorizationException("Failed to create an authorization key"),
