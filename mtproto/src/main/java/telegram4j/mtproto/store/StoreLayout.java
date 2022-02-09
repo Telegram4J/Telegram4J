@@ -74,6 +74,15 @@ public interface StoreLayout {
     Mono<InputChannel> resolveChannel(long channelId);
 
     /**
+     * Check existence of message.
+     * Currently used only in updates handling.
+     *
+     * @param message The ordinal or service message to check.
+     * @return A {@link Mono} emitting on successful completion {@code true} if message exists.
+     */
+    Mono<Boolean> existMessage(BaseMessageFields message);
+
+    /**
      * Retrieve user/group chat's messages with auxiliary data by given ids.
      * Ids with type {@link InputMessagePinned} will be ignored.
      *

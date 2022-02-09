@@ -20,7 +20,7 @@ public class MessageActionChatEditPhoto extends BaseMessageAction {
                                       InputPeer peer, int messageId) {
         super(client, Type.CHAT_EDIT_PHOTO);
         this.data = Objects.requireNonNull(data, "data");
-        this.peer = peer;
+        this.peer = Objects.requireNonNull(peer, "peer");
         this.messageId = messageId;
     }
 

@@ -93,6 +93,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Boolean> existMessage(BaseMessageFields message) {
+        return Mono.fromSupplier(() -> messages.getIfPresent(MessageId.create(message)) != null);
+    }
+
+    @Override
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
         return Mono.fromSupplier(() -> {
             var ids = StreamSupport.stream(messageIds.spliterator(), false)

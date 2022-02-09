@@ -133,6 +133,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Boolean> existMessage(BaseMessageFields message) {
+        return delegate.existMessage(message);
+    }
+
+    @Override
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
         return delegate.getMessages(messageIds);
     }

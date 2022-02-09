@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import reactor.bool.BooleanUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -37,7 +38,6 @@ public class UpdatesManager {
 
     private static final Logger log = Loggers.getLogger(UpdatesManager.class);
 
-    private static final int MIN_CHANNEL_DIFFERENCE = 1;
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
     private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
     private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(15);
@@ -74,10 +74,9 @@ public class UpdatesManager {
                         .filter(s -> s.qts() != -1 && s.seq() != -1
                                 && s.pts() != -1 && s.date() != -1)
                         .defaultIfEmpty(state)
-                        .doOnNext(this::applyStateLocal)
-                        .thenReturn(state);
+                        .doOnNext(this::applyStateLocal);
             }
-            return applyState(state);
+            return Mono.empty();
         })
         .thenMany(getDifference())
         .doOnNext(client.getMtProtoResources()
@@ -102,7 +101,7 @@ public class UpdatesManager {
                 Flux<Event> preApply = Flux.empty();
                 int updSeq = data.seq();
                 if (updSeq != 0 && seq + 1 < updSeq) {
-                    log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", updSeq, updSeq + 1, seq);
+                    log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", updSeq, updSeq + 1, seq);
                     preApply = getDifference();
                 } else if (updSeq != 0 && seq + 1 > updSeq) {
                     return Flux.empty();
@@ -130,7 +129,7 @@ public class UpdatesManager {
                 Flux<Event> preApply = Flux.empty();
                 int seqBegin = data.seqStart();
                 if (seqBegin != 0 && seq + 1 < seqBegin) {
-                    log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, data.seq(), seq);
+                    log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, data.seq(), seq);
                     preApply = getDifference();
                 } else if (seqBegin != 0 && seq + 1 > seqBegin) {
                     return Flux.empty();
@@ -146,14 +145,23 @@ public class UpdatesManager {
                     date = data.date();
                 }
 
-                Flux<Event> events0 = Flux.fromIterable(data.updates())
+                Flux<Event> events = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
-                return preApply.concatWith(events0);
+                return preApply.concatWith(events);
             }
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
+
+                Flux<Event> preApply = Flux.empty();
+                if (pts + data.pts() < data.pts()) {
+                    log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
+                            data.pts(), data.pts() + data.ptsCount(), pts);
+                    preApply = getDifference();
+                } else if (pts + data.pts() > data.pts()) {
+                    return Flux.empty();
+                }
 
                 var message = BaseMessage.builder()
                         .out(data.out())
@@ -163,7 +171,7 @@ public class UpdatesManager {
                         .id(data.id())
                         .date(data.date())
                         .fromId(ImmutablePeerUser.of(data.fromId()))
-                        .peerId(ImmutablePeerUser.of(data.chatId()))
+                        .peerId(ImmutablePeerChat.of(data.chatId()))
                         .fwdFrom(data.fwdFrom())
                         .viaBotId(data.viaBotId())
                         .replyTo(data.replyTo())
@@ -171,14 +179,25 @@ public class UpdatesManager {
                         .ttlPeriod(data.ttlPeriod())
                         .message(data.message());
 
-                return updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                Flux<Event> mapUpdate = updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(message.build())
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
                         .build()));
+
+                return preApply.concatWith(mapUpdate);
             }
             case UpdateShortMessage.ID: {
                 UpdateShortMessage data = (UpdateShortMessage) updates;
+
+                Flux<Event> preApply = Flux.empty();
+                if (pts + data.pts() < data.pts()) {
+                    log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
+                            data.pts(), data.pts() + data.ptsCount(), pts);
+                    preApply = getDifference();
+                } else if (pts + data.pts() > data.pts()) {
+                    return Flux.empty();
+                }
 
                 var message = BaseMessage.builder()
                         .out(data.out())
@@ -194,7 +213,7 @@ public class UpdatesManager {
                         .ttlPeriod(data.ttlPeriod())
                         .message(data.message());
 
-                return client.getMtProtoResources()
+                Flux<Event> mapUpdate = client.getMtProtoResources()
                         .getStoreLayout()
                         .getSelfId()
                         .map(selfId -> {
@@ -212,6 +231,8 @@ public class UpdatesManager {
                                 .pts(data.pts())
                                 .ptsCount(data.ptsCount())
                                 .build())));
+
+                return preApply.concatWith(mapUpdate);
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates));
@@ -230,14 +251,11 @@ public class UpdatesManager {
 
     private Mono<Void> applyState(State state) {
         return Mono.defer(() -> {
-            if (pts == state.pts() && qts == state.qts() && seq == state.seq()) {
-                return Mono.empty();
-            }
-
             if (log.isDebugEnabled()) {
                 log.debug("Updating state, old: {}, new: {}",
                         ImmutableState.of(pts, qts, date, seq, -1), state);
             }
+
             applyStateLocal(state);
             return client.getMtProtoResources()
                     .getStoreLayout()
@@ -290,6 +308,8 @@ public class UpdatesManager {
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
+                                    .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
+                                            .getStoreLayout().existMessage(message)))
                                     .flatMap(data -> {
                                         long id = getRawPeerId(data.peerId());
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
@@ -342,20 +362,10 @@ public class UpdatesManager {
                                                 Objects.requireNonNull(channel.accessHash()));
 
                                         Integer upts = u.pts();
-                                        int dpts;
-                                        if (cpts != -1) {
-                                            dpts = cpts;
-                                        } else {
-                                            dpts = upts != null ? upts : -1;
-                                        }
-
+                                        int dpts = Math.max(1, Math.max(upts != null ? upts : -1, cpts));
                                         int limit = client.isBot()
                                                 ? MAX_BOT_CHANNEL_DIFFERENCE
                                                 : MAX_CHANNEL_DIFFERENCE;
-                                        if (dpts == -1) {
-                                            limit = MIN_CHANNEL_DIFFERENCE;
-                                            dpts = 1;
-                                        }
 
                                         if (log.isDebugEnabled()) {
                                             log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", channel.id(), dpts, limit);
@@ -401,6 +411,8 @@ public class UpdatesManager {
 
                             Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(difference0.newMessages())
                                     .ofType(BaseMessageFields.class)
+                                    .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
+                                            .getStoreLayout().existMessage(message)))
                                     .flatMap(data -> {
                                         long id = getRawPeerId(data.peerId());
                                         var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
@@ -430,9 +442,8 @@ public class UpdatesManager {
                                                 .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
 
-                            State intermediateState = difference0.intermediateState();
+                            applyStateLocal(difference0.intermediateState());
 
-                            applyStateLocal(intermediateState);
                             return Flux.fromIterable(difference0.otherUpdates())
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                             client, chatsMap, usersMap, update)))
@@ -461,7 +472,7 @@ public class UpdatesManager {
             case ChannelDifferenceTooLong.ID:
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
                 if (diff0.dialog().identifier() == BaseDialog.ID) {
-                    BaseDialog dialog = (BaseDialog) diff0;
+                    BaseDialog dialog = (BaseDialog) diff0.dialog();
                     Integer pts = dialog.pts();
                     newPts = pts != null ? pts : 1;
                 } else {
@@ -517,6 +528,8 @@ public class UpdatesManager {
 
                 Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
                         .ofType(BaseMessageFields.class)
+                        .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
+                                .getStoreLayout().existMessage(message)))
                         .flatMap(data -> {
                             var chat = Optional.ofNullable(data.fromId())
                                     .flatMap(p -> {
@@ -584,6 +597,8 @@ public class UpdatesManager {
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
                         .ofType(BaseMessageFields.class)
+                        .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
+                                .getStoreLayout().existMessage(message)))
                         .flatMap(data -> {
                             var chat = Optional.ofNullable(data.fromId())
                                     .flatMap(p -> {
