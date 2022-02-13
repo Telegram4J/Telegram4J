@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'signing'
     id 'com.github.ben-manes.versions' version '0.38.0'
 }
 
@@ -13,7 +14,9 @@ ext {
     caffeine_version = '3.0.5'
 
     tl_parser_version = '0.1.0'
-    tl_parser_group = 'com.telegram4j'
+
+    isJitpack = System.getenv("JITPACK") == "true"
+    isSnapshot = version.toString().endsWith("-SNAPSHOT")
 }
 
 allprojects {
@@ -21,9 +24,13 @@ allprojects {
     apply plugin: 'maven-publish'
     apply plugin: 'com.github.ben-manes.versions'
 
-    group = 'com.telegram4j'
+    if (!isJitpack && !isSnapshot) {
+        apply plugin: 'signing'
+    }
+
+    group = 'io.github.telegram4j'
     description = 'Java library for the Telegram API'
-    version = '0.1.0'
+    version = '0.1.0-SNAPSHOT'
 
     targetCompatibility = JavaVersion.VERSION_11
     sourceCompatibility = JavaVersion.VERSION_11
@@ -38,7 +45,7 @@ allprojects {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
         api "com.github.ben-manes.caffeine:caffeine:$caffeine_version"
 
-        api "$tl_parser_group:tl-parser:$tl_parser_version"
+        api "io.github.telegram4j:tl-parser:$tl_parser_version"
     }
 
     configurations.all {
@@ -94,7 +101,7 @@ subprojects {
 
                 pom {
                     name = 'Telegram4J'
-                    description = 'A java REST wrapper for the Telegram Bot API'
+                    description = 'A java MTPtoro library for the Telegram API'
                     url = 'https://github.com/Telegram4J/Telegram4J'
                     inceptionYear = '2021'
 
@@ -119,6 +126,39 @@ subprojects {
                     }
                 }
             }
+        }
+
+
+        if (!isJitpack) {
+            repositories {
+                maven {
+                    if (isSnapshot) {
+                        url 'https://s01.oss.sonatype.org/content/repositories/snapshots'
+                    } else {
+                        url 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2'
+                    }
+
+                    def sonatypeUsername = findProperty('sonatypeUsername')
+                    def sonatypePassword = findProperty('sonatypePassword')
+                    if (sonatypeUsername != null && sonatypePassword != null) {
+                        credentials {
+                            username sonatypeUsername
+                            password sonatypePassword
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (!isJitpack && !isSnapshot) {
+        signing {
+            def signingKey = findProperty('signingKey')
+            def signingPassword = findProperty('signingPassword')
+            if (signingKey != null && signingPassword != null) {
+                useInMemoryPgpKeys(signingKey, signingPassword)
+            }
+            sign publishing.publications.mavenJava
         }
     }
 }

@@ -2,7 +2,3 @@ rootProject.name = 'Telegram4J'
 
 include 'core'
 include 'mtproto'
-
-if (file('../tl-parser').exists()) {
-    includeBuild '../tl-parser'
-}

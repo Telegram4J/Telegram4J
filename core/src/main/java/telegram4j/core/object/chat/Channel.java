@@ -23,8 +23,7 @@ public interface Channel extends Chat {
      * via {@link telegram4j.core.retriever.EntityRetriever#resolvePeer(PeerId)}
      * or used in {@link PeerId peer id}.
      *
-     *
-     * @return
+     * @return The username of channel, if present.
      */
     Optional<String> getUsername();
 
