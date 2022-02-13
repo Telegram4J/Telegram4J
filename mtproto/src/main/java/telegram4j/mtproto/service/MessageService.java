@@ -494,6 +494,7 @@ public class MessageService extends RpcService {
         return client.sendAwait(ClearAllDrafts.instance());
     }
 
+    @BotCompatible
     public Mono<Updates> updatePinnedMessage(UpdatePinnedMessage request) {
         return client.sendAwait(request);
     }
