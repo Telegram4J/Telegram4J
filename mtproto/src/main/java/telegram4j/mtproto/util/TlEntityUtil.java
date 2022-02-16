@@ -48,6 +48,19 @@ public class TlEntityUtil {
         return expanded.asReadOnly();
     }
 
+    public static boolean isAvailableChat(Chat chat) {
+        switch (chat.identifier()) {
+            case BaseChat.ID:
+            case Channel.ID:
+                return true;
+            case ChannelForbidden.ID:
+            case ChatEmpty.ID:
+            case ChatForbidden.ID:
+                return false;
+            default: throw new IllegalArgumentException("Unknown chat type: " + chat);
+        }
+    }
+
     public static String stripUsername(String username) {
         return username.toLowerCase().trim()
                 .replace(".", "")

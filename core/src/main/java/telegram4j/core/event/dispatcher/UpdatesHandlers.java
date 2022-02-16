@@ -19,6 +19,8 @@ public final class UpdatesHandlers {
                 MessageUpdateHandlers::handleUpdateEditMessage);
         addHandler(UpdateDeleteMessagesFields.class, MessageUpdateHandlers::handleStateUpdateDeleteMessages,
                 MessageUpdateHandlers::handleUpdateDeleteMessages);
+        addHandler(UpdatePinnedMessagesFields.class, MessageUpdateHandlers::handleStateUpdatePinnedMessages,
+                MessageUpdateHandlers::handleUpdatePinnedMessages);
         // user updates
         addHandler(UpdateChannelUserTyping.class, UserUpdateHandlers::handleStateUpdateChannelUserTyping,
                 UserUpdateHandlers::handleUpdateChannelUserTyping);

@@ -36,7 +36,7 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Retrieve minimal information about user.
+     * Retrieve minimal information about user and update cache.
      *
      * @param userId The id of user
      * @return A {@link Mono} emitting on successful completion minimal information about user
@@ -47,7 +47,7 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Retrieve minimal information about list of users.
+     * Retrieve minimal information about list of users and update cache.
      *
      * @param userIds An iterable of user id elements
      * @return A {@link Flux} emitting minimal users
@@ -61,7 +61,7 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Retrieve detailed information about user.
+     * Retrieve detailed information about user and update cache.
      *
      * @param id The id of the user
      * @return A {@link Mono} emitting on successful completion an object contains
@@ -84,7 +84,7 @@ public class UserService extends RpcService {
     // Methods from ContactsService
 
     /**
-     * Search peers by substring of query.
+     * Search peers by substring of query and update cache.
      *
      * @param username The peer full username
      * @return A {@link Mono} emitting on successful completion an object contains
@@ -185,9 +185,7 @@ public class UserService extends RpcService {
     // Methods from HelpService
 
     public Mono<UserInfo> getUserInfo(InputUser id) {
-        return client.sendAwait(ImmutableGetUserInfo.of(id))
-                .flatMap(u -> storeLayout.onUserInfoUpdate(u)
-                        .thenReturn(u));
+        return client.sendAwait(ImmutableGetUserInfo.of(id));
     }
 
     public Mono<UserInfo> editUserInfo(InputUser id, String message, Iterable<? extends MessageEntity> entities) {
@@ -195,9 +193,7 @@ public class UserService extends RpcService {
                         .userId(id)
                         .message(message)
                         .entities(entities)
-                        .build())
-                .flatMap(u -> storeLayout.onUserInfoUpdate(u)
-                        .thenReturn(u));
+                        .build());
     }
 
     // Methods from PhotoService

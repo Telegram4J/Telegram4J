@@ -45,14 +45,29 @@ public class ChatParticipant implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets {@link Status status} type of participant.
+     *
+     * @return The status type of participant.
+     */
     public Status getStatus() {
         return Status.of(data);
     }
 
+    /**
+     * Gets id of chat/channel with which participant associated.
+     *
+     * @return The id of chat/channel with which participant associated.
+     */
     public Id getChatId() {
         return chatId;
     }
 
+    /**
+     * Gets id of participant. That's might be not only user if status type is {@link Status#LEFT} or {@link Status#BANNED}.
+     *
+     * @return The id of participant.
+     */
     public Id getUserId() {
         switch (data.identifier()) {
             case BaseChannelParticipant.ID: return Id.ofUser(((BaseChannelParticipant) data).userId(), null);
@@ -68,6 +83,11 @@ public class ChatParticipant implements TelegramObject {
         }
     }
 
+    /**
+     * Gets participant join timestamp, if present.
+     *
+     * @return The participant join timestamp, if present.
+     */
     public Optional<Instant> getJoinTimestamp() {
         switch (data.identifier()) {
             case BaseChannelParticipant.ID: return Optional.of(Instant.ofEpochSecond(((BaseChannelParticipant) data).date()));
@@ -83,6 +103,11 @@ public class ChatParticipant implements TelegramObject {
         }
     }
 
+    /**
+     * Gets id of the inviter user, if present.
+     *
+     * @return The id of inviter user, if present.
+     */
     public Optional<Id> getInviterId() {
         switch (data.identifier()) {
             case ChannelParticipantSelf.ID: return Optional.of(Id.ofUser(((ChannelParticipantSelf) data).inviterId(), null));
@@ -99,22 +124,42 @@ public class ChatParticipant implements TelegramObject {
         }
     }
 
+    /**
+     * Gets whether this chat participant is <i>current</i> user.
+     *
+     * @return {@literal true} if participant is <i>current</i> user, {@literal false} otherwise.
+     */
     public boolean isSelf() {
         return data.identifier() == ChannelParticipantSelf.ID ||
                 (data.identifier() == ChannelParticipantAdmin.ID &&
                 ((ChannelParticipantAdmin) data).self());
     }
 
+    /**
+     * Gets whether this <i>current</i> user can edit this participant.
+     *
+     * @return {@literal true} if <i>current</i> user can edit this participant, {@literal false} otherwise.
+     */
     public boolean isCanEdit() {
         return data.identifier() == ChannelParticipantAdmin.ID
                 && ((ChannelParticipantAdmin) data).canEdit();
     }
 
+    /**
+     * Gets whether this participant invited via request.
+     *
+     * @return {@literal true} if participant invited via request, {@literal false} otherwise.
+     */
     public boolean isInvitedViaRequest() {
         return data.identifier() == ChannelParticipantSelf.ID
                 && ((ChannelParticipantSelf) data).viaRequest();
     }
 
+    /**
+     * Gets {@link EnumSet} of permissions this participant, if it's admin or present
+     *
+     * @return The {@link EnumSet} of permissions this participant, if it's admin or present.
+     */
     public Optional<EnumSet<ChatAdminRights>> getAdminRights() {
         switch (data.identifier()) {
             case ChannelParticipantCreator.ID: return Optional.of(ChatAdminRights.of(((ChannelParticipantCreator) data).adminRights()));
@@ -130,6 +175,11 @@ public class ChatParticipant implements TelegramObject {
         }
     }
 
+    /**
+     * Gets rank of participant, if it's admin or present.
+     *
+     * @return The rank of participant, if it's admin or present.
+     */
     public Optional<String> getRank() {
         switch (data.identifier()) {
             case ChannelParticipantCreator.ID: return Optional.ofNullable(((ChannelParticipantCreator) data).rank());
@@ -145,24 +195,33 @@ public class ChatParticipant implements TelegramObject {
         }
     }
 
-    public Optional<Id> getPromoterId() {
-        return data.identifier() == ChannelParticipantAdmin.ID
-                ? Optional.ofNullable(((ChannelParticipantAdmin) data).inviterId()).map(l -> Id.ofUser(l, null))
-                : Optional.empty();
-    }
-
+    /**
+     * Gets whether this participant is banned or left chat/channel.
+     *
+     * @return {@literal true} if participant is banned or left chat/channel, {@link false} otherwise.
+     */
     public boolean isLeft() {
         return data.identifier() == ChannelParticipantLeft.ID ||
                 (data.identifier() == ChannelParticipantBanned.ID
                 && ((ChannelParticipantBanned) data).left());
     }
 
-    public Optional<Id> getKickedBy() {
+    /**
+     * Gets id of admin which kicks participant, if participant was banned.
+     *
+     * @return The id of admin which kicks participant, if participant was banned.
+     */
+    public Optional<Id> getKickerId() {
         return data.identifier() == ChannelParticipantBanned.ID
                 ? Optional.of(((ChannelParticipantBanned) data).kickedBy()).map(l -> Id.ofUser(l, null))
                 : Optional.empty();
     }
 
+    /**
+     * Gets permissions overwrite for this participant, if participant was banned.
+     *
+     * @return The permissions overwrite for this participant, if participant was banned.
+     */
     public Optional<ChatBannedRightsSettings> getBannedRights() {
         return data.identifier() == ChannelParticipantBanned.ID
                 ? Optional.of(((ChannelParticipantBanned) data).bannedRights())
@@ -190,14 +249,29 @@ public class ChatParticipant implements TelegramObject {
                 '}';
     }
 
+    /** Inferred status types of {@link telegram4j.tl.ChatParticipant} object. */
     public enum Status {
+        /** Default chat/channel participant type. */
         DEFAULT,
+
+        /** Status of chat/channel owner. */
         CREATOR,
+
+        /** Status of chat/channel admin or user with rank. */
         ADMIN,
 
+        /** Status which indicates a banned participant. */
         BANNED,
+
+        /** Status which indicated a left from chat/channel participant. */
         LEFT;
 
+        /**
+         * Gets type of {@link telegram4j.tl.ChatParticipant} or {@link ChannelParticipant}.
+         *
+         * @param data The {@link telegram4j.tl.ChatParticipant} or {@link ChannelParticipant} object to get status.
+         * @return The type of chat/channel participant
+         */
         public static Status of(TlObject data) {
             switch (data.identifier()) {
                 case BaseChannelParticipant.ID:

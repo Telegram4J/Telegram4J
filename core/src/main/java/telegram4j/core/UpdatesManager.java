@@ -7,17 +7,18 @@ import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.ResettableInterval;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
-import telegram4j.tl.api.TlObject;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.ImmutableChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
@@ -27,6 +28,7 @@ import telegram4j.tl.updates.*;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -108,8 +110,11 @@ public class UpdatesManager {
                 }
 
                 var usersMap = data.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u)
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
                 var chatsMap = data.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
                 if (updSeq != 0 && data.date() != 0) {
@@ -117,11 +122,14 @@ public class UpdatesManager {
                     date = data.date();
                 }
 
+                Mono<Void> saveContacts = client.getMtProtoResources()
+                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
                 Flux<Event> events = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
-                return preApply.concatWith(events);
+                return saveContacts.thenMany(preApply.concatWith(events));
             }
             case UpdatesCombined.ID: {
                 UpdatesCombined data = (UpdatesCombined) updates;
@@ -136,8 +144,11 @@ public class UpdatesManager {
                 }
 
                 var usersMap = data.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u)
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
                 var chatsMap = data.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
                 if (data.seq() != 0 && data.date() != 0) {
@@ -145,11 +156,14 @@ public class UpdatesManager {
                     date = data.date();
                 }
 
+                Mono<Void> saveContacts = client.getMtProtoResources()
+                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
                 Flux<Event> events = Flux.fromIterable(data.updates())
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
-                return preApply.concatWith(events);
+                return saveContacts.thenMany(preApply.concatWith(events));
             }
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
@@ -296,13 +310,16 @@ public class UpdatesManager {
                             // difference0.newEncryptedMessages()
 
                             var chatsMap = difference0.chats().stream()
+                                    .filter(TlEntityUtil::isAvailableChat)
                                     .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+
                             var usersMap = difference0.users().stream()
+                                    .filter(u -> u.identifier() == BaseUser.ID)
+                                    .map(u -> (BaseUser) u)
                                     .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                             var selfUser = usersMap.values().stream()
-                                    .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                                    .map(b -> (BaseUser) b)
+                                    .filter(BaseUser::self)
                                     .findFirst()
                                     .orElse(null);
 
@@ -311,26 +328,11 @@ public class UpdatesManager {
                                     .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                             .getStoreLayout().existMessage(message)))
                                     .flatMap(data -> {
-                                        long id = getRawPeerId(data.peerId());
-                                        var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
-                                                .or(() -> Optional.ofNullable(usersMap.get(id)))
-                                                .map(c -> EntityFactory.createChat(client, c, selfUser))
+                                        var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
                                                 .orElse(null);
 
                                         var author = Optional.ofNullable(data.fromId())
-                                                .flatMap(p -> {
-                                                    long rawId = getRawPeerId(p);
-                                                    switch (p.identifier()) {
-                                                        case PeerUser.ID:
-                                                            return Optional.ofNullable(usersMap.get(rawId))
-                                                                    .map(u -> EntityFactory.createUser(client, u));
-                                                        case PeerChat.ID:
-                                                        case PeerChannel.ID:
-                                                            return Optional.ofNullable(chatsMap.get(rawId))
-                                                                    .map(c -> EntityFactory.createChat(client, c, null));
-                                                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
-                                                    }
-                                                })
+                                                .flatMap(p -> mapPeer(p, chatsMap, usersMap))
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
@@ -346,6 +348,11 @@ public class UpdatesManager {
                                     .zipWhen(u -> client.getMtProtoResources()
                                             .getStoreLayout()
                                             .getChatFullById(u.channelId())
+                                            .switchIfEmpty(client.getMtProtoResources().getStoreLayout()
+                                                    .resolveChannel(u.channelId())
+                                                    .flatMap(c -> client.getServiceHolder()
+                                                            .getChatService()
+                                                            .getFullChannel(c)))
                                             .map(ChatFull::fullChat)
                                             .ofType(ChannelFull.class)
                                             .map(ChannelFull::pts)
@@ -391,21 +398,26 @@ public class UpdatesManager {
                                     .concatWith(messageCreateEvents)
                                     .concatWith(applyChannelDifference);
 
-                            return applyState(difference0.state())
+                            Mono<Void> saveContacts = client.getMtProtoResources()
+                                    .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
+                            return saveContacts.and(applyState(difference0.state()))
                                     .thenMany(concatedUpdates);
                         }
                         case DifferenceSlice.ID: {
                             DifferenceSlice difference0 = (DifferenceSlice) difference;
 
                             var chatsMap = difference0.chats().stream()
+                                    .filter(TlEntityUtil::isAvailableChat)
                                     .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
                             var usersMap = difference0.users().stream()
+                                    .filter(u -> u.identifier() == BaseUser.ID)
+                                    .map(u -> (BaseUser) u)
                                     .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                             var selfUser = usersMap.values().stream()
-                                    .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                                    .map(b -> (BaseUser) b)
+                                    .filter(BaseUser::self)
                                     .findFirst()
                                     .orElse(null);
 
@@ -414,26 +426,11 @@ public class UpdatesManager {
                                     .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                             .getStoreLayout().existMessage(message)))
                                     .flatMap(data -> {
-                                        long id = getRawPeerId(data.peerId());
-                                        var chat = Optional.<TlObject>ofNullable(chatsMap.get(id))
-                                                .or(() -> Optional.ofNullable(usersMap.get(id)))
-                                                .map(c -> EntityFactory.createChat(client, c, selfUser))
+                                        var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
                                                 .orElse(null);
 
                                         var author = Optional.ofNullable(data.fromId())
-                                                .flatMap(p -> {
-                                                    long rawId = getRawPeerId(p);
-                                                    switch (p.identifier()) {
-                                                        case PeerUser.ID:
-                                                            return Optional.ofNullable(usersMap.get(rawId))
-                                                                    .map(u -> EntityFactory.createUser(client, u));
-                                                        case PeerChat.ID:
-                                                        case PeerChannel.ID:
-                                                            return Optional.ofNullable(chatsMap.get(rawId))
-                                                                    .map(c -> EntityFactory.createChat(client, c, null));
-                                                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
-                                                    }
-                                                })
+                                                .flatMap(p -> mapPeer(p, chatsMap, usersMap))
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
@@ -442,9 +439,12 @@ public class UpdatesManager {
                                                 .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
 
+                            Mono<Void> saveContacts = client.getMtProtoResources()
+                                    .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
                             applyStateLocal(difference0.intermediateState());
 
-                            return Flux.fromIterable(difference0.otherUpdates())
+                            return saveContacts.thenMany(Flux.fromIterable(difference0.otherUpdates()))
                                     .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                             client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents)
@@ -516,13 +516,15 @@ public class UpdatesManager {
                 BaseChannelDifference diff0 = (BaseChannelDifference) diff;
 
                 var chatsMap = diff0.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
                 var usersMap = diff0.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u)
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                 var selfUser = usersMap.values().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                        .map(b -> (BaseUser) b)
+                        .filter(BaseUser::self)
                         .findFirst()
                         .orElse(null);
 
@@ -531,36 +533,11 @@ public class UpdatesManager {
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .flatMap(data -> {
-                            var chat = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> {
-                                        long rawId = getRawPeerId(p);
-                                        switch (p.identifier()) {
-                                            case PeerUser.ID:
-                                                return Optional.ofNullable(usersMap.get(rawId))
-                                                        .map(v -> EntityFactory.createChat(client, v, selfUser));
-                                            case PeerChat.ID:
-                                            case PeerChannel.ID:
-                                                return Optional.ofNullable(chatsMap.get(rawId))
-                                                        .map(c -> EntityFactory.createChat(client, c, null));
-                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
-                                        }
-                                    })
+                            var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
                                     .orElse(null);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> {
-                                        long rawId = getRawPeerId(p);
-                                        switch (p.identifier()) {
-                                            case PeerUser.ID:
-                                                return Optional.ofNullable(usersMap.get(rawId))
-                                                        .map(u -> EntityFactory.createUser(client, u));
-                                            case PeerChat.ID:
-                                            case PeerChannel.ID:
-                                                return Optional.ofNullable(chatsMap.get(rawId))
-                                                        .map(c -> EntityFactory.createChat(client, c, null));
-                                            default: throw new IllegalArgumentException("Unknown peer type: " + p);
-                                        }
-                                    })
+                                    .flatMap(p -> mapPeer(p, chatsMap, usersMap))
                                     .orElse(null);
 
                             return Mono.justOrEmpty(chat)
@@ -570,7 +547,11 @@ public class UpdatesManager {
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
 
-                return updatePts.thenMany(Flux.fromIterable(diff0.otherUpdates()))
+                Mono<Void> saveContacts = client.getMtProtoResources()
+                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
+                return saveContacts.and(updatePts)
+                        .thenMany(Flux.fromIterable(diff0.otherUpdates()))
                         .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
                         .concatWith(messageCreateEvents)
@@ -585,13 +566,15 @@ public class UpdatesManager {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
 
                 var chatsMap = diff0.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
                 var usersMap = diff0.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(u -> (BaseUser) u)
                         .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
 
                 var selfUser = usersMap.values().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                        .map(b -> (BaseUser) b)
+                        .filter(BaseUser::self)
                         .findFirst()
                         .orElse(null);
 
@@ -600,38 +583,11 @@ public class UpdatesManager {
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .flatMap(data -> {
-                            var chat = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> {
-                                        long rawId = getRawPeerId(p);
-                                        switch (p.identifier()) {
-                                            case PeerUser.ID:
-                                                return Optional.ofNullable(usersMap.get(rawId))
-                                                        .map(v -> EntityFactory.createChat(client, v, selfUser));
-                                            case PeerChat.ID:
-                                            case PeerChannel.ID:
-                                                return Optional.ofNullable(chatsMap.get(rawId))
-                                                        .map(c -> EntityFactory.createChat(client, c, null));
-                                            default:
-                                                throw new IllegalArgumentException("Unknown peer type: " + p);
-                                        }
-                                    })
-                                    .orElse(null);
+                            var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
+                                .orElse(null);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> {
-                                        long rawId = getRawPeerId(p);
-                                        switch (p.identifier()) {
-                                            case PeerUser.ID:
-                                                return Optional.ofNullable(usersMap.get(rawId))
-                                                        .map(u -> EntityFactory.createUser(client, u));
-                                            case PeerChat.ID:
-                                            case PeerChannel.ID:
-                                                return Optional.ofNullable(chatsMap.get(rawId))
-                                                        .map(c -> EntityFactory.createChat(client, c, null));
-                                            default:
-                                                throw new IllegalArgumentException("Unknown peer type: " + p);
-                                        }
-                                    })
+                                    .flatMap(p -> mapPeer(p, chatsMap, usersMap))
                                     .orElse(null);
 
                             return Mono.justOrEmpty(chat)
@@ -641,11 +597,47 @@ public class UpdatesManager {
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
 
-                return updatePts.thenMany(messageCreateEvents)
+                Mono<Void> saveContacts = client.getMtProtoResources()
+                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+
+                return updatePts.and(saveContacts)
+                        .thenMany(messageCreateEvents)
                         .concatWith(refetchDifference);
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown channel difference type: " + diff));
+        }
+    }
+
+    private Optional<Chat> mapChat(Peer peer, Map<Long, telegram4j.tl.Chat> chatsMap,
+                                   Map<Long, BaseUser> usersMap, @Nullable BaseUser selfUser) {
+        long rawId = getRawPeerId(peer);
+        switch (peer.identifier()) {
+            case PeerUser.ID:
+                return Optional.ofNullable(usersMap.get(rawId))
+                        .map(u -> EntityFactory.createChat(client, u, selfUser));
+            case PeerChat.ID:
+            case PeerChannel.ID:
+                return Optional.ofNullable(chatsMap.get(rawId))
+                        .map(c -> EntityFactory.createChat(client, c, null));
+            default:
+                throw new IllegalArgumentException("Unknown peer type: " + peer);
+        }
+    }
+
+    private Optional<PeerEntity> mapPeer(Peer peer, Map<Long, telegram4j.tl.Chat> chatsMap,
+                                         Map<Long, BaseUser> usersMap) {
+        long rawId = getRawPeerId(peer);
+        switch (peer.identifier()) {
+            case PeerUser.ID:
+                return Optional.ofNullable(usersMap.get(rawId))
+                        .map(u -> EntityFactory.createUser(client, u));
+            case PeerChat.ID:
+            case PeerChannel.ID:
+                return Optional.ofNullable(chatsMap.get(rawId))
+                        .map(c -> EntityFactory.createChat(client, c, null));
+            default:
+                throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 

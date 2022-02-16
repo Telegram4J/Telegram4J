@@ -5,13 +5,10 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
-import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
-
-import java.util.Map;
 
 /**
  * Storage interface for interacting with tl entities and session information.
@@ -148,39 +145,43 @@ public interface StoreLayout {
 
     // message updates
 
-    Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onNewMessage(Message message);
 
-    Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Message> onEditMessage(Message message);
 
     Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update);
 
+    Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload);
+
     // user updates
 
-    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action);
 
-    Mono<Void> onChatUserTyping(UpdateChatUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatUserTyping(UpdateChatUserTyping action);
 
-    Mono<Void> onUserTyping(UpdateUserTyping action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onUserTyping(UpdateUserTyping action);
 
-    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action);
 
-    Mono<String> onUserPhoneUpdate(UpdateUserPhone action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<String> onUserPhoneUpdate(UpdateUserPhone action);
 
-    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action);
 
-    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action);
 
-    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, Map<Long, Chat> chats, Map<Long, User> users);
+    // common updates
 
-    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action);
 
-    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action);
 
-    Mono<Void> onChatParticipant(UpdateChatParticipant action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action);
 
-    Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatParticipant(UpdateChatParticipant action);
 
-    Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users);
+    Mono<Void> onChatParticipants(UpdateChatParticipants action);
+
+    Mono<Void> onChannelParticipant(UpdateChannelParticipant update);
 
     // not an update-related methods
 
@@ -192,11 +193,11 @@ public interface StoreLayout {
 
     // common request methods
 
+    Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users);
+
     Mono<User> onUserUpdate(User payload);
 
     Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload);
-
-    Mono<UserInfo> onUserInfoUpdate(UserInfo payload);
 
     Mono<Chat> onChatUpdate(Chat payload);
 

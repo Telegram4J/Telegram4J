@@ -15,7 +15,6 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
-import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
@@ -25,7 +24,6 @@ import telegram4j.tl.users.UserFull;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 
 public class TestFileStoreLayout implements StoreLayout {
 
@@ -78,6 +76,11 @@ public class TestFileStoreLayout implements StoreLayout {
             return Mono.empty();
         })
         .subscribeOn(Schedulers.boundedElastic());
+    }
+
+    @Override
+    public Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
+        return delegate.onContacts(chats, users);
     }
 
     private Mono<Void> save() {
@@ -168,13 +171,13 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onNewMessage(message, chats, users);
+    public Mono<Void> onNewMessage(Message message) {
+        return delegate.onNewMessage(message);
     }
 
     @Override
-    public Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onEditMessage(message, chats, users);
+    public Mono<Message> onEditMessage(Message message) {
+        return delegate.onEditMessage(message);
     }
 
     @Override
@@ -183,68 +186,73 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChannelUserTyping(action, chats, users);
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload) {
+        return delegate.onUpdatePinnedMessages(payload);
     }
 
     @Override
-    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatUserTyping(action, chats, users);
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action) {
+        return delegate.onChannelUserTyping(action);
     }
 
     @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onUserTyping(action, chats, users);
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action) {
+        return delegate.onChatUserTyping(action);
     }
 
     @Override
-    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onUserNameUpdate(action, chats, users);
+    public Mono<Void> onUserTyping(UpdateUserTyping action) {
+        return delegate.onUserTyping(action);
     }
 
     @Override
-    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onUserPhoneUpdate(action, chats, users);
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action) {
+        return delegate.onUserNameUpdate(action);
     }
 
     @Override
-    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onUserPhotoUpdate(action, chats, users);
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action) {
+        return delegate.onUserPhoneUpdate(action);
     }
 
     @Override
-    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onUserStatusUpdate(action, chats, users);
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action) {
+        return delegate.onUserPhotoUpdate(action);
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatParticipantAdd(action, chats, users);
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action) {
+        return delegate.onUserStatusUpdate(action);
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatParticipantAdmin(action, chats, users);
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action) {
+        return delegate.onChatParticipantAdd(action);
     }
 
     @Override
-    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatParticipantDelete(action, chats, users);
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action) {
+        return delegate.onChatParticipantAdmin(action);
     }
 
     @Override
-    public Mono<Void> onChatParticipant(UpdateChatParticipant action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatParticipant(action, chats, users);
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action) {
+        return delegate.onChatParticipantDelete(action);
     }
 
     @Override
-    public Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChatParticipants(action, chats, users);
+    public Mono<Void> onChatParticipant(UpdateChatParticipant action) {
+        return delegate.onChatParticipant(action);
     }
 
     @Override
-    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users) {
-        return delegate.onChannelParticipant(update, chats, users);
+    public Mono<Void> onChatParticipants(UpdateChatParticipants action) {
+        return delegate.onChatParticipants(action);
+    }
+
+    @Override
+    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update) {
+        return delegate.onChannelParticipant(update);
     }
 
     @Override
@@ -272,11 +280,6 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<User> onUserUpdate(User payload) {
         return delegate.onUserUpdate(payload);
-    }
-
-    @Override
-    public Mono<UserInfo> onUserInfoUpdate(UserInfo payload) {
-        return delegate.onUserInfoUpdate(payload);
     }
 
     @Override

@@ -2,11 +2,14 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
+import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.user.*;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.Id;
 import telegram4j.mtproto.store.UserNameFields;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Instant;
@@ -22,43 +25,43 @@ class UserUpdateHandlers {
     static Mono<Void> handleStateUpdateChannelUserTyping(UpdateContext<UpdateChannelUserTyping> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onChannelUserTyping(context.getUpdate(), context.getChats(), context.getUsers());
+                .onChannelUserTyping(context.getUpdate());
     }
 
     static Mono<Void> handleStateUpdateChatUserTyping(UpdateContext<UpdateChatUserTyping> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onChatUserTyping(context.getUpdate(), context.getChats(), context.getUsers());
+                .onChatUserTyping(context.getUpdate());
     }
 
     static Mono<UserNameFields> handleStateUpdateUserName(UpdateContext<UpdateUserName> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onUserNameUpdate(context.getUpdate(), context.getChats(), context.getUsers());
+                .onUserNameUpdate(context.getUpdate());
     }
 
     static Mono<UserProfilePhoto> handleStateUpdateUserPhoto(UpdateContext<UpdateUserPhoto> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onUserPhotoUpdate(context.getUpdate(), context.getChats(), context.getUsers());
+                .onUserPhotoUpdate(context.getUpdate());
     }
 
     static Mono<String> handleStateUpdateUserPhone(UpdateContext<UpdateUserPhone> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onUserPhoneUpdate(context.getUpdate(), context.getChats(), context.getUsers());
+                .onUserPhoneUpdate(context.getUpdate());
     }
 
     static Mono<UserStatus> handleStateUpdateUserStatus(UpdateContext<UpdateUserStatus> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onUserStatusUpdate(context.getUpdate(), context.getChats(), context.getUsers());
+                .onUserStatusUpdate(context.getUpdate());
     }
 
     static Mono<Void> handleStateUpdateUserTyping(UpdateContext<UpdateUserTyping> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onUserTyping(context.getUpdate(), context.getChats(), context.getUsers());
+                .onUserTyping(context.getUpdate());
     }
 
     // Update handler
@@ -99,18 +102,30 @@ class UserUpdateHandlers {
     static Flux<UpdateUserPhotoEvent> handleUpdateUserPhoto(StatefulUpdateContext<UpdateUserPhoto, UserProfilePhoto> context) {
         MTProtoTelegramClient client = context.getClient();
 
-        Id userId = Id.ofUser(context.getUpdate().userId(), null);
-        Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
-        var inputPeer = ImmutableInputPeerUser.of(context.getUpdate().userId(), -1); // TODO: resolve access_hash
-        var currentPhoto = Optional.ofNullable(unmapEmpty(context.getUpdate().photo(), ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d, inputPeer, -1))
-                .orElse(null);
-        var oldPhoto = Optional.ofNullable(unmapEmpty(context.getOld(), ChatPhotoFields.class))
-                .map(d -> new ChatPhoto(client, d, inputPeer, -1))
-                .orElse(null);
+        long userId = context.getUpdate().userId();
+        // resolve input user for correct file ref id refreshing
+        return client.getMtProtoResources().getStoreLayout()
+                .resolveUser(userId)
+                .map(u -> {
+                    Id id = u.identifier() == BaseInputUser.ID
+                            ? Id.ofUser(userId, ((BaseInputUser) u).accessHash())
+                            : Id.ofUser(userId, null);
 
-        return Flux.just(new UpdateUserPhotoEvent(context.getClient(), userId, timestamp,
-                currentPhoto, oldPhoto, context.getUpdate().previous()));
+                    return Tuples.of(id, TlEntityUtil.toInputPeer(u));
+                })
+                .map(TupleUtils.function((id, peer) -> {
+                    Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
+                    var currentPhoto = Optional.ofNullable(unmapEmpty(context.getUpdate().photo(), ChatPhotoFields.class))
+                            .map(d -> new ChatPhoto(client, d, peer, -1))
+                            .orElse(null);
+                    var oldPhoto = Optional.ofNullable(unmapEmpty(context.getOld(), ChatPhotoFields.class))
+                            .map(d -> new ChatPhoto(client, d, peer, -1))
+                            .orElse(null);
+
+                    return new UpdateUserPhotoEvent(context.getClient(), id, timestamp,
+                            currentPhoto, oldPhoto, context.getUpdate().previous());
+                }))
+                .flux();
     }
 
     static Flux<UpdateUserStatusEvent> handleUpdateUserStatus(StatefulUpdateContext<UpdateUserStatus, UserStatus> context) {

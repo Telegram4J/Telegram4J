@@ -58,8 +58,9 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableUpdateStatus.of(offline));
     }
 
-    public Mono<WallPapers> getWallPapers(long hash) {
-        return client.sendAwait(ImmutableGetWallPapers.of(hash));
+    public Mono<BaseWallPapers> getWallPapers(long hash) {
+        return client.sendAwait(ImmutableGetWallPapers.of(hash))
+                .ofType(BaseWallPapers.class);
     }
 
     public Mono<Boolean> reportPeer(InputPeer peer, ReportReason reportReason, String message) {
@@ -208,8 +209,8 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableVerifyEmail.of(email, code));
     }
 
-    public Mono<Takeout> initTakeoutSession(InitTakeoutSession request) {
-        return client.sendAwait(request);
+    public Mono<Long> initTakeoutSession(InitTakeoutSession request) {
+        return client.sendAwait(request).map(Takeout::id);
     }
 
     public Mono<Boolean> finishTakeoutSession(FinishTakeoutSession request) {
@@ -307,8 +308,9 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableGetTheme.of(format, theme, documentId));
     }
 
-    public Mono<Themes> getThemes(String format, long hash) {
-        return client.sendAwait(ImmutableGetThemes.of(format, hash));
+    public Mono<BaseThemes> getThemes(String format, long hash) {
+        return client.sendAwait(ImmutableGetThemes.of(format, hash))
+                .ofType(BaseThemes.class);
     }
 
     public Mono<Boolean> setContentSettings(SetContentSettings request) {

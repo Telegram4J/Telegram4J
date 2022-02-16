@@ -10,7 +10,6 @@ import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.contacts.ResolvedPeer;
-import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
@@ -222,9 +221,8 @@ public class StoreLayoutImpl implements StoreLayout {
     // ==================
 
     @Override
-    public Mono<Void> onNewMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<Void> onNewMessage(Message message) {
         return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
             BaseMessageFields cast = (BaseMessageFields) message;
             MessageId key = MessageId.create(cast);
 
@@ -233,9 +231,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> onEditMessage(Message message, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<Message> onEditMessage(Message message) {
         return Mono.fromSupplier(() -> {
-            saveContacts(chats, users);
             BaseMessageFields cast = (BaseMessageFields) message;
             MessageId key = MessageId.create(cast);
 
@@ -307,30 +304,42 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload) {
         return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
+
+            long chatId = payload.identifier() == UpdatePinnedChannelMessages.ID
+                    ? ((UpdatePinnedChannelMessages) payload).channelId() : -1;
+
+            payload.messages().stream()
+                    .map(i -> new MessageId(i, chatId))
+                    .forEach(k -> messages.asMap().computeIfPresent(k, (k1, v) -> {
+                        if (v.identifier() == BaseMessage.ID) {
+                            return ImmutableBaseMessage.copyOf((BaseMessage) v)
+                                    .withPinned(payload.pinned());
+                        }
+                        return v;
+                    }));
         });
     }
 
     @Override
-    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<Void> onUserTyping(UpdateUserTyping action) {
+        return Mono.empty();
+    }
+
+    @Override
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action) {
         return Mono.fromSupplier(() -> {
-            saveContacts(chats, users);
             var old = this.users.get(action.userId());
             UserNameFields fields = old != null ? new UserNameFields(old.min.username(), old.min.firstName(), old.min.lastName()) : null;
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min
@@ -343,9 +352,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action) {
         return Mono.fromSupplier(() -> {
-            saveContacts(chats, users);
             var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhone(action.phone())));
 
@@ -354,9 +362,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action) {
         return Mono.fromSupplier(() -> {
-            saveContacts(chats, users);
             var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhoto(action.photo())));
 
@@ -365,9 +372,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action, Map<Long, Chat> chats, Map<Long, User> users) {
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action) {
         return Mono.fromSupplier(() -> {
-            saveContacts(chats, users);
             var old = this.users.get(action.userId());
             this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withStatus(action.status())));
 
@@ -376,45 +382,33 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipant(UpdateChatParticipant action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatParticipant(UpdateChatParticipant action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipants(UpdateChatParticipants action, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChatParticipants(UpdateChatParticipants action) {
+        return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update, Map<Long, Chat> chats, Map<Long, User> users) {
-        return Mono.fromRunnable(() -> {
-            saveContacts(chats, users);
-        });
+    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update) {
+        return Mono.empty();
     }
 
     @Override
@@ -433,6 +427,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
+        return Mono.fromRunnable(() -> saveContacts(chats, users));
+    }
+
+    @Override
     public Mono<User> onUserUpdate(User payload) {
         return Mono.fromSupplier(() -> saveUserMin(payload)).mapNotNull(PartialFields::getMin);
     }
@@ -445,11 +444,6 @@ public class StoreLayoutImpl implements StoreLayout {
                         .users(List.of(userInfo.min))
                         .fullUser(Objects.requireNonNull(userInfo.full))
                         .build());
-    }
-
-    @Override
-    public Mono<UserInfo> onUserInfoUpdate(UserInfo payload) {
-        return Mono.empty(); // unsupported
     }
 
     @Override
@@ -552,15 +546,6 @@ public class StoreLayoutImpl implements StoreLayout {
         return old;
     }
 
-    private boolean isChatInputPeer(InputPeer peer) {
-        switch (peer.identifier()) {
-            case InputPeerChannel.ID:
-            case InputPeerChannelFromMessage.ID:
-            case InputPeerChat.ID: return true;
-            default: return false;
-        }
-    }
-
     private InputPeer getInputPeer(Peer peer) {
         long rawPeerId = TlEntityUtil.getRawPeerId(peer);
         switch (peer.identifier()) {
@@ -645,11 +630,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return old;
     }
 
-    private void saveContacts(Map<Long, Chat> chats, Map<Long, User> users) {
-        saveContacts(chats.values(), users.values());
-    }
-
-    private void saveContacts(Iterable<Chat> chats, Iterable<User> users) {
+    private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
         for (Chat chat : chats) {
             saveChatMin(chat);
         }
@@ -731,8 +712,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     static class MessageId {
-        private final int messageId;
-        private final long chatId;
+        final int messageId;
+        final long chatId;
 
         static MessageId create(BaseMessageFields message) {
             switch (message.peerId().identifier()) {

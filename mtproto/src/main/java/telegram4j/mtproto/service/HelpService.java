@@ -19,17 +19,28 @@ public class HelpService extends RpcService {
         super(client, storeLayout);
     }
 
+    /**
+     * Retrieve current DC configuration.
+     *
+     * @return A {@link Mono} emitting on successful completion the {@link Config}.
+     */
     @BotCompatible
     public Mono<Config> getConfig() {
         return client.sendAwait(GetConfig.instance());
     }
 
+    /**
+     * Retrieve current DC configuration of the nearest DC.
+     *
+     * @return A {@link Mono} emitting on successful completion the {@link NearestDc} of the nearest DC.
+     */
     public Mono<NearestDc> getNearstDc() {
         return client.sendAwait(GetNearestDc.instance());
     }
 
-    public Mono<AppUpdate> getAppUpdate(String source) {
-        return client.sendAwait(ImmutableGetAppUpdate.of(source));
+    public Mono<BaseAppUpdate> getAppUpdate(String source) {
+        return client.sendAwait(ImmutableGetAppUpdate.of(source))
+                .ofType(BaseAppUpdate.class);
     }
 
     public Mono<String> getInviteText() {
@@ -79,8 +90,9 @@ public class HelpService extends RpcService {
         return client.sendAwait(ImmutableAcceptTermsOfService.of(ImmutableDataJSON.of(idJson)));
     }
 
-    public Mono<DeepLinkInfo> getDeepLinkInfo(String path) {
-        return client.sendAwait(ImmutableGetDeepLinkInfo.of(path));
+    public Mono<BaseDeepLinkInfo> getDeepLinkInfo(String path) {
+        return client.sendAwait(ImmutableGetDeepLinkInfo.of(path))
+                .ofType(BaseDeepLinkInfo.class);
     }
 
     public Mono<JsonNode> getAppConfig() {
@@ -91,8 +103,9 @@ public class HelpService extends RpcService {
         return client.sendAwait(SaveAppLog.builder().events(events).build());
     }
 
-    public Mono<PassportConfig> getPassportConfig(int hash) {
-        return client.sendAwait(ImmutableGetPassportConfig.of(hash));
+    public Mono<BasePassportConfig> getPassportConfig(int hash) {
+        return client.sendAwait(ImmutableGetPassportConfig.of(hash))
+                .ofType(BasePassportConfig.class);
     }
 
     public Mono<String> getSupportName() {

@@ -9,7 +9,6 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.tl.BaseUser;
 import telegram4j.tl.UpdateChannelParticipant;
 
 import java.time.Instant;
@@ -23,7 +22,7 @@ class ChannelUpdateHandlers {
     static Mono<Void> handleStateUpdateChatParticipant(UpdateContext<UpdateChannelParticipant> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onChannelParticipant(context.getUpdate(), context.getChats(), context.getUsers());
+                .onChannelParticipant(context.getUpdate());
     }
 
     // Update handler
@@ -33,17 +32,14 @@ class ChannelUpdateHandlers {
         UpdateChannelParticipant upd = context.getUpdate();
 
         Channel channel = Optional.ofNullable(context.getChats().get(upd.channelId()))
-                .map(d -> EntityFactory.createChat(context.getClient(), d, null))
-                .map(c -> (Channel) c)
+                .map(d -> (Channel) EntityFactory.createChat(context.getClient(), d, null))
                 .orElseThrow();
         Id chatId = channel.getId();
         User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .filter(u -> u.identifier() == BaseUser.ID)
-                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .map(d -> new User(context.getClient(), d))
                 .orElseThrow();
         User actor = Optional.ofNullable(context.getUsers().get(upd.actorId()))
-                .filter(u -> u.identifier() == BaseUser.ID)
-                .map(d -> new User(context.getClient(), (BaseUser) d))
+                .map(d -> new User(context.getClient(), d))
                 .orElseThrow();
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
                 .map(d -> new ExportedChatInvite(context.getClient(), d))

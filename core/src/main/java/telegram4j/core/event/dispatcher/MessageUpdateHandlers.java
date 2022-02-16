@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.message.DeleteMessagesEvent;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
+import telegram4j.core.event.domain.message.UpdatePinnedMessagesEvent;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.chat.Chat;
@@ -27,19 +28,25 @@ class MessageUpdateHandlers {
     static Mono<Void> handleStateUpdateNewMessage(UpdateContext<UpdateNewMessageFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onNewMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
+                .onNewMessage(context.getUpdate().message());
     }
 
     static Mono<telegram4j.tl.Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessageFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
-                .onEditMessage(context.getUpdate().message(), context.getChats(), context.getUsers());
+                .onEditMessage(context.getUpdate().message());
     }
 
-    public static Mono<ResolvedDeletedMessages> handleStateUpdateDeleteMessages(UpdateContext<UpdateDeleteMessagesFields> context) {
+    static Mono<ResolvedDeletedMessages> handleStateUpdateDeleteMessages(UpdateContext<UpdateDeleteMessagesFields> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onDeleteMessages(context.getUpdate());
+    }
+
+    static Mono<Void> handleStateUpdatePinnedMessages(UpdateContext<UpdatePinnedMessagesFields> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onUpdatePinnedMessages(context.getUpdate());
     }
 
     // Update handler
@@ -51,14 +58,11 @@ class MessageUpdateHandlers {
 
         long chatId = getRawPeerId(message.peerId());
         BaseUser selfUser = context.getUsers().values().stream()
-                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                .map(b -> (BaseUser) b)
+                .filter(BaseUser::self)
                 .findFirst()
                 .orElse(null);
         Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
-                .or(() -> Optional.ofNullable(context.getUsers().get(chatId))
-                        .filter(u -> u.identifier() == BaseUser.ID)
-                        .map(u -> (BaseUser) u))
+                .or(() -> Optional.ofNullable(context.getUsers().get(chatId)))
                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .orElse(null);
         var author = Optional.ofNullable(message.fromId())
@@ -89,14 +93,11 @@ class MessageUpdateHandlers {
 
         long chatId = getRawPeerId(message.peerId());
         var selfUser = context.getUsers().values().stream()
-                .filter(u -> u.identifier() == BaseUser.ID && ((BaseUser) u).self())
-                .map(b -> (BaseUser) b)
+                .filter(BaseUser::self)
                 .findFirst()
                 .orElse(null);
         Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
-                .or(() -> Optional.ofNullable(context.getUsers().get(chatId))
-                        .filter(u -> u.identifier() == BaseUser.ID)
-                        .map(u -> (BaseUser) u))
+                .or(() -> Optional.ofNullable(context.getUsers().get(chatId)))
                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .orElse(null);
         var author = Optional.ofNullable(message.fromId())
@@ -123,7 +124,7 @@ class MessageUpdateHandlers {
         return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat, author));
     }
 
-    public static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
+    static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
         return Mono.justOrEmpty(context.getOld())
                 .flatMapMany(re -> {
                     Id chatId;
@@ -138,7 +139,7 @@ class MessageUpdateHandlers {
                             break;
                         case InputPeerUser.ID:
                             InputPeerUser peerUser = (InputPeerUser) re.getPeer();
-                            chatId = Id.ofChannel(peerUser.userId(), peerUser.accessHash());
+                            chatId = Id.ofUser(peerUser.userId(), peerUser.accessHash());
                             break;
                         default:
                             throw new IllegalStateException();
@@ -153,5 +154,16 @@ class MessageUpdateHandlers {
                     return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
                             scheduled, oldMessages, context.getUpdate().messages()));
                 });
+    }
+
+    static Flux<UpdatePinnedMessagesEvent> handleUpdatePinnedMessages(StatefulUpdateContext<UpdatePinnedMessagesFields, Void> context) {
+        UpdatePinnedMessagesFields upd = context.getUpdate();
+
+        Id chatId = upd.identifier() == UpdatePinnedMessages.ID
+                ? Id.of(((UpdatePinnedMessages) upd).peer())
+                : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId(), null);
+
+        return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId,
+                upd.messages(), upd.pts(), upd.ptsCount()));
     }
 }

@@ -29,8 +29,9 @@ public class AuthService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<LoggedOut> logOut() {
-        return client.sendAwait(LogOut.instance());
+    public Mono<byte[]> logOut() {
+        return client.sendAwait(LogOut.instance())
+                .mapNotNull(LoggedOut::futureAuthToken);
     }
 
     public Mono<Boolean> resetAuthorizations() {
@@ -61,8 +62,8 @@ public class AuthService extends RpcService {
         return client.sendAwait(ImmutableCheckPassword.of(password));
     }
 
-    public Mono<PasswordRecovery> requestPasswordRecovery() {
-        return client.sendAwait(RequestPasswordRecovery.instance());
+    public Mono<String> requestPasswordRecovery() {
+        return client.sendAwait(RequestPasswordRecovery.instance()).map(PasswordRecovery::emailPattern);
     }
 
     public Mono<Authorization> recoverPassword(RecoverPassword request) {

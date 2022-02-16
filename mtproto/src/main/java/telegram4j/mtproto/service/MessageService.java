@@ -495,8 +495,18 @@ public class MessageService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Updates> updatePinnedMessage(UpdatePinnedMessage request) {
-        return client.sendAwait(request);
+    public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
+        return client.sendAwait(request)
+                .flatMap(u -> {
+                    switch (u.identifier()) {
+                        case BaseUpdates.ID:
+                            // This method can return 0-2 updates in a BaseUpdates and I don't know what I should return
+                            client.updates().emitNext(u, DEFAULT_PARKING);
+
+                            return Mono.empty();
+                        default: return Mono.error(new IllegalStateException("Unknown updates type: " + u));
+                    }
+                });
     }
 
     public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<byte[]> options) {

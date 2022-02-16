@@ -56,7 +56,7 @@ public class ChatService extends RpcService {
     }
 
     /**
-     * Retrieve detailed information about chat by their id.
+     * Retrieve detailed information about chat by their id and update cache.
      *
      * @param chatId The id of the chat.
      * @return A {@link Mono} emitting on successful completion an object contains
@@ -173,14 +173,15 @@ public class ChatService extends RpcService {
     }
 
     /**
-     * Retrieve detailed channel by given id.
+     * Retrieve detailed channel by given id and update cache.
      *
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion detailed information about channel
      */
     @BotCompatible
     public Mono<ChatFull> getFullChannel(InputChannel id) {
-        return client.sendAwait(ImmutableGetFullChannel.of(id));
+        return client.sendAwait(ImmutableGetFullChannel.of(id))
+                .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
     // TODO: check updates type
@@ -201,7 +202,7 @@ public class ChatService extends RpcService {
     }
 
     /**
-     * Check if a username is free and can be assigned to a channel/supergroup
+     * Check if a username is free and can be assigned to a channel/supergroup.
      *
      * @param channel the channel/supergroup that will assign the specified username
      * @param username the username to check
