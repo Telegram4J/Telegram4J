@@ -33,7 +33,7 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
 
-    private volatile long selfId;
+    private volatile long selfId = -1;
     private volatile ImmutableState state;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
@@ -74,9 +74,9 @@ public class StoreLayoutImpl implements StoreLayout {
                 return InputUserSelf.instance();
             }
 
-            return Optional.ofNullable(chats.get(userId))
-                    .map(c -> (Channel) c.min)
-                    .map(Channel::accessHash)
+            return Optional.ofNullable(users.get(userId))
+                    .map(c -> (BaseUser) c.min)
+                    .map(BaseUser::accessHash)
                     .map(ah -> ImmutableBaseInputUser.of(userId, ah))
                     .orElse(null);
         });

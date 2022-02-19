@@ -78,6 +78,34 @@ public interface MTProtoClient {
     boolean updateTimeOffset(long serverTime);
 
     /**
+     * Gets calculated server time offset used in message id generation.
+     *
+     * @return The calculated server time offset.
+     */
+    int getTimeOffset();
+
+    /**
+     * Gets id of current mtproto session.
+     *
+     * @return The id of current mtproto session
+     */
+    long getSessionId();
+
+    /**
+     * Gets current packet sequence number.
+     *
+     * @return The current packet sequence number.
+     */
+    int getSeqNo();
+
+    /**
+     * Gets active server salt.
+     *
+     * @return The active server salt.
+     */
+    long getServerSalt();
+
+    /**
      * Create child media client, associated with given datacenter.
      *
      * @param dc The media datacenter.
@@ -86,7 +114,7 @@ public interface MTProtoClient {
     MTProtoClient createMediaClient(DataCenter dc);
 
     /**
-     * Gets a {@link Mono} which closes client and editing empty signals.
+     * Gets a {@link Mono} which closes client and emitting empty signals.
      *
      * @return A {@link Mono} emitting empty signals on successful completion.
      */

@@ -26,7 +26,7 @@ public interface StoreLayout {
     Mono<State> getCurrentState();
 
     /**
-     * Retrieve self user id.
+     * Retrieve self user id, if present otherwise {@literal -1}.
      *
      * @return A {@link Mono} emitting on successful completion a self user id.
      */

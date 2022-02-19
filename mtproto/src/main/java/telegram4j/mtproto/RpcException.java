@@ -20,7 +20,7 @@ public class RpcException extends MTProtoException {
                 .replace("Immutable", "");
     }
 
-    static RpcException create(RpcError error, DefaultMTProtoClient.RequestEntry request) {
+    static RpcException create(RpcError error, DefaultMTProtoClient.PendingRequest request) {
         String orig = error.errorMessage();
         int argIdx = orig.indexOf("_X");
         String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
