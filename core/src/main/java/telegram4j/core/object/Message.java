@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
@@ -175,16 +176,15 @@ public class Message implements TelegramObject {
 
     public Mono<Message> edit(EditMessageSpec spec) {
         return Mono.defer(() -> {
-            var text = spec.parser()
+            var parsed = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                    .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(parser.apply(s))))
-                    .or(() -> spec.message().map(s -> Tuples.of(s, List.of())))
-                    .orElse(null);
+                    .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s))))
+                    .orElseGet(() -> Mono.just(Tuples.of(spec.message().orElse(""), List.of())));
 
-            return client.getServiceHolder().getMessageService()
+            return parsed.flatMap(TupleUtils.function((txt, ent) -> client.getServiceHolder().getMessageService()
                     .editMessage(EditMessage.builder()
-                            .message(text != null ? text.getT1() : null)
-                            .entities(text != null ? text.getT2() : null)
+                            .message(txt.isEmpty() ? null : txt)
+                            .entities(ent.isEmpty() ? null : ent)
                             .noWebpage(spec.noWebpage())
                             .id(getId())
                             .scheduleDate(spec.scheduleTimestamp()
@@ -194,7 +194,7 @@ public class Message implements TelegramObject {
                             .replyMarkup(spec.replyMarkup().orElse(null))
                             .media(spec.media().orElse(null))
                             .peer(getChatIdAsPeer())
-                            .build())
+                            .build())))
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
         });
     }

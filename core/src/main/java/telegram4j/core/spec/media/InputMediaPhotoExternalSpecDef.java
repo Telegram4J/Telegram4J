@@ -1,6 +1,9 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
+import reactor.core.publisher.Mono;
+import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaPhotoExternal;
 
 import java.time.Duration;
@@ -19,13 +22,13 @@ interface InputMediaPhotoExternalSpecDef extends InputMediaSpec {
     Optional<Duration> autoDeleteDuration();
 
     @Override
-    default InputMediaPhotoExternal asData() {
-        return InputMediaPhotoExternal.builder()
+    default Mono<InputMedia> asData(MTProtoTelegramClient client) {
+        return Mono.just(InputMediaPhotoExternal.builder()
                 .url(url())
                 .ttlSeconds(autoDeleteDuration()
                         .map(Duration::getSeconds)
                         .map(Math::toIntExact)
                         .orElse(null))
-                .build();
+                .build());
     }
 }

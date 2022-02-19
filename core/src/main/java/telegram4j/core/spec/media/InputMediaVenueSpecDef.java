@@ -1,7 +1,10 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
+import reactor.core.publisher.Mono;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.BaseInputGeoPoint;
+import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaVenue;
 
 import java.util.Optional;
@@ -31,8 +34,8 @@ interface InputMediaVenueSpecDef extends InputMediaSpec {
     String venueType();
 
     @Override
-    default InputMediaVenue asData() {
-        return InputMediaVenue.builder()
+    default Mono<InputMedia> asData(MTProtoTelegramClient client) {
+        return Mono.just(InputMediaVenue.builder()
                 .geoPoint(BaseInputGeoPoint.builder()
                         .lat(latitide())
                         .longState(longtitude())
@@ -43,6 +46,6 @@ interface InputMediaVenueSpecDef extends InputMediaSpec {
                 .provider(provider())
                 .venueId(venueId())
                 .venueType(venueType())
-                .build();
+                .build());
     }
 }

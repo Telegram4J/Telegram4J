@@ -1,9 +1,13 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
+import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.function.Tuples;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.util.EntityParser;
 import telegram4j.core.util.EntityParserSupport;
+import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaPoll;
 import telegram4j.tl.Poll;
 
@@ -28,17 +32,16 @@ interface InputMediaPollSpecDef extends InputMediaSpec {
     Optional<Function<String, EntityParser>> parser();
 
     @Override
-    default InputMediaPoll asData() {
-        var text = parser()
-                .flatMap(p -> solution().map(s -> EntityParserSupport.parse(p.apply(s))))
-                .or(() -> solution().map(s -> Tuples.of(s, List.of())))
-                .orElse(null);
+    default Mono<InputMedia> asData(MTProtoTelegramClient client) {
+        var parsed = parser()
+                .flatMap(p -> solution().map(s -> EntityParserSupport.parse(client, p.apply(s))))
+                .orElseGet(() -> Mono.just(Tuples.of(solution().orElse(""), List.of())));
 
-        return InputMediaPoll.builder()
+        return parsed.map(TupleUtils.function((txt, ent) -> InputMediaPoll.builder()
                 .poll(poll())
                 .correctAnswers(correctAnswers().orElse(null))
-                .solution(text != null ? text.getT1() : null)
-                .solutionEntities(text != null ? text.getT2() : null)
-                .build();
+                .solution(txt.isEmpty() ? null : txt)
+                .solutionEntities(ent.isEmpty() ? null : ent)
+                .build()));
     }
 }

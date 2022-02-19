@@ -92,12 +92,12 @@ abstract class BaseChat implements Chat {
     @Override
     public Mono<Message> sendMessage(SendMessageSpec spec) {
         return Mono.defer(() -> {
-            var text = spec.parser()
+            var parser = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                    .map(m -> EntityParserSupport.parse(m.apply(spec.message())))
-                    .orElseGet(() -> Tuples.of(spec.message(), List.of()));
+                    .map(m -> EntityParserSupport.parse(client, m.apply(spec.message())))
+                    .orElseGet(() -> Mono.just(Tuples.of(spec.message(), List.of())));
 
-            return client.getServiceHolder().getMessageService()
+            return parser.flatMap(TupleUtils.function((txt, ent) -> client.getServiceHolder().getMessageService()
                     .sendMessage(SendMessage.builder()
                             .randomId(CryptoUtil.random.nextLong())
                             .peer(getIdAsPeer())
@@ -106,14 +106,14 @@ abstract class BaseChat implements Chat {
                             .background(spec.background())
                             .clearDraft(spec.clearDraft())
                             .replyToMsgId(spec.replyToMessageId().orElse(null))
-                            .message(text.getT1())
-                            .entities(text.getT2())
+                            .message(txt)
+                            .entities(ent)
                             .replyMarkup(spec.replyMarkup().map(MessageFields.ReplyMarkupSpec::asData).orElse(null))
                             .scheduleDate(spec.scheduleTimestamp()
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
                                     .orElse(null))
-                            .build())
+                            .build())))
                     .map(e -> EntityFactory.createMessage(client, e, id));
         });
     }
@@ -156,11 +156,12 @@ abstract class BaseChat implements Chat {
                 .flatMap(client::resolvePeer)
                 .map(BaseChat::asInputPeer)
                 .defaultIfEmpty(InputPeerEmpty.instance())
-                .zipWith(Mono.fromSupplier(() -> awareEntityParser(spec.media())))
+                .zipWith(Mono.fromSupplier(() -> awareEntityParser(spec.media()))
+                        .flatMap(media -> media.asData(client)))
                 .flatMap(TupleUtils.function((sendAs, media) -> client.getServiceHolder()
                         .getMessageService()
                         .sendMedia(SendMedia.builder()
-                                .media(media.asData())
+                                .media(media)
                                 .randomId(CryptoUtil.random.nextLong())
                                 .silent(spec.silent())
                                 .background(spec.background())
@@ -190,7 +191,8 @@ abstract class BaseChat implements Chat {
     @Override
     public Mono<MessageMedia> uploadMedia(InputMediaSpec spec) {
         return Mono.fromSupplier(() -> awareEntityParser(spec))
+                .flatMap(media -> media.asData(client))
                 .flatMap(media -> client.getServiceHolder().getMessageService()
-                        .uploadMedia(getIdAsPeer(), media.asData()));
+                        .uploadMedia(getIdAsPeer(), media));
     }
 }

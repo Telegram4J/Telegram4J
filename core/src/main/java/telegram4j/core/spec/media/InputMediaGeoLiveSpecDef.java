@@ -1,7 +1,10 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
+import reactor.core.publisher.Mono;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.BaseInputGeoPoint;
+import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaGeoLive;
 
 import java.util.Optional;
@@ -32,8 +35,8 @@ interface InputMediaGeoLiveSpecDef extends InputMediaSpec {
     Optional<Integer> proximityNotificationRadius();
 
     @Override
-    default InputMediaGeoLive asData() {
-        return InputMediaGeoLive.builder()
+    default Mono<InputMedia> asData(MTProtoTelegramClient client) {
+        return Mono.just(InputMediaGeoLive.builder()
                 .geoPoint(BaseInputGeoPoint.builder()
                         .lat(latitide())
                         .longState(longtitude())
@@ -42,6 +45,6 @@ interface InputMediaGeoLiveSpecDef extends InputMediaSpec {
                 .heading(heading().orElse(null))
                 .heading(period().orElse(null))
                 .heading(proximityNotificationRadius().orElse(null))
-                .build();
+                .build());
     }
 }

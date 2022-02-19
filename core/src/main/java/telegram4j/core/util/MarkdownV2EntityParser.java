@@ -3,11 +3,10 @@ package telegram4j.core.util;
 import telegram4j.core.object.MessageEntity;
 
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import static telegram4j.core.util.EntityParserSupport.USER_LINK_ID_PATTERN;
 
 class MarkdownV2EntityParser implements EntityParser {
-
-    static final Pattern USER_LINK_ID_PATTERN = Pattern.compile("^tg://user\\?id=(\\d{1,19})$", Pattern.CASE_INSENSITIVE);
 
     final StringBuilder striped;
     final String str;
@@ -17,6 +16,7 @@ class MarkdownV2EntityParser implements EntityParser {
     EntityToken prev = EntityToken.UNKNOWN;
 
     MarkdownV2EntityParser(String str) {
+        str = str.trim();
         this.striped = new StringBuilder(str.length());
         this.str = str;
     }

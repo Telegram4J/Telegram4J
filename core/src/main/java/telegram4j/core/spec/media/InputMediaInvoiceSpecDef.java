@@ -1,10 +1,9 @@
 package telegram4j.core.spec.media;
 
 import org.immutables.value.Value;
-import telegram4j.tl.ImmutableDataJSON;
-import telegram4j.tl.InputMediaInvoice;
-import telegram4j.tl.InputWebDocument;
-import telegram4j.tl.Invoice;
+import reactor.core.publisher.Mono;
+import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.tl.*;
 
 import java.util.Optional;
 
@@ -34,8 +33,8 @@ interface InputMediaInvoiceSpecDef extends InputMediaSpec {
     Optional<String> startParam();
 
     @Override
-    default InputMediaInvoice asData() {
-        return InputMediaInvoice.builder()
+    default Mono<InputMedia> asData(MTProtoTelegramClient client) {
+        return Mono.just(InputMediaInvoice.builder()
                 .title(title())
                 .description(description())
                 .photo(photo().orElse(null))
@@ -44,6 +43,6 @@ interface InputMediaInvoiceSpecDef extends InputMediaSpec {
                 .provider(provider())
                 .providerData(ImmutableDataJSON.of(providerJsonData()))
                 .startParam(startParam().orElse(null))
-                .build();
+                .build());
     }
 }
