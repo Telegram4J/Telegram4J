@@ -198,7 +198,7 @@ public class ChatParticipant implements TelegramObject {
     /**
      * Gets whether this participant is banned or left chat/channel.
      *
-     * @return {@literal true} if participant is banned or left chat/channel, {@link false} otherwise.
+     * @return {@literal true} if participant is banned or left chat/channel, {@literal false} otherwise.
      */
     public boolean isLeft() {
         return data.identifier() == ChannelParticipantLeft.ID ||

@@ -6,8 +6,8 @@ import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 import reactor.netty.tcp.TcpClient;
+import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
@@ -18,6 +18,7 @@ import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.UpdatesHandlers;
+import telegram4j.core.object.Id;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
 import telegram4j.core.util.EntityParser;
@@ -37,12 +38,14 @@ import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
+    private static final boolean parseBotIdFromToken = Boolean.getBoolean("telegram4j.core.MTProtoBootstrap.parseBotIdFromToken");
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
@@ -166,9 +169,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .query(initConnection())
                     .build();
 
+            AtomicReference<Id> selfId = new AtomicReference<>();
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
-                    mtProtoResources, updatesHandlers,
+                    mtProtoResources, updatesHandlers, selfId,
                     serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
 
             Mono<Void> disconnect = Mono.fromRunnable(() -> {
@@ -211,12 +215,22 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .flatMapMany(f -> Flux.from(f.apply(telegramClient)))
                                         .then();
 
-                                Mono<Void> fetchSelf = storeLayout.getSelfId()
-                                        .filter(l -> l != 0)
+                                Mono<Void> fetchSelfId = Mono.defer(() -> {
+                                            // bot user id writes before ':' char
+                                            if (authResources.getType() == Type.BOT && parseBotIdFromToken) {
+                                                return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
+                                                        .map(t -> Long.parseLong(t.split(":")[0]))
+                                                        .orElseThrow(), null));
+                                            }
+                                            return storeLayout.getSelfId()
+                                                    .filter(l -> l != -1)
+                                                    .map(l -> Id.ofUser(l, null));
+                                        })
                                         .switchIfEmpty(serviceHolder.getUserService()
                                                 .getFullUser(InputUserSelf.instance())
-                                                .flatMap(user -> storeLayout.updateSelfId(user.fullUser().id()))
-                                                .then(Mono.empty()))
+                                                .flatMap(user -> storeLayout.updateSelfId(user.fullUser().id())
+                                                        .thenReturn(Id.ofUser(user.fullUser().id(), null))))
+                                        .doOnNext(id -> selfId.compareAndSet(null, id))
                                         .then();
 
                                 return mtProtoClient.sendAwait(invokeWithLayout)
@@ -226,7 +240,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                         e instanceof RpcException &&
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
-                                        .then(fetchSelf)
+                                        .then(fetchSelfId)
                                         .then(telegramClient.getUpdatesManager().fillGap())
                                         .thenReturn(telegramClient) // FIXME: reconnections drop signals
                                         .doOnNext(sink::success);
@@ -289,7 +303,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        return new DefaultEventDispatcher(Schedulers.boundedElastic(),
+        return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events"),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 EmissionHandlers.DEFAULT_PARKING);
     }

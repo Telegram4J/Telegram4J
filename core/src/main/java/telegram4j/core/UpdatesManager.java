@@ -42,7 +42,7 @@ public class UpdatesManager {
 
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
     private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
-    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(15);
+    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(10);
 
     private final MTProtoTelegramClient client;
     private final UpdatesHandlers updatesHandlers;
@@ -227,24 +227,19 @@ public class UpdatesManager {
                         .ttlPeriod(data.ttlPeriod())
                         .message(data.message());
 
-                Flux<Event> mapUpdate = client.getMtProtoResources()
-                        .getStoreLayout()
-                        .getSelfId()
-                        .map(selfId -> {
-                            if (data.out()) {
-                                message.peerId(ImmutablePeerUser.of(data.userId()));
-                                message.fromId(ImmutablePeerUser.of(selfId));
-                            } else {
-                                message.peerId(ImmutablePeerUser.of(selfId));
-                                message.fromId(ImmutablePeerUser.of(data.userId()));
-                            }
-                            return message.build();
-                        })
-                        .flatMapMany(msg -> updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
-                                .message(msg)
-                                .pts(data.pts())
-                                .ptsCount(data.ptsCount())
-                                .build())));
+                if (data.out()) {
+                    message.peerId(ImmutablePeerUser.of(data.userId()));
+                    message.fromId(ImmutablePeerUser.of(client.getSelfId().asLong()));
+                } else {
+                    message.peerId(ImmutablePeerUser.of(client.getSelfId().asLong()));
+                    message.fromId(ImmutablePeerUser.of(data.userId()));
+                }
+
+                Flux<Event> mapUpdate = updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                        .message(message.build())
+                        .pts(data.pts())
+                        .ptsCount(data.ptsCount())
+                        .build()));
 
                 return preApply.concatWith(mapUpdate);
             }

@@ -21,6 +21,8 @@ import telegram4j.tl.ImmutableBaseInputChannel;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.upload.BaseFile;
 
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
@@ -31,19 +33,21 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
+    private final AtomicReference<Id> selfId;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
     private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
-                          UpdatesHandlers updatesHandlers, ServiceHolder serviceHolder,
+                          UpdatesHandlers updatesHandlers, AtomicReference<Id> selfId, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
+        this.selfId = selfId;
         this.entityRetriever = entityRetriever.apply(this);
         this.onDisconnect = onDisconnect;
 
@@ -65,6 +69,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     public boolean isBot() {
         return authResources.getType() == AuthorizationResources.Type.BOT;
+    }
+
+    public Id getSelfId() {
+        return Objects.requireNonNull(selfId.get(), "Self id has not yet resolved.");
     }
 
     public AuthorizationResources getAuthResources() {
