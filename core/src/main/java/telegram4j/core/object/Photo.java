@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
@@ -24,20 +23,18 @@ public class Photo implements TelegramObject {
 
     private final String fileReferenceId;
 
-    public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId) {
-        this(client, data, InputPeerEmpty.instance(), messageId);
+    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
+        this(client, data, InputPeerEmpty.instance(), chatPeer, messageId);
     }
 
-    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer peer, int messageId) {
+    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer peer, InputPeer chatPeer, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
 
         if (peer.identifier() != InputPeerEmpty.ID) {
-            this.fileReferenceId = FileReferenceId.ofChatPhoto(data, -1, peer)
-                    .serialize(ByteBufAllocator.DEFAULT);
+            this.fileReferenceId = FileReferenceId.ofChatPhoto(data, -1, peer).serialize();
         } else {
-            this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, peer)
-                    .serialize(ByteBufAllocator.DEFAULT);
+            this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer).serialize();
         }
     }
 
@@ -85,5 +82,13 @@ public class Photo implements TelegramObject {
 
     public int getDcId() {
         return data.dcId();
+    }
+
+    @Override
+    public String toString() {
+        return "Photo{" +
+                "data=" + data +
+                ", fileReferenceId='" + fileReferenceId + '\'' +
+                '}';
     }
 }

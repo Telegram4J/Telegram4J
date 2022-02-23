@@ -27,7 +27,7 @@ public class MessageMediaPhoto extends BaseMessageMedia {
 
     public Optional<Photo> photo() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
-                .map(d -> new Photo(getClient(), d, messageId));
+                .map(d -> new Photo(getClient(), d, peer, messageId));
     }
 
     public Optional<Duration> getAutoDeleteDuration() {

@@ -56,7 +56,7 @@ public class Game implements TelegramObject {
 
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
-                .map(p -> new Photo(client, p, messageId));
+                .map(p -> new Photo(client, p, peer, messageId));
     }
 
     public Optional<Document> getDocument() {

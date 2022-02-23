@@ -1,6 +1,5 @@
 package telegram4j.mtproto.file;
 
-import io.netty.buffer.ByteBufAllocator;
 import org.junit.jupiter.api.Test;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
@@ -60,6 +59,6 @@ class FileReferenceIdTest {
     }
 
     static FileReferenceId serialize(FileReferenceId ref) {
-        return deserialize(ref.serialize(ByteBufAllocator.DEFAULT));
+        return deserialize(ref.serialize());
     }
 }

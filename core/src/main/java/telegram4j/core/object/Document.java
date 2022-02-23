@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
@@ -33,8 +32,7 @@ public class Document implements TelegramObject {
         this.fileReference = ByteBufUtil.hexDump(data.fileReference());
         this.fileName = fileName;
 
-        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer)
-                .serialize(ByteBufAllocator.DEFAULT);
+        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer).serialize();
     }
 
     @Override

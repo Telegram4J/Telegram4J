@@ -4,6 +4,8 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.tl.ImmutableInputStickerSetID;
 
 import java.time.Instant;
 import java.util.List;
@@ -15,14 +17,27 @@ public class StickerSet implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.StickerSet data;
 
+    @Nullable
+    private final String fileReferenceId;
+
     public StickerSet(MTProtoTelegramClient client, telegram4j.tl.StickerSet data) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+
+        this.fileReferenceId = Optional.ofNullable(data.thumbVersion())
+                .map(version -> FileReferenceId.ofStickerSet(
+                ImmutableInputStickerSetID.of(data.id(), data.accessHash()), version)
+                .serialize())
+                .orElse(null);
     }
 
     @Override
     public MTProtoTelegramClient getClient() {
         return client;
+    }
+
+    public Optional<String> getFileReferenceId() {
+        return Optional.ofNullable(fileReferenceId);
     }
 
     public boolean isArchived() {
@@ -101,6 +116,7 @@ public class StickerSet implements TelegramObject {
     public String toString() {
         return "StickerSet{" +
                 "data=" + data +
+                ", fileReferenceId='" + fileReferenceId + '\'' +
                 '}';
     }
 }

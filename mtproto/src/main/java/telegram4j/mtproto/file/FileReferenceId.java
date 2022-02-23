@@ -21,13 +21,14 @@ import java.util.Objects;
  */
 public class FileReferenceId {
 
+    static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
     static final int MESSAGE_ID_MASK = 1 << 0;
     static final int PEER_MASK = 1 << 1;
 
     private final Type fileType;
     private final PhotoSizeType sizeType;
     private final int dcId;
-    private final long photoId;
+    private final long documentId;
     private final long accessHash;
     private final byte[] fileReference;
     private final String thumbSizeType;
@@ -37,14 +38,14 @@ public class FileReferenceId {
     private final int messageId;
     private final InputPeer peer;
 
-    FileReferenceId(Type fileType, PhotoSizeType sizeType, int dcId, long photoId, long accessHash,
+    FileReferenceId(Type fileType, PhotoSizeType sizeType, int dcId, long documentId, long accessHash,
                     byte[] fileReference, String thumbSizeType,
                     InputStickerSet stickerSet, int thumbVersion,
                     int messageId, InputPeer peer) {
         this.fileType = Objects.requireNonNull(fileType, "fileType");
         this.sizeType = Objects.requireNonNull(sizeType, "sizeType");
         this.dcId = dcId;
-        this.photoId = photoId;
+        this.documentId = documentId;
         this.accessHash = accessHash;
         this.fileReference = Objects.requireNonNull(fileReference, "fileReference");
         this.thumbSizeType = Objects.requireNonNull(thumbSizeType, "thumbSize");
@@ -89,12 +90,12 @@ public class FileReferenceId {
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
      * @param chatPhoto The chat photo info.
      * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The source peer.
+     * @param peer The chat/channel peer where photo was sent.
      * @return The new {@code FileReferenceId} from given <b>normal</b> photo and source context.
      */
     public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, int messageId, InputPeer peer) {
         if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
+            throw new IllegalArgumentException("Unexpected peer type: " + peer);
         }
         var firstPhotoSize = chatPhoto.sizes().get(0);
 
@@ -111,13 +112,13 @@ public class FileReferenceId {
      * @param chatPhoto The chat photo info.
      * @param sizeType The size type of photo, must be {@link PhotoSizeType#CHAT_PHOTO_SMALL} or {@link PhotoSizeType#CHAT_PHOTO_BIG}.
      * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The source peer.
+     * @param peer The peer that's have this photo.
      * @return The new {@code FileReferenceId} from given minimal chat photo and source context.
      */
     public static FileReferenceId ofChatPhoto(ChatPhotoFields chatPhoto, PhotoSizeType sizeType,
                                               int messageId, InputPeer peer) {
         if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
+            throw new IllegalArgumentException("Unexpected peer type: " + peer);
         }
         if (sizeType == PhotoSizeType.UNKNOWN) {
             throw new IllegalArgumentException("Unexpected size type for chat photo: " + sizeType);
@@ -179,6 +180,7 @@ public class FileReferenceId {
         ByteBuf data = Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
         ByteBuf buf = Base64.decode(data, Base64Dialect.URL_SAFE);
         data.release();
+        buf = decodeZeroRle(buf);
 
         Type fileType = Type.ALL[buf.readByte()];
         byte flags = buf.readByte();
@@ -200,7 +202,8 @@ public class FileReferenceId {
                 long accessHash = buf.readLongLE();
 
                 byte[] fileReference = TlSerialUtil.deserializeBytes(buf);
-                String thumbSizeType = TlSerialUtil.deserializeString(buf);
+                String thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
+                buf.release();
 
                 return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, dcId, photoId, accessHash,
                         fileReference, thumbSizeType, InputStickerSetEmpty.instance(),
@@ -211,13 +214,23 @@ public class FileReferenceId {
                 int dcId = buf.readByte();
                 long photoId = buf.readLongLE();
 
+                byte[] fileReference = EmptyArrays.EMPTY_BYTES;
+                String thumbSizeType = "";
+                if (sizeType == PhotoSizeType.UNKNOWN) {
+                    fileReference = TlSerialUtil.deserializeBytes(buf);
+                    thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
+                }
+
+                buf.release();
+
                 return new FileReferenceId(fileType, sizeType, dcId, photoId, -1,
-                        EmptyArrays.EMPTY_BYTES, "", InputStickerSetEmpty.instance(),
+                        fileReference, thumbSizeType, InputStickerSetEmpty.instance(),
                         -1, messageId, peer);
             }
             case STICKER_SET_THUMB: {
                 int thumbVersion = buf.readIntLE();
                 InputStickerSet stickerSet = TlDeserializer.deserialize(buf);
+                buf.release();
 
                 return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, -1, -1, -1,
                         EmptyArrays.EMPTY_BYTES, "", stickerSet, thumbVersion, messageId, peer);
@@ -225,6 +238,46 @@ public class FileReferenceId {
             default:
                 throw new IllegalStateException("Malformed file reference id.");
         }
+    }
+
+    static ByteBuf encodeZeroRle(ByteBuf data) {
+        ByteBuf encoded = data.alloc().buffer(data.readableBytes());
+
+        for (int i = 0, n = data.readableBytes(); i < n; i++) {
+            byte b = data.getByte(i);
+            encoded.writeByte(b);
+
+            if (i + 1 < n && b == 0) {
+                int c = 1;
+                while (c < MAX_RLE_SEQ && i + c < n && data.getByte(i + c) == 0) {
+                    c++;
+                }
+
+                encoded.writeByte(c);
+                i += c - 1;
+            }
+        }
+
+        data.release();
+        return encoded;
+    }
+
+    static ByteBuf decodeZeroRle(ByteBuf data) {
+        ByteBuf decoded = data.alloc().buffer(data.readableBytes());
+
+        for (int i = 0, n = data.readableBytes(); i < n; i++) {
+            byte b = data.getByte(i);
+            if (i + 1 < n && b == 0) {
+                decoded.writeZero(data.getByte(i + 1));
+                i++;
+                continue;
+            }
+
+            decoded.writeByte(b);
+        }
+
+        data.release();
+        return decoded;
     }
 
     /**
@@ -259,8 +312,8 @@ public class FileReferenceId {
      *
      * @return The id of file, if applicable, otherwise {@code -1}.
      */
-    public long getPhotoId() {
-        return photoId;
+    public long getDocumentId() {
+        return documentId;
     }
 
     /**
@@ -309,6 +362,16 @@ public class FileReferenceId {
     }
 
     /**
+     * Serializes reference to base 64 url string with {@link ByteBufAllocator#DEFAULT} allocator,
+     * which can be deserialized via {@link #deserialize(String)}.
+     *
+     * @return The serialized base 64 url identifier string of file reference.
+     */
+    public String serialize() {
+        return serialize(ByteBufAllocator.DEFAULT);
+    }
+
+    /**
      * Serializes reference to base 64 url string,
      * which can be deserialized via {@link #deserialize(String)}.
      *
@@ -334,33 +397,29 @@ public class FileReferenceId {
             case DOCUMENT:
             case PHOTO: {
                 ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
-                ByteBuf thumbSizeTypeBuf = TlSerialUtil.serializeString(alloc, thumbSizeType);
 
                 buf.writeByte((byte) dcId);
-                buf.writeLongLE(photoId);
+                buf.writeLongLE(documentId);
                 buf.writeLongLE(accessHash);
 
                 buf.writeBytes(fileReferenceBuf);
                 fileReferenceBuf.release();
-                buf.writeBytes(thumbSizeTypeBuf);
-                thumbSizeTypeBuf.release();
+                buf.writeShortLE(thumbSizeType.charAt(0));
 
                 break;
             }
             case CHAT_PHOTO: {
                 buf.writeByte((byte) sizeType.ordinal());
                 buf.writeByte((byte) dcId);
-                buf.writeLongLE(photoId);
+                buf.writeLongLE(documentId);
 
                 if (sizeType == PhotoSizeType.UNKNOWN) {
                     ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
-                    ByteBuf thumbSizeTypeBuf = TlSerialUtil.serializeString(alloc, thumbSizeType);
 
                     buf.writeLongLE(accessHash);
                     buf.writeBytes(fileReferenceBuf);
                     fileReferenceBuf.release();
-                    buf.writeBytes(thumbSizeTypeBuf);
-                    thumbSizeTypeBuf.release();
+                    buf.writeShortLE(thumbSizeType.charAt(0));
                 }
 
                 break;
@@ -375,6 +434,7 @@ public class FileReferenceId {
                 break;
         }
 
+        buf = encodeZeroRle(buf);
         ByteBuf base64 = Base64.encode(buf, Base64Dialect.URL_SAFE);
         buf.release();
         try {
@@ -397,21 +457,21 @@ public class FileReferenceId {
                     return InputPhotoFileLocation.builder()
                             .accessHash(accessHash)
                             .fileReference(fileReference)
-                            .id(photoId)
+                            .id(documentId)
                             .thumbSize(thumbSizeType)
                             .build();
                 }
 
                 return InputPeerPhotoFileLocation.builder()
                         .peer(peer)
-                        .photoId(photoId)
+                        .photoId(documentId)
                         .big(sizeType == PhotoSizeType.CHAT_PHOTO_BIG)
                         .build();
             case PHOTO:
                 return InputPhotoFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
-                        .id(photoId)
+                        .id(documentId)
                         .thumbSize(thumbSizeType)
                         .build();
             case STICKER_SET_THUMB:
@@ -423,7 +483,7 @@ public class FileReferenceId {
                 return InputDocumentFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
-                        .id(photoId)
+                        .id(documentId)
                         .thumbSize(thumbSizeType)
                         .build();
             default:
@@ -436,7 +496,7 @@ public class FileReferenceId {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         FileReferenceId that = (FileReferenceId) o;
-        return dcId == that.dcId && photoId == that.photoId &&
+        return dcId == that.dcId && documentId == that.documentId &&
                 accessHash == that.accessHash && thumbVersion == that.thumbVersion &&
                 messageId == that.messageId && fileType == that.fileType &&
                 sizeType == that.sizeType && Arrays.equals(fileReference, that.fileReference) &&
@@ -446,7 +506,7 @@ public class FileReferenceId {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(fileType, sizeType, dcId, photoId, accessHash,
+        int result = Objects.hash(fileType, sizeType, dcId, documentId, accessHash,
                 thumbSizeType, stickerSet, thumbVersion, messageId, peer);
         result = 31 * result + Arrays.hashCode(fileReference);
         return result;
@@ -463,7 +523,7 @@ public class FileReferenceId {
             throw new IllegalStateException("Cant create input document from file reference id.");
         }
 
-        return ImmutableBaseInputDocument.of(photoId, accessHash, fileReference);
+        return ImmutableBaseInputDocument.of(documentId, accessHash, fileReference);
     }
 
     /**
@@ -477,7 +537,60 @@ public class FileReferenceId {
             throw new IllegalStateException("Cant create input document from file reference id.");
         }
 
-        return ImmutableBaseInputPhoto.of(photoId, accessHash, fileReference);
+        return ImmutableBaseInputPhoto.of(documentId, accessHash, fileReference);
+    }
+
+    @Override
+    public String toString() {
+        switch (fileType) {
+            case DOCUMENT:
+                return "FileReferenceId{" +
+                        "fileType=" + fileType +
+                        ", dcId=" + dcId +
+                        ", documentId=" + documentId +
+                        ", accessHash=" + accessHash +
+                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
+                        ", thumbSizeType=" + thumbSizeType +
+                        ", messageId=" + messageId +
+                        ", peer=" + peer +
+                        '}';
+            case STICKER_SET_THUMB:
+                return "FileReferenceId{" +
+                        "fileType=" + fileType +
+                        ", stickerSet=" + stickerSet +
+                        ", thumbVersion=" + thumbVersion +
+                        '}';
+            case PHOTO:
+                return "FileReferenceId{" +
+                        "fileType=" + fileType +
+                        ", dcId=" + dcId +
+                        ", documentId=" + documentId +
+                        ", accessHash=" + accessHash +
+                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
+                        ", thumbSizeType='" + thumbSizeType + '\'' +
+                        ", messageId=" + messageId +
+                        ", peer=" + peer +
+                        '}';
+            case CHAT_PHOTO:
+                String extended = sizeType != PhotoSizeType.UNKNOWN ?
+                        ", documentId=" + documentId +
+                        ", accessHash=" + accessHash +
+                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
+                        ", thumbSizeType='" + thumbSizeType + '\''
+                        : "";
+
+                return "FileReferenceId{" +
+                        "fileType=" + fileType +
+                        ", sizeType=" + sizeType +
+                        ", dcId=" + dcId +
+                        ", documentId=" + documentId +
+                        extended +
+                        ", messageId=" + messageId +
+                        ", peer=" + peer +
+                        '}';
+            default:
+                throw new IllegalStateException();
+        }
     }
 
     /**
