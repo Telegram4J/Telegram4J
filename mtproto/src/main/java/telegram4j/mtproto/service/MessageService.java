@@ -1,23 +1,15 @@
 package telegram4j.mtproto.service;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
-import reactor.util.concurrent.Queues;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import telegram4j.mtproto.BotCompatible;
-import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.ExportedChatInvite;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.MessageViews;
@@ -25,31 +17,12 @@ import telegram4j.tl.messages.PeerSettings;
 import telegram4j.tl.messages.*;
 import telegram4j.tl.request.messages.UpdateDialogFilter;
 import telegram4j.tl.request.messages.*;
-import telegram4j.tl.request.upload.GetFile;
-import telegram4j.tl.request.upload.ImmutableGetWebFile;
-import telegram4j.tl.request.upload.SaveBigFilePart;
-import telegram4j.tl.request.upload.SaveFilePart;
-import telegram4j.tl.storage.FileType;
-import telegram4j.tl.upload.BaseFile;
-import telegram4j.tl.upload.FileCdnRedirect;
-import telegram4j.tl.upload.WebFile;
 
-import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
 public class MessageService extends RpcService {
-
-    private static final int PART_SIZE = 512 * 1024;
-    private static final int TEN_MB = 10 * 1024 * 1024;
-    private static final int LIMIT_MB = 2000 * 1024 * 1024;
-    private static final int PARALLELISM = 5;
-    private static final int PRECISE_LIMIT = 1024 << 10; // 1mb
 
     public MessageService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
@@ -111,7 +84,7 @@ public class MessageService extends RpcService {
     }
 
     @BotCompatible
-    public Flux<Message> forwardMessages(ForwardMessages request) {
+    public Flux<BaseMessageFields> forwardMessages(ForwardMessages request) {
         return client.sendAwait(request)
                 .ofType(BaseUpdates.class)
                 .flatMapMany(updates -> {
@@ -119,7 +92,8 @@ public class MessageService extends RpcService {
 
                     return Flux.fromIterable(updates.updates())
                             .ofType(UpdateNewMessageFields.class)
-                            .map(UpdateNewMessageFields::message);
+                            .map(UpdateNewMessageFields::message)
+                            .ofType(BaseMessageFields.class);
                 });
     }
 
@@ -711,8 +685,11 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<Updates> setHistoryTtl(InputPeer peer, int period) {
-        return client.sendAwait(ImmutableSetHistoryTTL.of(peer, period));
+    public Mono<Void> setHistoryTtl(InputPeer peer, int period) {
+        return client.sendAwait(ImmutableSetHistoryTTL.of(peer, period))
+                // Typically, UpdatePeerHistoryTTL,UpdateNewMessage(service message)
+                .cast(BaseUpdates.class)
+                .flatMap(u -> Mono.fromRunnable(() -> client.updates().emitNext(u, DEFAULT_PARKING)));
     }
 
     public Mono<CheckedHistoryImportPeer> checkHistoryImportPeer(InputPeer peer) {
@@ -728,171 +705,10 @@ public class MessageService extends RpcService {
                 .flatMapIterable(Function.identity());
     }
 
-    // Upload methods
-
-    @BotCompatible
-    public Mono<InputFile> saveFile(ByteBuf data, String name) {
-        long fileId = CryptoUtil.random.nextLong();
-        int parts = (int) Math.ceil((float) data.readableBytes() / PART_SIZE);
-        boolean big = data.readableBytes() > TEN_MB;
-
-        if (data.readableBytes() > LIMIT_MB) {
-            return Mono.error(new IllegalArgumentException("File size is under limit. Size: "
-                    + data.readableBytes() + ", limit: " + LIMIT_MB));
-        }
-
-        if (big) {
-            Sinks.Many<SaveBigFilePart> queue = Sinks.many().multicast()
-                    .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-
-            AtomicInteger it = new AtomicInteger(0);
-            AtomicInteger suc = new AtomicInteger(0);
-
-            List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
-            DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.get(0);
-
-            Sinks.Empty<Void> done = Sinks.empty();
-
-            Mono<Void> initialize = Flux.range(0, PARALLELISM)
-                    .map(i -> client.createMediaClient(mediaDc))
-                    .doOnNext(clients::add)
-                    .flatMap(MTProtoClient::connect)
-                    .then();
-
-            Mono<Void> sender = queue.asFlux()
-                    .publishOn(Schedulers.boundedElastic())
-                    .handle((req, sink) -> {
-                        MTProtoClient client = clients.get(it.getAndUpdate(i -> i + 1 == PARALLELISM ? 0 : i + 1));
-                        client.sendAwait(req)
-                                .filter(b -> b)
-                                .switchIfEmpty(Mono.error(new IllegalStateException("Failed to upload part #" + req.filePart())))
-                                .flatMap(b -> {
-                                    if (suc.incrementAndGet() == req.fileTotalParts()) {
-                                        done.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                                        queue.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
-                                        return Flux.fromIterable(clients)
-                                                .flatMap(MTProtoClient::close)
-                                                .then(Mono.fromRunnable(sink::complete));
-                                    }
-                                    return Mono.empty();
-                                })
-                                .subscribe();
-                    })
-                    .then();
-
-            Mono<Void> reader = Flux.range(0, parts)
-                    .doOnNext(filePart -> {
-                        ByteBuf part = data.readBytes(Math.min(PART_SIZE, data.readableBytes()));
-                        byte[] partBytes = CryptoUtil.toByteArray(part);
-
-                        SaveBigFilePart req = SaveBigFilePart.builder()
-                                .fileId(fileId)
-                                .filePart(filePart)
-                                .bytes(partBytes)
-                                .fileTotalParts(parts)
-                                .build();
-
-                        queue.emitNext(req, DEFAULT_PARKING);
-                    })
-                    .then();
-
-            return Mono.when(initialize, reader, sender)
-                    .then(Mono.fromSupplier(() -> ImmutableInputFileBig.of(fileId, parts, name)));
-        }
-
-        MessageDigest md5 = CryptoUtil.MD5.get();
-
-        return Flux.range(0, parts)
-                .flatMap(filePart -> {
-                    ByteBuf part = data.readBytes(Math.min(PART_SIZE, data.readableBytes()));
-                    byte[] partBytes = CryptoUtil.toByteArray(part);
-
-                    synchronized (md5) {
-                        md5.update(partBytes);
-                    }
-
-                    SaveFilePart req = SaveFilePart.builder()
-                            .fileId(fileId)
-                            .filePart(filePart)
-                            .bytes(partBytes)
-                            .build();
-
-                    return client.sendAwait(req);
-                })
-                .then(Mono.fromSupplier(() -> ImmutableBaseInputFile.of(fileId,
-                        parts, name, ByteBufUtil.hexDump(md5.digest()))));
-    }
-
-    public Mono<Void> getWebFile(InputWebFileLocation location, Function<WebFile, ? extends Publisher<?>> progressor) {
-        AtomicInteger offset = new AtomicInteger();
-        AtomicBoolean complete = new AtomicBoolean();
-        int limit = PRECISE_LIMIT;
-
-        return Mono.defer(() -> client.sendAwait(ImmutableGetWebFile.of(location, offset.get(), limit)))
-                .flatMap(part -> {
-                    offset.addAndGet(limit);
-                    if (part.fileType() == FileType.UNKNOWN) { // download completed
-                        complete.set(true);
-                        return Mono.empty();
-                    }
-
-                    return Mono.from(progressor.apply(part));
-                })
-                .repeat(() -> !complete.get())
-                .then();
-    }
-
-    @BotCompatible
-    public Mono<Void> getFile(FileReferenceId location, Function<BaseFile, ? extends Publisher<?>> progressor) {
-        AtomicInteger offset = new AtomicInteger();
-        AtomicBoolean complete = new AtomicBoolean();
-        int limit = PRECISE_LIMIT;
-        var headerRequest = GetFile.builder()
-                .precise(true)
-                .cdnSupported(false) // TODO
-                .location(location.asLocation())
-                .offset(offset.get())
-                .limit(limit)
-                .build();
-
-        return client.sendAwait(headerRequest)
-                .flatMap(header -> {
-                    switch (header.identifier()) {
-                        case BaseFile.ID:
-                            BaseFile baseFile = (BaseFile) header;
-                            offset.addAndGet(limit);
-
-                            Mono<Void> download = Mono.defer(() -> client.sendAwait(headerRequest.withOffset(offset.get())))
-                                    .cast(BaseFile.class)
-                                    .flatMap(part -> {
-                                        offset.addAndGet(limit);
-                                        if (part.type() == FileType.UNKNOWN) { // download completed
-                                            complete.set(true);
-                                            return Mono.empty();
-                                        }
-
-                                        return Mono.from(progressor.apply(part));
-                                    })
-                                    .repeat(() -> !complete.get())
-                                    .then();
-
-                            // apply header and continue download
-                            return Mono.from(progressor.apply(baseFile)).then(download);
-                        case FileCdnRedirect.ID:
-                            FileCdnRedirect fileCdnRedirect = (FileCdnRedirect) header;
-
-                            // TODO: implement
-                        default:
-                            return Mono.error(new IllegalArgumentException("Unknown file type: " + header));
-                    }
-                })
-                .then();
-    }
-
     // Message interactions
 
     @BotCompatible
-    public Mono<Message> sendMessage(SendMessage request) {
+    public Mono<BaseMessageFields> sendMessage(SendMessage request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
                 .map(TupleUtils.function((updates, peer) -> {
@@ -905,7 +721,7 @@ public class MessageService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Message> sendMedia(SendMedia request) {
+    public Mono<BaseMessageFields> sendMedia(SendMedia request) {
         return client.sendAwait(request)
                 .zipWith(toPeer(request.peer()))
                 .map(TupleUtils.function((updates, peer) -> {
@@ -918,7 +734,7 @@ public class MessageService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Message> editMessage(EditMessage request) {
+    public Mono<BaseMessageFields> editMessage(EditMessage request) {
         return client.sendAwait(request)
                 .map(updates -> {
                     switch (updates.identifier()) {
@@ -933,7 +749,7 @@ public class MessageService extends RpcService {
 
                             client.updates().emitNext(updates, DEFAULT_PARKING);
 
-                            return update.message();
+                            return (BaseMessageFields) update.message();
                         default:
                             throw new IllegalArgumentException("Unknown updates type: " + updates);
                     }
@@ -942,12 +758,12 @@ public class MessageService extends RpcService {
 
     // Short-send related updates object should be transformed to the updateShort or baseUpdates.
     // https://core.telegram.org/api/updates-sequence
-    static Tuple2<Message, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
+    static Tuple2<BaseMessageFields, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
         switch (updates.identifier()) {
             case UpdateShortSentMessage.ID: {
                 UpdateShortSentMessage casted = (UpdateShortSentMessage) updates;
                 Integer replyToMsgId = request.replyToMsgId();
-                Message message = BaseMessage.builder()
+                var message = BaseMessage.builder()
                         .flags(request.flags() | casted.flags())
                         .peerId(peer)
                         .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(replyToMsgId) : null)
@@ -974,7 +790,7 @@ public class MessageService extends RpcService {
             case UpdateShortMessage.ID: {
                 UpdateShortMessage casted = (UpdateShortMessage) updates;
 
-                Message message = BaseMessage.builder()
+                var message = BaseMessage.builder()
                         .flags(request.flags() | casted.flags())
                         .peerId(peer)
                         .replyTo(casted.replyTo())
@@ -1002,7 +818,7 @@ public class MessageService extends RpcService {
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage casted = (UpdateShortChatMessage) updates;
 
-                Message message = BaseMessage.builder()
+                var message = BaseMessage.builder()
                         .flags(request.flags() | casted.flags())
                         .peerId(peer)
                         .viaBotId(casted.viaBotId())
@@ -1041,9 +857,9 @@ public class MessageService extends RpcService {
                             + ", received: " + updateMessageID.randomId());
                 }
 
-                Message message = casted.updates().stream()
+                var message = casted.updates().stream()
                         .filter(upd -> upd instanceof UpdateNewMessageFields)
-                        .map(upd -> ((UpdateNewMessageFields) upd).message())
+                        .map(upd -> (BaseMessageFields) ((UpdateNewMessageFields) upd).message())
                         .findFirst()
                         .orElseThrow();
 

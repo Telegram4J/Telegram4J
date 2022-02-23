@@ -9,7 +9,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.dispatcher.UpdateContext;
-import telegram4j.core.event.dispatcher.UpdatesHandlers;
+import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.Id;
@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
+/** Manager for correct and complete work with general and channel updates. */
 public class UpdatesManager {
 
     private static final Logger log = Loggers.getLogger(UpdatesManager.class);
@@ -45,7 +46,7 @@ public class UpdatesManager {
     private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(10);
 
     private final MTProtoTelegramClient client;
-    private final UpdatesHandlers updatesHandlers;
+    private final UpdatesMapper updatesMapper;
     private final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel());
 
     private volatile int pts = -1;
@@ -53,9 +54,11 @@ public class UpdatesManager {
     private volatile int date = -1;
     private volatile int seq = -1;
 
-    public UpdatesManager(MTProtoTelegramClient client, UpdatesHandlers updatesHandlers) {
+    public UpdatesManager(MTProtoTelegramClient client, UpdatesMapper updatesMapper) {
         this.client = Objects.requireNonNull(client, "client");
-        this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
+        this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
+
+        stateInterval.start(DEFAULT_CHECKIN, DEFAULT_CHECKIN);
     }
 
     public Mono<Void> start() {
@@ -95,7 +98,7 @@ public class UpdatesManager {
 
                 date = data.date();
 
-                return updatesHandlers.handle(UpdateContext.create(client, data.update()));
+                return updatesMapper.handle(UpdateContext.create(client, data.update()));
             }
             case BaseUpdates.ID: {
                 BaseUpdates data = (BaseUpdates) updates;
@@ -126,7 +129,7 @@ public class UpdatesManager {
                         .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
 
                 Flux<Event> events = Flux.fromIterable(data.updates())
-                        .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                        .flatMap(update -> updatesMapper.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
                 return saveContacts.thenMany(preApply.concatWith(events));
@@ -160,7 +163,7 @@ public class UpdatesManager {
                         .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
 
                 Flux<Event> events = Flux.fromIterable(data.updates())
-                        .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                        .flatMap(update -> updatesMapper.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)));
 
                 return saveContacts.thenMany(preApply.concatWith(events));
@@ -193,7 +196,7 @@ public class UpdatesManager {
                         .ttlPeriod(data.ttlPeriod())
                         .message(data.message());
 
-                Flux<Event> mapUpdate = updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                Flux<Event> mapUpdate = updatesMapper.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(message.build())
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
@@ -235,7 +238,7 @@ public class UpdatesManager {
                     message.fromId(ImmutablePeerUser.of(data.userId()));
                 }
 
-                Flux<Event> mapUpdate = updatesHandlers.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                Flux<Event> mapUpdate = updatesMapper.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(message.build())
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
@@ -388,7 +391,7 @@ public class UpdatesManager {
                                     }));
 
                             Flux<Event> concatedUpdates = Flux.fromIterable(difference0.otherUpdates())
-                                    .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                                    .flatMap(update -> updatesMapper.handle(UpdateContext.create(
                                             client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents)
                                     .concatWith(applyChannelDifference);
@@ -440,7 +443,7 @@ public class UpdatesManager {
                             applyStateLocal(difference0.intermediateState());
 
                             return saveContacts.thenMany(Flux.fromIterable(difference0.otherUpdates()))
-                                    .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                                    .flatMap(update -> updatesMapper.handle(UpdateContext.create(
                                             client, chatsMap, usersMap, update)))
                                     .concatWith(messageCreateEvents)
                                     .transform(f -> f.concatWith(getDifference()));
@@ -547,7 +550,7 @@ public class UpdatesManager {
 
                 return saveContacts.and(updatePts)
                         .thenMany(Flux.fromIterable(diff0.otherUpdates()))
-                        .flatMap(update -> updatesHandlers.handle(UpdateContext.create(
+                        .flatMap(update -> updatesMapper.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
                         .concatWith(messageCreateEvents)
                         .concatWith(refetchDifference);

@@ -49,7 +49,7 @@ public class StickersService extends RpcService {
         return client.sendAwait(ImmutableCheckShortName.of(shortName));
     }
 
-    public Mono<SuggestedShortName> suggestShortName(String title) {
-        return client.sendAwait(ImmutableSuggestShortName.of(title));
+    public Mono<String> suggestShortName(String title) {
+        return client.sendAwait(ImmutableSuggestShortName.of(title)).map(SuggestedShortName::shortName);
     }
 }

@@ -155,33 +155,33 @@ public interface StoreLayout {
 
     // user updates
 
-    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action);
+    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping payload);
 
-    Mono<Void> onChatUserTyping(UpdateChatUserTyping action);
+    Mono<Void> onChatUserTyping(UpdateChatUserTyping payload);
 
-    Mono<Void> onUserTyping(UpdateUserTyping action);
+    Mono<Void> onUserTyping(UpdateUserTyping payload);
 
-    Mono<UserNameFields> onUserNameUpdate(UpdateUserName action);
+    Mono<UserNameFields> onUserNameUpdate(UpdateUserName payload);
 
-    Mono<String> onUserPhoneUpdate(UpdateUserPhone action);
+    Mono<String> onUserPhoneUpdate(UpdateUserPhone payload);
 
-    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action);
+    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto payload);
 
-    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action);
+    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus payload);
 
     // common updates
 
-    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action);
+    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload);
 
-    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action);
+    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin payload);
 
-    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action);
+    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete payload);
 
-    Mono<Void> onChatParticipant(UpdateChatParticipant action);
+    Mono<Void> onChatParticipant(UpdateChatParticipant payload);
 
-    Mono<Void> onChatParticipants(UpdateChatParticipants action);
+    Mono<Void> onChannelParticipant(UpdateChannelParticipant payload);
 
-    Mono<Void> onChannelParticipant(UpdateChannelParticipant update);
+    Mono<Void> onChatParticipants(ChatParticipants payload);
 
     // not an update-related methods
 

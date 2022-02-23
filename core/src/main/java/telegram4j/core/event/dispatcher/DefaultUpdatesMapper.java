@@ -8,7 +8,7 @@ import telegram4j.tl.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class UpdatesHandlers {
+public final class DefaultUpdatesMapper implements UpdatesMapper {
     private static final List<HandlerTuple<?, ?>> handlers = new ArrayList<>();
 
     static {
@@ -37,24 +37,24 @@ public final class UpdatesHandlers {
         addHandler(UpdateUserTyping.class, UserUpdateHandlers::handleStateUpdateUserTyping,
                 UserUpdateHandlers::handleUpdateUserTyping);
         // chat updates
-        addHandler(UpdateChatParticipantAdd.class,
-                ChatUpdateHandlers::handleStateUpdateChatParticipantAdd,ChatUpdateHandlers::handleUpdateChatParticipantAdd);
-        addHandler(UpdateChatParticipantAdmin.class,
-                ChatUpdateHandlers::handleStateUpdateChatParticipantAdmin,ChatUpdateHandlers::handleUpdateChatParticipantAdmin);
-        addHandler(UpdateChatParticipantDelete.class,
-                ChatUpdateHandlers::handleStateUpdateChatParticipantDelete,ChatUpdateHandlers::handleUpdateChatParticipantDelete);
-        addHandler(UpdateChatParticipant.class,
-                ChatUpdateHandlers::handleStateUpdateChatParticipant, ChatUpdateHandlers::handleUpdateChatParticipant);
-        addHandler(UpdateChatParticipants.class,
-                ChatUpdateHandlers::handleStateUpdateChatParticipants, ChatUpdateHandlers::handleUpdateChatParticipants);
+        addHandler(UpdateChatParticipantAdd.class, ChatUpdateHandlers::handleStateUpdateChatParticipantAdd,
+                ChatUpdateHandlers::handleUpdateChatParticipantAdd);
+        addHandler(UpdateChatParticipantAdmin.class, ChatUpdateHandlers::handleStateUpdateChatParticipantAdmin,
+                ChatUpdateHandlers::handleUpdateChatParticipantAdmin);
+        addHandler(UpdateChatParticipantDelete.class, ChatUpdateHandlers::handleStateUpdateChatParticipantDelete,
+                ChatUpdateHandlers::handleUpdateChatParticipantDelete);
+        addHandler(UpdateChatParticipant.class, ChatUpdateHandlers::handleStateUpdateChatParticipant,
+                ChatUpdateHandlers::handleUpdateChatParticipant);
+        addHandler(UpdateChatParticipants.class, ChatUpdateHandlers::handleStateUpdateChatParticipants,
+                ChatUpdateHandlers::handleUpdateChatParticipants);
         // channel updates
         addHandler(UpdateChannelParticipant.class, ChannelUpdateHandlers::handleStateUpdateChatParticipant,
                 ChannelUpdateHandlers::handleUpdateChannelParticipant);
     }
 
-    public static final UpdatesHandlers instance = new UpdatesHandlers();
+    public static final DefaultUpdatesMapper instance = new DefaultUpdatesMapper();
 
-    private UpdatesHandlers() {
+    private DefaultUpdatesMapper() {
     }
 
     static <U extends Update, O> void addHandler(Class<? extends U> type,
@@ -64,6 +64,7 @@ public final class UpdatesHandlers {
     }
 
     @SuppressWarnings("unchecked")
+    @Override
     public <U extends Update> Flux<Event> handle(UpdateContext<U> context) {
         return Mono.justOrEmpty(handlers.stream()
                         .filter(t -> t.type.isAssignableFrom(context.getUpdate().getClass()))

@@ -11,10 +11,12 @@ public class ExportedChatInvite implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.ExportedChatInvite data;
+    private final User admin;
 
-    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ExportedChatInvite data) {
+    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ExportedChatInvite data, User admin) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
+        this.admin = admin;
     }
 
     public boolean isRevoked() {
@@ -31,6 +33,10 @@ public class ExportedChatInvite implements TelegramObject {
 
     public Id getAdminId() {
         return Id.ofUser(data.adminId(), null);
+    }
+
+    public User getAdmin() {
+        return admin;
     }
 
     public Instant getCreateTimestamp() {
@@ -75,6 +81,7 @@ public class ExportedChatInvite implements TelegramObject {
     public String toString() {
         return "ExportedChatInvite{" +
                 "data=" + data +
+                ", admin=" + admin +
                 '}';
     }
 }

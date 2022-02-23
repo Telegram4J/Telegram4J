@@ -39,7 +39,7 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<Chat> getChat(long id) {
         return getChats(List.of(id))
-                .ofType(BaseChats.class)
+                .cast(BaseChats.class)
                 .map(c -> c.chats().get(0));
     }
 
@@ -143,6 +143,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableGetParticipants.of(channel, filter, offset, limit, hash));
     }
 
+    @BotCompatible
     public Mono<ChannelParticipant> getParticipant(InputChannel channel, InputPeer peer) {
         return client.sendAwait(ImmutableGetParticipant.of(channel, peer));
     }
@@ -156,7 +157,7 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<Chat> getChannel(InputChannel id) {
         return getChannels(List.of(id))
-                .ofType(BaseChats.class)
+                .cast(BaseChats.class)
                 .map(chats -> chats.chats().get(0));
     }
 

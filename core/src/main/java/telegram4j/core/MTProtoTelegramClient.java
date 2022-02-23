@@ -4,7 +4,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.event.dispatcher.UpdatesHandlers;
+import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.PeerEntity;
@@ -33,6 +33,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
+    private final FileReferenceManager fileReferenceManager;
     private final AtomicReference<Id> selfId;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
@@ -40,7 +41,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
-                          UpdatesHandlers updatesHandlers, AtomicReference<Id> selfId, ServiceHolder serviceHolder,
+                          UpdatesMapper updatesMapper, AtomicReference<Id> selfId, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
@@ -51,7 +52,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         this.entityRetriever = entityRetriever.apply(this);
         this.onDisconnect = onDisconnect;
 
-        this.updatesManager = new UpdatesManager(this, updatesHandlers);
+        this.updatesManager = new UpdatesManager(this, updatesMapper);
+        this.fileReferenceManager = new FileReferenceManager(this);
     }
 
     public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, String botAuthToken) {
@@ -65,6 +67,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     public UpdatesManager getUpdatesManager() {
         return updatesManager;
+    }
+
+    public FileReferenceManager getFileReferenceManager() {
+        return fileReferenceManager;
     }
 
     public boolean isBot() {
@@ -103,10 +109,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return mtProtoResources.getEventDispatcher().on(type);
     }
 
-    public Mono<Void> getFile(String fileReferenceId, Function<BaseFile, ? extends Publisher<?>> progressor) {
+    public Flux<BaseFile> getFile(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .flatMap(loc -> serviceHolder.getMessageService()
-                        .getFile(loc, progressor));
+                .flatMapMany(loc -> serviceHolder.getUploadService().getFile(loc));
     }
 
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {

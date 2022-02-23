@@ -31,7 +31,7 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<Long, PartialFields<Chat, ChatFull>> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, InputPeer> usernames = new ConcurrentHashMap<>();
-    private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authorizationKeys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
 
     private volatile long selfId = -1;
     private volatile ImmutableState state;
@@ -214,7 +214,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.fromSupplier(() -> authorizationKeys.get(dc));
+        return Mono.fromSupplier(() -> authKeys.get(dc));
     }
 
     // Updates methods
@@ -323,76 +323,86 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping action) {
+    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatUserTyping(UpdateChatUserTyping action) {
+    public Mono<Void> onChatUserTyping(UpdateChatUserTyping payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping action) {
+    public Mono<Void> onUserTyping(UpdateUserTyping payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName action) {
+    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName payload) {
         return Mono.fromSupplier(() -> {
-            var old = this.users.get(action.userId());
+            var old = this.users.get(payload.userId());
             UserNameFields fields = old != null ? new UserNameFields(old.min.username(), old.min.firstName(), old.min.lastName()) : null;
-            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min
-                    .withUsername(action.username())
-                    .withFirstName(action.firstName())
-                    .withLastName(action.lastName())));
+
+            Optional.ofNullable(fields)
+                    .map(UserNameFields::getUserName)
+                    .ifPresent(s -> usernames.remove(stripUsername(s)));
+
+            this.users.computeIfPresent(payload.userId(), (k, v) -> {
+                var upd = v.min
+                        .withUsername(payload.username())
+                        .withFirstName(payload.firstName())
+                        .withLastName(payload.lastName());
+
+                saveUsernamePeer(upd);
+                return v.withMin(upd);
+            });
 
             return fields;
         });
     }
 
     @Override
-    public Mono<String> onUserPhoneUpdate(UpdateUserPhone action) {
+    public Mono<String> onUserPhoneUpdate(UpdateUserPhone payload) {
         return Mono.fromSupplier(() -> {
-            var old = this.users.get(action.userId());
-            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhone(action.phone())));
+            var old = this.users.get(payload.userId());
+            this.users.computeIfPresent(payload.userId(), (k, v) -> v.withMin(v.min.withPhone(payload.phone())));
 
             return old != null ? old.min.phone() : null;
         });
     }
 
     @Override
-    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto action) {
+    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto payload) {
         return Mono.fromSupplier(() -> {
-            var old = this.users.get(action.userId());
-            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withPhoto(action.photo())));
+            var old = this.users.get(payload.userId());
+            this.users.computeIfPresent(payload.userId(), (k, v) -> v.withMin(v.min.withPhoto(payload.photo())));
 
             return old != null ? old.min.photo() : null;
         });
     }
 
     @Override
-    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus action) {
+    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus payload) {
         return Mono.fromSupplier(() -> {
-            var old = this.users.get(action.userId());
-            this.users.computeIfPresent(action.userId(), (k, v) -> v.withMin(v.min.withStatus(action.status())));
+            var old = this.users.get(payload.userId());
+            this.users.computeIfPresent(payload.userId(), (k, v) -> v.withMin(v.min.withStatus(payload.status())));
 
             return old != null ? old.min.status() : null;
         });
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd action) {
+    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin action) {
+    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete action) {
+    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete payload) {
         return Mono.empty();
     }
 
@@ -402,12 +412,12 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChatParticipants(UpdateChatParticipants action) {
+    public Mono<Void> onChatParticipants(ChatParticipants payload) {
         return Mono.empty();
     }
 
     @Override
-    public Mono<Void> onChannelParticipant(UpdateChannelParticipant update) {
+    public Mono<Void> onChannelParticipant(UpdateChannelParticipant payload) {
         return Mono.empty();
     }
 
@@ -423,7 +433,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
-        return Mono.fromRunnable(() -> authorizationKeys.put(authorizationKey.getDc(), authorizationKey));
+        return Mono.fromRunnable(() -> authKeys.put(authorizationKey.getDc(), authorizationKey));
     }
 
     @Override

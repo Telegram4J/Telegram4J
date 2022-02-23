@@ -21,13 +21,12 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     private final int qts;
     private final GroupChat chat;
     private final User actor;
-    private final User user;
 
     public ChatParticipantUpdateEvent(MTProtoTelegramClient client, Instant timestamp,
                                       @Nullable ChatParticipant oldParticipant,
                                       @Nullable ChatParticipant currentParticipant,
                                       @Nullable ExportedChatInvite invite, int qts,
-                                      GroupChat chat, User actor, User user) {
+                                      GroupChat chat, User actor) {
         super(client);
         this.timestamp = timestamp;
         this.oldParticipant = oldParticipant;
@@ -36,7 +35,6 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
         this.qts = qts;
         this.chat = chat;
         this.actor = actor;
-        this.user = user;
     }
 
     public boolean isLeftEvent() {
@@ -75,10 +73,6 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
         return actor;
     }
 
-    public User getUser() {
-        return user;
-    }
-
     @Override
     public String toString() {
         return "ChatParticipantUpdateEvent{" +
@@ -89,7 +83,6 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
                 ", qts=" + qts +
                 ", chat=" + chat +
                 ", actor=" + actor +
-                ", user=" + user +
                 '}';
     }
 }

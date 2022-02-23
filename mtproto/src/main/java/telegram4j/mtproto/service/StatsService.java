@@ -33,7 +33,7 @@ public class StatsService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<MessageStats> getMessageStats(GetMessageStats request) {
-        return client.sendAwait(request);
+    public Mono<StatsGraph> getMessageStats(GetMessageStats request) {
+        return client.sendAwait(request).map(MessageStats::viewsGraph);
     }
 }

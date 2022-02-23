@@ -15,7 +15,6 @@ public class ChannelParticipantUpdateEvent extends ChatEvent {
     private final Channel channel;
     private final Instant timestamp;
     private final User actor;
-    private final User user;
     @Nullable
     private final ChatParticipant oldParticipant;
     @Nullable
@@ -25,14 +24,13 @@ public class ChannelParticipantUpdateEvent extends ChatEvent {
     private final int qts;
 
     public ChannelParticipantUpdateEvent(MTProtoTelegramClient client, Channel channel, Instant timestamp,
-                                         User actor, User user, @Nullable ChatParticipant oldParticipant,
+                                         User actor, @Nullable ChatParticipant oldParticipant,
                                          @Nullable ChatParticipant currentParticipant,
                                          @Nullable ExportedChatInvite invite, int qts) {
         super(client);
         this.channel = channel;
         this.timestamp = timestamp;
         this.actor = actor;
-        this.user = user;
         this.oldParticipant = oldParticipant;
         this.currentParticipant = currentParticipant;
         this.invite = invite;
@@ -59,10 +57,6 @@ public class ChannelParticipantUpdateEvent extends ChatEvent {
         return actor;
     }
 
-    public User getUser() {
-        return user;
-    }
-
     public Optional<ChatParticipant> getOldParticipant() {
         return Optional.ofNullable(oldParticipant);
     }
@@ -85,7 +79,6 @@ public class ChannelParticipantUpdateEvent extends ChatEvent {
                 "channel=" + channel +
                 ", timestamp=" + timestamp +
                 ", actor=" + actor +
-                ", user=" + user +
                 ", oldParticipant=" + oldParticipant +
                 ", currentParticipant=" + currentParticipant +
                 ", invite=" + invite +

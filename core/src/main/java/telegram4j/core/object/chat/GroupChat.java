@@ -21,22 +21,27 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Represents a basic group of 0-200 users (must be upgraded to a supergroup to accommodate more than 200 users). */
-public class GroupChat extends BaseChat {
+public final class GroupChat extends BaseChat {
 
     private final telegram4j.tl.BaseChat minData;
     @Nullable
     private final telegram4j.tl.BaseChatFull fullData;
+    @Nullable
+    private final ExportedChatInvite exportedChatInvite;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
+        this.exportedChatInvite = null;
     }
 
-    public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
+    public GroupChat(MTProtoTelegramClient client, BaseChatFull fullData,
+                     telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
+        this.exportedChatInvite = exportedChatInvite;
     }
 
     @Override
@@ -102,6 +107,7 @@ public class GroupChat extends BaseChat {
 
     // BaseChatFull fields
 
+    @Override
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(BaseChatFull::about);
     }
@@ -118,9 +124,7 @@ public class GroupChat extends BaseChat {
     }
 
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(fullData)
-                .map(BaseChatFull::exportedInvite)
-                .map(d -> new ExportedChatInvite(client, d));
+        return Optional.ofNullable(exportedChatInvite);
     }
 
     public Optional<List<BotInfo>> getBotInfo() {

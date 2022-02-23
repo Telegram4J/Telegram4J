@@ -3,9 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.ChatBannedRightsSettings;
-import telegram4j.core.object.Id;
-import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.*;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 
@@ -14,7 +12,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 
-public class ChatParticipant implements TelegramObject {
+public final class ChatParticipant implements TelegramObject {
     /*
      * This is a too complex type from polymorphism side, and
      * it's mapping looks quite specific (ugly!).
@@ -25,17 +23,21 @@ public class ChatParticipant implements TelegramObject {
      */
 
     private final MTProtoTelegramClient client;
+    @Nullable
+    private final PeerEntity peer;
     private final TlObject data;
     private final Id chatId;
 
-    public ChatParticipant(MTProtoTelegramClient client, ChannelParticipant data, Id chatId) {
+    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, ChannelParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client, "client");
+        this.peer = peer;
         this.data = Objects.requireNonNull(data, "data");
         this.chatId = Objects.requireNonNull(chatId, "chatId");
     }
 
-    public ChatParticipant(MTProtoTelegramClient client, telegram4j.tl.ChatParticipant data, Id chatId) {
+    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, telegram4j.tl.ChatParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client, "client");
+        this.peer = peer;
         this.data = Objects.requireNonNull(data, "data");
         this.chatId = Objects.requireNonNull(chatId, "chatId");
     }
@@ -43,6 +45,15 @@ public class ChatParticipant implements TelegramObject {
     @Override
     public MTProtoTelegramClient getClient() {
         return client;
+    }
+
+    /**
+     * Gets minimal information about the user/chat to whom this {@code ChatParticipant} is associated, if present.
+     *
+     * @return The {@link PeerEntity} object with minimal information, if present.
+     */
+    private Optional<PeerEntity> getPeer() {
+        return Optional.ofNullable(peer);
     }
 
     /**
@@ -146,9 +157,9 @@ public class ChatParticipant implements TelegramObject {
     }
 
     /**
-     * Gets whether this participant invited via request.
+     * Gets whether this participant is <i>current</i> user and invited via request.
      *
-     * @return {@literal true} if participant invited via request, {@literal false} otherwise.
+     * @return {@literal true} if participant is <i>current</i> user and invited via request, {@literal false} otherwise.
      */
     public boolean isInvitedViaRequest() {
         return data.identifier() == ChannelParticipantSelf.ID

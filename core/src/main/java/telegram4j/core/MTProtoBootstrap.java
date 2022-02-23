@@ -17,7 +17,8 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
-import telegram4j.core.event.dispatcher.UpdatesHandlers;
+import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;
+import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.object.Id;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
@@ -61,7 +62,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     @Nullable
     private Function<String, EntityParser> defaultEntityParserFactory;
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
-    private UpdatesHandlers updatesHandlers = UpdatesHandlers.instance;
+    private UpdatesMapper updatesMapper = DefaultUpdatesMapper.instance;
 
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
@@ -112,8 +113,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setUpdatesHandlers(UpdatesHandlers updatesHandlers) {
-        this.updatesHandlers = Objects.requireNonNull(updatesHandlers, "updatesHandlers");
+    public MTProtoBootstrap<O> setUpdatesMapper(UpdatesMapper updatesMapper) {
+        this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
         return this;
     }
 
@@ -172,7 +173,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             AtomicReference<Id> selfId = new AtomicReference<>();
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
-                    mtProtoResources, updatesHandlers, selfId,
+                    mtProtoResources, updatesMapper, selfId,
                     serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
 
             Mono<Void> disconnect = Mono.fromRunnable(() -> {

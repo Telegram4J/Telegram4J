@@ -270,14 +270,15 @@ public class AccountService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<Document> uploadTheme(InputFile file, @Nullable InputFile thumb,
+    public Mono<BaseDocument> uploadTheme(InputFile file, @Nullable InputFile thumb,
                                       String fileName, String mimyType) {
         return client.sendAwait(UploadTheme.builder()
                 .file(file)
                 .thumb(thumb)
                 .fileName(fileName)
                 .mimeType(mimyType)
-                .build());
+                .build())
+                .ofType(BaseDocument.class);
     }
 
     public Mono<Theme> createTheme(String slug, String title, @Nullable String documentFileReferenceId,
@@ -346,7 +347,8 @@ public class AccountService extends RpcService {
         return client.sendAwait(DeclinePasswordReset.instance());
     }
 
-    public Mono<Themes> getChatThemes(int hash) {
-        return client.sendAwait(ImmutableGetChatThemes.of(hash));
+    public Mono<BaseThemes> getChatThemes(int hash) {
+        return client.sendAwait(ImmutableGetChatThemes.of(hash))
+                .ofType(BaseThemes.class);
     }
 }

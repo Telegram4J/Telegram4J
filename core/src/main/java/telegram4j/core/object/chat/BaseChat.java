@@ -12,7 +12,6 @@ import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.MessageFields;
 import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
-import telegram4j.core.spec.media.InputMediaPollSpec;
 import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
@@ -25,6 +24,7 @@ import telegram4j.tl.request.messages.SendMessage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** This class provides default implementation of {@link Chat} methods. */
@@ -54,6 +54,9 @@ abstract class BaseChat implements Chat {
     public Type getType() {
         return type;
     }
+
+    @Override
+    public abstract Optional<String> getAbout();
 
     // Interaction methods implementation
 
@@ -156,8 +159,7 @@ abstract class BaseChat implements Chat {
                 .flatMap(client::resolvePeer)
                 .map(BaseChat::asInputPeer)
                 .defaultIfEmpty(InputPeerEmpty.instance())
-                .zipWith(Mono.fromSupplier(() -> awareEntityParser(spec.media()))
-                        .flatMap(media -> media.asData(client)))
+                .zipWith(Mono.defer(() -> spec.media().asData(client)))
                 .flatMap(TupleUtils.function((sendAs, media) -> client.getServiceHolder()
                         .getMessageService()
                         .sendMedia(SendMedia.builder()
@@ -179,19 +181,9 @@ abstract class BaseChat implements Chat {
                         .map(e -> EntityFactory.createMessage(client, e, id))));
     }
 
-    private InputMediaSpec awareEntityParser(InputMediaSpec spec) {
-        if (spec.type() == InputMediaSpec.Type.POLL) {
-            InputMediaPollSpec media = (InputMediaPollSpec) spec;
-
-            return media.withParser(media.parser().or(() -> client.getMtProtoResources().getDefaultEntityParser()));
-        }
-        return spec;
-    }
-
     @Override
     public Mono<MessageMedia> uploadMedia(InputMediaSpec spec) {
-        return Mono.fromSupplier(() -> awareEntityParser(spec))
-                .flatMap(media -> media.asData(client))
+        return Mono.defer(() -> spec.asData(client))
                 .flatMap(media -> client.getServiceHolder().getMessageService()
                         .uploadMedia(getIdAsPeer(), media));
     }

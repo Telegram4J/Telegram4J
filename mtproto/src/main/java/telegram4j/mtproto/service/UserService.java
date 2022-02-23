@@ -106,8 +106,9 @@ public class UserService extends RpcService {
                 .flatMapIterable(Function.identity());
     }
 
-    public Mono<Contacts> getContacts(long hash) {
-        return client.sendAwait(ImmutableGetContacts.of(hash));
+    public Mono<BaseContacts> getContacts(long hash) {
+        return client.sendAwait(ImmutableGetContacts.of(hash))
+                .ofType(BaseContacts.class);
     }
 
     public Mono<ImportedContacts> importContacts(Iterable<? extends InputContact> contacts) {
@@ -190,10 +191,10 @@ public class UserService extends RpcService {
 
     public Mono<UserInfo> editUserInfo(InputUser id, String message, Iterable<? extends MessageEntity> entities) {
         return client.sendAwait(EditUserInfo.builder()
-                        .userId(id)
-                        .message(message)
-                        .entities(entities)
-                        .build());
+                .userId(id)
+                .message(message)
+                .entities(entities)
+                .build());
     }
 
     // Methods from PhotoService

@@ -15,6 +15,7 @@ import java.util.Optional;
 /** The Telegram <a href="https://core.telegram.org/api/channel">chat</a> representation. */
 public interface Chat extends PeerEntity {
 
+    @Override
     Id getId();
 
     /**
@@ -64,6 +65,8 @@ public interface Chat extends PeerEntity {
      */
     Optional<PeerNotifySettings> getNotifySettings();
 
+    Optional<String> getAbout();
+
     // Interaction methods
 
     Mono<Message> sendMessage(SendMessageSpec spec);
@@ -72,6 +75,7 @@ public interface Chat extends PeerEntity {
 
     Mono<Message> sendMedia(SendMediaSpec spec);
 
+    // TODO: mapping for return type
     Mono<MessageMedia> uploadMedia(InputMediaSpec spec);
 
     /** All types of telegram chat. */

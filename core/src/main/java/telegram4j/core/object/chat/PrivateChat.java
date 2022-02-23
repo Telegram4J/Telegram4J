@@ -67,6 +67,11 @@ public final class PrivateChat extends BaseChat {
     }
 
     @Override
+    public Optional<String> getAbout() {
+        return user.getAbout();
+    }
+
+    @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

@@ -15,6 +15,7 @@ public final class ServiceHolder {
     private final StickersService stickersService;
     private final HelpService helpService;
     private final MessageService messageService;
+    private final UploadService uploadService;
     private final UpdatesService updatesService;
     private final UserService userService;
     private final BotService botService;
@@ -30,6 +31,7 @@ public final class ServiceHolder {
         this.stickersService = new StickersService(client, storeLayout);
         this.helpService = new HelpService(client, storeLayout);
         this.messageService = new MessageService(client, storeLayout);
+        this.uploadService = new UploadService(client, storeLayout);
         this.updatesService = new UpdatesService(client, storeLayout);
         this.userService = new UserService(client, storeLayout);
         this.botService = new BotService(client, storeLayout);
@@ -73,6 +75,10 @@ public final class ServiceHolder {
 
     public MessageService getMessageService() {
         return messageService;
+    }
+
+    public UploadService getUploadService() {
+        return uploadService;
     }
 
     public UpdatesService getUpdatesService() {

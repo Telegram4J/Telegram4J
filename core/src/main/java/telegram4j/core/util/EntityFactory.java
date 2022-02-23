@@ -3,6 +3,7 @@ package telegram4j.core.util;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
+import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
@@ -70,6 +71,7 @@ import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
 import java.time.Instant;
+import java.util.Optional;
 
 public final class EntityFactory {
 
@@ -145,7 +147,6 @@ public final class EntityFactory {
                 return new BroadcastChannel(client, channel);
             case ChatFull.ID:
                 ChatFull chatFull = (ChatFull) possibleChat;
-                // TODO: I haven't been able to figure out what chatFull.users() is for yet, so I'm just ignoring it
 
                 var minData = chatFull.chats().stream()
                         .filter(c -> (c.identifier() == BaseChat.ID || c.identifier() == Channel.ID) &&
@@ -153,18 +154,38 @@ public final class EntityFactory {
                         .findFirst()
                         .orElseThrow();
 
+                var exportedChatInvite = Optional.of(chatFull.fullChat())
+                        .map(c -> {
+                            switch (c.identifier()) {
+                                case ChannelFull.ID: return ((ChannelFull) c).exportedInvite();
+                                case BaseChatFull.ID: return ((BaseChatFull) c).exportedInvite();
+                                default: throw new IllegalStateException();
+                            }
+                        })
+                        .map(d -> {
+                            var admin = createUser(client, chatFull.users().stream()
+                                    // This list is *usually* small, so there is no point in computing map
+                                    .filter(u -> u.identifier() == BaseUser.ID && u.id() == d.adminId())
+                                    .findFirst()
+                                    .orElseThrow());
+
+                            return new ExportedChatInvite(client, d, admin);
+                        })
+                        .orElse(null);
+
                 if (chatFull.fullChat().identifier() == ChannelFull.ID) {
                     ChannelFull channelFull = (ChannelFull) chatFull.fullChat();
                     var channelMin = (telegram4j.tl.Channel) minData;
 
                     if (channelMin.megagroup()) {
-                        return new SupergroupChat(client, channelFull, channelMin);
+                        return new SupergroupChat(client, channelFull, channelMin, exportedChatInvite);
                     }
 
-                    return new BroadcastChannel(client, channelFull, channelMin);
+                    return new BroadcastChannel(client, channelFull, channelMin, exportedChatInvite);
                 }
 
-                return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(), (telegram4j.tl.BaseChat) minData);
+                return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(),
+                        (telegram4j.tl.BaseChat) minData, exportedChatInvite);
             default:
                 throw new IllegalArgumentException("Unknown chat type: " + possibleChat);
         }
