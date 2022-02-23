@@ -8,6 +8,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.api.EmptyObject;
 import telegram4j.tl.api.TlObject;
 
+/** Utility class with frequently used methods for mapping TL objects. */
 public class TlEntityUtil {
 
     private TlEntityUtil() {
@@ -45,7 +46,7 @@ public class TlEntityUtil {
         expanded.writeBytes(bytes, 3, bytes.length - 3);
         expanded.writeBytes(footer);
 
-        return expanded.asReadOnly();
+        return Unpooled.unreleasableBuffer(expanded.asReadOnly());
     }
 
     public static boolean isAvailableChat(Chat chat) {

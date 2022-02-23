@@ -34,6 +34,7 @@ interface InputMediaPollSpecDef extends InputMediaSpec {
     @Override
     default Mono<InputMedia> asData(MTProtoTelegramClient client) {
         var parsed = parser()
+                .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                 .flatMap(p -> solution().map(s -> EntityParserSupport.parse(client, p.apply(s))))
                 .orElseGet(() -> Mono.just(Tuples.of(solution().orElse(""), List.of())));
 

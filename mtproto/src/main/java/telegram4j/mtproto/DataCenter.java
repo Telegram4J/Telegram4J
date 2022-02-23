@@ -27,6 +27,12 @@ public final class DataCenter {
     /** Latest information about <b>media</b> datacenters with IPv6 addresses. */
     public static final List<DataCenter> mediaDataCentersIpv6;
 
+    /** Latest information about <b>cdn</b> datacenters with IPv4 addresses. */
+    public static final List<DataCenter> cdnDataCentersIpv4;
+
+    /** Latest information about <b>media</b> datacenters with IPv6 addresses. */
+    public static final List<DataCenter> cdnDataCentersIpv6;
+
     static {
         productionDataCentersIpv4 = List.of(
                 create(1, "149.154.175.54", 443),
@@ -65,6 +71,14 @@ public final class DataCenter {
         mediaDataCentersIpv6 = List.of(
                 create(2, "2001:067c:04e8:f002:0000:0000:0000:000b", 443),
                 create(4, "2001:067c:04e8:f004:0000:0000:0000:000b", 443)
+        );
+
+        cdnDataCentersIpv4 = List.of(
+                create(203, "91.105.192.100", 443)
+        );
+
+        cdnDataCentersIpv6 = List.of(
+                create(203, "2a0a:f280:0203:000a:5000:0000:0000:0100", 443)
         );
     }
 

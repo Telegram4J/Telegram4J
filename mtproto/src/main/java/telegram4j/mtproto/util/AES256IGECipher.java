@@ -1,5 +1,6 @@
 package telegram4j.mtproto.util;
 
+import io.netty.buffer.ByteBuf;
 import reactor.core.Exceptions;
 
 import javax.crypto.Cipher;
@@ -10,9 +11,9 @@ public final class AES256IGECipher {
     private static final String AES_ECB_ALGORITHM = "AES/ECB/NoPadding";
 
     private final Cipher delegate;
-    private final byte[] iv;
+    private final ByteBuf iv;
 
-    public AES256IGECipher(boolean encrypt, byte[] key, byte[] iv) {
+    public AES256IGECipher(boolean encrypt, byte[] key, ByteBuf iv) {
         this.delegate = newCipher(AES_ECB_ALGORITHM);
         this.iv = iv;
 
@@ -20,27 +21,29 @@ public final class AES256IGECipher {
         initCipher(delegate, encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
     }
 
-    public byte[] encrypt(byte[] data) {
+    public ByteBuf encrypt(ByteBuf data) {
+        int size = data.readableBytes();
         int blockSize = delegate.getBlockSize();
-        byte[] encrypted = new byte[data.length];
-        byte[] encryptedBlock = new byte[blockSize];
+        ByteBuf encrypted = data.alloc().buffer(size);
+        // first 16 - input, second - output
+        byte[] buffer = new byte[blockSize + blockSize];
 
-        byte[] x = iv;
+        ByteBuf x = iv;
         int xOffset = blockSize;
-        byte[] y = iv;
+        ByteBuf y = iv;
         int yOffset = 0;
-        for (int i = 0; i < data.length / blockSize; i++) {
+        for (int i = 0; i < size / blockSize; i++) {
             int offset = i * blockSize;
             for (int j = 0; j < blockSize; j++) {
-                encryptedBlock[j] = (byte) (data[offset + j] ^ y[yOffset + j]);
+                buffer[j] = (byte) (data.getByte(offset + j) ^ y.getByte(yOffset + j));
             }
 
-            encryptedBlock = doFinal(delegate, encryptedBlock);
+            doFinal(delegate, buffer);
             for (int j = 0; j < blockSize; j++) {
-                encryptedBlock[j] ^= x[xOffset + j];
+                buffer[blockSize + j] ^= x.getByte(xOffset + j);
             }
 
-            System.arraycopy(encryptedBlock, 0, encrypted, offset, blockSize);
+            encrypted.writeBytes(buffer, blockSize, blockSize);
 
             x = data;
             yOffset = offset;
@@ -48,36 +51,44 @@ public final class AES256IGECipher {
             xOffset = offset;
         }
 
+        data.release();
+        iv.release();
+
         return encrypted;
     }
 
-    public byte[] decrypt(byte[] data) {
+    public ByteBuf decrypt(ByteBuf data) {
+        int size = data.readableBytes();
         int blockSize = delegate.getBlockSize();
-        byte[] decrypted = new byte[data.length];
-        byte[] decryptedBlock = new byte[blockSize];
+        ByteBuf decrypted = data.alloc().buffer(size);
+        // first 16b - input, second 16b - output
+        byte[] buffer = new byte[blockSize + blockSize];
 
-        byte[] x = iv;
+        ByteBuf x = iv;
         int xOffset = blockSize;
-        byte[] y = iv;
+        ByteBuf y = iv;
         int yOffset = 0;
-        for (int i = 0; i < data.length / blockSize; i++) {
+        for (int i = 0; i < size / blockSize; i++) {
             int offset = i * blockSize;
             for (int j = 0; j < blockSize; j++) {
-                decryptedBlock[j] = (byte) (data[offset + j] ^ x[xOffset + j]);
+                buffer[j] =  (byte) (data.getByte(offset + j) ^ x.getByte(xOffset + j));
             }
 
-            decryptedBlock = doFinal(delegate, decryptedBlock);
+            doFinal(delegate, buffer);
             for (int j = 0; j < blockSize; j++) {
-                decryptedBlock[j] ^= y[yOffset + j];
+                buffer[blockSize + j] ^= y.getByte(yOffset + j);
             }
 
-            System.arraycopy(decryptedBlock, 0, decrypted, offset, blockSize);
+            decrypted.writeBytes(buffer, blockSize, blockSize);
 
             y = data;
             yOffset = offset;
             x = decrypted;
             xOffset = offset;
         }
+
+        data.release();
+        iv.release();
 
         return decrypted;
     }
@@ -98,9 +109,10 @@ public final class AES256IGECipher {
         }
     }
 
-    static byte[] doFinal(Cipher cipher, byte[] input) {
+    static void doFinal(Cipher cipher, byte[] buffer) {
         try {
-            return cipher.doFinal(input);
+            int blockSize = cipher.getBlockSize();
+            cipher.doFinal(buffer, 0, blockSize, buffer, blockSize);
         } catch (Throwable t) {
             throw Exceptions.propagate(t);
         }

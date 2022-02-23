@@ -172,11 +172,11 @@ public final class AuthorizationHandler {
                 context.getNewNonce().retainedSlice(0, 4));
 
         byte[] aesKey = toByteArray(tmpAesKey);
-        byte[] aesIv = toByteArray(tmpAesIv);
 
-        AES256IGECipher decrypter = new AES256IGECipher(false, aesKey, aesIv);
+        AES256IGECipher decrypter = new AES256IGECipher(false, aesKey, tmpAesIv.retain());
 
-        ByteBuf answer = Unpooled.wrappedBuffer(decrypter.decrypt(serverDHParams.encryptedAnswer()))
+        ByteBuf encryptedAnswer = Unpooled.wrappedBuffer(serverDHParams.encryptedAnswer());
+        ByteBuf answer = decrypter.decrypt(encryptedAnswer)
                 .skipBytes(20); // answer hash
 
         ServerDHInnerData serverDHInnerData = TlDeserializer.deserialize(answer);
@@ -205,8 +205,8 @@ public final class AuthorizationHandler {
         ByteBuf innerData = TlSerializer.serialize(alloc, clientDHInnerData);
         ByteBuf innerDataWithHash = align(Unpooled.wrappedBuffer(sha1Digest(innerData), innerData), 16);
 
-        AES256IGECipher encrypter = new AES256IGECipher(true, aesKey, aesIv);
-        byte[] dataWithHashEnc = encrypter.encrypt(toByteArray(innerDataWithHash));
+        AES256IGECipher encrypter = new AES256IGECipher(true, aesKey, tmpAesIv);
+        byte[] dataWithHashEnc = toByteArray(encrypter.encrypt(innerDataWithHash));
 
         client.updateTimeOffset(serverDHInnerData.serverTime());
 

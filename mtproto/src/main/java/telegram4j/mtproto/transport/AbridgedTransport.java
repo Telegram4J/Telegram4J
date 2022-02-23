@@ -2,6 +2,7 @@ package telegram4j.mtproto.transport;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,20 +19,15 @@ public class AbridgedTransport implements Transport {
 
     @Override
     public ByteBuf encode(ByteBuf payload, boolean quickAck) {
-        try {
-            int length = payload.readableBytes() / 4;
-            ByteBuf buf = payload.alloc().buffer((length >= 0x7f ? 4 : 1) + payload.readableBytes());
-            if (length >= 0x7f) {
-                buf.writeByte(0x7f);
-                buf.writeMediumLE(length);
-            } else {
-                buf.writeByte(length);
-            }
-            buf.writeBytes(payload);
-            return buf;
-        } finally {
-            payload.release();
+        int length = payload.readableBytes() / 4;
+        ByteBuf header = payload.alloc().buffer((length >= 0x7f ? 4 : 1) + payload.readableBytes());
+        if (length >= 0x7f) {
+            header.writeByte(0x7f);
+            header.writeMediumLE(length);
+        } else {
+            header.writeByte(length);
         }
+        return Unpooled.wrappedBuffer(header, payload);
     }
 
     @Override
@@ -43,9 +39,8 @@ public class AbridgedTransport implements Transport {
             }
 
             int payloadLength = partialLength * 4;
-            return payload.readBytes(payloadLength);
+            return payload.readSlice(payloadLength);
         } finally {
-            payload.release();
             size.set(-1);
             completed.set(-1);
         }

@@ -12,6 +12,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
+/** Utility class with set of most-used cryptography and bytebuf methods. */
 public final class CryptoUtil {
 
     private CryptoUtil() {
@@ -69,20 +70,6 @@ public final class CryptoUtil {
             byte[] res2 = new byte[res.length - 1];
             System.arraycopy(res, 1, res2, 0, res2.length);
             return res2;
-        }
-        return res;
-    }
-
-    public static byte[] concat(byte[]... v) {
-        int len = 0;
-        for (byte[] value : v) {
-            len += value.length;
-        }
-        byte[] res = new byte[len];
-        int offset = 0;
-        for (byte[] bytes : v) {
-            System.arraycopy(bytes, 0, res, offset, bytes.length);
-            offset += bytes.length;
         }
         return res;
     }
@@ -161,12 +148,6 @@ public final class CryptoUtil {
         return Unpooled.wrappedBuffer(sha1.digest());
     }
 
-    public static byte[] substring(byte[] src, int start, int len) {
-        byte[] res = new byte[len];
-        System.arraycopy(src, start, res, 0, len);
-        return res;
-    }
-
     public static ByteBuf rsaEncrypt(ByteBuf src, PublicRsaKey key) {
         BigInteger num = fromByteArray(toByteArray(src));
         return toByteBuf(num.modPow(key.getExponent(), key.getModulus()));
@@ -229,6 +210,6 @@ public final class CryptoUtil {
         sha256a.release();
         sha256b.release();
 
-        return new AES256IGECipher(!server, toByteArray(aesKey), toByteArray(aesIV));
+        return new AES256IGECipher(!server, toByteArray(aesKey), aesIV);
     }
 }

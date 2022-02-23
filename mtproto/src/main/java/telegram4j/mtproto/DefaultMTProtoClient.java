@@ -7,6 +7,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -156,7 +157,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> stateHandler = state.asFlux()
                     .flatMap(state -> {
-                        log.debug("Updating state: {}", state);
+                        log.debug("[C:0x{}] Updating state: {}", id, state);
 
                         switch (state) {
                             case AUTHORIZATION_END:
@@ -193,8 +194,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> onConnect = state.asFlux().filter(state -> state == State.CONNECTED).next().then();
 
-            Mono<Void> inboundHandler = connection.inbound()
-                    .receive().retain()
+            Mono<Void> inboundHandler = connection.inbound().receive()
+                    .map(ByteBuf::retainedDuplicate)
                     .publishOn(Schedulers.boundedElastic())
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
@@ -250,20 +251,25 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     + Long.toHexString(longAuthKeyId)));
                         }
 
-                        ByteBuf messageKey = buf.readRetainedSlice(Long.BYTES * 2);
+                        ByteBuf messageKey = buf.readRetainedSlice(16);
 
                         ByteBuf authKey = this.authKey.getAuthKey();
                         AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
 
-                        ByteBuf decrypted = Unpooled.wrappedBuffer(cipher.decrypt(toByteArray(buf)));
+                        ByteBuf decrypted = cipher.decrypt(buf.slice());
 
                         ByteBuf messageKeyHash = sha256Digest(authKey.slice(96, 32), decrypted);
                         ByteBuf messageKeyHashSlice = messageKeyHash.slice(8, 16);
 
                         if (!messageKey.equals(messageKeyHashSlice)) {
-                            return Mono.error(new IllegalStateException("Incorrect message key. Received: "
-                                    + ByteBufUtil.hexDump(messageKey) + ", but recomputed: "
-                                    + ByteBufUtil.hexDump(messageKeyHashSlice)));
+                            return Mono.error(() -> {
+                                String messageKeyHexdump = ByteBufUtil.hexDump(messageKey);
+                                messageKey.release();
+
+                                return new IllegalStateException("Incorrect message key. Received: "
+                                        + messageKeyHexdump + ", but recomputed: "
+                                        + ByteBufUtil.hexDump(messageKeyHashSlice));
+                            });
                         }
 
                         messageKey.release();
@@ -284,8 +290,14 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         updateTimeOffset(messageId >> 32);
 
                         ByteBuf payload = decrypted.readSlice(length);
-                        TlObject obj = TlDeserializer.deserialize(payload);
-                        payload.release();
+                        TlObject obj;
+                        try {
+                            obj = TlDeserializer.deserialize(payload);
+                        } catch (Throwable t) {
+                            return Mono.error(Exceptions.propagate(t));
+                        } finally {
+                            payload.release();
+                        }
 
                         return handleServiceMessage(obj, messageId);
                     })
@@ -342,7 +354,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         ByteBuf messageKey = messageKeyHash.slice(8, 16);
                         AES256IGECipher cipher = createAesCipher(messageKey, authKey, false);
 
-                        ByteBuf encrypted = Unpooled.wrappedBuffer(cipher.encrypt(toByteArray(plainData)));
+                        ByteBuf encrypted = cipher.encrypt(plainData);
                         ByteBuf message = Unpooled.wrappedBuffer(authKeyId.retain(), messageKey, encrypted);
 
                         if (rpcLog.isDebugEnabled()) {
@@ -357,12 +369,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Flux<ByteBuf> authFlux = authOutbound.asFlux()
                     .map(method -> {
                         ByteBuf data = TlSerializer.serialize(alloc, method);
-                        ByteBuf payload = alloc.buffer(20 + data.readableBytes())
+                        ByteBuf header = alloc.buffer(20 + data.readableBytes())
                                 .writeLongLE(0) // auth key id
                                 .writeLongLE(getMessageId()) // Message id in the auth requests doesn't allow receiving payload
-                                .writeIntLE(data.readableBytes())
-                                .writeBytes(data);
-                        data.release();
+                                .writeIntLE(data.readableBytes());
+                        ByteBuf payload = Unpooled.wrappedBuffer(header, data);
 
                         if (rpcLog.isDebugEnabled()) {
                             rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(method));
@@ -473,7 +484,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private Retry authRetry(AuthorizationHandler authHandler) {
         return options.getAuthRetry()
                 .filter(t -> t instanceof AuthorizationException)
-                .doBeforeRetryAsync(v -> authHandler.start())
+                .doAfterRetryAsync(v -> authHandler.start())
                 .onRetryExhaustedThrow((spec, signal) -> {
                     state.emitNext(State.CLOSED, options.getEmissionHandler());
                     return new MTProtoException("Failed to generate auth key (" +
@@ -560,6 +571,18 @@ public class DefaultMTProtoClient implements MTProtoClient {
         }
 
         DefaultMTProtoClient client = new DefaultMTProtoClient(Type.MEDIA, dc, options);
+
+        client.authKey = authKey;
+        client.lastMessageId = lastMessageId;
+        client.timeOffset = timeOffset;
+        client.serverSalt = serverSalt;
+
+        return client;
+    }
+
+    @Override
+    public MTProtoClient createChildClient() {
+        DefaultMTProtoClient client = new DefaultMTProtoClient(type, dataCenter, options);
 
         client.authKey = authKey;
         client.lastMessageId = lastMessageId;

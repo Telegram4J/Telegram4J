@@ -114,6 +114,13 @@ public interface MTProtoClient {
     MTProtoClient createMediaClient(DataCenter dc);
 
     /**
+     * Create child client, associated with parent datacenter.
+     *
+     * @return The new child client.
+     */
+    MTProtoClient createChildClient();
+
+    /**
      * Gets a {@link Mono} which closes client and emitting empty signals.
      *
      * @return A {@link Mono} emitting empty signals on successful completion.
