@@ -1,16 +1,15 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
+import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.EntityParser;
-import telegram4j.tl.InputMedia;
-import telegram4j.tl.ReplyMarkup;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Function;
 
 @Value.Immutable(singleton = true)
-public interface EditMessageSpecDef extends Spec {
+interface EditMessageSpecDef extends Spec {
 
     @Value.Default
     default boolean noWebpage() {
@@ -19,9 +18,9 @@ public interface EditMessageSpecDef extends Spec {
 
     Optional<String> message();
 
-    Optional<InputMedia> media();
+    Optional<InputMediaSpec> media();
 
-    Optional<ReplyMarkup> replyMarkup();
+    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
 
