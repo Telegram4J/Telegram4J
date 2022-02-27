@@ -214,16 +214,18 @@ public class FileReferenceId {
                 int dcId = buf.readByte();
                 long photoId = buf.readLongLE();
 
+                long accessHash = -1;
                 byte[] fileReference = EmptyArrays.EMPTY_BYTES;
                 String thumbSizeType = "";
                 if (sizeType == PhotoSizeType.UNKNOWN) {
+                    accessHash = buf.readLongLE();
                     fileReference = TlSerialUtil.deserializeBytes(buf);
                     thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
                 }
 
                 buf.release();
 
-                return new FileReferenceId(fileType, sizeType, dcId, photoId, -1,
+                return new FileReferenceId(fileType, sizeType, dcId, photoId, accessHash,
                         fileReference, thumbSizeType, InputStickerSetEmpty.instance(),
                         -1, messageId, peer);
             }
@@ -278,87 +280,6 @@ public class FileReferenceId {
 
         data.release();
         return decoded;
-    }
-
-    /**
-     * Gets the type of file.
-     *
-     * @return The type of file.
-     */
-    public Type getFileType() {
-        return fileType;
-    }
-
-    /**
-     * Gets the size type of chat photo, if chat photo is it.
-     *
-     * @return The size type of chat photo, if applicable, otherwise {@link PhotoSizeType#UNKNOWN}.
-     */
-    public PhotoSizeType getSizeType() {
-        return sizeType;
-    }
-
-    /**
-     * Gets the id of media dc, through which can be downloaded file, if applicable.
-     *
-     * @return The id of media dc, if applicable, otherwise {@code -1}.
-     */
-    public int getDcId() {
-        return dcId;
-    }
-
-    /**
-     * Gets the id of file, if applicable.
-     *
-     * @return The id of file, if applicable, otherwise {@code -1}.
-     */
-    public long getDocumentId() {
-        return documentId;
-    }
-
-    /**
-     * Gets the access hash, if file has it.
-     *
-     * @return The access hash, if applicable, otherwise {@code -1}.
-     */
-    public long getAccessHash() {
-        return accessHash;
-    }
-
-    /**
-     * Gets a hex dump of file reference, if file has it.
-     *
-     * @return The hex dump of file reference, if applicable, otherwise {@code ""}.
-     */
-    public String getFileReference() {
-        return ByteBufUtil.hexDump(fileReference);
-    }
-
-    /**
-     * Gets the source peer id, if applicable.
-     *
-     * @return The source peer id, if applicable, otherwise {@link InputPeerEmpty}.
-     */
-    public InputPeer getPeer() {
-        return peer;
-    }
-
-    /**
-     * Gets the thumbnail transformation type, if file has it.
-     *
-     * @return The thumbnail transformation type, if applicable, otherwise {@code ""}.
-     */
-    public String getThumbSizeType() {
-        return thumbSizeType;
-    }
-
-    /**
-     * Gets the source message id, if file from message.
-     *
-     * @return The source message id, if applicable, otherwise {@code -1}.
-     */
-    public int getMessageId() {
-        return messageId;
     }
 
     /**
@@ -445,6 +366,87 @@ public class FileReferenceId {
     }
 
     /**
+     * Gets the type of file.
+     *
+     * @return The type of file.
+     */
+    public Type getFileType() {
+        return fileType;
+    }
+
+    /**
+     * Gets the size type of chat photo, if chat photo is it.
+     *
+     * @return The size type of chat photo, if applicable, otherwise {@link PhotoSizeType#UNKNOWN}.
+     */
+    public PhotoSizeType getSizeType() {
+        return sizeType;
+    }
+
+    /**
+     * Gets the id of media dc, through which can be downloaded file, if applicable.
+     *
+     * @return The id of media dc, if applicable, otherwise {@code -1}.
+     */
+    public int getDcId() {
+        return dcId;
+    }
+
+    /**
+     * Gets the id of file, if applicable.
+     *
+     * @return The id of file, if applicable, otherwise {@code -1}.
+     */
+    public long getDocumentId() {
+        return documentId;
+    }
+
+    /**
+     * Gets the access hash, if file has it.
+     *
+     * @return The access hash, if applicable, otherwise {@code -1}.
+     */
+    public long getAccessHash() {
+        return accessHash;
+    }
+
+    /**
+     * Gets a hex dump of file reference, if file has it.
+     *
+     * @return The hex dump of file reference, if applicable, otherwise {@code ""}.
+     */
+    public String getFileReference() {
+        return ByteBufUtil.hexDump(fileReference);
+    }
+
+    /**
+     * Gets the source peer id, if applicable.
+     *
+     * @return The source peer id, if applicable, otherwise {@link InputPeerEmpty}.
+     */
+    public InputPeer getPeer() {
+        return peer;
+    }
+
+    /**
+     * Gets the thumbnail transformation type, if file has it.
+     *
+     * @return The thumbnail transformation type, if applicable, otherwise {@code ""}.
+     */
+    public String getThumbSizeType() {
+        return thumbSizeType;
+    }
+
+    /**
+     * Gets the source message id, if file from message.
+     *
+     * @return The source message id, if applicable, otherwise {@code -1}.
+     */
+    public int getMessageId() {
+        return messageId;
+    }
+
+    /**
      * Creates a {@link InputFileLocation} from this reference,
      * which used in {@link telegram4j.tl.request.upload.GetFile} method.
      *
@@ -491,27 +493,6 @@ public class FileReferenceId {
         }
     }
 
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        FileReferenceId that = (FileReferenceId) o;
-        return dcId == that.dcId && documentId == that.documentId &&
-                accessHash == that.accessHash && thumbVersion == that.thumbVersion &&
-                messageId == that.messageId && fileType == that.fileType &&
-                sizeType == that.sizeType && Arrays.equals(fileReference, that.fileReference) &&
-                thumbSizeType.equals(that.thumbSizeType) &&
-                stickerSet.equals(that.stickerSet) && peer.equals(that.peer);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = Objects.hash(fileType, sizeType, dcId, documentId, accessHash,
-                thumbSizeType, stickerSet, thumbVersion, messageId, peer);
-        result = 31 * result + Arrays.hashCode(fileReference);
-        return result;
-    }
-
     /**
      * Creates a {@link ImmutableBaseInputDocument} from this reference if file type is {@link Type#DOCUMENT}.
      *
@@ -538,6 +519,27 @@ public class FileReferenceId {
         }
 
         return ImmutableBaseInputPhoto.of(documentId, accessHash, fileReference);
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        FileReferenceId that = (FileReferenceId) o;
+        return dcId == that.dcId && documentId == that.documentId &&
+                accessHash == that.accessHash && thumbVersion == that.thumbVersion &&
+                messageId == that.messageId && fileType == that.fileType &&
+                sizeType == that.sizeType && Arrays.equals(fileReference, that.fileReference) &&
+                thumbSizeType.equals(that.thumbSizeType) &&
+                stickerSet.equals(that.stickerSet) && peer.equals(that.peer);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(fileType, sizeType, dcId, documentId, accessHash,
+                thumbSizeType, stickerSet, thumbVersion, messageId, peer);
+        result = 31 * result + Arrays.hashCode(fileReference);
+        return result;
     }
 
     @Override
