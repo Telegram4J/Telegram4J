@@ -71,7 +71,7 @@ public final class AES256IGECipher {
         for (int i = 0; i < size / blockSize; i++) {
             int offset = i * blockSize;
             for (int j = 0; j < blockSize; j++) {
-                buffer[j] =  (byte) (data.getByte(offset + j) ^ x.getByte(xOffset + j));
+                buffer[j] = (byte) (data.getByte(offset + j) ^ x.getByte(xOffset + j));
             }
 
             doFinal(delegate, buffer);

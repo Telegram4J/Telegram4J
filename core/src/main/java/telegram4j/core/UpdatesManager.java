@@ -172,13 +172,15 @@ public class UpdatesManager {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                if (pts + data.pts() < data.pts()) {
+                if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts(), data.pts() + data.ptsCount(), pts);
                     preApply = getDifference();
-                } else if (pts + data.pts() > data.pts()) {
+                } else if (pts + data.ptsCount() > data.pts()) {
                     return Flux.empty();
                 }
+
+                pts = data.pts();
 
                 var message = BaseMessage.builder()
                         .out(data.out())
@@ -208,13 +210,15 @@ public class UpdatesManager {
                 UpdateShortMessage data = (UpdateShortMessage) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                if (pts + data.pts() < data.pts()) {
+                if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts(), data.pts() + data.ptsCount(), pts);
                     preApply = getDifference();
-                } else if (pts + data.pts() > data.pts()) {
+                } else if (pts + data.ptsCount() > data.pts()) {
                     return Flux.empty();
                 }
+
+                pts = data.pts();
 
                 var message = BaseMessage.builder()
                         .out(data.out())
