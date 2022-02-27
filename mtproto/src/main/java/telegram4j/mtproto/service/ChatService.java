@@ -134,7 +134,7 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
                                                      int offset, int limit, Iterable<Long> ids) {
-        return getParticipants(channel, filter, offset, limit, calculatePaginationHash(ids));
+        return Mono.defer(() -> getParticipants(channel, filter, offset, limit, calculatePaginationHash(ids)));
     }
 
     @BotCompatible

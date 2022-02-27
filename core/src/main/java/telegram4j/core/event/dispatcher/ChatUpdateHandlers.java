@@ -168,7 +168,7 @@ class ChatUpdateHandlers {
 
                             return new ChatParticipant(context.getClient(), user, d, chat.getId());
                         })
-                        .collect(Collectors.toList());
+                        .collect(Collectors.toUnmodifiableList());
                 int version = upd.version();
 
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, null, version, participants));

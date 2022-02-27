@@ -26,6 +26,13 @@ public interface Chat extends PeerEntity {
     Type getType();
 
     /**
+     * Gets title (i.e. name) of chat.
+     *
+     * @return The name of chat.
+     */
+    String getName();
+
+    /**
      * Gets the low quality chat photo, if present.
      *
      * @return The {@link ChatPhoto photo} of chat, if present.
@@ -66,6 +73,8 @@ public interface Chat extends PeerEntity {
     Optional<PeerNotifySettings> getNotifySettings();
 
     Optional<String> getAbout();
+
+    Optional<Integer> getFolderId();
 
     // Interaction methods
 

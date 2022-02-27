@@ -132,7 +132,6 @@ public class RpcEntityRetriever implements EntityRetriever {
         });
     }
 
-
     @Override
     public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds) {
         if (channelId.getType() != Id.Type.CHANNEL) {

@@ -3,6 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
+import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Message;
@@ -186,5 +187,18 @@ abstract class BaseChat implements Chat {
         return Mono.defer(() -> spec.asData(client))
                 .flatMap(media -> client.getServiceHolder().getMessageService()
                         .uploadMedia(getIdAsPeer(), media));
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BaseChat baseChat = (BaseChat) o;
+        return id.equals(baseChat.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return id.hashCode();
     }
 }

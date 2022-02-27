@@ -118,12 +118,12 @@ public final class Id {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Id id = (Id) o;
-        return value == id.value && accessHash == id.accessHash && type == id.type;
+        return value == id.value && type == id.type;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, value, accessHash);
+        return Objects.hash(value, type);
     }
 
     @Override

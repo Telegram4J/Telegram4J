@@ -1,5 +1,6 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
@@ -13,8 +14,10 @@ import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.core.util.PaginationSupport;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.channels.BaseChannelParticipants;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -22,6 +25,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 abstract class BaseChannel extends BaseChat implements Channel {
@@ -54,7 +58,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public String getTitle() {
+    public String getName() {
         return minData.title();
     }
 
@@ -275,37 +279,69 @@ abstract class BaseChannel extends BaseChat implements Channel {
                 .map(d -> {
                     // Since ChannelParticipantBanned/ChannelParticipantLeft have Peer typed id field,
                     // then most likely there may be a chat/channel as the participant
-                    PeerEntity peer = Optional.of(d.participant())
-                            .flatMap(c -> {
-                                var chat = d.chats().stream()
-                                        .filter(u -> u.identifier() == telegram4j.tl.BaseChat.ID && u.id() == participantId.asLong())
-                                        .map(u -> EntityFactory.createChat(client, u, null))
-                                        .findFirst();
-                                var user = d.users().stream()
-                                        .filter(u -> u.identifier() == BaseUser.ID && u.id() == participantId.asLong())
-                                        .map(u -> EntityFactory.createUser(client, u))
-                                        .findFirst();
+                    Peer peerId = TlEntityUtil.getUserId(d.participant());
+                    PeerEntity peerEntity;
+                    switch (peerId.identifier()) {
+                        case PeerChat.ID:
+                        case PeerChannel.ID:
+                            peerEntity = d.chats().stream()
+                                    .filter(u -> TlEntityUtil.isAvailableChat(u) && u.id() == participantId.asLong())
+                                    .map(u -> EntityFactory.createChat(client, u, null))
+                                    .findFirst()
+                                    .orElseThrow();
+                            break;
+                        case PeerUser.ID:
+                            peerEntity = d.users().stream()
+                                    .filter(u -> u.identifier() == BaseUser.ID && u.id() == participantId.asLong())
+                                    .map(u -> EntityFactory.createUser(client, u))
+                                    .findFirst()
+                                    .orElseThrow();
+                            break;
+                        default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
+                    }
 
-                                switch (c.identifier()) {
-                                    case ChannelParticipantBanned.ID:
-                                        ChannelParticipantBanned c1 = (ChannelParticipantBanned) c;
-                                        if (c1.peer().identifier() == PeerUser.ID) {
-                                            return user;
-                                        }
-                                        return chat;
-                                    case ChannelParticipantLeft.ID:
-                                        ChannelParticipantLeft c2 = (ChannelParticipantLeft) c;
-                                        if (c2.peer().identifier() == PeerUser.ID) {
-                                            return user;
-                                        }
-                                        return chat;
-                                    default:
-                                        return user;
+                    return new ChatParticipant(client, peerEntity, d.participant(), id);
+                });
+    }
+
+    @Override
+    public Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit) {
+        InputChannel channel = TlEntityUtil.toInputChannel(getIdAsPeer());
+
+        return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
+                .getParticipants(channel, filter, o, limit, 0)
+                .cast(BaseChannelParticipants.class), BaseChannelParticipants::count, offset, limit)
+                .flatMap(data -> {
+                    var chatsMap = data.chats().stream()
+                            .filter(TlEntityUtil::isAvailableChat)
+                            .map(c -> EntityFactory.createChat(client, c, null))
+                            .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
+                    var usersMap = data.users().stream()
+                            .filter(u -> u.identifier() == BaseUser.ID)
+                            .map(u -> EntityFactory.createUser(client, u))
+                            .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+
+                    var participants = data.participants().stream()
+                            .map(c -> {
+                                Peer peerId = TlEntityUtil.getUserId(c);
+                                long rawPeerId = TlEntityUtil.getRawPeerId(peerId);
+                                PeerEntity peerEntity;
+                                switch (peerId.identifier()) {
+                                    case PeerChat.ID:
+                                    case PeerChannel.ID:
+                                        peerEntity = chatsMap.get(rawPeerId);
+                                        break;
+                                    case PeerUser.ID:
+                                        peerEntity = usersMap.get(rawPeerId);
+                                        break;
+                                    default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
                                 }
-                            })
-                            .orElseThrow();
 
-                    return new ChatParticipant(client, peer, d.participant(), id);
+                                return new ChatParticipant(client, peerEntity, c, id);
+                            })
+                            .collect(Collectors.toList());
+
+                    return Flux.fromIterable(participants);
                 });
     }
 
@@ -326,26 +362,5 @@ abstract class BaseChannel extends BaseChat implements Channel {
                 default: throw new IllegalStateException();
             }
         });
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (!(o instanceof BaseChannel)) return false;
-        BaseChannel that = (BaseChannel) o;
-        return minData.equals(that.minData) && Objects.equals(fullData, that.fullData);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(minData, fullData);
-    }
-
-    @Override
-    public String toString() {
-        return "BaseChannel{" +
-                "minData=" + minData +
-                ", fullData=" + fullData +
-                '}';
     }
 }

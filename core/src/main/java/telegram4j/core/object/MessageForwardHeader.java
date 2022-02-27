@@ -38,7 +38,7 @@ public class MessageForwardHeader implements TelegramObject {
         return Instant.ofEpochSecond(data.date());
     }
 
-    public Optional<Integer> getChannelPost() {
+    public Optional<Integer> getChannelPostId() {
         return Optional.ofNullable(data.channelPost());
     }
 

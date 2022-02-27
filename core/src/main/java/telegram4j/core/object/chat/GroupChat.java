@@ -28,20 +28,25 @@ public final class GroupChat extends BaseChat {
     private final telegram4j.tl.BaseChatFull fullData;
     @Nullable
     private final ExportedChatInvite exportedChatInvite;
+    @Nullable
+    private final List<ChatParticipant> chatParticipants;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.exportedChatInvite = null;
+        this.chatParticipants = null;
     }
 
     public GroupChat(MTProtoTelegramClient client, BaseChatFull fullData,
-                     telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite) {
+                     telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite,
+                     @Nullable List<ChatParticipant> chatParticipants) {
         super(client, Id.ofChat(minData.id()), Type.GROUP);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.exportedChatInvite = exportedChatInvite;
+        this.chatParticipants = chatParticipants;
     }
 
     @Override
@@ -71,14 +76,15 @@ public final class GroupChat extends BaseChat {
 
     // ChatMin fields
 
+    @Override
+    public String getName() {
+        return minData.title();
+    }
+
     public Optional<Id> getMigratedToChannelId() {
         return Optional.ofNullable(minData.migratedTo())
                 .map(c -> (BaseInputChannel) c)
                 .map(c -> Id.ofChannel(c.channelId(), c.accessHash()));
-    }
-
-    public String getTitle() {
-        return minData.title();
     }
 
     public int getParticipantsCount() {
@@ -112,15 +118,20 @@ public final class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData).map(BaseChatFull::about);
     }
 
-    public Optional<ChatParticipants> getParticipants() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::participants);
-    }
-
     @Override
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::notifySettings)
                 .map(d -> new PeerNotifySettings(client, d));
+    }
+
+    @Override
+    public Optional<Integer> getFolderId() {
+        return Optional.ofNullable(fullData).map(BaseChatFull::folderId);
+    }
+
+    public Optional<List<ChatParticipant>> getParticipants() {
+        return Optional.ofNullable(chatParticipants);
     }
 
     public Optional<ExportedChatInvite> getExportedInvite() {
@@ -135,10 +146,6 @@ public final class GroupChat extends BaseChat {
                         .collect(Collectors.toList()));
     }
 
-    public Optional<Integer> getFolderId() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::folderId);
-    }
-
     public Optional<InputGroupCall> getCall() {
         return Optional.ofNullable(fullData).map(BaseChatFull::call);
     }
@@ -151,19 +158,6 @@ public final class GroupChat extends BaseChat {
 
     public Optional<String> getThemeEmoticon() {
         return Optional.ofNullable(fullData).map(BaseChatFull::themeEmoticon);
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        GroupChat groupChat = (GroupChat) o;
-        return minData.equals(groupChat.minData) && Objects.equals(fullData, groupChat.fullData);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(minData, fullData);
     }
 
     @Override

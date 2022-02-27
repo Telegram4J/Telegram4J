@@ -57,6 +57,9 @@ public final class SupergroupChat extends BaseChannel {
 
     @Override
     public String toString() {
-        return "SupergroupChat{} " + super.toString();
+        return "SupergroupChat{" +
+                "minData=" + minData +
+                ", fullData=" + fullData +
+                '}';
     }
 }

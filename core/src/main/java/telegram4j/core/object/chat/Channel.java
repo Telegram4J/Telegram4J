@@ -1,8 +1,10 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.*;
+import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 
 import java.time.Instant;
@@ -18,13 +20,6 @@ public interface Channel extends Chat {
      * @return The {@link EnumSet} of enabled channel flags.
      */
     EnumSet<Flag> getFlags();
-
-    /**
-     * Gets title (i.e. name) of channel.
-     *
-     * @return The name of channel.
-     */
-    String getTitle();
 
     /**
      * Gets username of channel, if present. This username can be used to retrieve channel
@@ -68,8 +63,6 @@ public interface Channel extends Chat {
 
     Optional<Integer> getAvailableMinId();
 
-    Optional<Integer> getFolderId();
-
     Optional<List<String>> getPendingSuggestions();
 
     Optional<Integer> getRequestsPending();
@@ -111,6 +104,8 @@ public interface Channel extends Chat {
     // Interaction methods
 
     Mono<ChatParticipant> getParticipant(Id participantId);
+
+    Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit);
 
     enum Flag {
         // ChannelMin flags

@@ -19,6 +19,9 @@ public final class BroadcastChannel extends BaseChannel {
 
     @Override
     public String toString() {
-        return "BroadcastChannel{} " + super.toString();
+        return "BroadcastChannel{" +
+                "minData=" + minData +
+                ", fullData=" + fullData +
+                '}';
     }
 }

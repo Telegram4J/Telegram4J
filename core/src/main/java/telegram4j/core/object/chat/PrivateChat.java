@@ -42,6 +42,11 @@ public final class PrivateChat extends BaseChat {
     }
 
     @Override
+    public String getName() {
+        return user.getFullName();
+    }
+
+    @Override
     public Optional<ChatPhoto> getMinPhoto() {
         return user.getMinPhoto();
     }
@@ -72,16 +77,8 @@ public final class PrivateChat extends BaseChat {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PrivateChat that = (PrivateChat) o;
-        return user.equals(that.user) && Objects.equals(selfUser, that.selfUser);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(user, selfUser);
+    public Optional<Integer> getFolderId() {
+        return user.getFolderId();
     }
 
     @Override

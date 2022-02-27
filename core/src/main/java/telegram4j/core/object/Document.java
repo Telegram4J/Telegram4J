@@ -10,16 +10,21 @@ import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.InputPeer;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * General type of the documents.
+ * All subtypes are inferred from {@link BaseDocument#attributes()} except {@link telegram4j.tl.DocumentAttributeFilename},
+ * that pre-inferred to {@link #getFileName()} for this type.
+ */
 public class Document implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final BaseDocument data;
-    private final String fileReference;
     @Nullable
     private final String fileName;
 
@@ -29,7 +34,6 @@ public class Document implements TelegramObject {
                     @Nullable String fileName, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
-        this.fileReference = ByteBufUtil.hexDump(data.fileReference());
         this.fileName = fileName;
 
         this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer).serialize();
@@ -53,11 +57,11 @@ public class Document implements TelegramObject {
     }
 
     public String getFileReference() {
-        return fileReference;
+        return ByteBufUtil.hexDump(data.fileReference());
     }
 
-    public int getDate() {
-        return data.date();
+    public Instant getCreationTimestamp() {
+        return Instant.ofEpochSecond(data.date());
     }
 
     public String getMimeType() {

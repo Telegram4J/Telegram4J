@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Mono;
-import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
@@ -9,6 +8,7 @@ import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
+import telegram4j.core.spec.MessageFields;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static reactor.function.TupleUtils.function;
 import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
 public class Message implements TelegramObject {
@@ -181,8 +182,7 @@ public class Message implements TelegramObject {
                     .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s))))
                     .orElseGet(() -> Mono.just(Tuples.of(spec.message().orElse(""), List.of())));
 
-            return parsed.flatMap(TupleUtils.function((txt, ent) -> client.getServiceHolder().getMessageService()
-                    .editMessage(EditMessage.builder()
+            return parsed.map(function((txt, ent) -> EditMessage.builder()
                             .message(txt.isEmpty() ? null : txt)
                             .entities(ent.isEmpty() ? null : ent)
                             .noWebpage(spec.noWebpage())
@@ -191,10 +191,15 @@ public class Message implements TelegramObject {
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
                                     .orElse(null))
-                            .replyMarkup(spec.replyMarkup().orElse(null))
-                            .media(spec.media().orElse(null))
+                            .replyMarkup(spec.replyMarkup().map(MessageFields.ReplyMarkupSpec::asData).orElse(null))
                             .peer(getChatIdAsPeer())
-                            .build())))
+                            .build()))
+                    .flatMap(editMessage -> Mono.justOrEmpty(spec.media())
+                            .flatMap(s -> s.asData(client))
+                            .map(editMessage::withMedia)
+                            .defaultIfEmpty(editMessage))
+                    .flatMap(editMessage -> client.getServiceHolder()
+                            .getMessageService().editMessage(editMessage))
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
         });
     }
@@ -229,13 +234,13 @@ public class Message implements TelegramObject {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Message message = (Message) o;
-        return getBaseData().equals(message.getBaseData()) && resolvedChatId.equals(message.resolvedChatId);
+        Message that = (Message) o;
+        return getBaseData().id() == that.getBaseData().id();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getBaseData(), resolvedChatId);
+        return Integer.hashCode(getBaseData().id());
     }
 
     @Override

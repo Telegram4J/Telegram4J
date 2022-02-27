@@ -1,5 +1,6 @@
 package telegram4j.core.object.action;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
@@ -21,6 +22,19 @@ public class BaseMessageAction implements MessageAction {
     @Override
     public Type getType() {
         return type;
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BaseMessageAction that = (BaseMessageAction) o;
+        return type == that.type;
+    }
+
+    @Override
+    public int hashCode() {
+        return type.hashCode();
     }
 
     @Override

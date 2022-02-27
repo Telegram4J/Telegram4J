@@ -116,7 +116,12 @@ public class StoreLayoutImpl implements StoreLayout {
                     .map(i -> new MessageId(i, -1))
                     .collect(Collectors.toSet());
 
-            var messages = this.messages.getAllPresent(ids).values();
+            var messagesMap = this.messages.getAllPresent(ids);
+            if (messagesMap.isEmpty()) {
+                return null;
+            }
+
+            var messages = messagesMap.values();
 
             Set<User> users = new HashSet<>();
             Set<Chat> chats = new HashSet<>();
@@ -162,7 +167,12 @@ public class StoreLayoutImpl implements StoreLayout {
                     .map(i -> new MessageId(i, channelId))
                     .collect(Collectors.toSet());
 
-            var messages = this.messages.getAllPresent(ids).values();
+            var messagesMap = this.messages.getAllPresent(ids);
+            if (messagesMap.isEmpty()) {
+                return null;
+            }
+
+            var messages = messagesMap.values();
 
             Set<User> users = new HashSet<>();
             Set<Chat> chats = new HashSet<>();
@@ -717,7 +727,8 @@ public class StoreLayoutImpl implements StoreLayout {
                     users.add(userInfo.min);
                 }
                 break;
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
+            default:
+                throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 

@@ -290,16 +290,14 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         updateTimeOffset(messageId >> 32);
 
                         ByteBuf payload = decrypted.readSlice(length);
-                        TlObject obj;
                         try {
-                            obj = TlDeserializer.deserialize(payload);
+                            TlObject obj = TlDeserializer.deserialize(payload);
+                            return handleServiceMessage(obj, messageId);
                         } catch (Throwable t) {
                             return Mono.error(Exceptions.propagate(t));
                         } finally {
                             payload.release();
                         }
-
-                        return handleServiceMessage(obj, messageId);
                     })
                     .then();
 

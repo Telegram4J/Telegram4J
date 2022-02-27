@@ -127,6 +127,29 @@ public class TlEntityUtil {
         }
     }
 
+    public static Peer getUserId(ChatParticipant data) {
+        return getUserId0(data);
+    }
+
+    public static Peer getUserId(ChannelParticipant data) {
+        return getUserId0(data);
+    }
+
+    private static Peer getUserId0(TlObject data) {
+        switch (data.identifier()) {
+            case BaseChatParticipant.ID:
+            case ChatParticipantAdmin.ID:
+            case ChatParticipantCreator.ID: return ImmutablePeerUser.of(((ChatParticipant) data).userId());
+            case BaseChannelParticipant.ID: return ImmutablePeerUser.of(((BaseChannelParticipant) data).userId());
+            case ChannelParticipantSelf.ID: return ImmutablePeerUser.of(((ChannelParticipantSelf) data).userId());
+            case ChannelParticipantAdmin.ID: return ImmutablePeerUser.of(((ChannelParticipantAdmin) data).userId());
+            case ChannelParticipantBanned.ID: return ((ChannelParticipantBanned) data).peer();
+            case ChannelParticipantLeft.ID: return ((ChannelParticipantLeft) data).peer();
+            case ChannelParticipantCreator.ID: return ImmutablePeerUser.of(((ChannelParticipantCreator) data).userId());
+            default: throw new IllegalArgumentException("Unknown chat/channel participant type: " + data);
+        }
+    }
+
     @Nullable
     public static <T extends TlObject, R extends T> R unmapEmpty(@Nullable T obj, Class<R> impl) {
         if (obj == null || obj instanceof EmptyObject) {

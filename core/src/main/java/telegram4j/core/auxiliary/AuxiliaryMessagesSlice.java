@@ -9,21 +9,21 @@ import telegram4j.core.object.chat.Chat;
 import java.util.List;
 import java.util.Optional;
 
-// TODO: check whether chats list always contains only channels
-public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
+public class AuxiliaryMessagesSlice extends AuxiliaryMessages {
+
     private final boolean inexact;
-    private final int pts;
     private final int count;
+    @Nullable
+    private final Integer nextRate;
     @Nullable
     private final Integer offsetId;
 
-    public AuxiliaryChannelMessages(MTProtoTelegramClient client,
-                                    boolean inexact, int pts, int count, @Nullable Integer offsetId,
-                                    List<Message> messages, List<Chat> chats, List<User> users) {
+    public AuxiliaryMessagesSlice(MTProtoTelegramClient client, List<Message> messages, List<Chat> chats, List<User> users,
+                                  boolean inexact, int count, @Nullable Integer nextRate, @Nullable Integer offsetId) {
         super(client, messages, chats, users);
         this.inexact = inexact;
-        this.pts = pts;
         this.count = count;
+        this.nextRate = nextRate;
         this.offsetId = offsetId;
     }
 
@@ -31,12 +31,12 @@ public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
         return inexact;
     }
 
-    public int getPts() {
-        return pts;
-    }
-
     public int getCount() {
         return count;
+    }
+
+    public Optional<Integer> getNextRate() {
+        return Optional.ofNullable(nextRate);
     }
 
     public Optional<Integer> getOffsetId() {
@@ -45,10 +45,10 @@ public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
 
     @Override
     public String toString() {
-        return "AuxiliaryChannelMessages{" +
+        return "AuxiliaryMessagesSlice{" +
                 "inexact=" + inexact +
-                ", pts=" + pts +
                 ", count=" + count +
+                ", nextRate=" + nextRate +
                 ", offsetId=" + offsetId +
                 "} " + super.toString();
     }

@@ -32,6 +32,7 @@ import telegram4j.core.object.action.MessageActionSecureValuesSentMe;
 import telegram4j.core.object.action.MessageActionSetChatTheme;
 import telegram4j.core.object.action.*;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.*;
 import telegram4j.core.object.markup.ReplyInlineMarkup;
 import telegram4j.core.object.markup.ReplyKeyboardForceReply;
@@ -71,7 +72,10 @@ import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class EntityFactory {
 
@@ -184,8 +188,34 @@ public final class EntityFactory {
                     return new BroadcastChannel(client, channelFull, channelMin, exportedChatInvite);
                 }
 
-                return new GroupChat(client, (telegram4j.tl.BaseChatFull) chatFull.fullChat(),
-                        (telegram4j.tl.BaseChat) minData, exportedChatInvite);
+                var usersMap = chatFull.users().stream()
+                        .filter(u -> u.identifier() == BaseUser.ID)
+                        .map(d -> createUser(client, d))
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+
+                var chat = (telegram4j.tl.BaseChatFull) chatFull.fullChat();
+                List<ChatParticipant> chatParticipants;
+                Id chatId = Id.ofChat(chat.id());
+                switch (chat.participants().identifier()) {
+                    case BaseChatParticipants.ID: {
+                        BaseChatParticipants d = (BaseChatParticipants) chat.participants();
+                        chatParticipants = d.participants().stream()
+                                .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
+                                .collect(Collectors.toUnmodifiableList());
+                        break;
+                    }
+                    case ChatParticipantsForbidden.ID: {
+                        ChatParticipantsForbidden d = (ChatParticipantsForbidden) chat.participants();
+                        chatParticipants = Optional.ofNullable(d.selfParticipant())
+                                .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
+                                .map(List::of)
+                                .orElse(null);
+                        break;
+                    }
+                    default: throw new IllegalStateException("Unknown chat participants type: " + chat.participants());
+                }
+
+                return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData, exportedChatInvite, chatParticipants);
             default:
                 throw new IllegalArgumentException("Unknown chat type: " + possibleChat);
         }

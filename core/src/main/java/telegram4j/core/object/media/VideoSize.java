@@ -54,4 +54,11 @@ public class VideoSize implements TelegramObject {
     public int hashCode() {
         return data.hashCode();
     }
+
+    @Override
+    public String toString() {
+        return "VideoSize{" +
+                "data=" + data +
+                '}';
+    }
 }

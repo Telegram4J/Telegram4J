@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import io.netty.buffer.ByteBufUtil;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.VideoSize;
@@ -82,6 +83,19 @@ public class Photo implements TelegramObject {
 
     public int getDcId() {
         return data.dcId();
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Photo photo = (Photo) o;
+        return data.equals(photo.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
     }
 
     @Override

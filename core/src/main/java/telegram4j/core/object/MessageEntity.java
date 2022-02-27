@@ -53,6 +53,7 @@ public class MessageEntity implements TelegramObject {
     }
 
     public Optional<Id> getUserId() {
+        // InputMessageEntityMentionName doesn't handle because it's an input entity, that maps into the MessageEntityMentionName
         return data instanceof MessageEntityMentionName
                 ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
                 : Optional.empty();
@@ -63,12 +64,12 @@ public class MessageEntity implements TelegramObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         MessageEntity that = (MessageEntity) o;
-        return data.equals(that.data) && content.equals(that.content);
+        return data.equals(that.data);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(data, content);
+        return data.hashCode();
     }
 
     @Override

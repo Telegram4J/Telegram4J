@@ -48,12 +48,31 @@ public class User implements PeerEntity {
 
     // MinUser fields
 
+    /**
+     * Gets first name of user, if present.
+     *
+     * @return The first name of user, if present.
+     */
     public Optional<String> getFirstName() {
         return Optional.ofNullable(minData.firstName());
     }
 
+    /**
+     * Gets last name of user, if present.
+     *
+     * @return The last name of user, if present.
+     */
     public Optional<String> getLastName() {
         return Optional.ofNullable(minData.lastName());
+    }
+
+    /**
+     * Gets full name of user in format <b>first name last name</b>, or empty string if first and last name don't present.
+     *
+     * @return The full name of user.
+     */
+    public String getFullName() {
+        return getFirstName().map(s -> s + " ").orElse("") + getLastName().orElse("");
     }
 
     public Optional<String> getUsername() {
@@ -155,13 +174,13 @@ public class User implements PeerEntity {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        User user = (User) o;
-        return minData.equals(user.minData) && Objects.equals(fullData, user.fullData);
+        User that = (User) o;
+        return getId().equals(that.getId());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(minData, fullData);
+        return getId().hashCode();
     }
 
     @Override

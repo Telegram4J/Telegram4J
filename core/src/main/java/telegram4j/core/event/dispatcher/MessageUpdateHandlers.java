@@ -147,7 +147,7 @@ class MessageUpdateHandlers {
 
                     var oldMessages = re.getMessages().stream()
                             .map(d -> EntityFactory.createMessage(context.getClient(), d, chatId))
-                            .collect(Collectors.toList());
+                            .collect(Collectors.toUnmodifiableList());
 
                     boolean scheduled = context.getUpdate().identifier() == UpdateDeleteScheduledMessages.ID;
 
