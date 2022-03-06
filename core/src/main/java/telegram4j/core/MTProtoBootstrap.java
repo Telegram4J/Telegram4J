@@ -22,7 +22,7 @@ import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.object.Id;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserFactory;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
@@ -60,7 +60,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private IntPredicate gzipPackingPredicate;
 
     @Nullable
-    private Function<String, EntityParser> defaultEntityParserFactory;
+    private EntityParserFactory defaultEntityParserFactory;
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
     private UpdatesMapper updatesMapper = DefaultUpdatesMapper.instance;
 
@@ -138,7 +138,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setDefaultEntityParserFactory(Function<String, EntityParser> defaultEntityParserFactory) {
+    public MTProtoBootstrap<O> setDefaultEntityParserFactory(EntityParserFactory defaultEntityParserFactory) {
         this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory, "defaultEntityParserFactory");
         return this;
     }

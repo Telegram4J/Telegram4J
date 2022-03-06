@@ -5,7 +5,7 @@ import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaPoll;
@@ -13,7 +13,6 @@ import telegram4j.tl.Poll;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 @Value.Immutable(builder = false)
 interface InputMediaPollSpecDef extends InputMediaSpec {
@@ -29,13 +28,13 @@ interface InputMediaPollSpecDef extends InputMediaSpec {
 
     Optional<String> solution();
 
-    Optional<Function<String, EntityParser>> parser();
+    Optional<EntityParserFactory> parser();
 
     @Override
     default Mono<InputMedia> asData(MTProtoTelegramClient client) {
         var parsed = parser()
                 .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                .flatMap(p -> solution().map(s -> EntityParserSupport.parse(client, p.apply(s))))
+                .flatMap(p -> solution().map(s -> EntityParserSupport.parse(client, p.apply(s.trim()))))
                 .orElseGet(() -> Mono.just(Tuples.of(solution().orElse(""), List.of())));
 
         return parsed.map(TupleUtils.function((txt, ent) -> InputMediaPoll.builder()

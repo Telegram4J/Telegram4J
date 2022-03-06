@@ -1,11 +1,10 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserFactory;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.function.Function;
 
 @Value.Immutable
 interface SendMessageSpecDef extends Spec {
@@ -34,7 +33,7 @@ interface SendMessageSpecDef extends Spec {
 
     String message();
 
-    Optional<Function<String, EntityParser>> parser();
+    Optional<EntityParserFactory> parser();
 
     Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
 

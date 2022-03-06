@@ -179,7 +179,7 @@ public class Message implements TelegramObject {
         return Mono.defer(() -> {
             var parsed = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                    .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s))))
+                    .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s.trim()))))
                     .orElseGet(() -> Mono.just(Tuples.of(spec.message().orElse(""), List.of())));
 
             return parsed.map(function((txt, ent) -> EditMessage.builder()

@@ -2,22 +2,21 @@ package telegram4j.core;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.EventDispatcher;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserFactory;
 import telegram4j.mtproto.store.StoreLayout;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 
 /** Shared MTProto telegram client resources. */
 public class MTProtoResources {
     private final StoreLayout storeLayout;
     private final EventDispatcher eventDispatcher;
     @Nullable
-    private final Function<String, EntityParser> defaultEntityParser;
+    private final EntityParserFactory defaultEntityParser;
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
-                     @Nullable Function<String, EntityParser> defaultEntityParser) {
+                     @Nullable EntityParserFactory defaultEntityParser) {
         this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
         this.defaultEntityParser = defaultEntityParser;
@@ -47,7 +46,7 @@ public class MTProtoResources {
      *
      * @return The factory of message entity parser, if present.
      */
-    public Optional<Function<String, EntityParser>> getDefaultEntityParser() {
+    public Optional<EntityParserFactory> getDefaultEntityParser() {
         return Optional.ofNullable(defaultEntityParser);
     }
 }

@@ -3,11 +3,10 @@ package telegram4j.core.spec;
 import org.immutables.value.Value;
 import telegram4j.core.object.PeerId;
 import telegram4j.core.spec.media.InputMediaSpec;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.EntityParserFactory;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.function.Function;
 
 @Value.Immutable
 interface SendMediaSpecDef extends Spec {
@@ -42,7 +41,7 @@ interface SendMediaSpecDef extends Spec {
 
     Optional<Instant> scheduleTimestamp();
 
-    Optional<Function<String, EntityParser>> parser();
+    Optional<EntityParserFactory> parser();
 
     Optional<PeerId> sendAs();
 }

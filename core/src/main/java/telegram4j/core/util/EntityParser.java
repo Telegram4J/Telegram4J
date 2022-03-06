@@ -10,6 +10,13 @@ package telegram4j.core.util;
 public interface EntityParser {
 
     /**
+     * Gets the original text.
+     *
+     * @return The original text.
+     */
+    String source();
+
+    /**
      * Gets the text cleared from markup.
      *
      * @return The text cleared from markup.

@@ -11,17 +11,28 @@ import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.regex.Pattern;
 
 public final class EntityParserSupport {
 
     public static final Pattern USER_LINK_ID_PATTERN = Pattern.compile("^tg://user\\?id=(\\d{1,19})$", Pattern.CASE_INSENSITIVE);
+    // Patterns are taken from TDLib, https://github.com/tdlib/td/blob/master/td/telegram/MessageEntity.cpp
+    public static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "([a-z0-9_-]{0,26}[.+]){0,10}[a-z0-9_-]{1,35}@(([a-z0-9][a-z0-9_-]{0,28})?[a-z0-9][.]){1,6}[a-z]{2,8}",
+            Pattern.CASE_INSENSITIVE);
+    public static final Pattern HASHTAG_PATTERN = Pattern.compile(
+            "(?<=^|[^\\d_\\pL\\x{200c}])#([\\d_\\pL\\x{200c}]{1,256})(?![\\d_\\pL\\x{200c}]*#)",
+            Pattern.UNICODE_CASE);
+    public static final Pattern BOT_COMMAND_PATTERN = Pattern.compile(
+            "(?<!\\b|[/<>])/([a-zA-Z0-9_]{1,64})(?:@([a-zA-Z0-9_]{3,32}))?(?!\\B|[/<>])",
+            Pattern.UNICODE_CASE);
+    public static final Pattern CASHTAG_PATTERN = Pattern.compile(
+            "(?<=^|[^$\\d_\\pL\\x{200c}])\\$(1INCH|[A-Z]{1,8})(?![$\\d_\\pL\\x{200c}])",
+            Pattern.UNICODE_CASE);
+    public static final Pattern BANK_CARD_PATTERN = Pattern.compile("(?<=^|[^+_\\pL\\d-.,])[\\d -]{13,}([^_\\pL\\d-]|$)");
 
-    private EntityParserSupport() {}
-
-    public static final Function<String, EntityParser> MARKDOWN_V2 = MarkdownV2EntityParser::new;
-    public static final Function<String, EntityParser> HTML = HtmlEntityParser::new;
+    private EntityParserSupport() {
+    }
 
     public static Mono<Tuple2<String, List<MessageEntity>>> parse(MTProtoTelegramClient client, EntityParser parser) {
         List<EntityToken> tokens = new LinkedList<>();
@@ -106,7 +117,7 @@ public final class EntityParserSupport {
                                 .resolveUser(userId)
                                 .map(p -> ImmutableInputMessageEntityMentionName.of(offset, length, p))
                                 .subscribe(sink::next, sink::error, sink::complete);
-                    break;
+                        break;
                     case TEXT_URL:
                         sink.next(ImmutableMessageEntityTextUrl.of(offset, length,
                                 Objects.requireNonNullElse(begin.arg(), "")));

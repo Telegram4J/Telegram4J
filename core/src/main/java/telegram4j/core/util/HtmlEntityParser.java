@@ -16,9 +16,13 @@ public class HtmlEntityParser implements EntityParser {
     EntityToken prev = EntityToken.UNKNOWN;
 
     HtmlEntityParser(String str) {
-        str = str.trim();
         this.striped = new StringBuilder(str.length());
         this.str = str;
+    }
+
+    @Override
+    public String source() {
+        return str;
     }
 
     @Override
