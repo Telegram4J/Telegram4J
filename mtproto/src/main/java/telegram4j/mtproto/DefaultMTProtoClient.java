@@ -64,7 +64,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     private static final int maxMissedPong = 3;
     private static final Throwable RETRY = new RetryConnectException();
-    private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(10);
+    private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
     private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(30);
     private static final int PING_TIMEOUT = (int) PING_QUERY_PERIOD.multipliedBy(2).getSeconds();
 
@@ -386,6 +386,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> ping = pingEmitter.ticks()
+                    .delayUntil(l -> onConnect)
                     .flatMap(tick -> {
                         long now = System.nanoTime();
                         lastPong.compareAndSet(0, now);
@@ -398,6 +399,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                                 log.debug("[C:0x{}] Session updated due server forgot it", id);
 
+                                pingEmitter.dispose();
                                 return Mono.empty();
                             }
                         }

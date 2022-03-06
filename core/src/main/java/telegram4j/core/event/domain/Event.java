@@ -13,6 +13,11 @@ public abstract class Event {
         this.client = Objects.requireNonNull(client, "client");
     }
 
+    /**
+     * Gets client that applied this event.
+     *
+     * @return The client applying this event.
+     */
     public final MTProtoTelegramClient getClient() {
         return client;
     }

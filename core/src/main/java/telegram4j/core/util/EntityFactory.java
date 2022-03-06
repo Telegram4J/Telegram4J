@@ -112,6 +112,7 @@ public final class EntityFactory {
         }
     }
 
+    @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
                                   @Nullable BaseUser selfUserData) {
         switch (possibleChat.identifier()) {
@@ -123,7 +124,11 @@ public final class EntityFactory {
                                 u.id() == userFull.fullUser().id())
                         .map(u -> (BaseUser) u)
                         .findFirst()
-                        .orElseThrow();
+                        .orElse(null);
+
+                if (minData == null) {
+                    return null;
+                }
 
                 User mappedFullUser = new User(client, userFull.fullUser(), minData);
                 User selfUser = selfUserData != null ? new User(client, selfUserData) : null;
@@ -156,7 +161,11 @@ public final class EntityFactory {
                         .filter(c -> (c.identifier() == BaseChat.ID || c.identifier() == Channel.ID) &&
                                 c.id() == chatFull.fullChat().id())
                         .findFirst()
-                        .orElseThrow();
+                        .orElse(null);
+
+                if (minData == null) {
+                    return null;
+                }
 
                 var exportedChatInvite = Optional.of(chatFull.fullChat())
                         .map(c -> {

@@ -97,7 +97,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     return asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel);
                 }))
                 .ofType(telegram4j.tl.Chat.class)
-                .map(c -> EntityFactory.createChat(client, c, null));
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override // TODO: or also try fetch user?
@@ -113,7 +113,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     }
                     return asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getFullChannel);
                 }))
-                .map(c -> EntityFactory.createChat(client, c, null));
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override

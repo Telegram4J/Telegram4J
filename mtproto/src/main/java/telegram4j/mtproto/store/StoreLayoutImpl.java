@@ -516,12 +516,13 @@ public class StoreLayoutImpl implements StoreLayout {
     @Nullable
     private PartialFields<Chat, ChatFull> saveChatFull(telegram4j.tl.messages.ChatFull chat) {
         ChatFull chat0 = copy(chat.fullChat());
-        Chat chat1 = copy(chat.chats().stream()
+        var chat1 = chat.chats().stream()
                 .filter(c -> isAccessible(c) && c.id() == chat0.id())
                 .findFirst()
-                .orElseThrow());
+                .map(StoreLayoutImpl::copy)
+                .orElse(null);
 
-        if (!isAccessible(chat1)) {
+        if (chat1 == null || !isAccessible(chat1)) {
             return null;
         }
 
@@ -534,14 +535,15 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Nullable
     private PartialFields<ImmutableBaseUser, ImmutableUserFull> saveUserFull(telegram4j.tl.users.UserFull user) {
-        ImmutableUserFull user0 = ImmutableUserFull.copyOf(user.fullUser());
-        ImmutableBaseUser user1 = ImmutableBaseUser.copyOf(user.users().stream()
+        var user0 = ImmutableUserFull.copyOf(user.fullUser());
+        var user1 = user.users().stream()
                 .filter(u -> u.identifier() == BaseUser.ID && u.id() == user0.id())
                 .map(u -> (BaseUser) u)
                 .findFirst()
-                .orElseThrow());
+                .map(ImmutableBaseUser::copyOf)
+                .orElse(null);
 
-        if (!isAccessible(user1)) {
+        if (user1 == null || !isAccessible(user1)) {
             return null;
         }
 

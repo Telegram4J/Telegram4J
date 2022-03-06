@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Stripped down version of {@link telegram4j.tl.request.InitConnection} settings,
+ * Striped down version of {@link telegram4j.tl.request.InitConnection} settings,
  * used in connection initialization.
  */
 public class InitConnectionParams {

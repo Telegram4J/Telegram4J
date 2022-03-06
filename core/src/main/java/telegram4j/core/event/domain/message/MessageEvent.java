@@ -10,6 +10,7 @@ import telegram4j.core.event.domain.Event;
  *     <li>{@link SendMessageEvent}: a new ordinary or scheduled message in the chat/channel/user was sent.</li>
  *     <li>{@link EditMessageEvent}: an message was updated, e.g., updated text, added reactions.</li>
  *     <li>{@link DeleteMessagesEvent}: a message or batch of messages was deleted.</li>
+ *     <li>{@link UpdatePinnedMessagesEvent}: a message or batch of messages was pinned/unpinned.</li>
  * </ul>
  */
 public abstract class MessageEvent extends Event {
