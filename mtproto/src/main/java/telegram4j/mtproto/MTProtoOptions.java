@@ -6,25 +6,27 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
+import java.util.List;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public class MTProtoOptions {
-    private final DataCenter datacenter;
-    private final TcpClient tcpClient;
-    private final Supplier<Transport> transport;
-    private final StoreLayout storeLayout;
-    private final int acksSendThreshold;
-    private final Sinks.EmitFailureHandler emissionHandler;
-    private final RetryBackoffSpec retry;
-    private final RetryBackoffSpec authRetry;
-    private final IntPredicate gzipPackingPredicate;
+    protected final DataCenter datacenter;
+    protected final TcpClient tcpClient;
+    protected final Supplier<Transport> transport;
+    protected final StoreLayout storeLayout;
+    protected final int acksSendThreshold;
+    protected final Sinks.EmitFailureHandler emissionHandler;
+    protected final RetryBackoffSpec retry;
+    protected final RetryBackoffSpec authRetry;
+    protected final IntPredicate gzipPackingPredicate;
+    protected final List<ResponseTransformer> responseTransformers;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<Transport> transport, StoreLayout storeLayout,
                           int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec retry, RetryBackoffSpec authRetry,
-                          IntPredicate gzipPackingPredicate) {
+                          IntPredicate gzipPackingPredicate, List<ResponseTransformer> responseTransformers) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
         this.transport = transport;
@@ -34,6 +36,7 @@ public class MTProtoOptions {
         this.retry = retry;
         this.authRetry = authRetry;
         this.gzipPackingPredicate = gzipPackingPredicate;
+        this.responseTransformers = responseTransformers;
     }
 
     public DataCenter getDatacenter() {
@@ -70,5 +73,9 @@ public class MTProtoOptions {
 
     public IntPredicate getGzipPackingPredicate() {
         return gzipPackingPredicate;
+    }
+
+    public List<ResponseTransformer> getResponseTransformers() {
+        return responseTransformers;
     }
 }

@@ -417,7 +417,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChatParticipant(UpdateChatParticipant action) {
+    public Mono<Void> onChatParticipant(UpdateChatParticipant payload) {
         return Mono.empty();
     }
 
@@ -646,7 +646,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
         Chat cpy = copy(chat);
         var old = chats.computeIfAbsent(cpy.id(), k -> new PartialFields<>(cpy));
-        chats.computeIfPresent(cpy.id(), (k, v) -> new PartialFields<>(cpy, v.full));
+        chats.computeIfPresent(cpy.id(), (k, v) -> v.withMin(cpy));
         saveUsernamePeer(cpy);
 
         return old;

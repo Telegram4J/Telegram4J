@@ -38,7 +38,11 @@ import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
 import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
@@ -58,6 +62,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
     private IntPredicate gzipPackingPredicate;
+    private List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
@@ -143,6 +148,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    public MTProtoBootstrap<O> addResponseTransformer(ResponseTransformer responseTransformer) {
+        Objects.requireNonNull(responseTransformer, "responseTransformer");
+        responseTransformers.add(responseTransformer);
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -161,8 +172,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
                             storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
-                            initRetry(), initAuthRetry(), initGzipPackingPredicate())));
+                            initRetry(), initAuthRetry(), initGzipPackingPredicate(),
+                            Collections.unmodifiableList(responseTransformers))));
 
+            AtomicBoolean inited = new AtomicBoolean();
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
@@ -243,8 +256,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                 .doBeforeRetryAsync(signal -> userAuth))
                                         .then(fetchSelfId)
                                         .then(telegramClient.getUpdatesManager().fillGap())
-                                        .thenReturn(telegramClient) // FIXME: reconnections drop signals
-                                        .doOnNext(sink::success);
+                                        .doFinally(signal -> sink.success(telegramClient));
                             default:
                                 return Mono.empty();
                         }

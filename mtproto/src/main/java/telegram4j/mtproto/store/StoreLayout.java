@@ -169,7 +169,7 @@ public interface StoreLayout {
 
     Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus payload);
 
-    // common updates
+    // bot updates
 
     Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload);
 

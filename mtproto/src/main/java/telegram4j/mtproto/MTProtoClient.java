@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import telegram4j.tl.Updates;
+import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.request.messages.SendMessage;
 
@@ -33,18 +34,18 @@ public interface MTProtoClient {
      *
      * @param <T> Type of method.
      * @param <R> Type of result.
-     * @param object An api request.
+     * @param method An api request.
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
-    <R, T extends TlMethod<R>> Mono<R> sendAwait(T object);
+    <R, T extends TlMethod<R>> Mono<R> sendAwait(T method);
 
     /**
-     * Send api request for which result is not needed or not applicable (e.g. auth and rpc requests).
+     * Send auth api request for which result is not applicable.
      *
-     * @param object An api request.
+     * @param method An auth api request.
      * @return A {@link Mono} emitting empty signals immediately after request is prepared.
      */
-    Mono<Void> send(TlMethod<?> object);
+    Mono<Void> sendAuth(TlMethod<? extends MTProtoObject> method);
 
     /**
      * Gets a {@link Flux} of {@link State} displaying current status of the client.

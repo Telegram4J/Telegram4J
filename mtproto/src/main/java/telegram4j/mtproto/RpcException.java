@@ -3,6 +3,9 @@ package telegram4j.mtproto;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
+import java.util.function.Predicate;
+import java.util.stream.IntStream;
+
 public class RpcException extends MTProtoException {
     private static final long serialVersionUID = -4159674899075462143L;
 
@@ -11,6 +14,17 @@ public class RpcException extends MTProtoException {
     public RpcException(String message, RpcError error) {
         super(message);
         this.error = error;
+    }
+
+    public static Predicate<Throwable> isErrorCode(int... codes) {
+        return t -> {
+            if (t instanceof RpcException) {
+                RpcException t0 = (RpcException) t;
+
+                return IntStream.of(codes).anyMatch(c -> t0.getError().errorCode() == c);
+            }
+            return false;
+        };
     }
 
     static String prettyMethodName(TlMethod<?> method) {

@@ -52,7 +52,7 @@ public final class AuthorizationHandler {
             byte[] nonce = random.generateSeed(16);
             context.setNonce(Unpooled.wrappedBuffer(nonce));
 
-            return client.send(ImmutableReqPqMulti.of(nonce));
+            return client.sendAuth(ImmutableReqPqMulti.of(nonce));
         });
     }
 
@@ -148,7 +148,7 @@ public final class AuthorizationHandler {
         ByteBuf dataWithHash = Unpooled.wrappedBuffer(hash, pqInnerDataBuf, seed);
         ByteBuf encrypted = rsaEncrypt(dataWithHash, key);
 
-        return client.send(ReqDHParams.builder()
+        return client.sendAuth(ReqDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(serverNonce)
                 .encryptedData(toByteArray(encrypted))
@@ -210,7 +210,7 @@ public final class AuthorizationHandler {
 
         client.updateTimeOffset(serverDHInnerData.serverTime());
 
-        return client.send(SetClientDHParams.builder()
+        return client.sendAuth(SetClientDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(serverNonce)
                 .encryptedData(dataWithHashEnc)

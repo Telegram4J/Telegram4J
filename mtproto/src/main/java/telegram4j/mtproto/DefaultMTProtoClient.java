@@ -51,6 +51,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
@@ -196,7 +197,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> inboundHandler = connection.inbound().receive()
                     .map(ByteBuf::retainedDuplicate)
-                    .publishOn(Schedulers.boundedElastic())
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
                             .addComponents(true, bufs))
@@ -232,6 +232,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         }
                         return Mono.just(payload);
                     })
+                    .publishOn(Schedulers.boundedElastic())
                     .flatMap(buf -> {
                         long authKeyId = buf.readLongLE();
 
@@ -386,14 +387,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> ping = pingEmitter.ticks()
-                    .delayUntil(l -> onConnect)
                     .flatMap(tick -> {
                         long now = System.nanoTime();
                         lastPong.compareAndSet(0, now);
 
                         if (lastPing - lastPong.get() > 0) {
                             if (missedPong.incrementAndGet() >= maxMissedPong) {
-                                sessionId = random.nextLong();
+                                // sessionId = random.nextLong();
                                 seqNo.set(0);
                                 lastMessageId = 0;
 
@@ -497,6 +497,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 });
     }
 
+    private Retry serverErrorRetry() {
+        return Retry.withThrowable(reactor.retry.Retry.onlyIf(e -> RpcException.isErrorCode(500).test(e.exception()))
+                .exponentialBackoffWithJitter(Duration.ofSeconds(2), Duration.ofSeconds(15))
+                .doOnRetry(ctx -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("[C:0x{}] Retrying request due to {} auth key for {} (attempts: {})",
+                                id, ctx.exception().toString(), ctx.backoff(), ctx.iteration());
+                    }
+                }));
+    }
+
     @Override
     public Sinks.Many<Updates> updates() {
         return updates;
@@ -504,7 +515,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public boolean updateTimeOffset(long serverTime) {
-        int updated = Math.toIntExact(serverTime - System.currentTimeMillis() / 1000);
+        int updated = (int) (serverTime - System.currentTimeMillis() / 1000);
         boolean changed = Math.abs(timeOffset - updated) > 3;
 
         if (changed) {
@@ -545,12 +556,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
             }
 
             outbound.emitNext(request, options.getEmissionHandler());
-            return res.asMono();
+            return res.asMono()
+                    .transform(options.getResponseTransformers().stream()
+                            .map(tr -> tr.transform(method)
+                                    .andThen(m -> m.checkpoint("Apply " + tr + " to " + method + " [DefaultMTProtoClient]")))
+                            .reduce(Function.identity(), Function::andThen))
+                    .retryWhen(serverErrorRetry());
         });
     }
 
     @Override
-    public Mono<Void> send(TlMethod<?> method) {
+    public Mono<Void> sendAuth(TlMethod<? extends MTProtoObject> method) {
         return Mono.fromRunnable(() -> authOutbound.emitNext(method, options.getEmissionHandler()));
     }
 
@@ -743,6 +759,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             }
 
             serverSalt = newSession.serverSalt();
+            lastMessageId = newSession.firstMsgId();
 
             return acknowledgmentMessage(messageId);
         }

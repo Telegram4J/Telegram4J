@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.StringJoiner;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -43,7 +44,7 @@ public class UpdatesManager {
 
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
     private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
-    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(10);
+    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(2);
 
     private final MTProtoTelegramClient client;
     private final UpdatesMapper updatesMapper;
@@ -268,8 +269,21 @@ public class UpdatesManager {
     private Mono<Void> applyState(State state) {
         return Mono.defer(() -> {
             if (log.isDebugEnabled()) {
-                log.debug("Updating state, old: {}, new: {}",
-                        ImmutableState.of(pts, qts, date, seq, -1), state);
+                StringJoiner j = new StringJoiner(", ");
+                if (this.pts != state.pts()) {
+                    j.add("pts: " + this.pts + "->" + state.pts());
+                }
+                if (this.qts != state.qts()) {
+                    j.add("qts: " + this.qts + "->" + state.qts());
+                }
+                if (this.seq != state.seq()) {
+                    j.add("seq: " + seq + "->" + state.seq());
+                }
+                if (this.date != state.date()) {
+                    j.add("date: " + Instant.ofEpochSecond(this.date) + "->" + Instant.ofEpochSecond(state.date()));
+                }
+
+                log.debug("Updating state, " + j);
             }
 
             applyStateLocal(state);
@@ -284,6 +298,11 @@ public class UpdatesManager {
     }
 
     private Flux<Event> getDifference(int pts, int qts, int date) {
+        if (pts == -1 || qts == -1 || date == -1) {
+            log.debug("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+            return Flux.empty();
+        }
+
         if (log.isDebugEnabled()) {
             log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
         }
