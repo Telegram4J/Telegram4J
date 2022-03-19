@@ -1,6 +1,9 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.object.chat.Channel;
+import telegram4j.core.object.chat.GroupChat;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.tl.Peer;
 import telegram4j.tl.PeerChannel;
 import telegram4j.tl.PeerChat;
@@ -131,9 +134,15 @@ public final class Id {
         return "Id{" + value + '}';
     }
 
+    /** Available types of entities ids. */
     public enum Type {
+        /** Represents id for {@link GroupChat} entity. */
         CHAT,
+
+        /** Represents id for {@link Channel} entity. */
         CHANNEL,
+
+        /** Represents id for {@link PrivateChat}/{@link User} entity. */
         USER
     }
 }

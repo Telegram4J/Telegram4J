@@ -44,34 +44,74 @@ public class Document implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets serialized file reference id for this document.
+     *
+     * @return The serialized file reference id.
+     */
     public String getFileReferenceId() {
         return fileReferenceId;
     }
 
+    /**
+     * Gets id of the document. Mainly used in the methods.
+     *
+     * @return The id of the document.
+     */
     public long getId() {
         return data.id();
     }
 
+    /**
+     * Gets access hash of the document. Mainly used in the methods.
+     *
+     * @return The access hash of the document.
+     */
     public long getAccessHash() {
         return data.accessHash();
     }
 
+    /**
+     * Gets hex dump of the file reference. Mainly used in the methods.
+     *
+     * @return The hex dump of the file reference.
+     */
     public String getFileReference() {
         return ByteBufUtil.hexDump(data.fileReference());
     }
 
+    /**
+     * Gets timestamp of the document creation.
+     *
+     * @return The {@link Instant} of the document creation.
+     */
     public Instant getCreationTimestamp() {
         return Instant.ofEpochSecond(data.date());
     }
 
+    /**
+     * Gets mime-type of the document in the string.
+     *
+     * @return The mime-type string of the document.
+     */
     public String getMimeType() {
         return data.mimeType();
     }
 
+    /**
+     * Gets size of document in the bytes.
+     *
+     * @return The size of document in the bytes.
+     */
     public int getSize() {
         return data.size();
     }
 
+    /**
+     * Gets {@link List} of {@link PhotoSize thumbnails} for this document, if present.
+     *
+     * @return The l{@link List} of {@link PhotoSize thumbnails} for this document, if present.
+     */
     public Optional<List<PhotoSize>> getThumbs() {
         return Optional.ofNullable(data.thumbs())
                 .map(list -> list.stream()
@@ -79,6 +119,11 @@ public class Document implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets {@link List} of {@link VideoSize video thumbnails} for this document, if present.
+     *
+     * @return The l{@link List} of {@link VideoSize video thumbnails} for this document, if present.
+     */
     public Optional<List<VideoSize>> getVideoThumbs() {
         return Optional.ofNullable(data.videoThumbs())
                 .map(l -> l.stream()
@@ -86,10 +131,20 @@ public class Document implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets id of the DC, where document was stored.
+     *
+     * @return The id of the DC, where document was stored.
+     */
     public int getDcId() {
         return data.dcId();
     }
 
+    /**
+     * Gets name of document, if present.
+     *
+     * @return The name of document, if present.
+     */
     public Optional<String> getFileName() {
         return Optional.ofNullable(fileName);
     }

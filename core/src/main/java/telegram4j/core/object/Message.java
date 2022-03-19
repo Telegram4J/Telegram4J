@@ -26,6 +26,9 @@ import java.util.stream.Collectors;
 import static reactor.function.TupleUtils.function;
 import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
+/**
+ * Representation for default and service messages.
+ */
 public class Message implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -54,16 +57,26 @@ public class Message implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets whether message is service notification.
+     *
+     * @return {@code true} if message is service notification.
+     */
     public boolean isService() {
         return serviceData != null;
     }
 
+    /**
+     * Computes {@link EnumSet} of the message flags.
+     *
+     * @return The {@link EnumSet} of the message flags.
+     */
     public EnumSet<Flag> getFlags() {
-        return baseData != null ? Flag.of(baseData) : Flag.of(Objects.requireNonNull(serviceData));
+        return Flag.of(getBaseData());
     }
 
     /**
-     * Gets the id of message for <i>current</i> user if message from DM or group chat or for channel.
+     * Gets the <b>incremental</b> id of message for <i>current</i> user if message from DM or group chat or for channel.
      *
      * @return The id of message.
      */
@@ -71,42 +84,98 @@ public class Message implements TelegramObject {
         return getBaseData().id();
     }
 
+    /**
+     * Gets id of the message author, if present.
+     *
+     * @return The {@link Id} of the message author, if present.
+     */
     public Optional<Id> getAuthorId() {
         return Optional.ofNullable(getBaseData().fromId()).map(Id::of);
     }
 
+    /**
+     * Gets id of the chat, where message was sent.
+     *
+     * @return The {@link Id} of the chat, where message was sent.
+     */
     public Id getChatId() {
         return resolvedChatId;
     }
 
+    /**
+     * Gets header of the reply information, if present.
+     *
+     * @return The header of the reply information, if present.
+     */
     public Optional<MessageReplyHeader> getReplyTo() {
         return Optional.ofNullable(getBaseData().replyTo()).map(d -> new MessageReplyHeader(client, d));
     }
 
+    /**
+     * Gets timestamp of the message creation.
+     *
+     * @return The timestamp of the message creation.
+     */
     public Instant getCreateTimestamp() {
         return Instant.ofEpochSecond(getBaseData().date());
     }
 
+    /**
+     * Gets {@link Duration} of the message Time-To-Live, if present.
+     * <p>
+     * For getting auto-delete timestamp you can use following pattern:
+     * <pre>
+     *   Message message = ...;
+     *
+     *   Instant deleteTimestamp = message.getAutoDeleteDuration()
+     *     .map(message.createTimestamp()::plus)
+     *     .orElse(Instant.MIN);
+     * </pre>
+     *
+     * @return The {@link Duration} of the message Time-To-Live, if present.
+     */
     public Optional<Duration> getAutoDeleteDuration() {
         return Optional.ofNullable(getBaseData().ttlPeriod()).map(Duration::ofSeconds);
     }
 
     // BaseMessage fields
 
+    /**
+     * Gets header of forward information, if message is not service and data present.
+     *
+     * @return The header of forward information, if message is not service and data present.
+     */
     public Optional<MessageForwardHeader> getForwardedFrom() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::fwdFrom)
                 .map(d -> new MessageForwardHeader(client, d));
     }
 
-    public Optional<Long> getViaBotId() {
-        return Optional.ofNullable(baseData).map(BaseMessage::viaBotId);
+    /**
+     * Gets id of an inline bot that generated this message, if message it's not service and id present.
+     *
+     * @return The {@link Id} of an inline bot that generated this message, if message it's not service and id present.
+     */
+    public Optional<Id> getViaBotId() {
+        return Optional.ofNullable(baseData)
+                .map(BaseMessage::viaBotId)
+                .map(l -> Id.ofUser(l, null));
     }
 
+    /**
+     * Gets text of message, if it's not service.
+     *
+     * @return The raw text of message, if it's not service.
+     */
     public Optional<String> getMessage() {
         return Optional.ofNullable(baseData).map(BaseMessage::message);
     }
 
+    /**
+     * Gets media of message, if message is not service and data present.
+     *
+     * @return The media of message, if message is not service and data present.
+     */
     public Optional<MessageMedia> getMedia() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::media)
@@ -114,12 +183,22 @@ public class Message implements TelegramObject {
                         getId(), getChatIdAsPeer()));
     }
 
+    /**
+     * Gets bot reply markup (e.g. keyboard), if message is not service and data present.
+     *
+     * @return The bot reply markup, if message is not service and data present.
+     */
     public Optional<ReplyMarkup> getReplyMarkup() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::replyMarkup)
                 .map(d -> EntityFactory.createReplyMarkup(client, d));
     }
 
+    /**
+     * Gets markup entities for {@link #getMessage() text}, if message is not service and data present.
+     *
+     * @return The {@link List} of markup entities for {@link #getMessage() text}, if message is not service and data present.
+     */
     public Optional<List<MessageEntity>> getEntities() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::entities)
@@ -128,34 +207,70 @@ public class Message implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets views count of channel post, if message is not service and data present.
+     *
+     * @return The views count of channel post, if message is not service and data present.
+     */
     public Optional<Integer> getViews() {
         return Optional.ofNullable(baseData).map(BaseMessage::views);
     }
 
+    /**
+     * Gets forwards count, if message is not service and data present.
+     *
+     * @return The forwards count of message, if it's not service and data present.
+     */
     public Optional<Integer> getForwards() {
         return Optional.ofNullable(baseData).map(BaseMessage::forwards);
     }
 
+    /**
+     * Gets reply information, if message is not service and data present.
+     *
+     * @return The {@link MessageReplies} of message, if it's not service and data present.
+     */
     public Optional<MessageReplies> getReplies() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::replies)
                 .map(d -> new MessageReplies(client, d));
     }
 
+    /**
+     * Gets timestamp of the last message editing, if message is not service and data present.
+     *
+     * @return The {@link Instant} of the last message editing, if message is not service and data present.
+     */
     public Optional<Instant> getEditTimestamp() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::editDate)
                 .map(Instant::ofEpochSecond);
     }
 
+    /**
+     * Gets display name of the channel post's author, if message is not service and name present.
+     *
+     * @return The display name of the channel post's author, if message is not service and name present.
+     */
     public Optional<String> getPostAuthor() {
         return Optional.ofNullable(baseData).map(BaseMessage::postAuthor);
     }
 
+    /**
+     * Gets id of the group of multimedia/album, if present.
+     *
+     * @return The id of the group of multimedia/album, if message is not service and id present.
+     */
     public Optional<Long> getGroupedId() {
         return Optional.ofNullable(baseData).map(BaseMessage::groupedId);
     }
 
+    /**
+     * Gets {@link List} of {@link RestrictionReason} for why access to this message must be restricted,
+     * if message is not service and list present.
+     *
+     * @return The {@link List} of the {@link RestrictionReason}, if message is not service and list present.
+     */
     public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::restrictionReason)
@@ -166,6 +281,11 @@ public class Message implements TelegramObject {
 
     // MessageService fields
 
+    /**
+     * Gets action about which the service message notifies, if message is service.
+     *
+     * @return The service message action, if message is service.
+     */
     public Optional<MessageAction> getAction() {
         return Optional.ofNullable(serviceData)
                 .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
@@ -175,6 +295,12 @@ public class Message implements TelegramObject {
 
     // Interaction methods
 
+    /**
+     * Requests to edit this message by specified edit specification.
+     *
+     * @param spec an immutable object that specifies how to edit the message.
+     * @return A {@link Mono} emitting on successful completion updated message.
+     */
     public Mono<Message> edit(EditMessageSpec spec) {
         return Mono.defer(() -> {
             var parsed = spec.parser()
@@ -204,6 +330,12 @@ public class Message implements TelegramObject {
         });
     }
 
+    /**
+     * Requests to delete this message.
+     *
+     * @param revoke Whether to delete messages for all participants of the chat.
+     * @return A {@link Mono} emitting on successful completion updated message.
+     */
     public Mono<AffectedMessages> delete(boolean revoke) {
         return Mono.defer(() -> {
             switch (resolvedChatId.getType()) {
@@ -248,6 +380,7 @@ public class Message implements TelegramObject {
         return "Message{data=" + getBaseData() + "}";
     }
 
+    /** Available flag types of message. */
     public enum Flag {
 
         // BaseMessage & ServiceMessage flags
@@ -287,14 +420,30 @@ public class Message implements TelegramObject {
             this.flag = 1 << value;
         }
 
+        /**
+         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
+         *
+         * @return The flag shift position.
+         */
         public int getValue() {
             return value;
         }
 
+        /**
+         * Gets bit-mask for flag.
+         *
+         * @return The bit-mask for flag.
+         */
         public int getFlag() {
             return flag;
         }
 
+        /**
+         * Computes {@link EnumSet} from raw message data.
+         *
+         * @param data The message data.
+         * @return The {@link EnumSet} of the message flags.
+         */
         public static EnumSet<Flag> of(telegram4j.tl.Message data) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
             if (data instanceof MessageEmpty) {

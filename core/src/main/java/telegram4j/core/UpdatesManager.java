@@ -121,10 +121,11 @@ public class UpdatesManager {
                         .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                if (updSeq != 0 && data.date() != 0) {
+                if (updSeq != 0) {
                     seq = updSeq;
-                    date = data.date();
                 }
+
+                date = data.date();
 
                 Mono<Void> saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
@@ -155,10 +156,11 @@ public class UpdatesManager {
                         .filter(TlEntityUtil::isAvailableChat)
                         .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
 
-                if (data.seq() != 0 && data.date() != 0) {
+                if (data.seq() != 0) {
                     seq = data.seq();
-                    date = data.date();
                 }
+
+                date = data.date();
 
                 Mono<Void> saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
@@ -283,6 +285,11 @@ public class UpdatesManager {
                     j.add("date: " + Instant.ofEpochSecond(this.date) + "->" + Instant.ofEpochSecond(state.date()));
                 }
 
+                String str = j.toString();
+                if (str.isEmpty()) {
+                    return Mono.empty();
+                }
+
                 log.debug("Updating state, " + j);
             }
 
@@ -301,6 +308,12 @@ public class UpdatesManager {
         if (pts == -1 || qts == -1 || date == -1) {
             log.debug("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
             return Flux.empty();
+        }
+
+        // It often turns out that getDifference() returns the updates already received,
+        // but for some unknown reason sets them on a different date, which is longer by DEFAULT_CHECKIN interval
+        if (client.isBot()) {
+            date += DEFAULT_CHECKIN.getSeconds();
         }
 
         if (log.isDebugEnabled()) {

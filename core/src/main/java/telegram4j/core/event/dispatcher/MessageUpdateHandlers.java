@@ -10,6 +10,7 @@ import telegram4j.core.event.domain.message.UpdatePinnedMessagesEvent;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
@@ -56,14 +57,24 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        long chatId = getRawPeerId(message.peerId());
         BaseUser selfUser = context.getUsers().values().stream()
                 .filter(BaseUser::self)
                 .findFirst()
                 .orElse(null);
-        Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
-                .or(() -> Optional.ofNullable(context.getUsers().get(chatId)))
-                .map(c -> EntityFactory.createChat(client, c, selfUser))
+        Chat chat = Optional.of(message.peerId())
+                .flatMap(p -> {
+                    long rawId = getRawPeerId(message.peerId());
+                    switch (p.identifier()) {
+                        case PeerChat.ID:
+                        case PeerChannel.ID:
+                            return Optional.ofNullable(context.getChats().get(rawId))
+                                    .map(u -> EntityFactory.createChat(client, u, selfUser));
+                        case PeerUser.ID:
+                            return Optional.ofNullable(context.getUsers().get(rawId))
+                                    .map(u -> EntityFactory.createChat(client, u, selfUser));
+                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                    }
+                })
                 .orElse(null);
         var author = Optional.ofNullable(message.fromId())
                 .flatMap(p -> {
@@ -77,6 +88,9 @@ class MessageUpdateHandlers {
                         default: throw new IllegalArgumentException("Unknown peer type: " + p);
                     }
                 })
+                // fromId is often not set if the message was sent to the DM, so we will have to process it for convenience
+                .or(() -> chat.getType() == Chat.Type.PRIVATE
+                        ? Optional.of(((PrivateChat) chat).getUser()) : Optional.empty())
                 .orElse(null);
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)

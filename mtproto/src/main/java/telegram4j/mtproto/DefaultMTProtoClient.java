@@ -33,6 +33,7 @@ import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.Updates;
 import telegram4j.tl.api.MTProtoObject;
+import telegram4j.tl.api.RpcMethod;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
@@ -551,7 +552,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         return Mono.defer(() -> {
             Sinks.One<R> res = Sinks.one();
             PendingRequest request = new PendingRequest(res, method);
-            if (method.identifier() == MsgsAck.ID) {
+            if (method instanceof RpcMethod) {
                 res.emitEmpty(FAIL_FAST);
             }
 

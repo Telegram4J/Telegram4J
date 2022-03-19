@@ -41,20 +41,20 @@ public class MessageEntity implements TelegramObject {
     }
 
     public Optional<String> getLanguage() {
-        return data instanceof MessageEntityPre
+        return data.identifier() == MessageEntityPre.ID
                 ? Optional.of((MessageEntityPre) data).map(MessageEntityPre::language)
                 : Optional.empty();
     }
 
     public Optional<String> getUrl() {
-        return data instanceof MessageEntityTextUrl
+        return data.identifier() == MessageEntityTextUrl.ID
                 ? Optional.of((MessageEntityTextUrl) data).map(MessageEntityTextUrl::url)
                 : Optional.empty();
     }
 
     public Optional<Id> getUserId() {
         // InputMessageEntityMentionName doesn't handle because it's an input entity, that maps into the MessageEntityMentionName
-        return data instanceof MessageEntityMentionName
+        return data.identifier() == MessageEntityMentionName.ID
                 ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
                 : Optional.empty();
     }

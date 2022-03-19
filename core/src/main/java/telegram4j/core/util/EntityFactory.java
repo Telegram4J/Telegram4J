@@ -63,8 +63,8 @@ import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChat;
-import telegram4j.tl.Channel;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.contacts.ResolvedPeer;
@@ -158,8 +158,7 @@ public final class EntityFactory {
                 ChatFull chatFull = (ChatFull) possibleChat;
 
                 var minData = chatFull.chats().stream()
-                        .filter(c -> (c.identifier() == BaseChat.ID || c.identifier() == Channel.ID) &&
-                                c.id() == chatFull.fullChat().id())
+                        .filter(c -> TlEntityUtil.isAvailableChat(c) && c.id() == chatFull.fullChat().id())
                         .findFirst()
                         .orElse(null);
 
