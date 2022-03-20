@@ -338,7 +338,7 @@ public final class EntityFactory {
             case telegram4j.tl.MessageMediaGame.ID:
                 return new MessageMediaGame(client, (telegram4j.tl.MessageMediaGame) data, messageId, peer);
             case telegram4j.tl.MessageMediaInvoice.ID:
-                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data);
+                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data, messageId, peer);
             case telegram4j.tl.MessageMediaGeoLive.ID:
                 return new MessageMediaGeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
             case telegram4j.tl.MessageMediaPoll.ID:
@@ -382,7 +382,7 @@ public final class EntityFactory {
         }
     }
 
-    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocument data,
+    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocumentFields data,
                                           int messageId, InputPeer peer) {
         boolean animated = false;
         boolean hasStickers = false;

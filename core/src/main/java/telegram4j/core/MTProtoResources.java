@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import reactor.netty.http.client.HttpClient;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.util.EntityParserFactory;
@@ -14,12 +15,14 @@ public class MTProtoResources {
     private final EventDispatcher eventDispatcher;
     @Nullable
     private final EntityParserFactory defaultEntityParser;
+    private final HttpClient httpClient;
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
-                     @Nullable EntityParserFactory defaultEntityParser) {
+                     @Nullable EntityParserFactory defaultEntityParser, HttpClient httpClient) {
         this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
         this.defaultEntityParser = defaultEntityParser;
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
     }
 
     /**
@@ -48,5 +51,14 @@ public class MTProtoResources {
      */
     public Optional<EntityParserFactory> getDefaultEntityParser() {
         return Optional.ofNullable(defaultEntityParser);
+    }
+
+    /**
+     * Gets http client for downloading non-proxied by telegram web files.
+     *
+     * @return The http client for downloading web files.
+     */
+    public HttpClient getHttpClient() {
+        return httpClient;
     }
 }

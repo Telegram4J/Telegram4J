@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -15,11 +16,13 @@ import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.IdFields;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
+import telegram4j.mtproto.file.FilePart;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
-import telegram4j.tl.ImmutableBaseInputChannel;
+import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
-import telegram4j.tl.upload.BaseFile;
+import telegram4j.tl.storage.FileType;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -109,9 +112,37 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return mtProtoResources.getEventDispatcher().on(type);
     }
 
-    public Flux<BaseFile> getFile(String fileReferenceId) {
+    // Interaction methods
+    // ==========================
+
+    public Flux<FilePart> getFile(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .flatMapMany(loc -> serviceHolder.getUploadService().getFile(loc));
+                .flatMapMany(loc -> {
+                    if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
+                        if (loc.getAccessHash() == -1) {
+                            return getFile0(loc);
+                        }
+
+                        return serviceHolder.getUploadService().getWebFile(loc)
+                                .map(FilePart::ofWebFile);
+                    }
+
+                    return serviceHolder.getUploadService().getFile(loc)
+                            .map(FilePart::ofFile);
+                });
+    }
+
+    public Flux<FilePart> getFile0(FileReferenceId loc) {
+        return mtProtoResources.getHttpClient()
+                .get().uri(loc.getUrl())
+                .responseSingle((res, buf) -> buf.asByteArray()
+                        .map(bytes -> {
+                            String mimeType = res.responseHeaders().getAsString(HttpHeaderNames.CONTENT_TYPE);
+                            int size = res.responseHeaders().getInt(HttpHeaderNames.CONTENT_LENGTH, -1);
+                            FileType type = TlEntityUtil.suggestFileType(mimeType);
+                            return new FilePart(type, -1, bytes, size, mimeType);
+                        }))
+                .flux();
     }
 
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
@@ -133,6 +164,29 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         })
         .flatMap(p -> serviceHolder.getMessageService()
                 .deleteMessages(p, ids));
+    }
+
+    private Mono<InputPeer> asInputPeer(Id chatId) {
+        switch (chatId.getType()) {
+            case USER: return asInputUser(chatId).map(TlEntityUtil::toInputPeer);
+            case CHAT: return Mono.just(ImmutableInputPeerChat.of(chatId.asLong()));
+            case CHANNEL: return asInputChannel(chatId).map(TlEntityUtil::toInputPeer);
+            default: throw new IllegalStateException();
+        }
+    }
+
+    private Mono<InputChannel> asInputChannel(Id channelId) {
+        if (channelId.getAccessHash().isEmpty()) {
+            return mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong());
+        }
+        return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow()));
+    }
+
+    private Mono<InputUser> asInputUser(Id userId) {
+        if (userId.getAccessHash().isEmpty()) {
+            return mtProtoResources.getStoreLayout().resolveUser(userId.asLong());
+        }
+        return Mono.just(ImmutableBaseInputUser.of(userId.asLong(), userId.getAccessHash().orElseThrow()));
     }
 
     // EntityRetriever methods

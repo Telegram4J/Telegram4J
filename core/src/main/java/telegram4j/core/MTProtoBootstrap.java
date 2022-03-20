@@ -6,6 +6,7 @@ import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
 import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
@@ -55,6 +56,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
     private final AuthorizationResources authResources;
+    private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TcpClient tcpClient;
     private Supplier<Transport> transport;
@@ -62,12 +64,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
     private IntPredicate gzipPackingPredicate;
-    private List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
     private UpdatesMapper updatesMapper = DefaultUpdatesMapper.instance;
+    private HttpClient httpClient;
 
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
@@ -154,6 +156,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+
+    public MTProtoBootstrap<O> setHttpClient(HttpClient httpClient) {
+        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        return this;
+    }
+
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
@@ -176,7 +184,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             Collections.unmodifiableList(responseTransformers))));
 
             AtomicBoolean inited = new AtomicBoolean();
-            MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher, defaultEntityParserFactory);
+            MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
+                    defaultEntityParserFactory, initHttpClient());
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
                     .layer(MTProtoTelegramClient.LAYER)
@@ -361,5 +370,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return gzipPackingPredicate;
         }
         return i -> i >= 1024 * 16; // gzip packets if size is larger of 16kb
+    }
+
+    private HttpClient initHttpClient() {
+        if (httpClient != null) {
+            return httpClient;
+        }
+        return HttpClient.create().followRedirect(true);
     }
 }

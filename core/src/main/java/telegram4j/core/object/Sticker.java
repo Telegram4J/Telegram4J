@@ -12,7 +12,7 @@ public class Sticker extends Document {
     private final DocumentAttributeSticker stickerData;
     private final DocumentAttributeImageSize sizeData;
 
-    public Sticker(MTProtoTelegramClient client, BaseDocument data, @Nullable String fileName, int messageId,
+    public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName, int messageId,
                    InputPeer peer, DocumentAttributeSticker stickerData, DocumentAttributeImageSize sizeData) {
         super(client, data, fileName, messageId, peer);
         this.stickerData = stickerData;

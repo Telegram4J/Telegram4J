@@ -7,8 +7,7 @@ import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.VideoSize;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
-import telegram4j.tl.BaseDocument;
-import telegram4j.tl.InputPeer;
+import telegram4j.tl.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,13 +23,13 @@ import java.util.stream.Collectors;
 public class Document implements TelegramObject {
 
     private final MTProtoTelegramClient client;
-    private final BaseDocument data;
+    private final BaseDocumentFields data;
     @Nullable
     private final String fileName;
 
     private final String fileReferenceId;
 
-    public Document(MTProtoTelegramClient client, BaseDocument data,
+    public Document(MTProtoTelegramClient client, BaseDocumentFields data,
                     @Nullable String fileName, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
@@ -45,6 +44,26 @@ public class Document implements TelegramObject {
     }
 
     /**
+     * Gets whether document is web file.
+     *
+     * @return {@code true} if document is web, otherwise {@code false}.
+     */
+    public boolean isWeb() {
+        return data.identifier() != BaseDocument.ID;
+    }
+
+    /**
+     * Gets url of web file, if present.
+     *
+     * @return The url of the web file.
+     */
+    public Optional<String> getUrl() {
+        return data instanceof WebDocument
+                ? Optional.of(((WebDocument) data).url())
+                : Optional.empty();
+    }
+
+    /**
      * Gets serialized file reference id for this document.
      *
      * @return The serialized file reference id.
@@ -54,39 +73,52 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets id of the document. Mainly used in the methods.
+     * Gets id of the document, if document isn't web.
+     * Mainly used in the methods.
      *
-     * @return The id of the document.
+     * @return The id of the document, if document isn't web.
      */
-    public long getId() {
-        return data.id();
+    public Optional<Long> getId() {
+        return data.identifier() == BaseDocument.ID
+                ? Optional.of(((BaseDocument) data).id())
+                : Optional.empty();
     }
 
     /**
-     * Gets access hash of the document. Mainly used in the methods.
+     * Gets access hash of the document, if document has telegram proxying
+     * Mainly used in the methods.
      *
-     * @return The access hash of the document.
+     * @return The access hash of the document, if document has telegram proxying
      */
-    public long getAccessHash() {
-        return data.accessHash();
+    public Optional<Long> getAccessHash() {
+        switch (data.identifier()) {
+            case BaseWebDocument.ID: return Optional.of(((BaseWebDocument) data).accessHash());
+            case BaseDocument.ID: return Optional.of(((BaseDocument) data).accessHash());
+            default: return Optional.empty();
+        }
     }
 
     /**
-     * Gets hex dump of the file reference. Mainly used in the methods.
+     * Gets hex dump of the file reference, if document isn't web.
+     * Mainly used in the methods.
      *
-     * @return The hex dump of the file reference.
+     * @return The hex dump of the file reference, if document isn't web.
      */
-    public String getFileReference() {
-        return ByteBufUtil.hexDump(data.fileReference());
+    public Optional<String> getFileReference() {
+        return data.identifier() == BaseDocument.ID
+                ? Optional.of(ByteBufUtil.hexDump(((BaseDocument) data).fileReference()))
+                : Optional.empty();
     }
 
     /**
-     * Gets timestamp of the document creation.
+     * Gets timestamp of the document creation, if document isn't web.
      *
-     * @return The {@link Instant} of the document creation.
+     * @return The {@link Instant} of the document creation, if document isn't web.
      */
-    public Instant getCreationTimestamp() {
-        return Instant.ofEpochSecond(data.date());
+    public Optional<Instant> getCreationTimestamp() {
+        return data.identifier() == BaseDocument.ID
+                ? Optional.ofNullable(Instant.ofEpochSecond(((BaseDocument) data).date()))
+                : Optional.empty();
     }
 
     /**
@@ -113,10 +145,12 @@ public class Document implements TelegramObject {
      * @return The l{@link List} of {@link PhotoSize thumbnails} for this document, if present.
      */
     public Optional<List<PhotoSize>> getThumbs() {
-        return Optional.ofNullable(data.thumbs())
+        return data.identifier() == BaseDocument.ID
+                ? Optional.ofNullable(((BaseDocument) data).thumbs())
                 .map(list -> list.stream()
                         .map(d -> EntityFactory.createPhotoSize(client, d))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()))
+                : Optional.empty();
     }
 
     /**
@@ -125,19 +159,23 @@ public class Document implements TelegramObject {
      * @return The l{@link List} of {@link VideoSize video thumbnails} for this document, if present.
      */
     public Optional<List<VideoSize>> getVideoThumbs() {
-        return Optional.ofNullable(data.videoThumbs())
+        return data.identifier() == BaseDocument.ID
+                ? Optional.ofNullable(((BaseDocument) data).videoThumbs())
                 .map(l -> l.stream()
                         .map(d -> new VideoSize(client, d))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()))
+                : Optional.empty();
     }
 
     /**
-     * Gets id of the DC, where document was stored.
+     * Gets id of the DC, where document was stored, if document isn't web.
      *
-     * @return The id of the DC, where document was stored.
+     * @return The id of the DC, where document was stored, if document isn't web.
      */
-    public int getDcId() {
-        return data.dcId();
+    public Optional<Integer> getDcId() {
+        return data.identifier() == BaseDocument.ID
+                ? Optional.of(((BaseDocument) data).dcId())
+                : Optional.empty();
     }
 
     /**

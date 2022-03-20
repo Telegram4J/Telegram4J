@@ -17,7 +17,6 @@ import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.ImmutableBaseInputFile;
 import telegram4j.tl.ImmutableInputFileBig;
 import telegram4j.tl.InputFile;
-import telegram4j.tl.InputWebFileLocation;
 import telegram4j.tl.request.upload.GetFile;
 import telegram4j.tl.request.upload.ImmutableGetWebFile;
 import telegram4j.tl.request.upload.SaveBigFilePart;
@@ -142,13 +141,18 @@ public class UploadService extends RpcService {
         });
     }
 
-    public Flux<WebFile> getWebFile(InputWebFileLocation location) {
+    public Flux<WebFile> getWebFile(FileReferenceId location) {
         return Flux.defer(() -> {
                     AtomicInteger offset = new AtomicInteger();
                     AtomicBoolean complete = new AtomicBoolean();
                     int limit = PRECISE_LIMIT;
 
-                    return Flux.defer(() -> client.sendAwait(ImmutableGetWebFile.of(location, offset.get(), limit)))
+                    var request = ImmutableGetWebFile.of(location.asWebLocation()
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "Default documents can't be downloaded as web.")),
+                            offset.get(), limit);
+
+                    return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
                             .mapNotNull(part -> {
                                 offset.addAndGet(limit);
                                 if (part.fileType() == FileType.UNKNOWN || Arrays.equals(EmptyArrays.EMPTY_BYTES, part.bytes())) { // download completed
@@ -174,7 +178,8 @@ public class UploadService extends RpcService {
                             // Support for downloading from CDN is probably unlikely
                             // to be implemented soon because of its complexity and pointless
                             .cdnSupported(false)
-                            .location(location.asLocation())
+                            .location(location.asLocation().orElseThrow(() -> new IllegalArgumentException(
+                                    "Web documents can't be downloaded as default files")))
                             .offset(offset.get())
                             .limit(limit)
                             .build();

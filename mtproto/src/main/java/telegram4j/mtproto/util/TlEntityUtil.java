@@ -7,11 +7,32 @@ import reactor.util.annotation.Nullable;
 import telegram4j.tl.*;
 import telegram4j.tl.api.EmptyObject;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.storage.FileType;
+
+import java.util.Locale;
 
 /** Utility class with frequently used methods for mapping TL objects. */
 public class TlEntityUtil {
 
     private TlEntityUtil() {
+    }
+
+    public static FileType suggestFileType(@Nullable String mimeType) {
+        if (mimeType == null) {
+            return FileType.UNKNOWN;
+        }
+
+        switch (mimeType.toLowerCase(Locale.ROOT)) {
+            case "image/gif": return FileType.GIF;
+            case "image/jpeg": return FileType.JPEG;
+            case "image/png": return FileType.PNG;
+            case "image/webp": return FileType.WEBP;
+            case "application/pdf": return FileType.PDF;
+            case "audio/mpeg": return FileType.MP3;
+            case "audio/mp4": return FileType.MP4;
+            case "video/quicktime": return FileType.MOV;
+            default: return FileType.UNKNOWN;
+        }
     }
 
     public static ByteBuf expandInlineThumb(byte[] bytes) {

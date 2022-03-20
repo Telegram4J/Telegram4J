@@ -2,6 +2,10 @@ package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.Document;
+import telegram4j.core.util.EntityFactory;
+import telegram4j.tl.BaseDocumentFields;
+import telegram4j.tl.InputPeer;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -9,10 +13,15 @@ import java.util.Optional;
 public class MessageMediaInvoice extends BaseMessageMedia {
 
     private final telegram4j.tl.MessageMediaInvoice data;
+    private final int messageId;
+    private final InputPeer peer;
 
-    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data) {
+    public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data,
+                               int messageId, InputPeer peer) {
         super(client, Type.INVOICE);
         this.data = Objects.requireNonNull(data, "data");
+        this.messageId = messageId;
+        this.peer = Objects.requireNonNull(peer, "peer");
     }
 
     public boolean isShippingAddressRequested() {
@@ -31,8 +40,9 @@ public class MessageMediaInvoice extends BaseMessageMedia {
         return data.description();
     }
 
-    public Optional<WebDocument> getPhoto() {
-        return Optional.ofNullable(data.photo()).map(d -> new WebDocument(client, d));
+    public Optional<Document> getPhoto() {
+        return Optional.ofNullable(data.photo())
+                .map(d -> EntityFactory.createDocument(client, (BaseDocumentFields) d, messageId, peer));
     }
 
     public Optional<Integer> getReceiptMessageId() {

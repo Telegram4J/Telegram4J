@@ -1,5 +1,7 @@
 dependencies {
     api project(":mtproto")
+    api "io.projectreactor.netty:reactor-netty-http"
+    api "io.projectreactor.addons:reactor-extra"
 
     compileOnly "org.immutables:value:$immutables_version"
     annotationProcessor "org.immutables:value:$immutables_version"

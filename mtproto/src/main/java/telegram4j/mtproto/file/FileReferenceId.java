@@ -13,6 +13,7 @@ import telegram4j.tl.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * File reference wrapper, which can be serialized to base 64 url string
@@ -24,6 +25,7 @@ public class FileReferenceId {
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
     static final int MESSAGE_ID_MASK = 1 << 0;
     static final int PEER_MASK = 1 << 1;
+    static final int ACCESS_HASH_MASK = 1 << 2;
 
     private final Type fileType;
     private final PhotoSizeType sizeType;
@@ -32,6 +34,7 @@ public class FileReferenceId {
     private final long accessHash;
     private final byte[] fileReference;
     private final String thumbSizeType;
+    private final String url;
     private final InputStickerSet stickerSet;
     private final int thumbVersion;
 
@@ -40,7 +43,7 @@ public class FileReferenceId {
 
     FileReferenceId(Type fileType, PhotoSizeType sizeType, int dcId, long documentId, long accessHash,
                     byte[] fileReference, String thumbSizeType,
-                    InputStickerSet stickerSet, int thumbVersion,
+                    String url, InputStickerSet stickerSet, int thumbVersion,
                     int messageId, InputPeer peer) {
         this.fileType = Objects.requireNonNull(fileType, "fileType");
         this.sizeType = Objects.requireNonNull(sizeType, "sizeType");
@@ -48,6 +51,7 @@ public class FileReferenceId {
         this.documentId = documentId;
         this.accessHash = accessHash;
         this.fileReference = Objects.requireNonNull(fileReference, "fileReference");
+        this.url = Objects.requireNonNull(url, "url");
         this.thumbSizeType = Objects.requireNonNull(thumbSizeType, "thumbSize");
         this.stickerSet = stickerSet;
         this.thumbVersion = thumbVersion;
@@ -66,7 +70,7 @@ public class FileReferenceId {
      * @param peer The message source peer.
      * @return The new {@code FileReferenceId} from given document and source context.
      */
-    public static FileReferenceId ofDocument(BaseDocument document, int messageId, InputPeer peer) {
+    public static FileReferenceId ofDocument(BaseDocumentFields document, int messageId, InputPeer peer) {
         if (peer.identifier() == InputPeerEmpty.ID) {
             throw new IllegalArgumentException("Unexpected peer type.");
         }
@@ -74,12 +78,50 @@ public class FileReferenceId {
             throw new IllegalArgumentException("Message id must be positive.");
         }
 
-        var thumbs = document.thumbs();
-        String firstThumbSize = thumbs != null ? thumbs.get(0).type() : "";
+        long id = -1;
+        long accessHash = -1;
+        String firstThumbSize = "";
+        int dcId = -1;
+        byte[] fileReference = EmptyArrays.EMPTY_BYTES;
+        String url = "";
+        Type type;
+        switch (document.identifier()) {
+            case BaseDocument.ID: {
+                BaseDocument document0 = (BaseDocument) document;
 
-        return new FileReferenceId(Type.DOCUMENT, PhotoSizeType.UNKNOWN,
-                document.dcId(), document.id(), document.accessHash(),
-                document.fileReference(), firstThumbSize,
+                type = Type.DOCUMENT;
+                id = document0.id();
+                accessHash = document0.accessHash();
+                var thumbs = document0.thumbs();
+                firstThumbSize = thumbs != null ? thumbs.get(0).type() : "";
+                dcId = document0.dcId();
+                fileReference = document0.fileReference();
+
+                break;
+            }
+            case BaseWebDocument.ID: {
+                BaseWebDocument document0 = (BaseWebDocument) document;
+
+                type = Type.WEB_DOCUMENT;
+                url = document0.url();
+                accessHash = document0.accessHash();
+
+                break;
+            }
+            case WebDocumentNoProxy.ID: {
+                WebDocumentNoProxy document0 = (WebDocumentNoProxy) document;
+
+                url = document0.url();
+                type = Type.WEB_DOCUMENT;
+
+                break;
+            }
+            default:
+                throw new IllegalArgumentException("Unknown document type: " + document);
+        }
+
+        return new FileReferenceId(type, PhotoSizeType.UNKNOWN,
+                dcId, id, accessHash, fileReference, firstThumbSize, url,
                 InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
@@ -102,7 +144,7 @@ public class FileReferenceId {
         return new FileReferenceId(Type.CHAT_PHOTO, PhotoSizeType.UNKNOWN,
                 chatPhoto.dcId(), chatPhoto.id(), chatPhoto.accessHash(),
                 chatPhoto.fileReference(), firstPhotoSize.type(),
-                InputStickerSetEmpty.instance(), -1, messageId, peer);
+                "", InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
     /**
@@ -125,7 +167,7 @@ public class FileReferenceId {
         }
 
         return new FileReferenceId(Type.CHAT_PHOTO, sizeType, chatPhoto.dcId(), chatPhoto.photoId(), -1,
-                EmptyArrays.EMPTY_BYTES, "", InputStickerSetEmpty.instance(), -1, messageId, peer);
+                EmptyArrays.EMPTY_BYTES, "", "", InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
     /**
@@ -149,7 +191,7 @@ public class FileReferenceId {
 
         return new FileReferenceId(Type.PHOTO, PhotoSizeType.UNKNOWN, photo.dcId(), photo.id(), photo.accessHash(),
                 photo.fileReference(), firstPhotoSize.type(),
-                InputStickerSetEmpty.instance(), -1, messageId, peer);
+                "", InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
     /**
@@ -166,7 +208,7 @@ public class FileReferenceId {
         }
         // TODO: test and add condition for version
         return new FileReferenceId(Type.STICKER_SET_THUMB, PhotoSizeType.UNKNOWN, -1, -1, -1,
-                EmptyArrays.EMPTY_BYTES, "", stickerSet, version, -1, InputPeerEmpty.instance());
+                EmptyArrays.EMPTY_BYTES, "", "", stickerSet, version, -1, InputPeerEmpty.instance());
     }
 
     /**
@@ -194,52 +236,61 @@ public class FileReferenceId {
             peer = TlDeserializer.deserialize(buf);
         }
 
+        String url = "";
+        long accessHash = -1;
+        int dcId = -1;
+        long documentId = -1;
+        byte[] fileReference = EmptyArrays.EMPTY_BYTES;
+        String thumbSizeType = "";
+        PhotoSizeType sizeType = PhotoSizeType.UNKNOWN;
+        InputStickerSet stickerSet = InputStickerSetEmpty.instance();
+        int thumbVersion = -1;
+
         switch (fileType) {
+            case WEB_DOCUMENT:
+                if ((flags & ACCESS_HASH_MASK) != 0) {
+                    accessHash = buf.readLongLE();
+                }
+
+                url = TlSerialUtil.deserializeString(buf);
+
+                break;
             case DOCUMENT:
-            case PHOTO: {
-                int dcId = buf.readByte();
-                long photoId = buf.readLongLE();
-                long accessHash = buf.readLongLE();
+            case PHOTO:
+                dcId = buf.readByte();
+                documentId = buf.readLongLE();
+                accessHash = buf.readLongLE();
 
-                byte[] fileReference = TlSerialUtil.deserializeBytes(buf);
-                String thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
-                buf.release();
+                fileReference = TlSerialUtil.deserializeBytes(buf);
+                thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
 
-                return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, dcId, photoId, accessHash,
-                        fileReference, thumbSizeType, InputStickerSetEmpty.instance(),
-                        -1, messageId, peer);
-            }
-            case CHAT_PHOTO: {
-                PhotoSizeType sizeType = PhotoSizeType.ALL[buf.readByte()];
-                int dcId = buf.readByte();
-                long photoId = buf.readLongLE();
+                break;
+            case CHAT_PHOTO:
+                sizeType = PhotoSizeType.ALL[buf.readByte()];
+                dcId = buf.readByte();
+                documentId = buf.readLongLE();
 
-                long accessHash = -1;
-                byte[] fileReference = EmptyArrays.EMPTY_BYTES;
-                String thumbSizeType = "";
                 if (sizeType == PhotoSizeType.UNKNOWN) {
                     accessHash = buf.readLongLE();
                     fileReference = TlSerialUtil.deserializeBytes(buf);
                     thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
                 }
 
-                buf.release();
+                break;
+            case STICKER_SET_THUMB:
+                thumbVersion = buf.readIntLE();
+                stickerSet = TlDeserializer.deserialize(buf);
 
-                return new FileReferenceId(fileType, sizeType, dcId, photoId, accessHash,
-                        fileReference, thumbSizeType, InputStickerSetEmpty.instance(),
-                        -1, messageId, peer);
-            }
-            case STICKER_SET_THUMB: {
-                int thumbVersion = buf.readIntLE();
-                InputStickerSet stickerSet = TlDeserializer.deserialize(buf);
-                buf.release();
-
-                return new FileReferenceId(fileType, PhotoSizeType.UNKNOWN, -1, -1, -1,
-                        EmptyArrays.EMPTY_BYTES, "", stickerSet, thumbVersion, messageId, peer);
-            }
+                break;
             default:
+                buf.release();
                 throw new IllegalStateException("Malformed file reference id.");
         }
+
+        buf.release();
+        return new FileReferenceId(fileType, sizeType, dcId, documentId, accessHash,
+                fileReference, thumbSizeType, url, stickerSet,
+                thumbVersion, messageId, peer);
     }
 
     static ByteBuf encodeZeroRle(ByteBuf data) {
@@ -304,6 +355,10 @@ public class FileReferenceId {
         buf.writeByte((byte) fileType.ordinal());
 
         byte flags = (byte) ((messageId != -1 ? MESSAGE_ID_MASK : 0) | (peer.identifier() != InputPeerEmpty.ID ? PEER_MASK : 0));
+        if (fileType == Type.WEB_DOCUMENT && accessHash != -1) {
+            flags |= ACCESS_HASH_MASK;
+        }
+
         buf.writeByte(flags);
         if (messageId != -1) {
             buf.writeIntLE(messageId);
@@ -315,6 +370,16 @@ public class FileReferenceId {
         }
 
         switch (fileType) {
+            case WEB_DOCUMENT:
+                if (accessHash != -1) {
+                    buf.writeLongLE(accessHash);
+                }
+
+                ByteBuf urlBuf = TlSerialUtil.serializeString(alloc, url);
+                buf.writeBytes(urlBuf);
+                urlBuf.release();
+
+                break;
             case DOCUMENT:
             case PHOTO: {
                 ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
@@ -438,6 +503,15 @@ public class FileReferenceId {
     }
 
     /**
+     * Gets the web document url, if file has it.
+     *
+     * @return The url of web document, if applicable, otherwise {@code ""}.
+     */
+    public String getUrl() {
+        return url;
+    }
+
+    /**
      * Gets the source message id, if file from message.
      *
      * @return The source message id, if applicable, otherwise {@code -1}.
@@ -447,49 +521,70 @@ public class FileReferenceId {
     }
 
     /**
+     * Creates a {@link InputWebFileLocation} from this reference,
+     * which used in {@link telegram4j.tl.request.upload.GetWebFile} method, if access hash present, and it's web file
+     *
+     * @return The new {@link InputWebFileLocation} from this reference, if access hash present, and it's web file
+     */
+    public Optional<InputWebFileLocation> asWebLocation() {
+        switch (fileType) {
+            case WEB_DOCUMENT:
+                if (accessHash == -1) {
+                    return Optional.empty();
+                }
+
+                return Optional.of(ImmutableBaseInputWebFileLocation.of(url, accessHash));
+            default:
+                return Optional.empty();
+        }
+    }
+
+    /**
      * Creates a {@link InputFileLocation} from this reference,
      * which used in {@link telegram4j.tl.request.upload.GetFile} method.
+     * <p>
+     * Web files would be ignored, use {@link #asWebLocation()}.
      *
      * @return The new {@link InputFileLocation} from this reference.
      */
-    public InputFileLocation asLocation() {
+    public Optional<InputFileLocation> asLocation() {
         switch (fileType) {
             case CHAT_PHOTO:
                 if (fileReference != EmptyArrays.EMPTY_BYTES) { // is full image
-                    return InputPhotoFileLocation.builder()
+                    return Optional.of(InputPhotoFileLocation.builder()
                             .accessHash(accessHash)
                             .fileReference(fileReference)
                             .id(documentId)
                             .thumbSize(thumbSizeType)
-                            .build();
+                            .build());
                 }
 
-                return InputPeerPhotoFileLocation.builder()
+                return Optional.of(InputPeerPhotoFileLocation.builder()
                         .peer(peer)
                         .photoId(documentId)
                         .big(sizeType == PhotoSizeType.CHAT_PHOTO_BIG)
-                        .build();
+                        .build());
             case PHOTO:
-                return InputPhotoFileLocation.builder()
+                return Optional.of(InputPhotoFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
                         .id(documentId)
                         .thumbSize(thumbSizeType)
-                        .build();
+                        .build());
             case STICKER_SET_THUMB:
-                return InputStickerSetThumb.builder()
+                return Optional.of(InputStickerSetThumb.builder()
                         .stickerset(stickerSet)
                         .thumbVersion(thumbVersion)
-                        .build();
+                        .build());
             case DOCUMENT:
-                return InputDocumentFileLocation.builder()
+                return Optional.of(InputDocumentFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
                         .id(documentId)
                         .thumbSize(thumbSizeType)
-                        .build();
+                        .build());
             default:
-                throw new IllegalStateException();
+                return Optional.empty();
         }
     }
 
@@ -530,14 +625,14 @@ public class FileReferenceId {
                 accessHash == that.accessHash && thumbVersion == that.thumbVersion &&
                 messageId == that.messageId && fileType == that.fileType &&
                 sizeType == that.sizeType && Arrays.equals(fileReference, that.fileReference) &&
-                thumbSizeType.equals(that.thumbSizeType) &&
+                thumbSizeType.equals(that.thumbSizeType) && url.equals(that.url) &&
                 stickerSet.equals(that.stickerSet) && peer.equals(that.peer);
     }
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(fileType, sizeType, dcId, documentId, accessHash,
-                thumbSizeType, stickerSet, thumbVersion, messageId, peer);
+        int result = Objects.hash(fileType, sizeType, dcId, documentId,
+                accessHash, thumbSizeType, url, stickerSet, thumbVersion, messageId, peer);
         result = 31 * result + Arrays.hashCode(fileReference);
         return result;
     }
@@ -545,6 +640,14 @@ public class FileReferenceId {
     @Override
     public String toString() {
         switch (fileType) {
+            case WEB_DOCUMENT:
+                return "FileReferenceId{" +
+                        "fileType=" + fileType +
+                        ", accessHash=" + accessHash +
+                        ", url=" + url +
+                        ", messageId=" + messageId +
+                        ", peer=" + peer +
+                        '}';
             case DOCUMENT:
                 return "FileReferenceId{" +
                         "fileType=" + fileType +
@@ -619,6 +722,9 @@ public class FileReferenceId {
 
         /** File type, representing all documents. */
         DOCUMENT,
+
+        /** Web file type, representing web documents. */
+        WEB_DOCUMENT,
 
         /** Sticker set thumbnail type. */
         STICKER_SET_THUMB,
