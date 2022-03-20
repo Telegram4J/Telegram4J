@@ -30,7 +30,6 @@ allprojects {
 
     group = 'io.github.telegram4j'
     description = 'Java library for the Telegram API'
-    version = '0.1.0-SNAPSHOT'
 
     targetCompatibility = JavaVersion.VERSION_11
     sourceCompatibility = JavaVersion.VERSION_11
@@ -38,7 +37,9 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        if (isJitpack || isSnapshot) {
+            maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots' }
+        }
     }
 
     dependencies {
