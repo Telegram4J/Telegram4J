@@ -206,7 +206,9 @@ public class FileReferenceId {
         if (stickerSet.identifier() == InputStickerSetEmpty.ID) {
             throw new IllegalArgumentException("Unexpected peer type.");
         }
-        // TODO: test and add condition for version
+        if (version < 0) {
+            throw new IllegalArgumentException("Invalid sticker set thumbnail version.");
+        }
         return new FileReferenceId(Type.STICKER_SET_THUMB, PhotoSizeType.UNKNOWN, -1, -1, -1,
                 EmptyArrays.EMPTY_BYTES, "", "", stickerSet, version, -1, InputPeerEmpty.instance());
     }
@@ -644,7 +646,7 @@ public class FileReferenceId {
                 return "FileReferenceId{" +
                         "fileType=" + fileType +
                         ", accessHash=" + accessHash +
-                        ", url=" + url +
+                        ", url='" + url + '\'' +
                         ", messageId=" + messageId +
                         ", peer=" + peer +
                         '}';

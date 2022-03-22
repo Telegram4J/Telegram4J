@@ -13,6 +13,21 @@ class FileReferenceIdTest {
 
     @Test
     void all() {
+        var expWebDocumentNoProxy = ofDocument(WebDocumentNoProxy.builder()
+                .url("https://www.google.com")
+                // ignored fields
+                .mimeType("")
+                .size(-1)
+                .attributes(List.of())
+                .build(), 2, InputPeerSelf.instance());
+        var expWebDocument = ofDocument(BaseWebDocument.builder()
+                .url("https://www.google.com")
+                .accessHash(1337 >> 4)
+                // ignored fields
+                .mimeType("")
+                .size(-1)
+                .attributes(List.of())
+                .build(), 2, InputPeerSelf.instance());
         var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(1337, 2),
                 PhotoSizeType.CHAT_PHOTO_BIG, -1, InputPeerSelf.instance());
         var expMinPhoto = ofChatPhoto(BasePhoto.builder()
@@ -60,12 +75,16 @@ class FileReferenceIdTest {
                 .build(), 1, InputPeerSelf.instance());
         var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2);
 
+        var actWebDocumentNoProxy = serialize(expWebDocumentNoProxy);
+        var actWebDocument = serialize(expWebDocument);
         var actChatPhoto = serialize(expChatPhoto);
         var actMinPhoto = serialize(expMinPhoto);
         var actDocument = serialize(expDocument);
         var actPhoto = serialize(expPhoto);
         var actStickerSet = serialize(expStickerSet);
 
+        assertEquals(expWebDocumentNoProxy, actWebDocumentNoProxy);
+        assertEquals(expWebDocument, actWebDocument);
         assertEquals(expChatPhoto, actChatPhoto);
         assertEquals(expMinPhoto, actMinPhoto);
         assertEquals(expDocument, actDocument);
