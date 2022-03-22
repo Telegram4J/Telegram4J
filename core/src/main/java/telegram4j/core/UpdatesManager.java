@@ -370,7 +370,7 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(toId(data.peerId()))
+                                                .switchIfEmpty(client.asInputPeer(Id.of(data.peerId())).map(p -> Id.of(p, client.getSelfId())))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
@@ -468,7 +468,7 @@ public class UpdatesManager {
                                                 .orElse(null);
 
                                         return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                                                .switchIfEmpty(toId(data.peerId()))
+                                                .switchIfEmpty(client.asInputPeer(Id.of(data.peerId())).map(p -> Id.of(p, client.getSelfId())))
                                                 .map(i -> EntityFactory.createMessage(client, data, i))
                                                 .map(m -> new SendMessageEvent(client, m, chat, author));
                                     });
@@ -576,7 +576,7 @@ public class UpdatesManager {
 
                             return Mono.justOrEmpty(chat)
                                     .map(Chat::getId)
-                                    .switchIfEmpty(toId(data.peerId()))
+                                    .switchIfEmpty(client.asInputPeer(Id.of(data.peerId())).map(p -> Id.of(p, client.getSelfId())))
                                     .map(i -> EntityFactory.createMessage(client, data, i))
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
@@ -626,7 +626,7 @@ public class UpdatesManager {
 
                             return Mono.justOrEmpty(chat)
                                     .map(Chat::getId)
-                                    .switchIfEmpty(toId(data.peerId()))
+                                    .switchIfEmpty(client.asInputPeer(Id.of(data.peerId())).map(p -> Id.of(p, client.getSelfId())))
                                     .map(i -> EntityFactory.createMessage(client, data, i))
                                     .map(m -> new SendMessageEvent(client, m, chat, author));
                         });
@@ -673,37 +673,6 @@ public class UpdatesManager {
             default:
                 throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
-    }
-
-    private Mono<Id> toId(Peer peer) {
-        long id = TlEntityUtil.getRawPeerId(peer);
-        return Mono.defer(() -> {
-            switch (peer.identifier()) {
-                case PeerChannel.ID: return client.getMtProtoResources().getStoreLayout()
-                        .resolveChannel(id).map(TlEntityUtil::toInputPeer);
-                case PeerChat.ID:
-                    return Mono.just(ImmutableInputPeerChat.of(id));
-                case PeerUser.ID: return client.getMtProtoResources()
-                        .getStoreLayout().resolveUser(id);
-                default: return Mono.error(new IllegalArgumentException("Unknown peer type: " + peer));
-            }
-        })
-        .map(inputPeer -> {
-            switch (inputPeer.identifier()) {
-                // InputPeerUserFromMessage or InputPeerChannelFromMessage currently cannot be mapped
-                case InputPeerChannel.ID:
-                    InputPeerChannel inputPeerChannel = (InputPeerChannel) inputPeer;
-                    return Id.ofChannel(inputPeerChannel.channelId(), inputPeerChannel.accessHash());
-                case InputPeerChat.ID:
-                    InputPeerChat inputPeerChat = (InputPeerChat) inputPeer;
-                    return Id.ofChat(inputPeerChat.chatId());
-                case InputPeerSelf.ID: return Id.ofUser(id, null);
-                case InputPeerUser.ID:
-                    InputPeerUser inputPeerUser = (InputPeerUser) inputPeer;
-                    return Id.ofUser(inputPeerUser.userId(), inputPeerUser.accessHash());
-                default: throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
-            }
-        });
     }
 
     public void shutdown() {

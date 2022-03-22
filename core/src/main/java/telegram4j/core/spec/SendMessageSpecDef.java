@@ -1,6 +1,7 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
+import telegram4j.core.object.PeerId;
 import telegram4j.core.util.EntityParserFactory;
 
 import java.time.Instant;
@@ -29,6 +30,11 @@ interface SendMessageSpecDef extends Spec {
         return false;
     }
 
+    @Value.Default
+    default boolean noforwards() {
+        return false;
+    }
+
     Optional<Integer> replyToMessageId();
 
     String message();
@@ -38,4 +44,6 @@ interface SendMessageSpecDef extends Spec {
     Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
+
+    Optional<PeerId> sendAs();
 }

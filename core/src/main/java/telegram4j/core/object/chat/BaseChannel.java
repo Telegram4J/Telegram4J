@@ -36,20 +36,25 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Nullable
     protected final ExportedChatInvite exportedChatInvite;
 
-    protected BaseChannel(MTProtoTelegramClient client, Id id, Type type, telegram4j.tl.Channel minData) {
-        super(client, id, type);
+    protected BaseChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
+        super(client);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.exportedChatInvite = null;
     }
 
-    protected BaseChannel(MTProtoTelegramClient client, Id id, Type type,
+    protected BaseChannel(MTProtoTelegramClient client,
                           ChannelFull fullData, telegram4j.tl.Channel minData,
                           @Nullable ExportedChatInvite exportedChatInvite) {
-        super(client, id, type);
+        super(client);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.exportedChatInvite = exportedChatInvite;
+    }
+
+    @Override
+    public Id getId() {
+        return Id.ofChannel(minData.id(), minData.accessHash());
     }
 
     @Override
@@ -272,6 +277,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Mono<ChatParticipant> getParticipant(Id participantId) {
+        Id id = getId();
+
         return asInputPeer(participantId)
                 .flatMap(participantPeer -> client.getServiceHolder().getChatService().getParticipant(
                 ImmutableBaseInputChannel.of(id.asLong(), id.getAccessHash().orElseThrow()),
@@ -307,6 +314,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Override
     public Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit) {
         InputChannel channel = TlEntityUtil.toInputChannel(getIdAsPeer());
+        Id id = getId();
 
         return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
                 .getParticipants(channel, filter, o, limit, 0)
@@ -315,6 +323,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                     var chatsMap = data.chats().stream()
                             .filter(TlEntityUtil::isAvailableChat)
                             .map(c -> EntityFactory.createChat(client, c, null))
+                            .filter(Objects::nonNull)
                             .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                     var usersMap = data.users().stream()
                             .filter(u -> u.identifier() == BaseUser.ID)
@@ -334,7 +343,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                     case PeerUser.ID:
                                         peerEntity = usersMap.get(rawPeerId);
                                         break;
-                                    default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
+                                    default:
+                                        throw new IllegalArgumentException("Unknown peer type: " + peerId);
                                 }
 
                                 return new ChatParticipant(client, peerEntity, c, id);
@@ -347,14 +357,15 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     protected Mono<InputPeer> asInputPeer(Id participantId) {
         return Mono.defer(() -> {
-            switch (id.getType()) {
-                case CHAT: return Mono.just(ImmutableInputPeerChat.of(participantId.asLong()));
+            switch (getType()) {
+                case GROUP: return Mono.just(ImmutableInputPeerChat.of(participantId.asLong()));
+                case SUPERGROUP:
                 case CHANNEL: return participantId.getAccessHash().isEmpty()
                         ? client.getMtProtoResources().getStoreLayout()
                         .resolveChannel(participantId.asLong()).map(TlEntityUtil::toInputPeer)
                         : Mono.just(ImmutableInputPeerChannel.of(participantId.asLong(),
                         participantId.getAccessHash().orElseThrow()));
-                case USER: return participantId.getAccessHash().isEmpty()
+                case PRIVATE: return participantId.getAccessHash().isEmpty()
                         ? client.getMtProtoResources().getStoreLayout()
                         .resolveUser(participantId.asLong()).map(TlEntityUtil::toInputPeer)
                         : Mono.just(ImmutableInputPeerUser.of(participantId.asLong(),

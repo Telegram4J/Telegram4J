@@ -180,4 +180,12 @@ public class TlEntityUtil {
         }
         return impl.cast(obj);
     }
+
+    @Nullable
+    public static <T extends TlObject> T unmapEmpty(@Nullable T obj) {
+        if (obj == null || obj instanceof EmptyObject) {
+            return null;
+        }
+        return obj;
+    }
 }

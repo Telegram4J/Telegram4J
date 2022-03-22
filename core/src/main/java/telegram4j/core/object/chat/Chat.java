@@ -15,9 +15,6 @@ import java.util.Optional;
 /** The Telegram <a href="https://core.telegram.org/api/channel">chat</a> representation. */
 public interface Chat extends PeerEntity {
 
-    @Override
-    Id getId();
-
     /**
      * Gets the type of chat.
      *

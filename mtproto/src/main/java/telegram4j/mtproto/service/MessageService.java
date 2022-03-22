@@ -181,7 +181,6 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableCheckChatInvite.of(hash));
     }
 
-    // TODO: check updates type
     public Mono<Updates> importChatInvite(String hash) {
         return client.sendAwait(ImmutableImportChatInvite.of(hash));
     }
@@ -283,7 +282,6 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
-    // TODO: check updates type
     public Mono<Updates> getAllDrafts() {
         return client.sendAwait(GetAllDrafts.instance());
     }

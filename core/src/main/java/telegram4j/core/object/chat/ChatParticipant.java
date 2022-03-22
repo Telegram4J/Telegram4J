@@ -12,6 +12,7 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 
+/** A {@link GroupChat chat}/{@link Channel channel} participant implementation. */
 public final class ChatParticipant implements TelegramObject {
     /*
      * This is a too complex type from polymorphism side, and
@@ -62,7 +63,7 @@ public final class ChatParticipant implements TelegramObject {
      * @return The status type of participant.
      */
     public Status getStatus() {
-        return Status.of(data);
+        return Status.of0(data);
     }
 
     /**
@@ -278,12 +279,26 @@ public final class ChatParticipant implements TelegramObject {
         LEFT;
 
         /**
-         * Gets type of {@link telegram4j.tl.ChatParticipant} or {@link ChannelParticipant}.
+         * Gets type of the {@link ChannelParticipant}.
          *
-         * @param data The {@link telegram4j.tl.ChatParticipant} or {@link ChannelParticipant} object to get status.
-         * @return The type of chat/channel participant
+         * @param data The {@link ChannelParticipant} object to get status.
+         * @return The type of channel participant
          */
-        public static Status of(TlObject data) {
+        public static Status of(ChannelParticipant data) {
+            return of0(data);
+        }
+
+        /**
+         * Gets type of the {@link telegram4j.tl.ChatParticipant}.
+         *
+         * @param data The {@link telegram4j.tl.ChatParticipant} object to get status.
+         * @return The type of chat participant
+         */
+        public static Status of(telegram4j.tl.ChatParticipant data) {
+            return of0(data);
+        }
+
+        private static Status of0(TlObject data) {
             switch (data.identifier()) {
                 case BaseChannelParticipant.ID:
                 case ChannelParticipantSelf.ID:

@@ -30,7 +30,7 @@ import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
     /** The supported api scheme version. */
-    public static final int LAYER = 137;
+    public static final int LAYER = 138;
 
     private final AuthorizationResources authResources;
     private final MTProtoClient mtProtoClient;
@@ -119,7 +119,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
                 .flatMapMany(loc -> {
                     if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-                        if (loc.getAccessHash() == -1) {
+                        if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
                             return getFile0(loc);
                         }
 
@@ -132,7 +132,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 });
     }
 
-    public Flux<FilePart> getFile0(FileReferenceId loc) {
+    private Flux<FilePart> getFile0(FileReferenceId loc) {
         return mtProtoResources.getHttpClient()
                 .get().uri(loc.getUrl())
                 .responseSingle((res, buf) -> buf.asByteArray()
@@ -166,7 +166,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .deleteMessages(p, ids));
     }
 
-    private Mono<InputPeer> asInputPeer(Id chatId) {
+    public Mono<InputPeer> asInputPeer(Id chatId) {
         switch (chatId.getType()) {
             case USER: return asInputUser(chatId).map(TlEntityUtil::toInputPeer);
             case CHAT: return Mono.just(ImmutableInputPeerChat.of(chatId.asLong()));
@@ -175,14 +175,20 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         }
     }
 
-    private Mono<InputChannel> asInputChannel(Id channelId) {
+    public Mono<InputChannel> asInputChannel(Id channelId) {
+        if (channelId.getType() != Id.Type.CHANNEL) {
+            return Mono.error(new IllegalArgumentException("Specified id must be channel-typed: " + channelId));
+        }
         if (channelId.getAccessHash().isEmpty()) {
             return mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong());
         }
         return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow()));
     }
 
-    private Mono<InputUser> asInputUser(Id userId) {
+    public Mono<InputUser> asInputUser(Id userId) {
+        if (userId.getType() != Id.Type.USER) {
+            return Mono.error(new IllegalArgumentException("Specified id must be user-typed: " + userId));
+        }
         if (userId.getAccessHash().isEmpty()) {
             return mtProtoResources.getStoreLayout().resolveUser(userId.asLong());
         }

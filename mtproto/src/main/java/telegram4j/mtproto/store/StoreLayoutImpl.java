@@ -152,10 +152,7 @@ public class StoreLayoutImpl implements StoreLayout {
                             case InputMessagePinned.ID:
                                 return Optional.ofNullable(this.chats.get(channelId))
                                         .map(PartialFields::getFull)
-                                        // TODO: why parser doesnt pull up #pinnedMsgId method?
-                                        .map(c -> c.identifier() == ChannelFull.ID
-                                                ? ((ChannelFull) c).pinnedMsgId()
-                                                : ((BaseChatFull) c).pinnedMsgId())
+                                        .map(ChatFull::pinnedMsgId)
                                         .orElse(null);
                             case InputMessageCallbackQuery.ID:
                                 // TODO

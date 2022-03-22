@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Geo point representation. */
 public class GeoPoint implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -16,18 +17,38 @@ public class GeoPoint implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    /**
+     * Gets longitude coordinates of geo point.
+     *
+     * @return The longitude coordinates of geo point.
+     */
     public double getLongitude() {
         return data.longState();
     }
 
+    /**
+     * Gets latitude coordinates of geo point.
+     *
+     * @return The latitude coordinates of geo point.
+     */
     public double getLatitude() {
         return data.lat();
     }
 
+    /**
+     * Gets access hash for geo point.
+     *
+     * @return The access hash for geo point.
+     */
     public long getAccessHash() {
         return data.accessHash();
     }
 
+    /**
+     * Gets estimated horizontal accuracy of the location, in meters; defined by the sender.
+     *
+     * @return The estimated horizontal accuracy of the location, in meters; defined by the sender.
+     */
     public Optional<Integer> getAccuracyRadius() {
         return Optional.ofNullable(data.accuracyRadius());
     }

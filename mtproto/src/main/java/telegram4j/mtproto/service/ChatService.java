@@ -185,7 +185,6 @@ public class ChatService extends RpcService {
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
-    // TODO: check updates type
     public Mono<Updates> createChannel(CreateChannel request) {
         return client.sendAwait(request);
     }

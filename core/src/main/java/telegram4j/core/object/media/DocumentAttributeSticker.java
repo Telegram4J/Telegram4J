@@ -2,7 +2,7 @@ package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.tl.InputStickerSet;
+import telegram4j.core.spec.IdFields;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -24,9 +24,8 @@ public class DocumentAttributeSticker extends BaseDocumentAttribute {
         return data.alt();
     }
 
-    // TODO: mapping for this object
-    public InputStickerSet getStickerSet() {
-        return data.stickerset();
+    public IdFields.StickerSetId getStickerSet() {
+        return IdFields.StickerSetId.from(data.stickerset());
     }
 
     public Optional<MaskCoordinates> getMaskCoordinates() {

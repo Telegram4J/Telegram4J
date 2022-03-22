@@ -2,10 +2,7 @@ package telegram4j.core.object.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.ChatPhoto;
-import telegram4j.core.object.PeerNotifySettings;
-import telegram4j.core.object.Photo;
-import telegram4j.core.object.User;
+import telegram4j.core.object.*;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -18,9 +15,19 @@ public final class PrivateChat extends BaseChat {
     private final User selfUser;
 
     public PrivateChat(MTProtoTelegramClient client, User user, @Nullable User selfUser) {
-        super(client, user.getId(), Type.PRIVATE);
+        super(client);
         this.user = Objects.requireNonNull(user, "user");
         this.selfUser = selfUser;
+    }
+
+    @Override
+    public Id getId() {
+        return user.getId();
+    }
+
+    @Override
+    public Type getType() {
+        return Type.PRIVATE;
     }
 
     /**

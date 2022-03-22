@@ -89,8 +89,9 @@ class MessageUpdateHandlers {
                     }
                 })
                 // fromId is often not set if the message was sent to the DM, so we will have to process it for convenience
-                .or(() -> chat.getType() == Chat.Type.PRIVATE
-                        ? Optional.of(((PrivateChat) chat).getUser()) : Optional.empty())
+                .or(() -> Optional.ofNullable(chat)
+                        .filter(c -> c.getType() == Chat.Type.PRIVATE)
+                        .map(c -> ((PrivateChat) c).getUser()))
                 .orElse(null);
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)

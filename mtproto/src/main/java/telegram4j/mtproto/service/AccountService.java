@@ -237,7 +237,6 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableSetContactSignUpNotification.of(silent));
     }
 
-    // TODO: check updates type
     public Mono<Updates> getNotifyExceptions(GetNotifyExceptions request) {
         return client.sendAwait(request);
     }

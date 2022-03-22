@@ -85,6 +85,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authResources);
     }
 
+    /**
+     * Sets store layout for accessing and persisting incoming data from Telegram API.
+     * <p>
+     * If custom implementation isn't set, {@link StoreLayoutImpl} will be used.
+     *
+     * @param storeLayout A new store layout implementation for client.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setStoreLayout(StoreLayout storeLayout) {
         this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
         return this;

@@ -167,13 +167,7 @@ public final class EntityFactory {
                 }
 
                 var exportedChatInvite = Optional.of(chatFull.fullChat())
-                        .map(c -> {
-                            switch (c.identifier()) {
-                                case ChannelFull.ID: return ((ChannelFull) c).exportedInvite();
-                                case BaseChatFull.ID: return ((BaseChatFull) c).exportedInvite();
-                                default: throw new IllegalStateException();
-                            }
-                        })
+                        .map(telegram4j.tl.ChatFull::exportedInvite)
                         .map(d -> {
                             var admin = createUser(client, chatFull.users().stream()
                                     // This list is *usually* small, so there is no point in computing map
@@ -456,6 +450,7 @@ public final class EntityFactory {
         }
     }
 
+    @Nullable
     public static PeerEntity createPeerEntity(MTProtoTelegramClient client, ResolvedPeer p) {
         switch (p.peer().identifier()) {
             case PeerChannel.ID: return createChat(client, p.chats().get(0), null);

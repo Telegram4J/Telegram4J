@@ -13,6 +13,7 @@ import telegram4j.tl.messages.Messages;
 import telegram4j.tl.messages.MessagesSlice;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,7 @@ public final class AuxiliaryEntityFactory {
                 var chatsMap = data0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, null))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
@@ -67,6 +69,7 @@ public final class AuxiliaryEntityFactory {
                 var chatsMap = data0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, null))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
@@ -107,6 +110,7 @@ public final class AuxiliaryEntityFactory {
                 var chatsMap = data0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, null))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)

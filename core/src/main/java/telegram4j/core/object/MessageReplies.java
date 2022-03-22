@@ -2,7 +2,6 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.mtproto.util.TlEntityUtil;
 
 import java.util.List;
 import java.util.Objects;

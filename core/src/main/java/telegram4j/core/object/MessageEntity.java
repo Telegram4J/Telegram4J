@@ -2,11 +2,17 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
 
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Markup text entity.
+ * <p>
+ * For parsing entities use {@link EntityParserSupport} utility.
+ */
 public class MessageEntity implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -24,34 +30,71 @@ public class MessageEntity implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets type of the entity.
+     *
+     * @return The {@link Type} of the entity.
+     */
     public Type getType() {
         return Type.of(data);
     }
 
+    /**
+     * Gets text substring of the entity.
+     *
+     * @return The text value of the entity.
+     */
     public String getContent() {
         return content;
     }
 
+    /**
+     * Gets offset index in the striped text (in UTF-8 codepoints).
+     *
+     * @return The offset index in the striped text.
+     */
     public int getOffset() {
         return data.offset();
     }
 
+    /**
+     * Gets length of the entity in the text (in UTF-8 codepoints).
+     * For computing end index of the entity use following code: {@code getOffset() + getLength()}
+     *
+     * @return The length of the entity in the text.
+     */
     public int getLength() {
         return data.length();
     }
 
+    /**
+     * Gets programming language for code block, if {@code getType() == Type.PRE}.
+     * Might be empty string if language isn't specified.
+     *
+     * @return The programming language name for code block, if {@code getType() == Type.PRE}.
+     */
     public Optional<String> getLanguage() {
         return data.identifier() == MessageEntityPre.ID
                 ? Optional.of((MessageEntityPre) data).map(MessageEntityPre::language)
                 : Optional.empty();
     }
 
+    /**
+     * Gets url for <a href="https://www.google.com">text url</a>, if {@code getType() == Type.TEXT_URL}.
+     *
+     * @return The url for in-text url, if {@code getType() == Type.TEXT_URL}.
+     */
     public Optional<String> getUrl() {
         return data.identifier() == MessageEntityTextUrl.ID
                 ? Optional.of((MessageEntityTextUrl) data).map(MessageEntityTextUrl::url)
                 : Optional.empty();
     }
 
+    /**
+     * Gets id of the mentioned user, if {@code getType() == Type.MENTION_NAME}.
+     *
+     * @return The id of the mentioned user, if {@code getType() == Type.MENTION_NAME}.
+     */
     public Optional<Id> getUserId() {
         // InputMessageEntityMentionName doesn't handle because it's an input entity, that maps into the MessageEntityMentionName
         return data.identifier() == MessageEntityMentionName.ID

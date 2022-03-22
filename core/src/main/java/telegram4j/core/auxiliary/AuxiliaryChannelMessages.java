@@ -9,7 +9,6 @@ import telegram4j.core.object.chat.Chat;
 import java.util.List;
 import java.util.Optional;
 
-// TODO: check whether chats list always contains only channels
 public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
     private final boolean inexact;
     private final int pts;

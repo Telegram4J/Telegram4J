@@ -8,7 +8,6 @@ import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
-import telegram4j.core.spec.MessageFields;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.tl.*;
@@ -29,7 +28,7 @@ import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 /**
  * Representation for default and service messages.
  */
-public class Message implements TelegramObject {
+public final class Message implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     @Nullable
@@ -308,6 +307,12 @@ public class Message implements TelegramObject {
                     .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s.trim()))))
                     .orElseGet(() -> Mono.just(Tuples.of(spec.message().orElse(""), List.of())));
 
+            var replyMarkup = Mono.justOrEmpty(spec.replyMarkup())
+                    .flatMap(r -> r.asData(client));
+
+            var media = Mono.justOrEmpty(spec.media())
+                    .flatMap(r -> r.asData(client));
+
             return parsed.map(function((txt, ent) -> EditMessage.builder()
                             .message(txt.isEmpty() ? null : txt)
                             .entities(ent.isEmpty() ? null : ent)
@@ -317,13 +322,10 @@ public class Message implements TelegramObject {
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
                                     .orElse(null))
-                            .replyMarkup(spec.replyMarkup().map(MessageFields.ReplyMarkupSpec::asData).orElse(null))
-                            .peer(getChatIdAsPeer())
-                            .build()))
-                    .flatMap(editMessage -> Mono.justOrEmpty(spec.media())
-                            .flatMap(s -> s.asData(client))
-                            .map(editMessage::withMedia)
-                            .defaultIfEmpty(editMessage))
+                            .peer(getChatIdAsPeer())))
+                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .then(media.doOnNext(builder::media))
+                            .then(Mono.fromSupplier(builder::build)))
                     .flatMap(editMessage -> client.getServiceHolder()
                             .getMessageService().editMessage(editMessage))
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));

@@ -71,4 +71,63 @@ public final class IdFields {
             CALLBACK_QUERY;
         }
     }
+
+    @Value.Immutable(builder = false)
+    public interface StickerSetId extends Spec {
+
+        static StickerSetId from(InputStickerSet inputStickerSet) {
+            switch (inputStickerSet.identifier()) {
+                case InputStickerSetAnimatedEmoji.ID: return animatedEmoji();
+                case InputStickerSetAnimatedEmojiAnimations.ID: return animatedEmojiAnimations();
+                case InputStickerSetDice.ID: return dice(((InputStickerSetDice) inputStickerSet).emoticon());
+                case InputStickerSetID.ID:
+                    InputStickerSetID cast = (InputStickerSetID) inputStickerSet;
+                    return of(cast.id(), cast.accessHash());
+                case InputStickerSetShortName.ID: return shortName(((InputStickerSetShortName) inputStickerSet).shortName());
+                default: throw new IllegalArgumentException("Unknown input sticker set type: " + inputStickerSet);
+            }
+        }
+
+        static StickerSetId of(long id, long accessHash) {
+            return ImmutableIdFields.StickerSetId.of(Type.ID)
+                    .withId(id)
+                    .withAccessHash(accessHash);
+        }
+
+        static StickerSetId animatedEmoji() {
+            return ImmutableIdFields.StickerSetId.of(Type.ANIMATED_EMOJI);
+        }
+
+        static StickerSetId animatedEmojiAnimations() {
+            return ImmutableIdFields.StickerSetId.of(Type.ANIMATED_EMOJI_ANIMATIONS);
+        }
+
+        static StickerSetId dice(String emoticon) {
+            return ImmutableIdFields.StickerSetId.of(Type.DICE)
+                    .withEmoticon(emoticon);
+        }
+
+        static StickerSetId shortName(String shortName) {
+            return ImmutableIdFields.StickerSetId.of(Type.SHORT_NAME)
+                    .withShortName(shortName);
+        }
+
+        Type type();
+
+        Optional<Long> id();
+
+        Optional<Long> accessHash();
+
+        Optional<String> emoticon();
+
+        Optional<String> shortName();
+
+        enum Type {
+            ANIMATED_EMOJI,
+            ANIMATED_EMOJI_ANIMATIONS,
+            DICE,
+            ID,
+            SHORT_NAME,
+        }
+    }
 }

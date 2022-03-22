@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+/** Markup parsing utilities. */
 public final class EntityParserSupport {
 
     public static final Pattern USER_LINK_ID_PATTERN = Pattern.compile("^tg://user\\?id=(\\d{1,19})$", Pattern.CASE_INSENSITIVE);
@@ -34,6 +35,14 @@ public final class EntityParserSupport {
     private EntityParserSupport() {
     }
 
+    /**
+     * Collects and sorts tokens from specified parser to the nearest pairs.
+     * After sorting tokens converts to the {@link MessageEntity} and collects to the result list.
+     *
+     * @param client The client to resolve mentions.
+     * @param parser The message entity parser.
+     * @return A {@link Mono} emitting on successful completion {@link Tuple2} with striped text and list of parsed message entities.
+     */
     public static Mono<Tuple2<String, List<MessageEntity>>> parse(MTProtoTelegramClient client, EntityParser parser) {
         List<EntityToken> tokens = new LinkedList<>();
         EntityToken t;
@@ -42,7 +51,7 @@ public final class EntityParserSupport {
         }
 
         if (tokens.size() % 2 != 0) {
-            throw new IllegalStateException("Incorrect token count (" + tokens.size() + ") is odd.");
+            return Mono.error(new IllegalStateException("Incorrect token count (" + tokens.size() + ") is odd."));
         }
 
         String striped = parser.striped();

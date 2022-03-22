@@ -32,7 +32,7 @@ public final class GroupChat extends BaseChat {
     private final List<ChatParticipant> chatParticipants;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
-        super(client, Id.ofChat(minData.id()), Type.GROUP);
+        super(client);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = null;
         this.exportedChatInvite = null;
@@ -42,11 +42,21 @@ public final class GroupChat extends BaseChat {
     public GroupChat(MTProtoTelegramClient client, BaseChatFull fullData,
                      telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite,
                      @Nullable List<ChatParticipant> chatParticipants) {
-        super(client, Id.ofChat(minData.id()), Type.GROUP);
+        super(client);
         this.minData = Objects.requireNonNull(minData, "minData");
         this.fullData = Objects.requireNonNull(fullData, "fullData");
         this.exportedChatInvite = exportedChatInvite;
         this.chatParticipants = chatParticipants;
+    }
+
+    @Override
+    public Id getId() {
+        return Id.ofChat(minData.id());
+    }
+
+    @Override
+    public Type getType() {
+        return Type.GROUP;
     }
 
     @Override

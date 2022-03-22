@@ -115,7 +115,6 @@ public class UserService extends RpcService {
         return client.sendAwait(ImportContacts.builder().contacts(contacts).build());
     }
 
-    // TODO: check updates type
     public Mono<Updates> deleteContacts(Iterable<? extends InputUser> ids) {
         return client.sendAwait(DeleteContacts.builder().id(ids).build());
     }
@@ -166,7 +165,6 @@ public class UserService extends RpcService {
         return client.sendAwait(ImmutableToggleTopPeers.of(enabled));
     }
 
-    // TODO: check updates type
     public Mono<Updates> addContact(AddContact request) {
         return client.sendAwait(request);
     }

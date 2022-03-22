@@ -13,7 +13,6 @@ import java.lang.annotation.Target;
         typeAbstract = "*Def",
         typeImmutable = "*",
         visibility = Value.Style.ImplementationVisibility.PUBLIC,
-        deepImmutablesDetection = true,
         allMandatoryParameters = true,
         depluralize = true,
         instance = "create",
