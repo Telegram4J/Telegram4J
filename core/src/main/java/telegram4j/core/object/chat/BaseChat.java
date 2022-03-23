@@ -11,11 +11,10 @@ import telegram4j.core.object.PeerId;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
-import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.tl.*;
+import telegram4j.tl.InputPeerEmpty;
 import telegram4j.tl.request.messages.ForwardMessages;
 import telegram4j.tl.request.messages.SendMedia;
 import telegram4j.tl.request.messages.SendMessage;
@@ -54,21 +53,6 @@ abstract class BaseChat implements Chat {
 
     // Interaction methods implementation
 
-    protected InputPeer getIdAsPeer() {
-        Id id = getId();
-        switch (getType()) {
-            case PRIVATE:
-                if (id.equals(client.getSelfId())) {
-                    return InputPeerSelf.instance();
-                }
-                return ImmutableInputPeerUser.of(id.asLong(), id.getAccessHash().orElseThrow());
-            case SUPERGROUP:
-            case CHANNEL: return ImmutableInputPeerChannel.of(id.asLong(), id.getAccessHash().orElseThrow());
-            case GROUP: return ImmutableInputPeerChat.of(id.asLong());
-            default: throw new IllegalStateException();
-        }
-    }
-
     @Override
     public Mono<Message> sendMessage(SendMessageSpec spec) {
         return Mono.defer(() -> {
@@ -86,7 +70,7 @@ abstract class BaseChat implements Chat {
 
             return parser.map(function((txt, ent) -> SendMessage.builder()
                     .randomId(CryptoUtil.random.nextLong())
-                    .peer(getIdAsPeer())
+                    .peer(client.asResolvedInputPeer(getId()))
                     .silent(spec.silent())
                     .noWebpage(spec.noWebpage())
                     .background(spec.background())
@@ -128,7 +112,7 @@ abstract class BaseChat implements Chat {
                                 .dropAuthor(spec.dropAuthor())
                                 .dropMediaCaptions(spec.dropMediaCaptions())
                                 .noforwards(spec.noForwards())
-                                .fromPeer(getIdAsPeer())
+                                .fromPeer(client.asResolvedInputPeer(getId()))
                                 .silent(spec.silent())
                                 .toPeer(toPeerResend)
                                 .sendAs(unmapEmpty(sendAs))
@@ -158,7 +142,7 @@ abstract class BaseChat implements Chat {
                                 .background(spec.background())
                                 .clearDraft(spec.clearDraft())
                                 .noforwards(spec.noForwards())
-                                .peer(getIdAsPeer())
+                                .peer(client.asResolvedInputPeer(getId()))
                                 .silent(spec.silent())
                                 .message(spec.message())
                                 .sendAs(unmapEmpty(sendAs))
@@ -168,13 +152,6 @@ abstract class BaseChat implements Chat {
                                         .orElse(null))
                                 .build())
                         .map(e -> EntityFactory.createMessage(client, e, getId()))));
-    }
-
-    @Override
-    public Mono<MessageMedia> uploadMedia(InputMediaSpec spec) {
-        return Mono.defer(() -> spec.asData(client))
-                .flatMap(media -> client.getServiceHolder().getMessageService()
-                        .uploadMedia(getIdAsPeer(), media));
     }
 
     @Override

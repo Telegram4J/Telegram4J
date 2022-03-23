@@ -6,8 +6,6 @@ import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
-import telegram4j.core.spec.media.InputMediaSpec;
-import telegram4j.tl.MessageMedia;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -69,9 +67,27 @@ public interface Chat extends PeerEntity {
      */
     Optional<PeerNotifySettings> getNotifySettings();
 
+    /**
+     * Gets text of channel description or user about field, if present.
+     *
+     * @return The text of channel description or user about field, if present.
+     */
     Optional<String> getAbout();
 
+    /**
+     * Gets id of the dialog folder, where this chat/channel placed, if present.
+     *
+     * @see <a href="https://core.telegram.org/api/folders">Folders</a>
+     * @return The id of the dialog folder, where this chat/channel placed, if present.
+     */
     Optional<Integer> getFolderId();
+
+    /**
+     * Gets unicode emoji representation a specific channel theme.
+     *
+     * @return The unicode emoji representation a specific channel theme.
+     */
+    Optional<String> getThemeEmoticon();
 
     // Interaction methods
 
@@ -80,9 +96,6 @@ public interface Chat extends PeerEntity {
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
 
     Mono<Message> sendMedia(SendMediaSpec spec);
-
-    // TODO: mapping for return type
-    Mono<MessageMedia> uploadMedia(InputMediaSpec spec);
 
     /** All types of telegram chat. */
     enum Type {

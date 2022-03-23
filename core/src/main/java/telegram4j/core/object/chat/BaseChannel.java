@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static telegram4j.mtproto.util.TlEntityUtil.toInputChannel;
+
 abstract class BaseChannel extends BaseChat implements Channel {
 
     protected final telegram4j.tl.Channel minData;
@@ -85,7 +87,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Override
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, getIdAsPeer(), -1));
+                .map(d -> new ChatPhoto(client, d, client.asResolvedInputPeer(getId()), -1));
     }
 
     @Override
@@ -279,10 +281,9 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Mono<ChatParticipant> getParticipant(Id participantId) {
         Id id = getId();
 
-        return asInputPeer(participantId)
-                .flatMap(participantPeer -> client.getServiceHolder().getChatService().getParticipant(
-                ImmutableBaseInputChannel.of(id.asLong(), id.getAccessHash().orElseThrow()),
-                participantPeer))
+        return client.asInputPeer(participantId)
+                .flatMap(participantPeer -> client.getServiceHolder()
+                        .getChatService().getParticipant(toInputChannel(client.asResolvedInputPeer(getId())), participantPeer))
                 .map(d -> {
                     // Since ChannelParticipantBanned/ChannelParticipantLeft have Peer typed id field,
                     // then most likely there may be a chat/channel as the participant
@@ -313,7 +314,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit) {
-        InputChannel channel = TlEntityUtil.toInputChannel(getIdAsPeer());
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
         Id id = getId();
 
         return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
@@ -353,25 +354,5 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
                     return Flux.fromIterable(participants);
                 });
-    }
-
-    protected Mono<InputPeer> asInputPeer(Id participantId) {
-        return Mono.defer(() -> {
-            switch (getType()) {
-                case GROUP: return Mono.just(ImmutableInputPeerChat.of(participantId.asLong()));
-                case SUPERGROUP:
-                case CHANNEL: return participantId.getAccessHash().isEmpty()
-                        ? client.getMtProtoResources().getStoreLayout()
-                        .resolveChannel(participantId.asLong()).map(TlEntityUtil::toInputPeer)
-                        : Mono.just(ImmutableInputPeerChannel.of(participantId.asLong(),
-                        participantId.getAccessHash().orElseThrow()));
-                case PRIVATE: return participantId.getAccessHash().isEmpty()
-                        ? client.getMtProtoResources().getStoreLayout()
-                        .resolveUser(participantId.asLong()).map(TlEntityUtil::toInputPeer)
-                        : Mono.just(ImmutableInputPeerUser.of(participantId.asLong(),
-                        participantId.getAccessHash().orElseThrow()));
-                default: throw new IllegalStateException();
-            }
-        });
     }
 }

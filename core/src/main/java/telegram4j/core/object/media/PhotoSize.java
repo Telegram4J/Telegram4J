@@ -6,7 +6,7 @@ import telegram4j.core.object.TelegramObject;
 public interface PhotoSize extends TelegramObject {
 
     /**
-     * Gets a <a href="https://core.telegram.org/api/files#image-thumbnail-types">type</a> of thumbnail
+     * Gets a single-char <a href="https://core.telegram.org/api/files#image-thumbnail-types">type</a> of thumbnail
      *
      * @return The type of thumbnail.
      */

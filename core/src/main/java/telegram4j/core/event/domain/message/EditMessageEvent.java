@@ -9,6 +9,7 @@ import telegram4j.core.object.chat.Chat;
 import java.util.Objects;
 import java.util.Optional;
 
+/** Event of edited chat/channel message. */
 public class EditMessageEvent extends MessageEvent {
 
     private final Message newMessage;
@@ -29,18 +30,38 @@ public class EditMessageEvent extends MessageEvent {
         this.author = author;
     }
 
+    /**
+     * Gets current version of message.
+     *
+     * @return The current {@link Message} version.
+     */
     public Message getCurrentMessage() {
         return newMessage;
     }
 
+    /**
+     * Gets previous version of message, if message was previously stored.
+     *
+     * @return The previous {@link Message} version, if present.
+     */
     public Optional<Message> getOldMessage() {
         return Optional.ofNullable(oldMessage);
     }
 
+    /**
+     * Gets chat, where message was edited, if present.
+     *
+     * @return The chat, where message was edited, if present
+     */
     public Optional<Chat> getChat() {
         return Optional.ofNullable(chat);
     }
 
+    /**
+     * Gets author of message, if present.
+     *
+     * @return The author entity of message, if present.
+     */
     public Optional<PeerEntity> getAuthor() {
         return Optional.ofNullable(author);
     }

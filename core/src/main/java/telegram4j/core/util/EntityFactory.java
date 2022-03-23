@@ -39,12 +39,6 @@ import telegram4j.core.object.markup.ReplyKeyboardForceReply;
 import telegram4j.core.object.markup.ReplyKeyboardHide;
 import telegram4j.core.object.markup.ReplyKeyboardMarkup;
 import telegram4j.core.object.markup.ReplyMarkup;
-import telegram4j.core.object.media.DocumentAttribute;
-import telegram4j.core.object.media.DocumentAttributeAudio;
-import telegram4j.core.object.media.DocumentAttributeFilename;
-import telegram4j.core.object.media.DocumentAttributeImageSize;
-import telegram4j.core.object.media.DocumentAttributeSticker;
-import telegram4j.core.object.media.DocumentAttributeVideo;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.object.media.MessageMediaContact;
 import telegram4j.core.object.media.MessageMediaDice;
@@ -414,7 +408,8 @@ public final class EntityFactory {
         }
 
         if (stickerData != null) {
-            return new Sticker(client, data, fileName, messageId, peer, stickerData, sizeData);
+            return new Sticker(client, data, fileName,
+                    messageId, peer, stickerData, sizeData, videoData);
         }
 
         if (audioData != null) {
@@ -427,27 +422,6 @@ public final class EntityFactory {
         }
 
         return new Document(client, data, fileName, messageId, peer);
-    }
-
-    public static DocumentAttribute createDocumentAttribute(MTProtoTelegramClient client, telegram4j.tl.DocumentAttribute data) {
-        switch (data.identifier()) {
-            case telegram4j.tl.DocumentAttributeHasStickers.ID:
-                return new BaseDocumentAttribute(client, DocumentAttribute.Type.HAS_STICKERS);
-            case telegram4j.tl.DocumentAttributeAnimated.ID:
-                return new BaseDocumentAttribute(client, DocumentAttribute.Type.ANIMATED);
-            case telegram4j.tl.DocumentAttributeAudio.ID:
-                return new DocumentAttributeAudio(client, (telegram4j.tl.DocumentAttributeAudio) data);
-            case telegram4j.tl.DocumentAttributeFilename.ID:
-                return new DocumentAttributeFilename(client, (telegram4j.tl.DocumentAttributeFilename) data);
-            case telegram4j.tl.DocumentAttributeImageSize.ID:
-                return new DocumentAttributeImageSize(client, (telegram4j.tl.DocumentAttributeImageSize) data);
-            case telegram4j.tl.DocumentAttributeSticker.ID:
-                return new DocumentAttributeSticker(client, (telegram4j.tl.DocumentAttributeSticker) data);
-            case telegram4j.tl.DocumentAttributeVideo.ID:
-                return new DocumentAttributeVideo(client, (telegram4j.tl.DocumentAttributeVideo) data);
-            default:
-                throw new IllegalArgumentException("Unknown document attribute type: " + data);
-        }
     }
 
     @Nullable

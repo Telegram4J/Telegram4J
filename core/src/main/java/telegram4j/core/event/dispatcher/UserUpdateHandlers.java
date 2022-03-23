@@ -106,13 +106,7 @@ class UserUpdateHandlers {
         // resolve input user for correct file ref id refreshing
         return client.getMtProtoResources().getStoreLayout()
                 .resolveUser(userId)
-                .map(u -> {
-                    Id id = u.identifier() == BaseInputUser.ID
-                            ? Id.ofUser(userId, ((BaseInputUser) u).accessHash())
-                            : Id.ofUser(userId, null);
-
-                    return Tuples.of(id, TlEntityUtil.toInputPeer(u));
-                })
+                .map(u -> Tuples.of(Id.of(u, client.getSelfId()), TlEntityUtil.toInputPeer(u)))
                 .map(TupleUtils.function((id, peer) -> {
                     Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());
                     var currentPhoto = Optional.ofNullable(unmapEmpty(context.getUpdate().photo(), ChatPhotoFields.class))

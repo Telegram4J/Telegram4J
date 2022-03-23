@@ -10,7 +10,10 @@ import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
-import telegram4j.tl.*;
+import telegram4j.tl.BaseMessage;
+import telegram4j.tl.BaseMessageFields;
+import telegram4j.tl.MessageEmpty;
+import telegram4j.tl.MessageService;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
 
@@ -179,7 +182,7 @@ public final class Message implements TelegramObject {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::media)
                 .map(d -> EntityFactory.createMessageMedia(client, d,
-                        getId(), getChatIdAsPeer()));
+                        getId(), client.asResolvedInputPeer(resolvedChatId)));
     }
 
     /**
@@ -289,7 +292,7 @@ public final class Message implements TelegramObject {
         return Optional.ofNullable(serviceData)
                 .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
                 .map(e -> EntityFactory.createMessageAction(client, e,
-                        getChatIdAsPeer(), getId()));
+                        client.asResolvedInputPeer(resolvedChatId), getId()));
     }
 
     // Interaction methods
@@ -322,7 +325,7 @@ public final class Message implements TelegramObject {
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
                                     .orElse(null))
-                            .peer(getChatIdAsPeer())))
+                            .peer(client.asResolvedInputPeer(resolvedChatId))))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
@@ -350,15 +353,6 @@ public final class Message implements TelegramObject {
     }
 
     // Private methods
-
-    private InputPeer getChatIdAsPeer() {
-        switch (getChatId().getType()) {
-            case CHAT: return ImmutableInputPeerChat.of(getChatId().asLong());
-            case CHANNEL: return ImmutableInputPeerChannel.of(getChatId().asLong(), getChatId().getAccessHash().orElseThrow());
-            case USER: return ImmutableInputPeerUser.of(getChatId().asLong(), getChatId().getAccessHash().orElseThrow());
-            default: throw new IllegalArgumentException("Unknown peer type: " + getChatId().getType());
-        }
-    }
 
     private BaseMessageFields getBaseData() {
         return baseData != null ? baseData : Objects.requireNonNull(serviceData);

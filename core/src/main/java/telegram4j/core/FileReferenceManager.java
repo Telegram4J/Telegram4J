@@ -50,7 +50,7 @@ public class FileReferenceManager {
                                 default:
                                     return Mono.error(new IllegalArgumentException("Unknown input peer type: " + f.getPeer()));
                             }
-
+                        case WEB_DOCUMENT:
                         case DOCUMENT:
                         case PHOTO:
                             switch (f.getPeer().identifier()) {
@@ -129,6 +129,11 @@ public class FileReferenceManager {
                 return Mono.justOrEmpty(((MessageMediaPhoto) media).photo())
                         .ofType(BasePhoto.class)
                         .map(d -> FileReferenceId.ofPhoto(d,
+                                orig.getMessageId(), orig.getPeer()));
+            case MessageMediaInvoice.ID:
+                return Mono.justOrEmpty(((MessageMediaInvoice) media).photo())
+                        .cast(BaseDocumentFields.class)
+                        .map(d -> FileReferenceId.ofDocument(d,
                                 orig.getMessageId(), orig.getPeer()));
             default:
                 return Mono.error(new IllegalStateException("Unexpected message media type: " + media));

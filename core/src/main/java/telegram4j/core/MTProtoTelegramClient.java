@@ -24,13 +24,14 @@ import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.storage.FileType;
 
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
     /** The supported api scheme version. */
-    public static final int LAYER = 138;
+    public static final int LAYER = 139;
 
     private final AuthorizationResources authResources;
     private final MTProtoClient mtProtoClient;
@@ -59,10 +60,30 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         this.fileReferenceManager = new FileReferenceManager(this);
     }
 
+    /**
+     * Creates client builder with bot authorization schematic.
+     *
+     * @see <a href="https://core.telegram.org/bots#3-how-do-i-create-a-bot">Bots</a>
+     * @see <a href="https://core.telegram.org/api/obtaining_api_id#obtaining-api-id">Obtaining Api Id</a>
+     * @param apiId The api id.
+     * @param apiHash The api hash.
+     * @param botAuthToken The bot auth token from BotFather DM.
+     * @return The new {@link MTProtoBootstrap} client builder.
+     */
     public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, String botAuthToken) {
         return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, botAuthToken));
     }
 
+    /**
+     * Creates client builder with user authorization schematic.
+     *
+     * @see <a href="https://core.telegram.org/api/auth">User authorization</a>
+     * @see <a href="https://core.telegram.org/api/obtaining_api_id#obtaining-api-id">Obtaining Api Id</a>
+     * @param apiId The api id.
+     * @param apiHash The api hash.
+     * @param authHandler The user authorization implementation. QR or code handler.
+     * @return The new {@link MTProtoBootstrap} client builder.
+     */
     public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash,
                                                           Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
         return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, authHandler));
@@ -166,6 +187,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .deleteMessages(p, ids));
     }
 
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputPeer} object and
+     * assigns access hash from cache if present and applicable.
+     *
+     * @param chatId The id of user/chat/channel to converting.
+     * @return A {@link Mono}, emitting on successful completion resolved {@link InputPeer} object.
+     */
     public Mono<InputPeer> asInputPeer(Id chatId) {
         switch (chatId.getType()) {
             case USER: return asInputUser(chatId).map(TlEntityUtil::toInputPeer);
@@ -175,6 +203,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         }
     }
 
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputChannel} object and
+     * assigns access hash from cache if present.
+     *
+     * @param channelId The id of channel to converting.
+     * @return A {@link Mono}, emitting on successful completion resolved {@link InputChannel} object.
+     */
     public Mono<InputChannel> asInputChannel(Id channelId) {
         if (channelId.getType() != Id.Type.CHANNEL) {
             return Mono.error(new IllegalArgumentException("Specified id must be channel-typed: " + channelId));
@@ -185,6 +220,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow()));
     }
 
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputUser} object and
+     * assigns access hash from cache if present.
+     *
+     * @param userId The id of user to converting.
+     * @return A {@link Mono}, emitting on successful completion resolved {@link InputUser} object.
+     */
     public Mono<InputUser> asInputUser(Id userId) {
         if (userId.getType() != Id.Type.USER) {
             return Mono.error(new IllegalArgumentException("Specified id must be user-typed: " + userId));
@@ -193,6 +235,28 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             return mtProtoResources.getStoreLayout().resolveUser(userId.asLong());
         }
         return Mono.just(ImmutableBaseInputUser.of(userId.asLong(), userId.getAccessHash().orElseThrow()));
+    }
+
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputPeer} object without access hash resolving.
+     *
+     * @see #asInputPeer(Id)
+     * @throws NoSuchElementException If access hash is needed and absent.
+     * @param peerId The id of the peer to converting.
+     * @return The new {@link InputPeer} from specified {@link Id}.
+     */
+    public InputPeer asResolvedInputPeer(Id peerId) {
+        switch (peerId.getType()) {
+            case USER:
+                if (getSelfId().equals(peerId)) {
+                    return InputPeerSelf.instance();
+                }
+
+                return ImmutableInputPeerUser.of(peerId.asLong(), peerId.getAccessHash().orElseThrow());
+            case CHAT: return ImmutableInputPeerChat.of(peerId.asLong());
+            case CHANNEL: return ImmutableInputPeerChannel.of(peerId.asLong(), peerId.getAccessHash().orElseThrow());
+            default: throw new IllegalStateException();
+        }
     }
 
     // EntityRetriever methods

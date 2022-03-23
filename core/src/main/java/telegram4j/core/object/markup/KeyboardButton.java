@@ -91,16 +91,16 @@ public class KeyboardButton implements TelegramObject {
 
     public Optional<Id> getBotId() {
         if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
-            var inputUser = ((BaseInputUser) ((InputKeyboardButtonUrlAuth) data).bot());
-            return Optional.of(Id.ofUser(inputUser.userId(), inputUser.accessHash()));
+            var inputUser = ((InputKeyboardButtonUrlAuth) data).bot();
+            return Optional.of(Id.of(inputUser, client.getSelfId()));
         }
         return Optional.empty();
     }
 
     public Optional<Id> getUserId() {
         if (data.identifier() == InputKeyboardButtonUserProfile.ID) {
-            var inputUser = ((BaseInputUser) ((InputKeyboardButtonUserProfile) data).userId());
-            return Optional.of(Id.ofUser(inputUser.userId(), inputUser.accessHash()));
+            var inputUser = ((InputKeyboardButtonUserProfile) data).userId();
+            return Optional.of(Id.of(inputUser, client.getSelfId()));
         }
         return Optional.empty();
     }

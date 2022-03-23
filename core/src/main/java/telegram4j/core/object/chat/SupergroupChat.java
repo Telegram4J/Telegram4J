@@ -13,7 +13,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
-/** Subtype of channel, which represents a large group of 0-200,000 users. */
+/**
+ * Subtype of channel, which represents a large group of 0-200,000 users.
+ *
+ * @see <a href="https://core.telegram.org/api/channel#supergroups">Supegroups</a>
+ */
 public final class SupergroupChat extends BaseChannel {
 
     public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {

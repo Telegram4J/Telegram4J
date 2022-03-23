@@ -14,7 +14,6 @@ import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
-import telegram4j.tl.api.TlObject;
 
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -106,14 +105,24 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        long chatId = getRawPeerId(message.peerId());
         var selfUser = context.getUsers().values().stream()
                 .filter(BaseUser::self)
                 .findFirst()
                 .orElse(null);
-        Chat chat = Optional.<TlObject>ofNullable(context.getChats().get(chatId))
-                .or(() -> Optional.ofNullable(context.getUsers().get(chatId)))
-                .map(c -> EntityFactory.createChat(client, c, selfUser))
+        Chat chat = Optional.of(message.peerId())
+                .flatMap(p -> {
+                    long rawId = getRawPeerId(message.peerId());
+                    switch (p.identifier()) {
+                        case PeerChat.ID:
+                        case PeerChannel.ID:
+                            return Optional.ofNullable(context.getChats().get(rawId))
+                                    .map(u -> EntityFactory.createChat(client, u, selfUser));
+                        case PeerUser.ID:
+                            return Optional.ofNullable(context.getUsers().get(rawId))
+                                    .map(u -> EntityFactory.createChat(client, u, selfUser));
+                        default: throw new IllegalArgumentException("Unknown peer type: " + p);
+                    }
+                })
                 .orElse(null);
         var author = Optional.ofNullable(message.fromId())
                 .flatMap(p -> {
@@ -127,6 +136,9 @@ class MessageUpdateHandlers {
                         default: throw new IllegalArgumentException("Unknown peer type: " + p);
                     }
                 })
+                .or(() -> Optional.ofNullable(chat)
+                        .filter(c -> c.getType() == Chat.Type.PRIVATE)
+                        .map(c -> ((PrivateChat) c).getUser()))
                 .orElse(null);
         Id resolvedId = Optional.ofNullable(chat)
                 .map(Chat::getId)
@@ -142,23 +154,7 @@ class MessageUpdateHandlers {
     static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
         return Mono.justOrEmpty(context.getOld())
                 .flatMapMany(re -> {
-                    Id chatId;
-                    switch (re.getPeer().identifier()) {
-                        case InputPeerChannel.ID:
-                            InputPeerChannel peerChannel = (InputPeerChannel) re.getPeer();
-                            chatId = Id.ofChannel(peerChannel.channelId(), peerChannel.accessHash());
-                            break;
-                        case InputPeerChat.ID:
-                            InputPeerChat peerChat = (InputPeerChat) re.getPeer();
-                            chatId = Id.ofChat(peerChat.chatId());
-                            break;
-                        case InputPeerUser.ID:
-                            InputPeerUser peerUser = (InputPeerUser) re.getPeer();
-                            chatId = Id.ofUser(peerUser.userId(), peerUser.accessHash());
-                            break;
-                        default:
-                            throw new IllegalStateException();
-                    }
+                    Id chatId = Id.of(re.getPeer(), context.getClient().getSelfId());
 
                     var oldMessages = re.getMessages().stream()
                             .map(d -> EntityFactory.createMessage(context.getClient(), d, chatId))

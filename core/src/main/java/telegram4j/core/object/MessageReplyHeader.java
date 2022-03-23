@@ -6,6 +6,11 @@ import telegram4j.core.MTProtoTelegramClient;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Reply information header.
+ *
+ * @see <a href="https://core.telegram.org/api/threads">Threads</a>
+ */
 public class MessageReplyHeader implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -21,14 +26,30 @@ public class MessageReplyHeader implements TelegramObject {
         return client;
     }
 
-    public int getReplyToMsgId() {
+    /**
+     * Gets id of the message, to which is replying.
+     *
+     * @return The id of the message, to which is replying.
+     */
+    public int getReplyToMessageId() {
         return data.replyToMsgId();
     }
 
+    /**
+     * Gets id of the discussion group for replies of which the current user is not a member, if present.
+     *
+     * @see <a href="https://core.telegram.org/api/discussion">Discussion Groups</a>
+     * @return The id of the discussion group.
+     */
     public Optional<Id> getReplyToPeerId() {
         return Optional.ofNullable(data.replyToPeerId()).map(Id::of);
     }
 
+    /**
+     * Gets id of the first original reply message, if present.
+     *
+     * @return The id of the original reply message, if present.
+     */
     public Optional<Integer> getReplyToTopId() {
         return Optional.ofNullable(data.replyToTopId());
     }

@@ -62,7 +62,7 @@ public final class GroupChat extends BaseChat {
     @Override
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, getIdAsPeer(), -1));
+                .map(d -> new ChatPhoto(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
     }
 
     @Override
@@ -92,9 +92,7 @@ public final class GroupChat extends BaseChat {
     }
 
     public Optional<Id> getMigratedToChannelId() {
-        return Optional.ofNullable(minData.migratedTo())
-                .map(c -> (BaseInputChannel) c)
-                .map(c -> Id.ofChannel(c.channelId(), c.accessHash()));
+        return Optional.ofNullable(minData.migratedTo()).map(Id::of);
     }
 
     public int getParticipantsCount() {
@@ -140,6 +138,11 @@ public final class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData).map(BaseChatFull::folderId);
     }
 
+    @Override
+    public Optional<String> getThemeEmoticon() {
+        return Optional.ofNullable(fullData).map(BaseChatFull::themeEmoticon);
+    }
+
     public Optional<List<ChatParticipant>> getParticipants() {
         return Optional.ofNullable(chatParticipants);
     }
@@ -166,10 +169,6 @@ public final class GroupChat extends BaseChat {
                 .map(Id::of);
     }
 
-    public Optional<String> getThemeEmoticon() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::themeEmoticon);
-    }
-
     @Override
     public String toString() {
         return "GroupChat{" +
@@ -178,6 +177,9 @@ public final class GroupChat extends BaseChat {
                 '}';
     }
 
+    /**
+     * Types of the group chat flags.
+     */
     public enum Flag {
         // MinChat flags
 
@@ -215,14 +217,31 @@ public final class GroupChat extends BaseChat {
             this.flag = 1 << value;
         }
 
+        /**
+         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
+         *
+         * @return The flag shift position.
+         */
         public int getValue() {
             return value;
         }
 
+        /**
+         * Gets bit-mask for flag.
+         *
+         * @return The bit-mask for flag.
+         */
         public int getFlag() {
             return flag;
         }
 
+        /**
+         * Computes {@link EnumSet} with chat flags from given min and full data.
+         *
+         * @param fullData The full chat data.
+         * @param minData The min chat data.
+         * @return The {@link EnumSet} with channel flags.
+         */
         public static EnumSet<Flag> of(@Nullable telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
             if (fullData != null) {
@@ -240,6 +259,12 @@ public final class GroupChat extends BaseChat {
             return set;
         }
 
+        /**
+         * Computes {@link EnumSet} with chat flags from given min data.
+         *
+         * @param data The min chat data.
+         * @return The {@link EnumSet} with channel flags.
+         */
         public static EnumSet<Flag> of(telegram4j.tl.Chat data) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
             if (data instanceof ChatEmpty) {

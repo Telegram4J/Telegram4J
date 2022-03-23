@@ -99,6 +99,31 @@ public final class Id implements Comparable<Id> {
         }
     }
 
+
+    /**
+     * Create new id from {@link InputChannel} object.
+     * If {@code inputChannel} parameter is {@link InputChannelFromMessage} id will be without access hash and min information.
+     *
+     * @throws IllegalArgumentException If specified input user identifier is unknown.
+     * @param inputChannel The {@link InputChannel} identifier.
+     * @return New {@link Id} from given {@link InputChannel}.
+     */
+    public static Id of(InputChannel inputChannel) {
+        switch (inputChannel.identifier()) {
+            case BaseInputChannel.ID: {
+                BaseInputChannel d = (BaseInputChannel) inputChannel;
+
+                return ofChannel(d.channelId(), d.accessHash());
+            }
+            case InputChannelFromMessage.ID: {
+                InputChannelFromMessage d = (InputChannelFromMessage) inputChannel;
+
+                return ofChannel(d.channelId(), null);
+            }
+            default: throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
+        }
+    }
+
     /**
      * Create new id from {@link InputPeer} object.
      * If {@code inputPeer} parameter is {@link InputPeerChannelFromMessage}/{@link InputPeerUserFromMessage}

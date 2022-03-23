@@ -89,6 +89,11 @@ public final class PrivateChat extends BaseChat {
     }
 
     @Override
+    public Optional<String> getThemeEmoticon() {
+        return user.getThemeEmoticon();
+    }
+
+    @Override
     public String toString() {
         return "PrivateChat{" +
                 "user=" + user +

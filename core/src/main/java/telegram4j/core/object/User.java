@@ -3,15 +3,13 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Duration;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class User implements PeerEntity {
@@ -38,10 +36,25 @@ public class User implements PeerEntity {
         return client;
     }
 
+    @Override
+    public Id getId() {
+        return Id.ofUser(minData.id(), minData.accessHash());
+    }
+
+    /**
+     * Computes {@link EnumSet} with user flags from full and min data.
+     *
+     * @return The {@link EnumSet} with user flags.
+     */
     public EnumSet<Flag> getFlags() {
         return Flag.fromUserFull(fullData, minData);
     }
 
+    /**
+     * Converts this user into the private chat for interacting with messages.
+     *
+     * @return The {@link PrivateChat} from this user with {@code null} self user.
+     */
     public PrivateChat asPrivateChat() {
         return new PrivateChat(client, this, null);
     }
@@ -72,28 +85,39 @@ public class User implements PeerEntity {
      * @return The full name of user.
      */
     public String getFullName() {
-        return getFirstName().map(s -> s + " ").orElse("") + getLastName().orElse("");
+        StringJoiner j = new StringJoiner(" ");
+        getFirstName().ifPresent(j::add);
+        getLastName().ifPresent(j::add);
+        return j.toString();
     }
 
+    /**
+     * Gets username of this user in format <b>@username</b>, if present can be used in the {@link EntityRetriever#resolvePeer(PeerId)}.
+     *
+     * @return The username of this user, if present.
+     */
     public Optional<String> getUsername() {
         return Optional.ofNullable(minData.username());
     }
 
+    /**
+     * Gets phone number of this user, if private settings allows.
+     *
+     * @return The phone number of this user, if private settings allows.
+     */
     public Optional<String> getPhone() {
         return Optional.ofNullable(minData.phone());
     }
 
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
-                .map(c -> new ChatPhoto(client, c, ImmutableInputPeerUser.of(minData.id(),
-                        Objects.requireNonNull(minData.accessHash())), -1));
+                .map(c -> new ChatPhoto(client, c, client.asResolvedInputPeer(getId()), -1));
     }
 
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, ImmutableInputPeerUser.of(minData.id(),
-                        Objects.requireNonNull(minData.accessHash())), -1));
+                .map(d -> new Photo(client, d, client.asResolvedInputPeer(getId()), -1));
     }
 
     public Optional<UserStatus> getStatus() {
@@ -117,11 +141,6 @@ public class User implements PeerEntity {
 
     public Optional<String> getLangCode() {
         return Optional.ofNullable(minData.langCode());
-    }
-
-    @Override
-    public Id getId() {
-        return Id.ofUser(minData.id(), minData.accessHash());
     }
 
     // FullUser fields
@@ -168,6 +187,10 @@ public class User implements PeerEntity {
 
     public Optional<String> getThemeEmoticon() {
         return Optional.ofNullable(fullData).map(UserFull::themeEmoticon);
+    }
+
+    public Optional<String> getPrivateForwardName() {
+        return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
     }
 
     @Override

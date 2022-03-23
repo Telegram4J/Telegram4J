@@ -240,13 +240,6 @@ public interface Channel extends Chat {
     Optional<Id> getLinkedChatId();
 
     /**
-     * Gets unicode emoji representation a specific channel theme.
-     *
-     * @return The unicode emoji representation a specific channel theme.
-     */
-    Optional<String> getThemeEmoticon();
-
-    /**
      * Gets current group call/livestream in the channel, if present
      * and if detailed information about channel is available.
      *

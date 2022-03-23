@@ -7,6 +7,11 @@ import telegram4j.core.object.TelegramObject;
 import java.util.Objects;
 import java.util.Optional;
 
+/**
+ * Representation for animated profile pictures in MPEG4 format.
+ *
+ * @see <a href="https://core.telegram.org/api/files#animated-profile-pictures">Animated Profile Pictures</a>
+ */
 public class VideoSize implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -22,22 +27,52 @@ public class VideoSize implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets single-char type of applied transformations to video.
+     * Can be one of these chars:
+     * <ul>
+     *   <li>{@code u}: if it's a profile photo.</li>
+     *   <li>{@code v}: if it's a trimmed and downscaled video previews.</li>
+     * </ul>
+     *
+     * @return The single-char type of applied transformations.
+     */
     public String getType() {
         return data.type();
     }
 
+    /**
+     * Gets wight of video.
+     *
+     * @return The wight of video.
+     */
     public int getWight() {
         return data.w();
     }
 
+    /**
+     * Gets height of video.
+     *
+     * @return The height of video.
+     */
     public int getHeight() {
         return data.h();
     }
 
+    /**
+     * Gets video size in bytes.
+     *
+     * @return The video size in bytes.
+     */
     public int getSize() {
         return data.size();
     }
 
+    /**
+     * Gets video timestamp (in seconds) that should be used as static preview, if present.
+     *
+     * @return The video timestamp (in seconds) that should be used as static preview, if present.
+     */
     public Optional<Double> getVideoStartTimestamp() {
         return Optional.ofNullable(data.videoStartTs());
     }

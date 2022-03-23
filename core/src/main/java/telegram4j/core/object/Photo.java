@@ -48,7 +48,7 @@ public class Photo implements TelegramObject {
         return fileReferenceId;
     }
 
-    public boolean isHasStickers() {
+    public boolean hasStickers() {
         return data.hasStickers();
     }
 
