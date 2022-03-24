@@ -86,6 +86,14 @@ allprojects {
 subprojects {
     archivesBaseName = "telegram4j-$project.name"
 
+    jar {
+        manifest {
+            attributes 'Implementation-Title': archivesBaseName,
+                    'Implementation-Version': archiveVersion,
+                    'Automatic-Module-Name': "telegram4j.$project.name"
+        }
+    }
+
     publishing {
         publications {
             mavenJava(MavenPublication) {

@@ -34,7 +34,8 @@ public class InitConnectionParams {
      * @return The new default computed init connection parameters.
      */
     public static InitConnectionParams getDefault() {
-        String appVersion = "0.1.0";
+        var pckg = InitConnectionParams.class.getPackage();
+        String appVersion = pckg.getImplementationVersion();
         String deviceModel = "Telegram4J";
         String systemVersion = String.join(" ", System.getProperty("os.name"),
                 System.getProperty("os.version"),
@@ -165,5 +166,19 @@ public class InitConnectionParams {
      */
     public Optional<JsonNode> getParams() {
         return Optional.ofNullable(params);
+    }
+
+    @Override
+    public String toString() {
+        return "InitConnectionParams{" +
+                "appVersion='" + appVersion + '\'' +
+                ", deviceModel='" + deviceModel + '\'' +
+                ", langCode='" + langCode + '\'' +
+                ", langPack='" + langPack + '\'' +
+                ", systemVersion='" + systemVersion + '\'' +
+                ", systemLangCode='" + systemLangCode + '\'' +
+                ", proxy=" + proxy +
+                ", params=" + params +
+                '}';
     }
 }
