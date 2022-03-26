@@ -74,7 +74,6 @@ public class Document implements TelegramObject {
 
     /**
      * Gets id of the document, if document isn't web.
-     * Mainly used in the methods.
      *
      * @return The id of the document, if document isn't web.
      */
@@ -85,10 +84,9 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets access hash of the document, if document has telegram proxying
-     * Mainly used in the methods.
+     * Gets access hash of the document, if document has telegram proxying.
      *
-     * @return The access hash of the document, if document has telegram proxying
+     * @return The access hash of the document, if document has telegram proxying.
      */
     public Optional<Long> getAccessHash() {
         switch (data.identifier()) {
@@ -100,7 +98,6 @@ public class Document implements TelegramObject {
 
     /**
      * Gets hex dump of the file reference, if document isn't web.
-     * Mainly used in the methods.
      *
      * @return The hex dump of the file reference, if document isn't web.
      */
@@ -142,7 +139,7 @@ public class Document implements TelegramObject {
     /**
      * Gets {@link List} of {@link PhotoSize thumbnails} for this document, if present.
      *
-     * @return The l{@link List} of {@link PhotoSize thumbnails} for this document, if present.
+     * @return The {@link List} of {@link PhotoSize thumbnails} for this document, if present.
      */
     public Optional<List<PhotoSize>> getThumbs() {
         return data.identifier() == BaseDocument.ID
@@ -156,7 +153,7 @@ public class Document implements TelegramObject {
     /**
      * Gets {@link List} of {@link VideoSize video thumbnails} for this document, if present.
      *
-     * @return The l{@link List} of {@link VideoSize video thumbnails} for this document, if present.
+     * @return The {@link List} of {@link VideoSize video thumbnails} for this document, if present.
      */
     public Optional<List<VideoSize>> getVideoThumbs() {
         return data.identifier() == BaseDocument.ID

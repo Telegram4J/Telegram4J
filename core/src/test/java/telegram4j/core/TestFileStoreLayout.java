@@ -161,6 +161,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<ChatFull> getChannelFullById(long channelId) {
+        return delegate.getChannelFullById(channelId);
+    }
+
+    @Override
     public Mono<User> getUserMinById(long userId) {
         return delegate.getUserMinById(userId);
     }
@@ -273,27 +278,27 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload) {
+    public Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload) {
         return delegate.onUserUpdate(payload);
     }
 
     @Override
-    public Mono<User> onUserUpdate(User payload) {
+    public Mono<Void> onUserUpdate(User payload) {
         return delegate.onUserUpdate(payload);
     }
 
     @Override
-    public Mono<Chat> onChatUpdate(Chat payload) {
+    public Mono<Void> onChatUpdate(Chat payload) {
         return delegate.onChatUpdate(payload);
     }
 
     @Override
-    public Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
+    public Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
         return delegate.onChatUpdate(payload);
     }
 
     @Override
-    public Mono<ResolvedPeer> onResolvedPeer(ResolvedPeer payload) {
+    public Mono<Void> onResolvedPeer(ResolvedPeer payload) {
         return delegate.onResolvedPeer(payload);
     }
 }

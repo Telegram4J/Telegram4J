@@ -49,6 +49,6 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
     public String toString() {
         return "ReplyKeyboardForceReply{" +
                 "data=" + data +
-                "} " + super.toString();
+                '}';
     }
 }

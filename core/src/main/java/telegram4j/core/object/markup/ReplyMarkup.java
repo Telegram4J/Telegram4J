@@ -20,23 +20,18 @@ public abstract class ReplyMarkup implements TelegramObject {
         return client;
     }
 
-    @Override
-    public String toString() {
-        return "ReplyMarkup{}";
-    }
-
     public enum Type {
         INLINE,
         FORCE,
         HIDE,
-        DEFAULT;
+        KEYBOARD;
 
         public static Type of(telegram4j.tl.ReplyMarkup data) {
             switch (data.identifier()) {
                 case telegram4j.tl.ReplyInlineMarkup.ID: return INLINE;
                 case telegram4j.tl.ReplyKeyboardForceReply.ID: return FORCE;
                 case telegram4j.tl.ReplyKeyboardHide.ID: return HIDE;
-                case telegram4j.tl.ReplyKeyboardMarkup.ID: return DEFAULT;
+                case telegram4j.tl.ReplyKeyboardMarkup.ID: return KEYBOARD;
                 default: throw new IllegalArgumentException("Unknown reply markup type: " + data);
             }
         }

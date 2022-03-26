@@ -9,7 +9,12 @@ import telegram4j.tl.*;
 import java.util.Objects;
 import java.util.Optional;
 
-public class KeyboardButton implements TelegramObject {
+/**
+ * Representation of various types of markup button.
+ *
+ * @see telegram4j.core.spec.MessageFields.KeyboardButtonSpec
+ */
+public final class KeyboardButton implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.KeyboardButton data;
@@ -24,38 +29,73 @@ public class KeyboardButton implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets type of button.
+     *
+     * @return The {@link Type} of button.
+     */
     public Type getType() {
         return Type.of(data);
     }
 
+    /**
+     * Gets text of button.
+     *
+     * @return The text of button.
+     */
     public String getText() {
         return data.text();
     }
 
+    /**
+     * Gets callback data, if {@link #getType() type} is {@link Type#CALLBACK}.
+     *
+     * @return The callback data, if {@link #getType() type} is {@link Type#CALLBACK}.
+     */
     public Optional<byte[]> getData() {
         return data.identifier() == KeyboardButtonCallback.ID
                 ? Optional.of(((KeyboardButtonCallback) data).data())
                 : Optional.empty();
     }
 
+    /**
+     * Gets whether button allows creating quiz polls, if {@link #getType() type} is {@link Type#REQUEST_POLL}.
+     *
+     * @return {@code true} if button allows creating and if {@link #getType() type} is {@link Type#REQUEST_POLL}.
+     */
     public Optional<Boolean> isQuiz() {
         return data.identifier() == KeyboardButtonRequestPoll.ID
                 ? Optional.ofNullable(((KeyboardButtonRequestPoll) data).quiz())
                 : Optional.empty();
     }
 
+    /**
+     * Gets inline query, if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
+     *
+     * @return The inline query, if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
+     */
     public Optional<String> getQuery() {
         return data.identifier() == KeyboardButtonSwitchInline.ID
                 ? Optional.of(((KeyboardButtonSwitchInline) data).query())
                 : Optional.empty();
     }
 
+    /**
+     * Gets whether button uses current chat/channel for inline query, if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
+     *
+     * @return {@code true} if button uses current chat/channel for inline query and if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
+     */
     public Optional<Boolean> isSamePeer() {
         return data.identifier() == KeyboardButtonSwitchInline.ID
                 ? Optional.of(((KeyboardButtonSwitchInline) data).samePeer())
                 : Optional.empty();
     }
 
+    /**
+     * Gets url that will be opened on press, if {@link #getType() type} is {@link Type#URL}/{@link Type#URL_AUTH}.
+     *
+     * @return The url that will be opened on press, if {@link #getType() type} is {@link Type#URL}/{@link Type#URL_AUTH}.
+     */
     public Optional<String> getUrl() {
         switch (data.identifier()) {
             case KeyboardButtonUrl.ID: return Optional.of(((KeyboardButtonUrl) data).url());
@@ -65,30 +105,55 @@ public class KeyboardButton implements TelegramObject {
         }
     }
 
+    /**
+     * Gets text that will be displayed in forwarded messages, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     *
+     * @return The text that will be displayed in forwarded messages, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     */
     public Optional<String> getForwardText() {
         return data.identifier() == KeyboardButtonUrlAuth.ID
                 ? Optional.ofNullable(((KeyboardButtonUrlAuth) data).fwdText())
                 : Optional.empty();
     }
 
+    /**
+     * Gets id of login button, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     *
+     * @return The id of login button, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     */
     public Optional<Integer> getButtonId() {
         return data.identifier() == KeyboardButtonUrlAuth.ID
                 ? Optional.of(((KeyboardButtonUrlAuth) data).buttonId())
                 : Optional.empty();
     }
 
+    /**
+     * Gets whether bot requests the permission to send messages to user, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     *
+     * @return {@code true} if bot requests the permission to send messages to user and if {@link #getType() type} is {@link Type#URL_AUTH}.
+     */
     public Optional<Boolean> isRequestWriteAccess() {
         return data.identifier() == InputKeyboardButtonUrlAuth.ID
                 ? Optional.of(((InputKeyboardButtonUrlAuth) data).requestWriteAccess())
                 : Optional.empty();
     }
 
+    /**
+     * Gets whether user should verify his identity by password, if {@link #getType() type} is {@link Type#CALLBACK}.
+     *
+     * @return {@code true} if user should verify his identity by password and if {@link #getType() type} is {@link Type#CALLBACK}.
+     */
     public Optional<Boolean> isRequiresPassword() {
         return data.identifier() == KeyboardButtonCallback.ID
                 ? Optional.of(((KeyboardButtonCallback) data).requiresPassword())
                 : Optional.empty();
     }
 
+    /**
+     * Gets id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     *
+     * @return The id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     */
     public Optional<Id> getBotId() {
         if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
             var inputUser = ((InputKeyboardButtonUrlAuth) data).bot();
@@ -97,12 +162,20 @@ public class KeyboardButton implements TelegramObject {
         return Optional.empty();
     }
 
+    /**
+     * Gets id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#USER_PROFILE}.
+     *
+     * @return The id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#USER_PROFILE}.
+     */
     public Optional<Id> getUserId() {
-        if (data.identifier() == InputKeyboardButtonUserProfile.ID) {
-            var inputUser = ((InputKeyboardButtonUserProfile) data).userId();
-            return Optional.of(Id.of(inputUser, client.getSelfId()));
+        switch (data.identifier()) {
+            case KeyboardButtonUserProfile.ID:
+                return Optional.of(Id.ofUser(((KeyboardButtonUserProfile) data).userId(), null));
+            case InputKeyboardButtonUserProfile.ID:
+                return Optional.of(Id.of(((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
+            default:
+                return Optional.empty();
         }
-        return Optional.empty();
     }
 
     @Override
@@ -131,12 +204,6 @@ public class KeyboardButton implements TelegramObject {
 
         /** Button to buy a product. */
         BUY,
-
-        /**
-         * Button to request a user to <a href="https://core.telegram.org/method/messages.acceptUrlAuth">authorize</a>
-         * via URL using <a href="https://telegram.org/blog/privacy-discussions-web-bots#meet-seamless-web-bots">Seamless Telegram Login</a>.
-         */
-        INPUT_URH_AUTH,
 
         /** Callback button. */
         CALLBACK,
@@ -168,8 +235,6 @@ public class KeyboardButton implements TelegramObject {
 
         USER_PROFILE,
 
-        INPUT_USER_PROFILE,
-
         /**
          * Button to request a user to authorize via URL
          * using <a href="https://telegram.org/blog/privacy-discussions-web-bots#meet-seamless-web-bots">Seamless Telegram Login</a>.
@@ -187,13 +252,20 @@ public class KeyboardButton implements TelegramObject {
          */
         URL_AUTH;
 
+        /**
+         * Gets type of raw {@link telegram4j.tl.KeyboardButton} object.
+         * Input button also will be handled but as resolved objects.
+         *
+         * @param data The button data.
+         * @return The {@code Type} of raw button object.
+         */
         public static Type of(telegram4j.tl.KeyboardButton data) {
             switch (data.identifier()) {
                 case BaseKeyboardButton.ID: return DEFAULT;
+                case InputKeyboardButtonUrlAuth.ID:
                 case KeyboardButtonUrlAuth.ID: return URL_AUTH;
-                case InputKeyboardButtonUrlAuth.ID: return INPUT_URH_AUTH;
+                case InputKeyboardButtonUserProfile.ID:
                 case KeyboardButtonUserProfile.ID: return USER_PROFILE;
-                case InputKeyboardButtonUserProfile.ID: return INPUT_USER_PROFILE;
                 case KeyboardButtonBuy.ID: return BUY;
                 case KeyboardButtonCallback.ID: return CALLBACK;
                 case KeyboardButtonGame.ID: return GAME;

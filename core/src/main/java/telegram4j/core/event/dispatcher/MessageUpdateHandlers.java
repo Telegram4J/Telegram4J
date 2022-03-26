@@ -56,9 +56,8 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        BaseUser selfUser = context.getUsers().values().stream()
-                .filter(BaseUser::self)
-                .findFirst()
+        var selfUser = Optional.ofNullable(context.getUsers().get(client.getSelfId().asLong()))
+                .map(u -> EntityFactory.createUser(client, u))
                 .orElse(null);
         Chat chat = Optional.of(message.peerId())
                 .flatMap(p -> {
@@ -83,7 +82,7 @@ class MessageUpdateHandlers {
                                 .map(u -> EntityFactory.createUser(client, u));
                         case PeerChat.ID:
                         case PeerChannel.ID: return Optional.ofNullable(context.getChats().get(rawId))
-                                .map(u -> EntityFactory.createChat(client, u, null));
+                                .map(u -> EntityFactory.createChat(client, u, selfUser));
                         default: throw new IllegalArgumentException("Unknown peer type: " + p);
                     }
                 })
@@ -105,9 +104,8 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        var selfUser = context.getUsers().values().stream()
-                .filter(BaseUser::self)
-                .findFirst()
+        var selfUser = Optional.ofNullable(context.getUsers().get(client.getSelfId().asLong()))
+                .map(u -> EntityFactory.createUser(client, u))
                 .orElse(null);
         Chat chat = Optional.of(message.peerId())
                 .flatMap(p -> {
@@ -132,7 +130,7 @@ class MessageUpdateHandlers {
                                 .map(u -> EntityFactory.createUser(client, u));
                         case PeerChat.ID:
                         case PeerChannel.ID: return Optional.ofNullable(context.getChats().get(rawId))
-                                .map(u -> EntityFactory.createChat(client, u, null));
+                                .map(u -> EntityFactory.createChat(client, u, selfUser));
                         default: throw new IllegalArgumentException("Unknown peer type: " + p);
                     }
                 })

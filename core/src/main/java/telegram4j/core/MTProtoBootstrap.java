@@ -20,6 +20,7 @@ import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
+import telegram4j.core.event.domain.Event;
 import telegram4j.core.object.Id;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
@@ -43,7 +44,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.IntPredicate;
@@ -88,7 +88,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     /**
      * Sets store layout for accessing and persisting incoming data from Telegram API.
      * <p>
-     * If custom implementation isn't set, {@link StoreLayoutImpl} will be used.
+     * If custom implementation doesn't set, {@link StoreLayoutImpl} with message LRU cache bounded to {@literal 10000} will be used.
      *
      * @param storeLayout A new store layout implementation for client.
      * @return This builder.
@@ -98,31 +98,80 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    /**
+     * Sets threshold for not-acknowledged messages buffer.
+     * <p>
+     * If custom threshold doesn't set, {@literal 3} will be used as threshold.
+     *
+     * @param acksSendThreshold A new threshold for acknowledge buffer.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setAcksSendThreshold(int acksSendThreshold) {
         this.acksSendThreshold = acksSendThreshold;
         return this;
     }
 
+    /**
+     * Sets TCP transport factory for all MTProto clients.
+     * <p>
+     * If custom transport factory doesn't set, {@link IntermediateTransport} factory will be used as threshold.
+     *
+     * @see <a href="https://core.telegram.org/mtproto/mtproto-transports">MTProto Transport</a>
+     * @param transport A new {@link Transport} factory for clients.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setTransport(Supplier<Transport> transport) {
         this.transport = Objects.requireNonNull(transport, "transport");
         return this;
     }
 
+    /**
+     * Sets netty's TCP client for all MTProto clients.
+     * <p>
+     * If custom client doesn't set, {@link TcpClient#create() pooled} implementation will be used.
+     * @param tcpClient A new netty's {@link TcpClient} for MTProto clients.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setTcpClient(TcpClient tcpClient) {
         this.tcpClient = Objects.requireNonNull(tcpClient, "tcpClient");
         return this;
     }
 
+    /**
+     * Sets connection identity parameters.
+     * That parameters send on connection establishment, i.e. sending {@link InitConnection} request.
+     * <p>
+     * If custom parameters doesn't set, {@link InitConnectionParams#getDefault()} will be used.
+     *
+     * @param initConnectionParams A new connection identity parameters.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setInitConnectionParams(InitConnectionParams initConnectionParams) {
         this.initConnectionParams = Objects.requireNonNull(initConnectionParams, "initConnectionParams");
         return this;
     }
 
+    /**
+     * Sets custom {@link EventDispatcher} implementation for distributing mapped {@link Event events} to subscribers.
+     * <p>
+     * If custom event dispatcher doesn't set, {@link Sinks sinks}-based {@link DefaultEventDispatcher} implementation will be used.
+     *
+     * @param eventDispatcher A new event dispatcher.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setEventDispatcher(EventDispatcher eventDispatcher) {
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
         return this;
     }
 
+    /**
+     * Sets DC address for main MTProto client.
+     * <p>
+     * If DC address doesn't set, production IPv4 DC 2 (europe) will be used.
+     *
+     * @param dataCenter A new DC address to use.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setDataCenter(DataCenter dataCenter) {
         this.dataCenter = Objects.requireNonNull(dataCenter, "dataCenter");
         return this;
@@ -170,15 +219,40 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    /**
+     *
+     * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
+     * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
+     * Any errors caused on connection time will be emitted to a {@link Mono} and terminate client with disconnecting.
+     *
+     * @param func A function to use client until it's disconnected.
+     * @see #connect()
+     * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
+     */
     public Mono<Void> withConnection(Function<MTProtoTelegramClient, ? extends Publisher<?>> func) {
         return Mono.usingWhen(connect(), client -> Flux.from(func.apply(client)).then(client.onDisconnect()),
                 MTProtoTelegramClient::disconnect);
     }
 
+    /**
+     * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
+     * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
+     * Any errors caused on connection time will be emitted to a {@link Mono}.
+     *
+     * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
+     */
     public Mono<MTProtoTelegramClient> connect() {
         return connect(DefaultMTProtoClient::new);
     }
 
+    /**
+     * Prepare and connect MTProto client to the specified Telegram DC and
+     * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
+     * Any errors caused on connection time will be emitted to a {@link Mono}.
+     *
+     * @param clientFactory A new factory for constructing main MTProto client.
+     * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
+     */
     public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MTProtoClient> clientFactory) {
         return Mono.create(sink -> {
             StoreLayout storeLayout = initStoreLayout();
@@ -191,7 +265,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             initRetry(), initAuthRetry(), initGzipPackingPredicate(),
                             Collections.unmodifiableList(responseTransformers))));
 
-            AtomicBoolean inited = new AtomicBoolean();
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
                     defaultEntityParserFactory, initHttpClient());
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
@@ -259,8 +332,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         })
                                         .switchIfEmpty(serviceHolder.getUserService()
                                                 .getFullUser(InputUserSelf.instance())
-                                                .flatMap(user -> storeLayout.updateSelfId(user.fullUser().id())
-                                                        .thenReturn(Id.ofUser(user.fullUser().id(), null))))
+                                                .map(user -> Id.ofUser(user.fullUser().id(), null)))
                                         .doOnNext(id -> selfId.compareAndSet(null, id))
                                         .then();
 
@@ -342,7 +414,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (storeLayout != null) {
             return storeLayout;
         }
-        return new StoreLayoutImpl(c -> c.maximumSize(1000));
+        return new StoreLayoutImpl(c -> c.maximumSize(10000));
     }
 
     private DataCenter initDataCenter() {

@@ -44,7 +44,7 @@ public final class PeerId {
      */
     public static PeerId of(String username) {
         if (!username.startsWith("@")) {
-            throw new IllegalArgumentException("Malformed peer id.");
+            throw new IllegalArgumentException("Malformed peer id: '" + username + "'");
         }
         return new PeerId(username);
     }

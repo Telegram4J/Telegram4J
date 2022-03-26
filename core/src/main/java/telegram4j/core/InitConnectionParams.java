@@ -1,6 +1,7 @@
 package telegram4j.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.InputClientProxy;
@@ -8,6 +9,7 @@ import telegram4j.tl.InputClientProxy;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TimeZone;
 
 /**
  * Striped down version of {@link telegram4j.tl.request.InitConnection} settings,
@@ -27,9 +29,9 @@ public class InitConnectionParams {
 
     /**
      * Computes system-dependent init connection params with
-     * system version format {@code Linux 5.10.93-1-MANJARO amd64} and
-     * device model {@code Telegram4J} with lib version and
-     * system languages.
+     * system version in format {@code Linux 5.10.93-1-MANJARO amd64} and
+     * device model {@code Telegram4J} with lib version from package info and
+     * system languages and parameters with extracted from TZ offset seconds.
      *
      * @return The new default computed init connection parameters.
      */
@@ -42,14 +44,17 @@ public class InitConnectionParams {
                 System.getProperty("os.arch"));
 
         String langCode = Locale.getDefault().getLanguage().toLowerCase(Locale.ROOT);
+        JsonNode node = JsonNodeFactory.instance.objectNode()
+                .put("tz_offset", TimeZone.getDefault().getRawOffset() / 1000d);
 
         return new InitConnectionParams(appVersion, deviceModel, langCode,
-                "", systemVersion, langCode, null, null);
+                "", systemVersion, langCode, null, node);
     }
 
     /**
      * Creates {@code InitConnectionParams} from specified settings.
      *
+     * @see #getParams()
      * @param appVersion The application model.
      * @param deviceModel The device model.
      * @param langCode The client language code in ISO 639-1 format.

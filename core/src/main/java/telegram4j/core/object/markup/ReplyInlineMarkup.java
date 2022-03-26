@@ -46,6 +46,6 @@ public final class ReplyInlineMarkup extends ReplyMarkup {
     public String toString() {
         return "ReplyInlineMarkup{" +
                 "data=" + data +
-                "} " + super.toString();
+                '}';
     }
 }

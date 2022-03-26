@@ -27,8 +27,6 @@ public abstract class RpcService {
     protected Mono<Peer> toPeer(InputPeer inputPeer) {
         return Mono.defer(() -> {
             switch (inputPeer.identifier()) {
-                case InputPeerEmpty.ID:
-                    return Mono.error(new IllegalArgumentException("Empty input peer: " + inputPeer));
                 case InputPeerSelf.ID:
                     return storeLayout.getSelfId()
                             .map(ImmutablePeerUser::of)

@@ -107,7 +107,12 @@ public class RpcEntityRetriever implements EntityRetriever {
             return Mono.error(new IllegalArgumentException("Incorrect id type, expected: [CHANNEL, CHAT], but given: USER"));
         }
 
-        return storeLayout.getChatFullById(chatId.asLong())
+        return Mono.defer(() -> {
+                    if (chatId.getType() == Id.Type.CHAT) {
+                        return storeLayout.getChatFullById(chatId.asLong());
+                    }
+                    return storeLayout.getChannelFullById(chatId.asLong());
+                })
                 .switchIfEmpty(Mono.defer(() -> {
                     if (chatId.getType() == Id.Type.CHAT) {
                         return serviceHolder.getChatService().getFullChat(chatId.asLong());

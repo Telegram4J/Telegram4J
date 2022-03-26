@@ -19,6 +19,10 @@ import java.util.Optional;
  * File reference wrapper, which can be serialized to base 64 url string
  * via {@link #serialize(ByteBufAllocator)} and deserialized {@link #deserialize(String)}.
  * For compatibility with rpc methods can be mapped to {@code InputPhoto}/{@code InputDocument}, {@code InputFileLocation}.
+ *
+ * @apiNote This identifier can't be used across different accounts
+ * due to the relativity of message identifiers in private chats
+ * and groups, as well as other privacy factors.
  */
 public class FileReferenceId {
 

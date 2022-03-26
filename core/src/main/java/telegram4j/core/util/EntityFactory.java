@@ -78,12 +78,9 @@ public final class EntityFactory {
 
     public static UserStatus createUserStatus(MTProtoTelegramClient client, telegram4j.tl.UserStatus data) {
         switch (data.identifier()) {
-            case UserStatusEmpty.ID:
-                return new UserStatus(client, UserStatus.Type.EMPTY);
-            case UserStatusLastMonth.ID:
-                return new UserStatus(client, UserStatus.Type.LAST_MONTH);
-            case UserStatusLastWeek.ID:
-                return new UserStatus(client, UserStatus.Type.LAST_WEEK);
+            case UserStatusEmpty.ID: return new UserStatus(client, UserStatus.Type.EMPTY);
+            case UserStatusLastMonth.ID: return new UserStatus(client, UserStatus.Type.LAST_MONTH);
+            case UserStatusLastWeek.ID: return new UserStatus(client, UserStatus.Type.LAST_WEEK);
             case UserStatusOffline.ID:
                 UserStatusOffline userStatusOffline = (UserStatusOffline) data;
                 Instant wasOnlineTimestamp = Instant.ofEpochSecond(userStatusOffline.wasOnline());
@@ -92,8 +89,7 @@ public final class EntityFactory {
                 UserStatusOnline userStatusOnline = (UserStatusOnline) data;
                 Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
                 return new UserStatus(client, UserStatus.Type.ONLINE, expiresTimestamp, null);
-            case UserStatusRecently.ID:
-                return new UserStatus(client, UserStatus.Type.RECENTLY);
+            case UserStatusRecently.ID: return new UserStatus(client, UserStatus.Type.RECENTLY);
             default: throw new IllegalArgumentException("Unknown user status type: " + data);
         }
     }
@@ -108,7 +104,7 @@ public final class EntityFactory {
 
     @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
-                                  @Nullable BaseUser selfUserData) {
+                                  @Nullable User selfUser) {
         switch (possibleChat.identifier()) {
             case UserFull.ID: {
                 UserFull userFull = (UserFull) possibleChat;
@@ -125,7 +121,6 @@ public final class EntityFactory {
                 }
 
                 User mappedFullUser = new User(client, userFull.fullUser(), minData);
-                User selfUser = selfUserData != null ? new User(client, selfUserData) : null;
 
                 return new PrivateChat(client, mappedFullUser, selfUser);
             }
@@ -133,7 +128,6 @@ public final class EntityFactory {
                 BaseUser baseUser = (BaseUser) possibleChat;
 
                 User mappedMinUser = new User(client, baseUser);
-                User selfUser = selfUserData != null ? new User(client, selfUserData) : null;
 
                 return new PrivateChat(client, mappedMinUser, selfUser);
             case BaseChat.ID:

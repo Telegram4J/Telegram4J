@@ -40,6 +40,6 @@ public final class ReplyKeyboardHide extends ReplyMarkup {
     public String toString() {
         return "ReplyKeyboardHide{" +
                 "data=" + data +
-                "} " + super.toString();
+                '}';
     }
 }

@@ -100,6 +100,14 @@ public class TlEntityUtil {
         }
     }
 
+    public static long getRawPeerId(InputChannel inputChannel) {
+        switch (inputChannel.identifier()) {
+            case BaseInputChannel.ID: return ((BaseInputChannel) inputChannel).channelId();
+            case InputChannelFromMessage.ID: return ((InputChannelFromMessage) inputChannel).channelId();
+            default: throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
+        }
+    }
+
     public static InputPeer toInputPeer(InputUser user) {
         switch (user.identifier()) {
             case InputUserFromMessage.ID:

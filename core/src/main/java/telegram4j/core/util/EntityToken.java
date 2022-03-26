@@ -6,7 +6,7 @@ import telegram4j.core.object.MessageEntity;
 /** Markup token interface with base information. */
 public interface EntityToken {
 
-    /** A token indicating the EOF. */
+    /** A token is indicating the EOF. */
     EntityToken UNKNOWN = create(MessageEntity.Type.UNKNOWN, -1, null);
 
     /**

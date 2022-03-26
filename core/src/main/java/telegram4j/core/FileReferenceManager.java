@@ -9,15 +9,23 @@ import telegram4j.tl.messages.ChannelMessages;
 import telegram4j.tl.messages.Messages;
 
 import java.util.List;
+import java.util.Objects;
 
 public class FileReferenceManager {
 
     private final MTProtoTelegramClient client;
 
     public FileReferenceManager(MTProtoTelegramClient client) {
-        this.client = client;
+        this.client = Objects.requireNonNull(client, "client");
     }
 
+    /**
+     * Refresh {@link FileReferenceId} file reference and access hash from specified context.
+     * Low-quality chat photos (Files with type {@link FileReferenceId.Type#CHAT_PHOTO}) photos will be refreshed as normal photos.
+     *
+     * @param fileReferenceId The serialized {@link FileReferenceId}.
+     * @return A {@link Mono} that emitting on successful completion refreshed {@link FileReferenceId}.
+     */
     public Mono<FileReferenceId> refresh(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
                 .flatMap(f -> {

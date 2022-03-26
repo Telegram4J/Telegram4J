@@ -63,6 +63,6 @@ public final class ReplyKeyboardMarkup extends ReplyMarkup {
     public String toString() {
         return "ReplyKeyboardMarkup{" +
                 "data=" + data +
-                "} " + super.toString();
+                '}';
     }
 }

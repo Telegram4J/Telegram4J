@@ -149,8 +149,8 @@ public class MessageEntity implements TelegramObject {
         CODE,
 
         /**
-         * Message entity representing a preformatted {@code codeblock},
-         * allowing the user to specify a programming language for the codeblock.
+         * Message entity representing a preformatted codeblock,
+         * allowing the user to specify a programming language.
          */
         PRE,
 
@@ -184,7 +184,12 @@ public class MessageEntity implements TelegramObject {
         /** Unknown message entity. */
         UNKNOWN;
 
-        static Type of(telegram4j.tl.MessageEntity data) {
+        /**
+         * Gets type of raw {@link telegram4j.tl.MessageEntity} data.
+         *
+         * @return The {@code Type} of raw message entity data.
+         */
+        public static Type of(telegram4j.tl.MessageEntity data) {
             switch (data.identifier()) {
                 case MessageEntityUnknown.ID: return UNKNOWN;
                 case MessageEntityMention.ID: return MENTION;

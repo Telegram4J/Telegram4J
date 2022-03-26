@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/** Representation for message and profile photos in normal quality. */
 public class Photo implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -44,36 +45,76 @@ public class Photo implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets serialized file reference id for this photo.
+     *
+     * @return The serialized file reference id.
+     */
     public String getFileReferenceId() {
         return fileReferenceId;
     }
 
+    /**
+     * Gets whether photo has mask stickers attached to it.
+     *
+     * @return {@code true} if photo has mask stickers attached to it.
+     */
     public boolean hasStickers() {
         return data.hasStickers();
     }
 
+    /**
+     * Gets id of the photo.
+     *
+     * @return The id of the photo.
+     */
     public long getId() {
         return data.id();
     }
 
+    /**
+     * Gets access hash of the photo.
+     *
+     * @return The access hash of the photo.
+     */
     public long getAccessHash() {
         return data.accessHash();
     }
 
+    /**
+     * Gets hex dump of the file reference.
+     *
+     * @return The hex dump of the file reference.
+     */
     public String getFileReference() {
         return ByteBufUtil.hexDump(data.fileReference());
     }
 
+    /**
+     * Gets timestamp of the photo upload.
+     *
+     * @return The {@link Instant} of the photo upload.
+     */
     public Instant getTimestamp() {
         return Instant.ofEpochSecond(data.date());
     }
 
+    /**
+     * Gets {@link List} of {@link PhotoSize thumbnails} for this photo.
+     *
+     * @return The {@link List} of {@link PhotoSize thumbnails} for this photo.
+     */
     public List<PhotoSize> getSizes() {
         return data.sizes().stream()
                 .map(d -> EntityFactory.createPhotoSize(client, d))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Gets {@link List} of {@link VideoSize video thumbnails} for this photo if it's animated, if present.
+     *
+     * @return The {@link List} of {@link VideoSize video thumbnails} for this photo, if present.
+     */
     public Optional<List<VideoSize>> getVideoSizes() {
         return Optional.ofNullable(data.videoSizes())
                 .map(l -> l.stream()
@@ -81,6 +122,11 @@ public class Photo implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets id of the DC, where photo was stored.
+     *
+     * @return The id of the DC, where photo was stored.
+     */
     public int getDcId() {
         return data.dcId();
     }

@@ -708,27 +708,23 @@ public class MessageService extends RpcService {
     @BotCompatible
     public Mono<BaseMessageFields> sendMessage(SendMessage request) {
         return client.sendAwait(request)
-                .zipWith(toPeer(request.peer()))
-                .map(TupleUtils.function((updates, peer) -> {
-                    var upd = transformMessageUpdate(request, updates, peer);
+                .flatMap(u -> transformMessageUpdate(request, u))
+                .map(updates -> {
+                    client.updates().emitNext(updates.getT2(), DEFAULT_PARKING);
 
-                    client.updates().emitNext(upd.getT2(), DEFAULT_PARKING);
-
-                    return upd.getT1();
-                }));
+                    return updates.getT1();
+                });
     }
 
     @BotCompatible
     public Mono<BaseMessageFields> sendMedia(SendMedia request) {
         return client.sendAwait(request)
-                .zipWith(toPeer(request.peer()))
-                .map(TupleUtils.function((updates, peer) -> {
-                    var upd = transformMessageUpdate(request, updates, peer);
+                .flatMap(u -> transformMessageUpdate(request, u))
+                .map(updates -> {
+                    client.updates().emitNext(updates.getT2(), DEFAULT_PARKING);
 
-                    client.updates().emitNext(upd.getT2(), DEFAULT_PARKING);
-
-                    return upd.getT1();
-                }));
+                    return updates.getT1();
+                });
     }
 
     @BotCompatible
@@ -756,115 +752,125 @@ public class MessageService extends RpcService {
 
     // Short-send related updates object should be transformed to the updateShort or baseUpdates.
     // https://core.telegram.org/api/updates-sequence
-    static Tuple2<BaseMessageFields, Updates> transformMessageUpdate(BaseSendMessageRequest request, Updates updates, Peer peer) {
-        switch (updates.identifier()) {
-            case UpdateShortSentMessage.ID: {
-                UpdateShortSentMessage casted = (UpdateShortSentMessage) updates;
-                Integer replyToMsgId = request.replyToMsgId();
-                var message = BaseMessage.builder()
-                        .flags(request.flags() | casted.flags())
-                        .peerId(peer)
-                        .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(replyToMsgId) : null)
-                        .message(request.message())
-                        .id(casted.id())
-                        .replyMarkup(request.replyMarkup())
-                        .media(casted.media())
-                        .entities(casted.entities())
-                        .date(casted.date())
-                        .ttlPeriod(casted.ttlPeriod())
-                        .build();
+    private Mono<Tuple2<BaseMessageFields, Updates>> transformMessageUpdate(BaseSendMessageRequest request, Updates updates) {
+        return toPeer(request.peer())
+                .zipWith(Mono.justOrEmpty(request.sendAs())
+                        .defaultIfEmpty(InputPeerSelf.instance())
+                        .flatMap(this::toPeer))
+                .map(TupleUtils.function((chat, author) -> {
 
-                Updates upds = UpdateShort.builder()
-                        .date(casted.date())
-                        .update(UpdateNewMessage.builder()
-                                .message(message)
-                                .pts(casted.pts())
-                                .ptsCount(casted.ptsCount())
-                                .build())
-                        .build();
+                    switch (updates.identifier()) {
+                        case UpdateShortSentMessage.ID: {
+                            UpdateShortSentMessage casted = (UpdateShortSentMessage) updates;
+                            Integer replyToMsgId = request.replyToMsgId();
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(replyToMsgId) : null)
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .media(casted.media())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
 
-                return Tuples.of(message, upds);
-            }
-            case UpdateShortMessage.ID: {
-                UpdateShortMessage casted = (UpdateShortMessage) updates;
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
 
-                var message = BaseMessage.builder()
-                        .flags(request.flags() | casted.flags())
-                        .peerId(peer)
-                        .replyTo(casted.replyTo())
-                        .message(request.message())
-                        .id(casted.id())
-                        .replyMarkup(request.replyMarkup())
-                        .fwdFrom(casted.fwdFrom())
-                        .entities(casted.entities())
-                        .date(casted.date())
-                        .viaBotId(casted.viaBotId())
-                        .ttlPeriod(casted.ttlPeriod())
-                        .build();
+                            return Tuples.of(message, upds);
+                        }
+                        case UpdateShortMessage.ID: {
+                            UpdateShortMessage casted = (UpdateShortMessage) updates;
 
-                Updates upds = UpdateShort.builder()
-                        .date(casted.date())
-                        .update(UpdateNewMessage.builder()
-                                .message(message)
-                                .pts(casted.pts())
-                                .ptsCount(casted.ptsCount())
-                                .build())
-                        .build();
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .replyTo(casted.replyTo())
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .fwdFrom(casted.fwdFrom())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .viaBotId(casted.viaBotId())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
 
-                return Tuples.of(message, upds);
-            }
-            case UpdateShortChatMessage.ID: {
-                UpdateShortChatMessage casted = (UpdateShortChatMessage) updates;
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
 
-                var message = BaseMessage.builder()
-                        .flags(request.flags() | casted.flags())
-                        .peerId(peer)
-                        .viaBotId(casted.viaBotId())
-                        .replyTo(casted.replyTo())
-                        .fwdFrom(casted.fwdFrom())
-                        .message(request.message())
-                        .id(casted.id())
-                        .replyMarkup(request.replyMarkup())
-                        .entities(casted.entities())
-                        .date(casted.date())
-                        .ttlPeriod(casted.ttlPeriod())
-                        .build();
+                            return Tuples.of(message, upds);
+                        }
+                        case UpdateShortChatMessage.ID: {
+                            UpdateShortChatMessage casted = (UpdateShortChatMessage) updates;
 
-                Updates upds = UpdateShort.builder()
-                        .date(casted.date())
-                        .update(UpdateNewMessage.builder()
-                                .message(message)
-                                .pts(casted.pts())
-                                .ptsCount(casted.ptsCount())
-                                .build())
-                        .build();
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .viaBotId(casted.viaBotId())
+                                    .replyTo(casted.replyTo())
+                                    .fwdFrom(casted.fwdFrom())
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
 
-                return Tuples.of(message, upds);
-            }
-            case BaseUpdates.ID: {
-                BaseUpdates casted = (BaseUpdates) updates;
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
 
-                UpdateMessageID updateMessageID = casted.updates().stream()
-                        .filter(u -> u.identifier() == UpdateMessageID.ID)
-                        .map(upd -> (UpdateMessageID) upd)
-                        .findFirst()
-                        .orElseThrow();
+                            return Tuples.of(message, upds);
+                        }
+                        case BaseUpdates.ID: {
+                            BaseUpdates casted = (BaseUpdates) updates;
 
-                if (updateMessageID.randomId() != request.randomId()) {
-                    throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
-                            + ", received: " + updateMessageID.randomId());
-                }
+                            UpdateMessageID updateMessageID = casted.updates().stream()
+                                    .filter(u -> u.identifier() == UpdateMessageID.ID)
+                                    .map(upd -> (UpdateMessageID) upd)
+                                    .findFirst()
+                                    .orElseThrow();
 
-                var message = casted.updates().stream()
-                        .filter(upd -> upd instanceof UpdateNewMessageFields)
-                        .map(upd -> (BaseMessageFields) ((UpdateNewMessageFields) upd).message())
-                        .findFirst()
-                        .orElseThrow();
+                            if (updateMessageID.randomId() != request.randomId()) {
+                                throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
+                                        + ", received: " + updateMessageID.randomId());
+                            }
 
-                return Tuples.of(message, casted);
-            }
-            default:
-                throw new IllegalArgumentException("Unknown updates type: " + updates);
-        }
+                            var message = casted.updates().stream()
+                                    .filter(upd -> upd instanceof UpdateNewMessageFields)
+                                    .map(upd -> (BaseMessageFields) ((UpdateNewMessageFields) upd).message())
+                                    .findFirst()
+                                    .orElseThrow();
+
+                            return Tuples.of(message, casted);
+                        }
+                        default:
+                            throw new IllegalArgumentException("Unknown updates type: " + updates);
+                    }
+                }));
     }
 }

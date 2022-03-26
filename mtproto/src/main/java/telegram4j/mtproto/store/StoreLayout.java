@@ -109,13 +109,22 @@ public interface StoreLayout {
     Mono<Chat> getChatMinById(long chatId);
 
     /**
-     * Retrieve detailed chat/channel information by specified id.
+     * Retrieve detailed chat information by specified id.
      *
-     * @param chatId The id of chat/channel.
+     * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link ChatFull} container with detailed and minimal information about chat/channel.
+     * the {@link ChatFull} container with detailed and minimal information about chat.
      */
     Mono<ChatFull> getChatFullById(long chatId);
+
+    /**
+     * Retrieve detailed chat/channel information by specified id.
+     *
+     * @param channelId The id of channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatFull} container with detailed and minimal information about channel.
+     */
+    Mono<ChatFull> getChannelFullById(long channelId);
 
     /**
      * Retrieve minimal user information by specified id.
@@ -195,13 +204,13 @@ public interface StoreLayout {
 
     Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users);
 
-    Mono<User> onUserUpdate(User payload);
+    Mono<Void> onUserUpdate(User payload);
 
-    Mono<telegram4j.tl.users.UserFull> onUserUpdate(telegram4j.tl.users.UserFull payload);
+    Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
 
-    Mono<Chat> onChatUpdate(Chat payload);
+    Mono<Void> onChatUpdate(Chat payload);
 
-    Mono<telegram4j.tl.messages.ChatFull> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
+    Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
 
-    Mono<ResolvedPeer> onResolvedPeer(ResolvedPeer payload);
+    Mono<Void> onResolvedPeer(ResolvedPeer payload);
 }
