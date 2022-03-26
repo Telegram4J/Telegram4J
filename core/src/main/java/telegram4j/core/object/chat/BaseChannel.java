@@ -13,6 +13,7 @@ import telegram4j.core.object.Photo;
 import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
+import telegram4j.core.spec.IdFields;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.PaginationSupport;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -278,6 +279,60 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
+    public Mono<Void> editTitle(String newTitle) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
+        return client.getServiceHolder().getChatService()
+                .editTitle(channel, newTitle);
+    }
+
+    @Override
+    public Mono<Channel> editAdmin(Id userId, EnumSet<ChatAdminRights> rights, String rank) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
+        return client.asInputUser(userId)
+                .flatMap(target -> client.getServiceHolder().getChatService()
+                        .editAdmin(channel, target, telegram4j.tl.ChatAdminRights.instance()
+                                .withFlags(rights.stream()
+                                        .map(ChatAdminRights::getFlag)
+                                        .reduce(0, (l, r) -> l | r)), rank))
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null))
+                .cast(Channel.class);
+    }
+
+    @Override
+    public Mono<Channel> editBanned(Id peerId, EnumSet<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
+        return client.asInputPeer(peerId)
+                .flatMap(target -> client.getServiceHolder().getChatService()
+                        .editBanned(channel, target, ChatBannedRights.builder()
+                                .flags(rights.stream()
+                                        .map(ChatBannedRightsSettings.Right::getFlag)
+                                        .reduce(0, (l, r) -> l | r))
+                                .untilDate(Math.toIntExact(untilTimestamp.getEpochSecond()))
+                                .build()))
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null))
+                .cast(Channel.class);
+    }
+
+    @Override
+    public Mono<Void> leave() {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
+        return client.getServiceHolder().getChatService()
+                .leaveChannel(channel);
+    }
+
+    @Override
+    public Mono<Boolean> setStickers(IdFields.StickerSetId stickerSetId) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
+        return client.getServiceHolder().getChatService()
+                .setStickers(channel, stickerSetId.asInputStickerSet());
+    }
+
+    @Override
     public Mono<ChatParticipant> getParticipant(Id participantId) {
         Id id = getId();
 
@@ -331,7 +386,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                             .map(u -> EntityFactory.createUser(client, u))
                             .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
-                    var participants = data.participants().stream()
+                    return Flux.fromIterable(data.participants())
                             .map(c -> {
                                 Peer peerId = TlEntityUtil.getUserId(c);
                                 long rawPeerId = TlEntityUtil.getRawPeerId(peerId);
@@ -349,10 +404,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                 }
 
                                 return new ChatParticipant(client, peerEntity, c, id);
-                            })
-                            .collect(Collectors.toList());
-
-                    return Flux.fromIterable(participants);
+                            });
                 });
     }
 }

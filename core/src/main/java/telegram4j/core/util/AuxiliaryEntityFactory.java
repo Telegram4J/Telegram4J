@@ -4,9 +4,11 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessagesSlice;
+import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.channels.SendAsPeers;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.ChannelMessages;
 import telegram4j.tl.messages.Messages;
@@ -37,8 +39,8 @@ public final class AuxiliaryEntityFactory {
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
 
                 var messages = data0.messages().stream()
-                        .filter(m -> m.identifier() != MessageEmpty.ID)
-                        .map(m -> (BaseMessageFields) m)
+                        .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
+                        .filter(Objects::nonNull)
                         .map(d -> {
                             long peerId = TlEntityUtil.getRawPeerId(d.peerId());
                             Id chatId;
@@ -77,8 +79,8 @@ public final class AuxiliaryEntityFactory {
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
 
                 var messages = data0.messages().stream()
-                        .filter(m -> m.identifier() != MessageEmpty.ID)
-                        .map(m -> (BaseMessageFields) m)
+                        .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
+                        .filter(Objects::nonNull)
                         .map(d -> {
                             long peerId = TlEntityUtil.getRawPeerId(d.peerId());
                             Id chatId;
@@ -107,14 +109,17 @@ public final class AuxiliaryEntityFactory {
             case BaseMessages.ID: {
                 BaseMessages data0 = (BaseMessages) data;
 
-                var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
-                        .map(d -> EntityFactory.createChat(client, d, null))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
+
+                var selfUser = usersMap.get(client.getSelfId().asLong());
+
+                var chatsMap = data0.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
+                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
 
                 var messages = data0.messages().stream()
@@ -146,5 +151,29 @@ public final class AuxiliaryEntityFactory {
             default:
                 throw new IllegalArgumentException("Unknown messages type: " + data);
         }
+    }
+
+    public static AuxiliarySendAs createSendAs(MTProtoTelegramClient client, SendAsPeers data) {
+        var peerIds = data.peers().stream()
+                .map(Id::of)
+                .collect(Collectors.toUnmodifiableList());
+
+        var users = data.users().stream()
+                .filter(u -> u.identifier() == BaseUser.ID)
+                .map(u -> EntityFactory.createUser(client, u))
+                .collect(Collectors.toUnmodifiableList());
+
+        var selfUser = users.stream()
+                .filter(u -> u.getId().equals(client.getSelfId()))
+                .findFirst()
+                .orElse(null);
+
+        var chats = data.chats().stream()
+                .filter(TlEntityUtil::isAvailableChat)
+                .map(c -> EntityFactory.createChat(client, c, selfUser))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toUnmodifiableList());
+
+        return new AuxiliarySendAs(client, peerIds, users, chats);
     }
 }

@@ -6,10 +6,12 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.AdminLogResults;
 import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.channels.ChannelParticipants;
+import telegram4j.tl.channels.SendAsPeers;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.*;
 import telegram4j.tl.request.channels.ImmutableDeleteHistory;
@@ -22,6 +24,8 @@ import telegram4j.tl.request.folders.ImmutableDeleteFolder;
 import telegram4j.tl.request.messages.*;
 
 import java.util.List;
+
+import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
 /** Rpc service with chat and channel related methods. */
 public class ChatService extends RpcService {
@@ -189,14 +193,43 @@ public class ChatService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<Updates> editAdmin(InputChannel channel, InputUser user, ChatAdminRights rights, String rank) {
-        return client.sendAwait(ImmutableEditAdmin.of(channel, user, rights, rank));
+    @BotCompatible
+    public Mono<Channel> editAdmin(InputChannel channel, InputUser user, ChatAdminRights rights, String rank) {
+        return client.sendAwait(ImmutableEditAdmin.of(channel, user, rights, rank))
+                .cast(BaseUpdates.class)
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.justOrEmpty(u.chats().get(0))
+                            .filter(TlEntityUtil::isAvailableChat)
+                            .cast(Channel.class);
+                });
     }
 
-    public Mono<Updates> editTitle(InputChannel channel, String title) {
-        return client.sendAwait(ImmutableEditTitle.of(channel, title));
+    @BotCompatible
+    public Mono<Void> editTitle(InputChannel channel, String title) {
+        return client.sendAwait(ImmutableEditTitle.of(channel, title))
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.empty();
+                });
     }
 
+    @BotCompatible
+    public Mono<Channel> editBanned(InputChannel channel, InputPeer participant, ChatBannedRights rights) {
+        return client.sendAwait(ImmutableEditBanned.of(channel, participant, rights))
+                .cast(BaseUpdates.class)
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.justOrEmpty(u.chats().get(0))
+                            .filter(TlEntityUtil::isAvailableChat)
+                            .cast(Channel.class);
+                });
+    }
+
+    @BotCompatible
     public Mono<Updates> editPhoto(InputChannel channel, InputChatPhoto photo) {
         return client.sendAwait(ImmutableEditPhoto.of(channel, photo));
     }
@@ -228,8 +261,13 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Updates> leaveChannel(InputChannel channel) {
-        return client.sendAwait(ImmutableLeaveChannel.of(channel));
+    public Mono<Void> leaveChannel(InputChannel channel) {
+        return client.sendAwait(ImmutableLeaveChannel.of(channel))
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.empty();
+                });
     }
 
     public Mono<Updates> inviteToChannel(InputChannel channel, Iterable<? extends InputUser> ids) {
@@ -253,10 +291,6 @@ public class ChatService extends RpcService {
 
     public Mono<Chats> getAdminedPublicChannels(GetAdminedPublicChannels request) {
         return client.sendAwait(request);
-    }
-
-    public Mono<Updates> editBanned(InputChannel channel, InputPeer participant, ChatBannedRights rights) {
-        return client.sendAwait(ImmutableEditBanned.of(channel, participant, rights));
     }
 
     public Mono<AdminLogResults> getAdminLog(InputChannel channel, String query, @Nullable ChannelAdminLogEventsFilter filter,
@@ -331,5 +365,9 @@ public class ChatService extends RpcService {
 
     public Mono<SponsoredMessages> getSponsoredMessages(InputChannel channel) {
         return client.sendAwait(ImmutableGetSponsoredMessages.of(channel));
+    }
+
+    public Mono<SendAsPeers> getSendAs(InputPeer peer) {
+        return client.sendAwait(ImmutableGetSendAs.of(peer));
     }
 }

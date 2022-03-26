@@ -5,15 +5,18 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerId;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
+import telegram4j.core.util.AuxiliaryEntityFactory;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
+import telegram4j.tl.InputPeer;
 import telegram4j.tl.InputPeerEmpty;
 import telegram4j.tl.request.messages.ForwardMessages;
 import telegram4j.tl.request.messages.SendMedia;
@@ -152,6 +155,14 @@ abstract class BaseChat implements Chat {
                                         .orElse(null))
                                 .build())
                         .map(e -> EntityFactory.createMessage(client, e, getId()))));
+    }
+
+    @Override
+    public Mono<AuxiliarySendAs> getSendAs() {
+        InputPeer peer = client.asResolvedInputPeer(getId());
+
+        return client.getServiceHolder().getChatService().getSendAs(peer)
+                .map(s -> AuxiliaryEntityFactory.createSendAs(client, s));
     }
 
     @Override

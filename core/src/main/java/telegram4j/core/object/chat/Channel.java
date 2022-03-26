@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.*;
+import telegram4j.core.spec.IdFields;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 
@@ -276,6 +277,49 @@ public interface Channel extends Chat {
     Optional<Integer> getStatsDcId();
 
     // Interaction methods
+
+    /**
+     * Requests to edit current channel title.
+     *
+     * @param newTitle A new title for channel.
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    Mono<Void> editTitle(String newTitle);
+
+    /**
+     * Requests to edit admin rights for specified user.
+     *
+     * @param userId The id of user to edit.
+     * @param rights The {@link EnumSet} with allowed admin rights.
+     * @param rank The new display rank.
+     * @return A {@link Mono} emitting on successful completion updated channel.
+     */
+    Mono<Channel> editAdmin(Id userId, EnumSet<ChatAdminRights> rights, String rank);
+
+    /**
+     * Requests to edit banned rights for specified peer.
+     *
+     * @param peerId The id of user/channel to edit.
+     * @param rights The {@link EnumSet} with disallowed rights.
+     * @param untilTimestamp The timestamp before which this overwrite active.
+     * @return A {@link Mono} emitting on successful completion updated channel.
+     */
+    Mono<Channel> editBanned(Id peerId, EnumSet<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp);
+
+    /**
+     * Requests to leave channel by <i>current</i> user.
+     *
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    Mono<Void> leave();
+
+    /**
+     * Requests to associate new stickerset with this channel.
+     *
+     * @param stickerSetId The id of sticker set to associate.
+     * @return A {@link Mono} emitting on successful completion boolean, indicates result.
+     */
+    Mono<Boolean> setStickers(IdFields.StickerSetId stickerSetId);
 
     /**
      * Retrieve channel participant by user id.

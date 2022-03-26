@@ -2,6 +2,7 @@ package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMediaSpec;
@@ -91,11 +92,38 @@ public interface Chat extends PeerEntity {
 
     // Interaction methods
 
+    /**
+     * Requests to create new message by specified edit specification in this chat.
+     *
+     * @param spec an immutable object that specifies how to create the message.
+     * @return A {@link Mono} emitting on successful completion created message.
+     */
     Mono<Message> sendMessage(SendMessageSpec spec);
 
+    /**
+     * Requests to forward message(s) by forward specification in this chat.
+     *
+     * @param spec an immutable object that specifies how to forward the message(s).
+     * @param toPeer The {@link PeerId} of chat where to forward message(s).
+     * @return A {@link Flux} emitting created messages.
+     */
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
 
+    /**
+     * Requests to create new message with media file by specified media specification in this chat.
+     *
+     * @param spec an immutable object that specifies how to create the message with media file.
+     * @return A {@link Mono} emitting on successful completion created message.
+     */
     Mono<Message> sendMedia(SendMediaSpec spec);
+
+    /**
+     * Retrieves {@link AuxiliarySendAs} container with available peers,
+     * which can be used as {@link SendMessageSpec#sendAs()} parameter.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliarySendAs} container.
+     */
+    Mono<AuxiliarySendAs> getSendAs();
 
     /** All types of telegram chat. */
     enum Type {

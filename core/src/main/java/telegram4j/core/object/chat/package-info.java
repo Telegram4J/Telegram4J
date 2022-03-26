@@ -1,3 +1,4 @@
+/** Package with chat/channel-related objects. */
 @NonNullApi
 package telegram4j.core.object.chat;
 

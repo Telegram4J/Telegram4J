@@ -122,6 +122,17 @@ public final class IdFields {
 
         Optional<String> shortName();
 
+        default InputStickerSet asInputStickerSet() {
+            switch (type()) {
+                case ANIMATED_EMOJI: return InputStickerSetAnimatedEmoji.instance();
+                case ANIMATED_EMOJI_ANIMATIONS: return InputStickerSetAnimatedEmojiAnimations.instance();
+                case DICE: return ImmutableInputStickerSetDice.of(emoticon().orElseThrow());
+                case ID: return ImmutableInputStickerSetID.of(id().orElseThrow(), accessHash().orElseThrow());
+                case SHORT_NAME: return ImmutableInputStickerSetShortName.of(shortName().orElseThrow());
+                default: throw new IllegalStateException();
+            }
+        }
+
         enum Type {
             ANIMATED_EMOJI,
             ANIMATED_EMOJI_ANIMATIONS,
