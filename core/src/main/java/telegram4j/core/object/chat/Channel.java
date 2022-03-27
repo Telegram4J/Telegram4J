@@ -5,6 +5,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.IdFields;
+import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 
@@ -305,6 +306,14 @@ public interface Channel extends Chat {
      * @return A {@link Mono} emitting on successful completion updated channel.
      */
     Mono<Channel> editBanned(Id peerId, EnumSet<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp);
+
+    /**
+     * Requests to edit current channel photo.
+     *
+     * @param spec A spec of new photo for channel, {@code null} value indicates removing.
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    Mono<Void> editPhoto(@Nullable InputChatPhotoSpec spec);
 
     /**
      * Requests to leave channel by <i>current</i> user.

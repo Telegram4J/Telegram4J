@@ -93,6 +93,7 @@ public final class Message implements TelegramObject {
      */
     public Optional<Id> getAuthorId() {
         return Optional.ofNullable(getBaseData().fromId()).map(Id::of)
+                // If message from DC (not outgoing message) fromId might be absent, just use chatId
                 .or(() -> resolvedChatId.getType() == Id.Type.USER ? Optional.of(resolvedChatId) : Optional.empty());
     }
 

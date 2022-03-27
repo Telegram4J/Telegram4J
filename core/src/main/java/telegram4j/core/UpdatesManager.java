@@ -283,6 +283,10 @@ public class UpdatesManager {
             return Flux.empty();
         }
 
+        if (this.pts == pts && this.qts == qts && this.date == date) { // empty diff
+            return Flux.empty();
+        }
+
         // It often turns out that getDifference() returns the updates already received,
         // but for some unknown reason sets them on a different date, which is longer by DEFAULT_CHECKIN interval
         if (client.isBot()) {
@@ -452,7 +456,7 @@ public class UpdatesManager {
             default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
         }
 
-        Id channelId = Id.of(request.channel());
+        Id channelId = Id.of(request.channel(), client.getSelfId());
         Mono<Void> updatePts = client.getMtProtoResources()
                 .getStoreLayout().getChannelFullById(channelId.asLong())
                 .map(c -> ImmutableChatFull.copyOf(c)

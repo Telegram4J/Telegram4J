@@ -7,6 +7,7 @@ import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.tl.*;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 
 /** The {@link PeerEntity} identifier with optional access hash. */
@@ -17,12 +18,12 @@ public final class Id implements Comparable<Id> {
 
     private final Type type;
     private final long value;
-    private final long accessHash;
+    private final Object context;
 
-    private Id(Type type, long value, long accessHash) {
+    private Id(Type type, long value, Object context) {
         this.type = Objects.requireNonNull(type, "type");
         this.value = value;
-        this.accessHash = accessHash;
+        this.context = context;
     }
 
     /**
@@ -47,6 +48,19 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
+     * Create new id with {@link Type#CHANNEL} type and min information.
+     *
+     * @param value The id of channel.
+     * @param peerId The id of chat/channel where have seen this channel.
+     * @param messageId The id of message where have seen this channel.
+     * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
+     * @return New {@link Id} of min channel.
+     */
+    public static Id ofChannel(long value, Id peerId, int messageId) {
+        return new Id(Type.CHANNEL, value, new MinInformation(peerId, messageId));
+    }
+
+    /**
      * Create new id with {@link Type#USER} type and given access hash.
      *
      * @param value The id of user.
@@ -55,6 +69,19 @@ public final class Id implements Comparable<Id> {
      */
     public static Id ofUser(long value, @Nullable Long accessHash) {
         return of(Type.USER, value, accessHash);
+    }
+
+    /**
+     * Create new id with {@link Type#USER} type and min information.
+     *
+     * @param value The id of user.
+     * @param peerId The id of chat/channel where have seen this user.
+     * @param messageId The id of message where have seen this user.
+     * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
+     * @return New {@link Id} of min user.
+     */
+    public static Id ofUser(long value, Id peerId, int messageId) {
+        return new Id(Type.USER, value, new MinInformation(peerId, messageId));
     }
 
     /**
@@ -92,7 +119,7 @@ public final class Id implements Comparable<Id> {
             case InputUserFromMessage.ID: {
                 InputUserFromMessage d = (InputUserFromMessage) inputUser;
 
-                return ofUser(d.userId(), null);
+                return ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
             }
             case InputUserSelf.ID: return selfId;
             default: throw new IllegalArgumentException("Unknown input user type: " + inputUser);
@@ -106,9 +133,10 @@ public final class Id implements Comparable<Id> {
      *
      * @throws IllegalArgumentException If specified input user identifier is unknown.
      * @param inputChannel The {@link InputChannel} identifier.
+     * @param selfId The id of <i>current</i> user, used for {@link InputChannelFromMessage} handling.
      * @return New {@link Id} from given {@link InputChannel}.
      */
-    public static Id of(InputChannel inputChannel) {
+    public static Id of(InputChannel inputChannel, Id selfId) {
         switch (inputChannel.identifier()) {
             case BaseInputChannel.ID: {
                 BaseInputChannel d = (BaseInputChannel) inputChannel;
@@ -118,7 +146,7 @@ public final class Id implements Comparable<Id> {
             case InputChannelFromMessage.ID: {
                 InputChannelFromMessage d = (InputChannelFromMessage) inputChannel;
 
-                return ofChannel(d.channelId(), null);
+                return ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
             }
             default: throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
         }
@@ -144,7 +172,7 @@ public final class Id implements Comparable<Id> {
             case InputPeerChannelFromMessage.ID: {
                 InputPeerChannelFromMessage d = (InputPeerChannelFromMessage) inputPeer;
 
-                return ofChannel(d.channelId(), null);
+                return ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
             }
             case InputPeerChat.ID: {
                 InputPeerChat d = (InputPeerChat) inputPeer;
@@ -160,7 +188,7 @@ public final class Id implements Comparable<Id> {
             case InputPeerUserFromMessage.ID: {
                 InputPeerUserFromMessage d = (InputPeerUserFromMessage) inputPeer;
 
-                return ofUser(d.userId(), null);
+                return ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
             }
             default: throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
         }
@@ -203,10 +231,23 @@ public final class Id implements Comparable<Id> {
      * @return The access hash of this id, if present and applicable.
      */
     public OptionalLong getAccessHash() {
-        if (accessHash != ACCESS_HASH_UNAVAILABLE) {
-            return OptionalLong.of(accessHash);
+        long accessHash0;
+        if (context instanceof Long && (accessHash0 = (long) context) != ACCESS_HASH_UNAVAILABLE) {
+            return OptionalLong.of(accessHash0);
         }
         return OptionalLong.empty();
+    }
+
+    /**
+     * Gets the min information for id, if present and applicable.
+     *
+     * @return The {@link MinInformation} for id, if present and applicable.
+     */
+    public Optional<MinInformation> getMinInformation() {
+        if (context instanceof MinInformation) {
+            return Optional.of((MinInformation) context);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -255,5 +296,44 @@ public final class Id implements Comparable<Id> {
 
         /** Represents id for {@link Channel} entity. */
         CHANNEL,
+    }
+
+    public static final class MinInformation {
+        private final Id peerId;
+        private final int messageId;
+
+        private MinInformation(Id peerId, int messageId) {
+            this.peerId = Objects.requireNonNull(peerId, "peerId");
+            this.messageId = messageId;
+        }
+
+        public Id getPeerId() {
+            return peerId;
+        }
+
+        public int getMessageId() {
+            return messageId;
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            MinInformation that = (MinInformation) o;
+            return messageId == that.messageId && peerId.equals(that.peerId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(peerId, messageId);
+        }
+
+        @Override
+        public String toString() {
+            return "MinInformation{" +
+                    "peerId=" + peerId +
+                    ", messageId=" + messageId +
+                    '}';
+        }
     }
 }

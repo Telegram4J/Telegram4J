@@ -14,6 +14,7 @@ import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.IdFields;
+import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.PaginationSupport;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -314,6 +315,15 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                 .build()))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
+    }
+
+    @Override
+    public Mono<Void> editPhoto(@Nullable InputChatPhotoSpec spec) {
+        return Mono.justOrEmpty(spec)
+                .map(InputChatPhotoSpec::asData)
+                .defaultIfEmpty(InputChatPhotoEmpty.instance())
+                .flatMap(c -> client.getServiceHolder().getChatService()
+                        .editChatPhoto(minData.id(), c));
     }
 
     @Override

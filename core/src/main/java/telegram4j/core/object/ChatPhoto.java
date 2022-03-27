@@ -37,30 +37,66 @@ public class ChatPhoto implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets serialized {@link FileReferenceId} of <b>small</b> chat photo.
+     *
+     * @return The serialized {@link FileReferenceId} of <b>small</b> chat photo.
+     */
     public String getSmallFileReferenceId() {
         return smallFileReferenceId;
     }
 
+    /**
+     * Gets serialized {@link FileReferenceId} of <b>big</b> chat photo.
+     *
+     * @return The serialized {@link FileReferenceId} of <b>big</b> chat photo.
+     */
     public String getBigFileReferenceId() {
         return bigFileReferenceId;
     }
 
+    /**
+     * Gets whether chat has animated photo.
+     *
+     * @return {@code true} if chat has animated photo.
+     */
     public boolean hasVideo() {
         return data.hasVideo();
     }
 
+    /**
+     * Gets id of chat photo.
+     *
+     * @return The id of chat photo.
+     */
     public long getPhotoId() {
         return data.photoId();
     }
 
+    /**
+     * Gets expanded stripped thumbnail for photo, if present.
+     * Don't forget after use {@link ByteBuf#release() release} buffer.
+     *
+     * @return The expanded stripped thumbnail for photo, if present.
+     */
     public Optional<ByteBuf> getExpandedStrippedThumb() {
         return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
     }
 
+    /**
+     * Gets not-expanded stripped thumbnail for photo, if present.
+     *
+     * @return The not-expanded stripped thumbnail for photo, if present.
+     */
     public Optional<byte[]> getStrippedThumb() {
         return Optional.ofNullable(data.strippedThumb());
     }
 
+    /**
+     * Gets id of DC that can be used for downloading this photo.
+     *
+     * @return The id of DC that can be used for downloading this photo.
+     */
     public int getDcId() {
         return data.dcId();
     }

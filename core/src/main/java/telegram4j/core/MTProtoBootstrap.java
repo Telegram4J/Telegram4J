@@ -323,7 +323,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                             // bot user id writes before ':' char
                                             if (authResources.getType() == Type.BOT && parseBotIdFromToken) {
                                                 return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
-                                                        .map(t -> Long.parseLong(t.split(":")[0]))
+                                                        .map(t -> Long.parseLong(t.split(":", 2)[0]))
                                                         .orElseThrow(), null));
                                             }
                                             return storeLayout.getSelfId()

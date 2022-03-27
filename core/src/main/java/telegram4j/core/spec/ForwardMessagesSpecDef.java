@@ -21,7 +21,7 @@ interface ForwardMessagesSpecDef extends Spec {
     }
 
     @Value.Default
-    default boolean withMyScore() {
+    default boolean myScore() {
         return false;
     }
 

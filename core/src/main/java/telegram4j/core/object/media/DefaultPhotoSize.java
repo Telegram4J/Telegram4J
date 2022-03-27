@@ -25,7 +25,7 @@ public class DefaultPhotoSize implements PhotoSize {
         return data.type();
     }
 
-    public int getWight() {
+    public int getWidth() {
         return data.w();
     }
 

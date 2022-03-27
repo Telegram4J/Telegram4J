@@ -111,7 +111,7 @@ abstract class BaseChat implements Chat {
                                         .collect(Collectors.toList()))
                                 .silent(spec.silent())
                                 .background(spec.background())
-                                .withMyScore(spec.withMyScore())
+                                .withMyScore(spec.myScore())
                                 .dropAuthor(spec.dropAuthor())
                                 .dropMediaCaptions(spec.dropMediaCaptions())
                                 .noforwards(spec.noForwards())

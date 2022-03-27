@@ -401,6 +401,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 log.debug("[C:0x{}] Session updated due server forgot it", id);
 
                                 pingEmitter.dispose();
+                                state.emitNext(State.RECONNECT, FAIL_FAST);
                                 return Mono.empty();
                             }
                         }

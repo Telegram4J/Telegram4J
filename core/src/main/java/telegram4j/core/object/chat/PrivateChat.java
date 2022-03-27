@@ -20,16 +20,6 @@ public final class PrivateChat extends BaseChat {
         this.selfUser = selfUser;
     }
 
-    @Override
-    public Id getId() {
-        return user.getId();
-    }
-
-    @Override
-    public Type getType() {
-        return Type.PRIVATE;
-    }
-
     /**
      * Gets the interlocutor user.
      *
@@ -46,6 +36,16 @@ public final class PrivateChat extends BaseChat {
      */
     public Optional<User> getSelfUser() {
         return Optional.ofNullable(selfUser);
+    }
+
+    @Override
+    public Id getId() {
+        return user.getId();
+    }
+
+    @Override
+    public Type getType() {
+        return Type.PRIVATE;
     }
 
     @Override

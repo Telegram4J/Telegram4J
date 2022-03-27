@@ -141,6 +141,7 @@ public class UploadService extends RpcService {
         });
     }
 
+    // TODO: bot compatible?
     public Flux<WebFile> getWebFile(FileReferenceId location) {
         return Flux.defer(() -> {
                     AtomicInteger offset = new AtomicInteger();

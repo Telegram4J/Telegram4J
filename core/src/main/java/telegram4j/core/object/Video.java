@@ -70,11 +70,11 @@ public class Video extends Document {
     }
 
     /**
-     * Gets video document wight.
+     * Gets video document width.
      *
-     * @return The video document wight.
+     * @return The video document width.
      */
-    public int getWight() {
+    public int getWidth() {
         return videoData.w();
     }
 

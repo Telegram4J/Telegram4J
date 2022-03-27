@@ -277,5 +277,25 @@ public final class KeyboardButton implements TelegramObject {
                 default: throw new IllegalStateException("Unexpected keyboard button type: " + data);
             }
         }
+
+        /**
+         * Gets whether specified type supports only in the {@link ReplyMarkup.Type#INLINE inline} keyboards.
+         *
+         * @return {@code true} if button type is supports in the inline keyboards.
+         */
+        public static boolean isInlineOnly(Type type) {
+            switch (type) {
+                case BUY:
+                case CALLBACK:
+                case GAME:
+                case SWITCH_INLINE:
+                case URL_AUTH:
+                case USER_PROFILE:
+                case URL:
+                    return true;
+                default:
+                    return false;
+            }
+        }
     }
 }

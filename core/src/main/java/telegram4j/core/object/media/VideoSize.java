@@ -42,11 +42,11 @@ public class VideoSize implements TelegramObject {
     }
 
     /**
-     * Gets wight of video.
+     * Gets width of video.
      *
-     * @return The wight of video.
+     * @return The width of video.
      */
-    public int getWight() {
+    public int getWidth() {
         return data.w();
     }
 

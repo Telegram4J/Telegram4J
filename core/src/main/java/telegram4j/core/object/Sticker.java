@@ -28,11 +28,11 @@ public class Sticker extends Document {
     }
 
     /**
-     * Gets wight of sticker.
+     * Gets width of sticker.
      *
-     * @return The wight of sticker.
+     * @return The width of sticker.
      */
-    public int getWeight() {
+    public int getWidth() {
         if (sizeData != null) {
             return sizeData.w();
         }

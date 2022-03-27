@@ -1,7 +1,6 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
@@ -72,34 +71,35 @@ public class ChatService extends RpcService {
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
-    public Mono<Chat> editChatTitle(long chatId, String title) {
+    public Mono<Void> editChatTitle(long chatId, String title) {
         return client.sendAwait(ImmutableEditChatTitle.of(chatId, title))
                 .flatMap(u -> {
-                    switch (u.identifier()) {
-                        case BaseUpdates.ID:
-                            BaseUpdates casted = (BaseUpdates) u;
+                    client.updates().emitNext(u, DEFAULT_PARKING);
 
-                            client.updates().emitNext(u, Sinks.EmitFailureHandler.FAIL_FAST);
-
-                            return Mono.justOrEmpty(casted.chats().stream()
-                                    .filter(c -> c.id() == chatId)
-                                    .findFirst());
-                        default:
-                            return Mono.error(new IllegalArgumentException("Unknown updates type: " + u));
-                    }
+                    return Mono.empty();
                 });
     }
 
-    public Mono<Updates> editChatPhoto(long chatId, InputChatPhoto photo) {
-        return client.sendAwait(ImmutableEditChatPhoto.of(chatId, photo));
+    public Mono<Void> editChatPhoto(long chatId, InputChatPhoto photo) {
+        return client.sendAwait(ImmutableEditChatPhoto.of(chatId, photo))
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.empty();
+                });
     }
 
     public Mono<Updates> addChatUser(long chatId, InputUser user, int forwardLimit) {
         return client.sendAwait(ImmutableAddChatUser.of(chatId, user, forwardLimit));
     }
 
-    public Mono<Updates> deleteChatUser(DeleteChatUser request) {
-        return client.sendAwait(request);
+    public Mono<Void> deleteChatUser(long chatId, InputUser userId, boolean revokeHistory) {
+        return client.sendAwait(DeleteChatUser.builder().revokeHistory(revokeHistory).chatId(chatId).userId(userId).build())
+                .flatMap(u -> {
+                    client.updates().emitNext(u, DEFAULT_PARKING);
+
+                    return Mono.empty();
+                });
     }
 
     public Mono<Updates> createChat(Iterable<? extends InputUser> users, String title) {

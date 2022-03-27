@@ -68,7 +68,7 @@ public final class IdFields {
             DEFAULT,
             REPLY_TO,
             PINNED,
-            CALLBACK_QUERY;
+            CALLBACK_QUERY
         }
     }
 
@@ -138,7 +138,7 @@ public final class IdFields {
             ANIMATED_EMOJI_ANIMATIONS,
             DICE,
             ID,
-            SHORT_NAME,
+            SHORT_NAME
         }
     }
 }

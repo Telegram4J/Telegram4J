@@ -1,5 +1,6 @@
 package telegram4j.core;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -7,10 +8,9 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
-import telegram4j.core.object.Id;
-import telegram4j.core.object.PeerEntity;
-import telegram4j.core.object.PeerId;
+import telegram4j.core.object.Document;
 import telegram4j.core.object.User;
+import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.IdFields;
@@ -136,6 +136,24 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     // Interaction methods
     // ==========================
 
+    /**
+     * Request to upload file to Telegram Media DC.
+     *
+     * @param data The {@link ByteBuf} with file data.
+     * @param filename The name for file.
+     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and CRC32.
+     */
+    public Mono<InputFile> saveFile(ByteBuf data, String filename) {
+        return serviceHolder.getUploadService().saveFile(data, filename);
+    }
+
+    /**
+     * Request to download file by their reference from Telegram Media DC or
+     * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
+     *
+     * @param fileReferenceId The serialized {@link FileReferenceId} of file.
+     * @return A {@link Flux} emitting full or parts of downloading file.
+     */
     public Flux<FilePart> getFile(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
                 .flatMapMany(loc -> {
@@ -166,10 +184,24 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .flux();
     }
 
+    /**
+     * Request to delete messages in DM or group chat.
+     *
+     * @param revoke Whether to delete messages for all participants of the chat.
+     * @param ids An {@link Iterable} of message ids.
+     * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>common</b> events.
+     */
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
         return serviceHolder.getMessageService().deleteMessages(revoke, ids);
     }
 
+    /**
+     * Request to delete messages in channel.
+     *
+     * @param channelId The id of channel where need to delete messages.
+     * @param ids An {@link Iterable} of message ids.
+     * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>channel</b> events.
+     */
     public Mono<AffectedMessages> deleteChannelMessages(Id channelId, Iterable<Integer> ids) {
         if (channelId.getType() != Id.Type.CHANNEL) {
             return Mono.error(new IllegalArgumentException("Channel id type must be CHANNEL"));
@@ -186,6 +218,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         .flatMap(p -> serviceHolder.getMessageService()
                 .deleteMessages(p, ids));
     }
+
+    // Utility methods
+    // ==========================
 
     /**
      * Converts specified {@link Id} into the low-leveled {@link InputPeer} object and
@@ -214,6 +249,17 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         if (channelId.getType() != Id.Type.CHANNEL) {
             return Mono.error(new IllegalArgumentException("Specified id must be channel-typed: " + channelId));
         }
+
+        var min = channelId.getMinInformation().orElse(null);
+        if (min != null) {
+            if (isBot()) {
+                return Mono.error(new IllegalArgumentException("Min ids can be used for bots"));
+            }
+
+            return asInputPeer(min.getPeerId())
+                    .map(p -> ImmutableInputChannelFromMessage.of(p, min.getMessageId(), channelId.asLong()));
+        }
+
         if (channelId.getAccessHash().isEmpty()) {
             return mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong());
         }
@@ -231,6 +277,21 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         if (userId.getType() != Id.Type.USER) {
             return Mono.error(new IllegalArgumentException("Specified id must be user-typed: " + userId));
         }
+
+        if (userId.equals(getSelfId())) { // Possible optimisation
+            return Mono.just(InputUserSelf.instance());
+        }
+
+        var min = userId.getMinInformation().orElse(null);
+        if (min != null) {
+            if (isBot()) {
+                return Mono.error(new IllegalArgumentException("Min ids can be used for bots"));
+            }
+
+            return asInputPeer(min.getPeerId())
+                    .map(p -> ImmutableInputUserFromMessage.of(p, min.getMessageId(), userId.asLong()));
+        }
+
         if (userId.getAccessHash().isEmpty()) {
             return mtProtoResources.getStoreLayout().resolveUser(userId.asLong());
         }
@@ -247,14 +308,40 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public InputPeer asResolvedInputPeer(Id peerId) {
         switch (peerId.getType()) {
-            case USER:
+            case USER: {
                 if (getSelfId().equals(peerId)) {
                     return InputPeerSelf.instance();
                 }
 
-                return ImmutableInputPeerUser.of(peerId.asLong(), peerId.getAccessHash().orElseThrow());
+                var min = peerId.getMinInformation().orElse(null);
+                if (min != null) {
+                    if (isBot()) {
+                        throw new IllegalArgumentException("Min ids can be used for bots");
+                    }
+
+                    InputPeer p = asResolvedInputPeer(min.getPeerId());
+                    return ImmutableInputPeerUserFromMessage.of(p, min.getMessageId(), peerId.asLong());
+                }
+
+                return ImmutableInputPeerUser.of(peerId.asLong(), peerId.getAccessHash()
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present")));
+            }
             case CHAT: return ImmutableInputPeerChat.of(peerId.asLong());
-            case CHANNEL: return ImmutableInputPeerChannel.of(peerId.asLong(), peerId.getAccessHash().orElseThrow());
+            case CHANNEL: {
+
+                var min = peerId.getMinInformation().orElse(null);
+                if (min != null) {
+                    if (isBot()) {
+                        throw new IllegalArgumentException("Min ids can be used for bots");
+                    }
+
+                    InputPeer p = asResolvedInputPeer(min.getPeerId());
+                    return ImmutableInputPeerChannelFromMessage.of(p, min.getMessageId(), peerId.asLong());
+                }
+
+                return ImmutableInputPeerChannel.of(peerId.asLong(), peerId.getAccessHash()
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present")));
+            }
             default: throw new IllegalStateException();
         }
     }

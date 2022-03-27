@@ -55,7 +55,7 @@ public class Document implements TelegramObject {
     /**
      * Gets url of web file, if present.
      *
-     * @return The url of the web file.
+     * @return The url of the web file, if present.
      */
     public Optional<String> getUrl() {
         return data instanceof WebDocument
