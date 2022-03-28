@@ -61,8 +61,6 @@ public class UpdatesManager {
     }
 
     public Mono<Void> start() {
-        stateInterval.start(DEFAULT_CHECKIN, DEFAULT_CHECKIN);
-
         Mono<Void> checkinInterval = stateInterval.ticks()
                 .flatMap(t -> fillGap())
                 .then();
@@ -283,12 +281,7 @@ public class UpdatesManager {
             return Flux.empty();
         }
 
-        if (this.pts == pts && this.qts == qts && this.date == date) { // empty diff
-            return Flux.empty();
-        }
-
-        // It often turns out that getDifference() returns the updates already received,
-        // but for some unknown reason sets them on a different date, which is longer by DEFAULT_CHECKIN interval
+        // It often turns out that getDifference() returns the updates already received.
         if (client.isBot()) {
             date += DEFAULT_CHECKIN.getSeconds();
         }
@@ -620,12 +613,16 @@ public class UpdatesManager {
                     }
                     break;
                 }
+                case UpdateChannelWebPage.ID: {
+                    UpdateChannelWebPage u = (UpdateChannelWebPage) ptsUpdate;
 
-                // TODO: not all handling
+                    channelId = u.channelId();
+                    break;
+                }
             }
 
             Flux<Event> preApply = Flux.empty();
-            if (channelId == -1) {
+            if (channelId == -1) { // common pts
                 if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
@@ -640,6 +637,7 @@ public class UpdatesManager {
                 return preApply.concatWith(mapUpdate);
             }
 
+            // channel pts
             long id = channelId;
 
             // If -1, just apply update
@@ -652,9 +650,8 @@ public class UpdatesManager {
                     .map(ChatFull::fullChat)
                     .cast(ChannelFull.class)
                     .map(ChannelFull::pts)
-                    .defaultIfEmpty(-1)
                     .flatMapMany(pts -> {
-                        if (pts != -1 && pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
+                        if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                             log.debug("Updates gap found for channel {}. Received pts: {}-{}, local pts: {}",
                                     id, ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
 
@@ -663,11 +660,12 @@ public class UpdatesManager {
                                     .resolveChannel(id)
                                     .flatMapMany(c -> getChannelDifference(c, pts))
                                     .concatWith(mapUpdate);
-                        } else if (pts != -1 && pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
+                        } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                             return Flux.empty();
                         }
                         return mapUpdate;
-                    });
+                    })
+                    .switchIfEmpty(mapUpdate);
         }
 
         if (ctx.getUpdate() instanceof QtsUpdate) {
