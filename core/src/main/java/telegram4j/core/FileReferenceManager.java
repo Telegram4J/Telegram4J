@@ -23,6 +23,8 @@ public class FileReferenceManager {
      * Refresh {@link FileReferenceId} file reference and access hash from specified context.
      * Low-quality chat photos (Files with type {@link FileReferenceId.Type#CHAT_PHOTO}) photos will be refreshed as normal photos.
      *
+     * @apiNote File ref ids with type {@link FileReferenceId.Type#STICKER_SET_THUMB} don't require refreshing.
+     *
      * @param fileReferenceId The serialized {@link FileReferenceId}.
      * @return A {@link Mono} that emitting on successful completion refreshed {@link FileReferenceId}.
      */

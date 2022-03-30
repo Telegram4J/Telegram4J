@@ -61,6 +61,10 @@ class ChatUpdateHandlers {
     static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
         UpdateChatParticipantAdd upd = context.getUpdate();
 
+        if (!context.getChats().containsKey(upd.chatId())) {
+            return Flux.empty();
+        }
+
         GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
                 .orElseThrow();
@@ -79,6 +83,10 @@ class ChatUpdateHandlers {
     static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
         UpdateChatParticipantAdmin upd = context.getUpdate();
 
+        if (!context.getChats().containsKey(upd.chatId())) {
+            return Flux.empty();
+        }
+
         GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
                 .orElseThrow();
@@ -93,6 +101,10 @@ class ChatUpdateHandlers {
     static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
         UpdateChatParticipantDelete upd = context.getUpdate();
 
+        if (!context.getChats().containsKey(upd.chatId())) {
+            return Flux.empty();
+        }
+
         GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                 .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
                 .orElseThrow();
@@ -105,6 +117,10 @@ class ChatUpdateHandlers {
 
     static Flux<ChatParticipantUpdateEvent> handleUpdateChatParticipant(StatefulUpdateContext<UpdateChatParticipant, Void> context) {
         UpdateChatParticipant upd = context.getUpdate();
+
+        if (!context.getChats().containsKey(upd.chatId())) {
+            return Flux.empty();
+        }
 
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())

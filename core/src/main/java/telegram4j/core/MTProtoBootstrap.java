@@ -32,6 +32,7 @@ import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.mtproto.transport.IntermediateTransport;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.EmissionHandlers;
+import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.request.InitConnection;
@@ -81,6 +82,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         this.authResources = authResources;
     }
 
+    /**
+     * Creates new {@code MTProtoBootstrap} with new option modifier step.
+     *
+     * @param optionsModifier A new option mapper for composing.
+     * @return This new builder with new option modifier.
+     */
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
         return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authResources);
     }
@@ -177,6 +184,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    /**
+     * Sets updates mapper for event handling in the {@link UpdatesManager}.
+     * <p>
+     * If custom updates mapper doesn't set, {@link DefaultUpdatesMapper} will be used.
+     *
+     * @param updatesMapper A new {@link UpdatesMapper} for {@link UpdatesManager}.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setUpdatesMapper(UpdatesMapper updatesMapper) {
         this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
         return this;
@@ -197,23 +212,50 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    /**
+     * Sets packet size predicate by which packets would be compressed with gzip.
+     * <p>
+     * If custom packet size predicate doesn't set, predicate with <b>16KB</b> package's size will be used.
+     *
+     * @param gzipPackingPredicate A new predicate for applying gzip to packets.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setGzipPackingPredicate(IntPredicate gzipPackingPredicate) {
         this.gzipPackingPredicate = Objects.requireNonNull(gzipPackingPredicate, "gzipPackingPredicate");
         return this;
     }
 
+    /**
+     * Sets default global {@link EntityParserFactory} for text parsing, by default is {@code null}.
+     *
+     * @param defaultEntityParserFactory A new default {@link EntityParserFactory} for text parsing.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setDefaultEntityParserFactory(EntityParserFactory defaultEntityParserFactory) {
         this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory, "defaultEntityParserFactory");
         return this;
     }
 
+    /**
+     * Adds new {@link ResponseTransformer} to transformation list.
+     *
+     * @param responseTransformer The new {@link ResponseTransformer} to add.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> addResponseTransformer(ResponseTransformer responseTransformer) {
         Objects.requireNonNull(responseTransformer, "responseTransformer");
         responseTransformers.add(responseTransformer);
         return this;
     }
 
-
+    /**
+     * Sets {@link HttpClient} client for direct file downloading.
+     * <p>
+     * If custom http client doesn't set, pooled with ssl and compression will be used.
+     *
+     * @param httpClient A new {@link HttpClient} for direct file downloading.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setHttpClient(HttpClient httpClient) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         return this;
@@ -326,13 +368,15 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                         .map(t -> Long.parseLong(t.split(":", 2)[0]))
                                                         .orElseThrow(), null));
                                             }
-                                            return storeLayout.getSelfId()
-                                                    .filter(l -> l != -1)
-                                                    .map(l -> Id.ofUser(l, null));
+                                            return storeLayout.getSelfId().map(l -> Id.ofUser(l, null));
                                         })
                                         .switchIfEmpty(serviceHolder.getUserService()
                                                 .getFullUser(InputUserSelf.instance())
-                                                .map(user -> Id.ofUser(user.fullUser().id(), null)))
+                                                .map(user -> {
+                                                    var self = (BaseUser) user.users().get(0);
+                                                    long ac = Objects.requireNonNull(self.accessHash());
+                                                    return Id.ofUser(user.fullUser().id(), ac);
+                                                }))
                                         .doOnNext(id -> selfId.compareAndSet(null, id))
                                         .then();
 
@@ -456,6 +500,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (httpClient != null) {
             return httpClient;
         }
-        return HttpClient.create().followRedirect(true);
+        return HttpClient.create().compress(true).followRedirect(true).secure();
     }
 }

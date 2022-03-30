@@ -1,4 +1,4 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.util;
 
 import reactor.core.Disposable;
 import reactor.core.Disposables;

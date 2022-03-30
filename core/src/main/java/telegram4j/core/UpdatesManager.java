@@ -19,7 +19,7 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.mtproto.ResettableInterval;
+import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.ChatFull;

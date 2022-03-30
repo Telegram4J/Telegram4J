@@ -685,8 +685,7 @@ public class MessageService extends RpcService {
 
     public Mono<Void> setHistoryTtl(InputPeer peer, int period) {
         return client.sendAwait(ImmutableSetHistoryTTL.of(peer, period))
-                // Typically, UpdatePeerHistoryTTL,UpdateNewMessage(service message)
-                .cast(BaseUpdates.class)
+                // Typically: UpdatePeerHistoryTTL, UpdateNewMessage(service message)
                 .flatMap(u -> Mono.fromRunnable(() -> client.updates().emitNext(u, DEFAULT_PARKING)));
     }
 

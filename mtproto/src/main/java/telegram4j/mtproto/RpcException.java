@@ -6,6 +6,7 @@ import telegram4j.tl.mtproto.RpcError;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
+/** Subtype of {@link MTProtoException} which receives on RPC response. */
 public class RpcException extends MTProtoException {
     private static final long serialVersionUID = -4159674899075462143L;
 
@@ -16,6 +17,14 @@ public class RpcException extends MTProtoException {
         this.error = error;
     }
 
+    /**
+     * Create {@link Predicate} for throwable which matches on
+     * {@code RpcException} with one of specified error codes.
+     *
+     * @param codes The array of rpc method errors codes
+     * @return A {@link Predicate} for throwable which matches
+     * on {@code RpcException} with one of specified error codes.
+     */
     public static Predicate<Throwable> isErrorCode(int... codes) {
         return t -> {
             if (t instanceof RpcException) {
@@ -47,6 +56,11 @@ public class RpcException extends MTProtoException {
         return new RpcException(format, error);
     }
 
+    /**
+     * Gets original {@link RpcError} received as method response.
+     *
+     * @return The original {@link RpcError}.
+     */
     public RpcError getError() {
         return error;
     }

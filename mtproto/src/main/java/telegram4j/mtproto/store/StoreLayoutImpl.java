@@ -50,7 +50,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Long> getSelfId() {
-        return Mono.justOrEmpty(selfId);
+        return Mono.justOrEmpty(selfId).filter(l -> l != -1);
     }
 
     @Override

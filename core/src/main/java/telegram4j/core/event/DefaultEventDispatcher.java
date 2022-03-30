@@ -28,10 +28,12 @@ public class DefaultEventDispatcher implements EventDispatcher {
         return sink.asFlux()
                 .publishOn(eventScheduler)
                 .ofType(type)
-                .doOnNext(e -> {
+                .handle((e, sink) -> {
                     if (log.isTraceEnabled()) {
                         log.trace(e.toString());
                     }
+
+                    sink.next(e);
                 });
     }
 

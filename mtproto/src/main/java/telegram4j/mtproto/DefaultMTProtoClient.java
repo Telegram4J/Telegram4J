@@ -28,6 +28,7 @@ import telegram4j.mtproto.auth.AuthorizationHandler;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
+import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.TlSerializer;
@@ -64,7 +65,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
-    private static final int maxMissedPong = 3;
+    private static final int maxMissedPong = 1;
     private static final Throwable RETRY = new RetryConnectException();
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
     private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(30);
@@ -307,7 +308,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .filter(e -> isContentRelated(e.method))
                     .delayUntil(e -> onConnect);
 
-            // Perhaps it's better to wrap it in a message container via .buffer(Duration), but there are difficulties with packaging
+            // Perhaps it's better to wrap it in a message container via .buffer(Duration),
+            // but there are difficulties with packaging
             Flux<PendingRequest> rpcFlux = outbound.asFlux()
                     .filter(e -> !isContentRelated(e.method));
 
@@ -400,8 +402,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                                 log.debug("[C:0x{}] Session updated due server forgot it", id);
 
-                                pingEmitter.dispose();
-                                state.emitNext(State.RECONNECT, FAIL_FAST);
+                                state.emitNext(State.DISCONNECTED, FAIL_FAST);
                                 return Mono.empty();
                             }
                         }
@@ -500,14 +501,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     private Retry serverErrorRetry() {
-        return Retry.withThrowable(reactor.retry.Retry.onlyIf(e -> RpcException.isErrorCode(500).test(e.exception()))
-                .exponentialBackoffWithJitter(Duration.ofSeconds(2), Duration.ofSeconds(15))
-                .doOnRetry(ctx -> {
+        return Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(2))
+                .maxBackoff(Duration.ofSeconds(15))
+                .filter(RpcException.isErrorCode(500))
+                .doAfterRetry(signal -> {
                     if (log.isDebugEnabled()) {
                         log.debug("[C:0x{}] Retrying request due to {} auth key for {} (attempts: {})",
-                                id, ctx.exception().toString(), ctx.backoff(), ctx.iteration());
+                                id, signal.failure().toString(), signal.totalRetriesInARow());
                     }
-                }));
+                });
     }
 
     @Override
