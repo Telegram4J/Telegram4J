@@ -4,7 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.Id;
-import telegram4j.core.spec.IdFields;
+import telegram4j.tl.ImmutableInputMessageID;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -65,7 +65,7 @@ public class UpdatePinnedMessagesEvent extends MessageEvent {
     public Mono<AuxiliaryMessages> getMessages() {
         return Mono.defer(() -> {
             var ids = messageIds.stream()
-                    .map(IdFields.MessageId::of)
+                    .map(ImmutableInputMessageID::of)
                     .collect(Collectors.toList());
 
             if (chatId.getType() != Id.Type.CHANNEL) {

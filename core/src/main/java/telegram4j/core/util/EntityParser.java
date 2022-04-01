@@ -19,8 +19,8 @@ public interface EntityParser {
     /**
      * Gets the text cleared from markup.
      *
-     * @return The text cleared from markup.
      * @throws IllegalStateException if the analysis is not finished yet
+     * @return The text cleared from markup.
      */
     String striped();
 

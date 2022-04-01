@@ -13,7 +13,6 @@ import telegram4j.core.object.Photo;
 import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
-import telegram4j.core.spec.IdFields;
 import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.PaginationSupport;
@@ -335,11 +334,11 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Boolean> setStickers(IdFields.StickerSetId stickerSetId) {
+    public Mono<Boolean> setStickers(InputStickerSet stickerSetId) {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.getServiceHolder().getChatService()
-                .setStickers(channel, stickerSetId.asInputStickerSet());
+                .setStickers(channel, stickerSetId);
     }
 
     @Override

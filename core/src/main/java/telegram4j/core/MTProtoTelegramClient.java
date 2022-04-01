@@ -13,7 +13,6 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
-import telegram4j.core.spec.IdFields;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FilePart;
@@ -185,7 +184,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     /**
-     * Request to delete messages in DM or group chat.
+     * Request to delete messages in DM or group chats.
      *
      * @param revoke Whether to delete messages for all participants of the chat.
      * @param ids An {@link Iterable} of message ids.
@@ -207,16 +206,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             return Mono.error(new IllegalArgumentException("Channel id type must be CHANNEL"));
         }
 
-        return Mono.defer(() -> {
-            if (channelId.getAccessHash().isEmpty()) {
-                return mtProtoResources.getStoreLayout()
-                        .resolveChannel(channelId.asLong());
-            }
-            return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(),
-                    channelId.getAccessHash().orElseThrow()));
-        })
-        .flatMap(p -> serviceHolder.getMessageService()
-                .deleteMessages(p, ids));
+        return asInputChannel(channelId)
+                .flatMap(p -> serviceHolder.getMessageService()
+                        .deleteMessages(p, ids));
     }
 
     // Utility methods
@@ -375,12 +367,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends IdFields.MessageId> messageIds) {
+    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
         return entityRetriever.getMessagesById(messageIds);
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds) {
+    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
         return entityRetriever.getMessagesById(channelId, messageIds);
     }
 }

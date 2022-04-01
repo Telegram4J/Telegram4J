@@ -1,6 +1,9 @@
 package telegram4j.core.util;
 
+import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
+import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.ExportedChatInvite;
@@ -57,6 +60,8 @@ import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
+import telegram4j.core.spec.inline.*;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChat;
 import telegram4j.tl.*;
@@ -425,5 +430,226 @@ public final class EntityFactory {
             case PeerUser.ID: return createUser(client, p.users().get(0));
             default: throw new IllegalArgumentException("Unknown peer type: " + p.peer());
         }
+    }
+
+    public static Mono<InputBotInlineResult> createInlineResult(MTProtoTelegramClient client, InlineResultSpec spec) {
+        Mono<InputBotInlineMessage> sendMessage = createInlineMessage(client, spec.message());
+
+        if (spec instanceof InlineResultArticleSpec) {
+            InlineResultArticleSpec r = (InlineResultArticleSpec) spec;
+
+            var builder = BaseInputBotInlineResult.builder()
+                    .type("article")
+                    .title(r.title())
+                    .description(r.description())
+                    .id(r.id())
+                    .url(r.url());
+
+            var contentBuilder = InputWebDocument.builder()
+                    .url(r.url())
+                    .size(0)
+                    .mimeType("text/html");
+
+            Optional.ofNullable(getFilenameFromUrl(r.url())).ifPresent(s -> contentBuilder.addAttribute(
+                    ImmutableDocumentAttributeFilename.of(s)));
+
+            builder.content(contentBuilder.build());
+            builder.thumb(createThumbnail(r.thumb()));
+
+            return sendMessage.map(builder::sendMessage)
+                    .map(ImmutableBaseInputBotInlineResult.Builder::build);
+        } else if (spec instanceof InlineResultPhotoSpec) {
+            InlineResultPhotoSpec r = (InlineResultPhotoSpec) spec;
+
+            try {
+                InputPhoto photo = FileReferenceId.deserialize(r.photo()).asInputPhoto();
+
+                var builder = InputBotInlineResultPhoto.builder()
+                        .type("photo")
+                        .photo(photo)
+                        .id(r.id());
+
+                return sendMessage.map(builder::sendMessage)
+                        .map(ImmutableInputBotInlineResultPhoto.Builder::build);
+            } catch (IllegalArgumentException e) { // may be just an url
+                String url = r.photo();
+
+                var builder = BaseInputBotInlineResult.builder()
+                        .type("photo")
+                        .title(r.title().orElse(null))
+                        .description(r.description().orElse(null))
+                        .id(r.id())
+                        .url(url);
+
+                var contentBuilder = InputWebDocument.builder()
+                        .url(url)
+                        .size(0)
+                        .mimeType("image/jpeg");
+
+                Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
+                        ImmutableDocumentAttributeFilename.of(s)));
+
+                r.photoSize().ifPresent(s -> contentBuilder.addAttribute(
+                        ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
+
+                builder.content(contentBuilder.build());
+                r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
+
+                return sendMessage.map(builder::sendMessage)
+                        .map(ImmutableBaseInputBotInlineResult.Builder::build);
+            }
+        } else if (spec instanceof InlineResultFileSpec) {
+            InlineResultFileSpec r = (InlineResultFileSpec) spec;
+
+            try {
+                InputDocument document = FileReferenceId.deserialize(r.file()).asInputDocument();
+
+                var builder = InputBotInlineResultDocument.builder()
+                        .type("file")
+                        .title(r.title().orElse(null))
+                        .description(r.description().orElse(null))
+                        .document(document)
+                        .id(r.id());
+
+                return sendMessage.map(builder::sendMessage)
+                        .map(ImmutableInputBotInlineResultDocument.Builder::build);
+            } catch (IllegalArgumentException e) { // may be just an url
+                String url = r.file();
+
+                var builder = BaseInputBotInlineResult.builder()
+                        .type("file")
+                        .title(r.title().orElse(null))
+                        .description(r.description().orElse(null))
+                        .id(r.id())
+                        .url(url);
+
+                var contentBuilder = InputWebDocument.builder()
+                        .url(url)
+                        .size(0)
+                        .mimeType(r.mimeType().orElseThrow(() -> new IllegalArgumentException(
+                                "Mime type must be included with urls.")));
+
+                Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
+                        ImmutableDocumentAttributeFilename.of(s)));
+
+                builder.content(contentBuilder.build());
+                builder.thumb(createThumbnail(r.thumb()));
+
+                return sendMessage.map(builder::sendMessage)
+                        .map(ImmutableBaseInputBotInlineResult.Builder::build);
+            }
+        } else if (spec instanceof InlineResultGameSpec) {
+            InlineResultGameSpec r = (InlineResultGameSpec) spec;
+
+            var builder = InputBotInlineResultGame.builder()
+                    .id(r.id())
+                    .shortName(r.shortName());
+
+            return sendMessage.map(builder::sendMessage)
+                    .map(ImmutableInputBotInlineResultGame.Builder::build);
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    // Internal utility methods
+    // ===========================
+
+    private static InputWebDocument createThumbnail(WebDocumentSpec spec) {
+
+        var thumbBuilder = InputWebDocument.builder()
+                .mimeType("image/jpeg")
+                .size(0)
+                .url(spec.url());
+
+        spec.imageSize().ifPresent(s -> thumbBuilder.addAttribute(
+                ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
+
+        Optional.ofNullable(getFilenameFromUrl(spec.url())).ifPresent(s -> thumbBuilder.addAttribute(
+                ImmutableDocumentAttributeFilename.of(s)));
+
+        return thumbBuilder.build();
+    }
+
+    private static Mono<InputBotInlineMessage> createInlineMessage(MTProtoTelegramClient client, InlineMessageSpec message) {
+        var replyMarkup = Mono.justOrEmpty(message.replyMarkup())
+                .flatMap(s -> s.asData(client));
+
+        if (message instanceof InlineMessageTextSpec) {
+            InlineMessageTextSpec m = (InlineMessageTextSpec) message;
+
+            String c = m.message().trim();
+            var parser = m.parser()
+                    .or(() -> client.getMtProtoResources().getDefaultEntityParser())
+                    .map(t -> EntityParserSupport.parse(client, t.apply(c)))
+                    .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
+
+            return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageText.builder()
+                            .message(txt)
+                            .entities(ent)
+                            .noWebpage(m.noWebpage())))
+                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .then(Mono.fromSupplier(builder::build)));
+        } else if (message instanceof InlineMessageMediaGameSpec) {
+            return Mono.just(InputBotInlineMessageGame.instance())
+                    .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
+                            .defaultIfEmpty(r));
+
+        } else if (message instanceof InlineMessageMediaAutoSpec) {
+            InlineMessageMediaAutoSpec m = (InlineMessageMediaAutoSpec) message;
+
+            String c = m.message().trim();
+            var parser = m.parser()
+                    .or(() -> client.getMtProtoResources().getDefaultEntityParser())
+                    .map(t -> EntityParserSupport.parse(client, t.apply(c)))
+                    .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
+
+            return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageMediaAuto.builder()
+                            .message(txt)
+                            .entities(ent)))
+                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .then(Mono.fromSupplier(builder::build)));
+            // } else if (message instanceof InlineMessageMediaContactSpec) {
+            //     InlineMessageMediaContactSpec m = (InlineMessageMediaContactSpec) message;
+
+            // } else if (message instanceof InlineMessageMediaGeoSpec) {
+            //     InlineMessageMediaGeoSpec m = (InlineMessageMediaGeoSpec) message;
+
+            // } else if (message instanceof InlineMessageMediaInvoiceSpec) {
+            //     InlineMessageMediaInvoiceSpec m = (InlineMessageMediaInvoiceSpec) message;
+
+        } else if (message instanceof InlineMessageMediaVenueSpec) {
+            InlineMessageMediaVenueSpec m = (InlineMessageMediaVenueSpec) message;
+
+            return Mono.just(InputBotInlineMessageMediaVenue.builder()
+                            .geoPoint(BaseInputGeoPoint.builder()
+                                    .lat(m.latitide())
+                                    .longState(m.longtitude())
+                                    .accuracyRadius(m.accuracyRadius().orElse(null))
+                                    .build())
+                            .title(m.title())
+                            .provider(m.provider())
+                            .venueType(m.venueType())
+                            .venueId(m.venueId())
+                            .address(m.address()))
+                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .then(Mono.fromSupplier(builder::build)));
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    @Nullable
+    private static String getFilenameFromUrl(String url) {
+        int begin = url.lastIndexOf('/') + 1;
+        url = url.substring(begin);
+
+        int end = Math.min(url.indexOf('?'), url.indexOf('#'));
+        if (end == -1) {
+            end = url.length();
+        }
+
+        String res = url.substring(0, end);
+        return res.isEmpty() ? null : res;
     }
 }

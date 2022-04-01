@@ -26,10 +26,12 @@ import java.util.Optional;
  */
 public class FileReferenceId {
 
+    static final char PREFIX = 'x';
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
     static final int MESSAGE_ID_MASK = 1 << 0;
     static final int PEER_MASK = 1 << 1;
     static final int ACCESS_HASH_MASK = 1 << 2;
+    static final int THUMB_SIZE_TYPE_MASK = 1 << 3;
 
     private final Type fileType;
     private final PhotoSizeType sizeType;
@@ -221,11 +223,18 @@ public class FileReferenceId {
      * Deserializes reference to {@code FileReferenceId}
      * with decoded information about file.
      *
+     * @throws IllegalArgumentException If it's not a file ref id.
      * @param str The base 64 url string.
      * @return The deserialized {@code FileReferenceId} with decoded information.
      */
     public static FileReferenceId deserialize(String str) {
+        if (str.length() < 1 || str.charAt(0) != PREFIX) {
+            throw new IllegalArgumentException("Incorrect file reference id format: '" + str + "'");
+        }
+
         ByteBuf data = Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
+        data.skipBytes(1); // PREFIX
+
         ByteBuf buf = Base64.decode(data, Base64Dialect.URL_SAFE);
         data.release();
         buf = decodeZeroRle(buf);
@@ -268,7 +277,9 @@ public class FileReferenceId {
                 accessHash = buf.readLongLE();
 
                 fileReference = TlSerialUtil.deserializeBytes(buf);
-                thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
+                if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                    thumbSizeType = Character.valueOf((char) buf.readByte()).toString();
+                }
 
                 break;
             case CHAT_PHOTO:
@@ -279,7 +290,9 @@ public class FileReferenceId {
                 if (sizeType == PhotoSizeType.UNKNOWN) {
                     accessHash = buf.readLongLE();
                     fileReference = TlSerialUtil.deserializeBytes(buf);
-                    thumbSizeType = Character.valueOf((char) buf.readUnsignedShortLE()).toString();
+                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                        thumbSizeType = Character.valueOf((char) buf.readByte()).toString();
+                    }
                 }
 
                 break;
@@ -364,6 +377,11 @@ public class FileReferenceId {
         if (fileType == Type.WEB_DOCUMENT && accessHash != -1) {
             flags |= ACCESS_HASH_MASK;
         }
+        if ((fileType == Type.DOCUMENT || fileType == Type.PHOTO ||
+                fileType == Type.CHAT_PHOTO && sizeType == PhotoSizeType.UNKNOWN)
+                && !thumbSizeType.isEmpty()) {
+            flags |= THUMB_SIZE_TYPE_MASK;
+        }
 
         buf.writeByte(flags);
         if (messageId != -1) {
@@ -396,7 +414,9 @@ public class FileReferenceId {
 
                 buf.writeBytes(fileReferenceBuf);
                 fileReferenceBuf.release();
-                buf.writeShortLE(thumbSizeType.charAt(0));
+                if (!thumbSizeType.isEmpty()) {
+                    buf.writeByte(thumbSizeType.charAt(0));
+                }
 
                 break;
             }
@@ -411,7 +431,10 @@ public class FileReferenceId {
                     buf.writeLongLE(accessHash);
                     buf.writeBytes(fileReferenceBuf);
                     fileReferenceBuf.release();
-                    buf.writeShortLE(thumbSizeType.charAt(0));
+
+                    if (!thumbSizeType.isEmpty()) {
+                        buf.writeByte(thumbSizeType.charAt(0));
+                    }
                 }
 
                 break;
@@ -430,7 +453,7 @@ public class FileReferenceId {
         ByteBuf base64 = Base64.encode(buf, Base64Dialect.URL_SAFE);
         buf.release();
         try {
-            return base64.toString(StandardCharsets.UTF_8);
+            return PREFIX + base64.toString(StandardCharsets.UTF_8);
         } finally {
             base64.release();
         }

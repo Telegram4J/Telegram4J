@@ -7,7 +7,7 @@ import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
-import telegram4j.core.spec.IdFields;
+import telegram4j.tl.InputMessage;
 
 /** Interface to accessing telegram entities. */
 public interface EntityRetriever {
@@ -62,7 +62,7 @@ public interface EntityRetriever {
 
     /**
      * Retrieve messages from user/group chats with auxiliary data by the specified message ids.
-     * Ids with {@link IdFields.MessageId#type()} {@code == IdFields.MessageId.Type.PINNED} will be ignored.
+     * Ids with {@link telegram4j.tl.InputMessagePinned pinned type} will be ignored.
      *
      * @implSpec Auxiliary data must contain chat and author if available.
      *
@@ -70,7 +70,7 @@ public interface EntityRetriever {
      * @return A {@link Mono} emitting on successful completion
      * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
      */
-    Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends IdFields.MessageId> messageIds);
+    Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds);
 
     /**
      * Retrieve messages from channel with auxiliary data by the specified channel id and message ids.
@@ -82,5 +82,5 @@ public interface EntityRetriever {
      * @return A {@link Mono} emitting on successful completion
      * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
      */
-    Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds);
+    Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds);
 }

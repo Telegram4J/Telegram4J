@@ -8,18 +8,16 @@ import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
-import telegram4j.core.spec.IdFields;
 import telegram4j.core.util.AuxiliaryEntityFactory;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseUser;
+import telegram4j.tl.InputMessage;
 import telegram4j.tl.messages.MessagesNotModified;
 
 import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Default implementation of {@code EntityRetriever}, which
@@ -123,40 +121,28 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends IdFields.MessageId> messageIds) {
-        return Mono.defer(() -> {
-            var ids = StreamSupport.stream(messageIds.spliterator(), false)
-                    .map(IdFields.MessageId::asInputMessage)
-                    .collect(Collectors.toList());
-
-            return storeLayout.getMessages(ids)
-                    .switchIfEmpty(client.getServiceHolder()
-                            .getMessageService()
-                            .getMessages(ids))
-                    .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
-                    .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
-        });
+    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
+        return storeLayout.getMessages(messageIds)
+                .switchIfEmpty(client.getServiceHolder()
+                        .getMessageService()
+                        .getMessages(messageIds))
+                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+                .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends IdFields.MessageId> messageIds) {
+    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
         if (channelId.getType() != Id.Type.CHANNEL) {
             return Mono.error(new IllegalArgumentException("Incorrect id type, expected: "
                     + Id.Type.CHANNEL + ", but given: " + channelId.getType()));
         }
 
-        return Mono.defer(() -> {
-            var ids = StreamSupport.stream(messageIds.spliterator(), false)
-                    .map(IdFields.MessageId::asInputMessage)
-                    .collect(Collectors.toList());
-
-            return storeLayout.getMessages(channelId.asLong(), ids)
-                    .switchIfEmpty(client.asInputChannel(channelId)
-                            .flatMap(c -> client.getServiceHolder()
-                                    .getMessageService()
-                                    .getMessages(c, ids)))
-                    .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
-                    .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
-        });
+        return storeLayout.getMessages(channelId.asLong(), messageIds)
+                .switchIfEmpty(client.asInputChannel(channelId)
+                        .flatMap(c -> client.getServiceHolder()
+                                .getMessageService()
+                                .getMessages(c, messageIds)))
+                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+                .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 }

@@ -50,6 +50,11 @@ public final class DefaultUpdatesMapper implements UpdatesMapper {
         // channel updates
         addHandler(UpdateChannelParticipant.class, ChannelUpdateHandlers::handleStateUpdateChatParticipant,
                 ChannelUpdateHandlers::handleUpdateChannelParticipant);
+        // bot updates
+        addHandler(UpdateBotInlineQuery.class, StateUpdateHandler.noOp(), BotUpdatesHandlers::handleUpdateBotInlineQuery);
+        addHandler(UpdateBotCallbackQuery.class, StateUpdateHandler.noOp(), BotUpdatesHandlers::handleUpdateBotCallbackQuery);
+        addHandler(UpdateInlineBotCallbackQuery.class, StateUpdateHandler.noOp(),
+                BotUpdatesHandlers::handleUpdateInlineBotCallbackQuery);
     }
 
     public static final DefaultUpdatesMapper instance = new DefaultUpdatesMapper();
@@ -96,6 +101,10 @@ public final class DefaultUpdatesMapper implements UpdatesMapper {
 
     @FunctionalInterface
     interface StateUpdateHandler<U extends Update, O> {
+
+        static <U extends Update, O> StateUpdateHandler<U, O> noOp() {
+            return ctx -> Mono.empty();
+        }
 
         Mono<O> handle(UpdateContext<U> context);
     }

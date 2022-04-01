@@ -6,6 +6,7 @@ import io.netty.buffer.Unpooled;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+/** A MTProto transport which aligns data up to 4-byte. */
 public class IntermediateTransport implements Transport {
     public static final int ID = 0xeeeeeeee;
 
@@ -77,5 +78,4 @@ public class IntermediateTransport implements Transport {
     public void setQuickAckState(boolean enable) {
         this.quickAck = enable;
     }
-
 }

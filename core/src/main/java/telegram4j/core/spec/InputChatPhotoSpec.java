@@ -28,7 +28,7 @@ public final class InputChatPhotoSpec {
     }
 
     public static InputChatPhotoSpec ofUploaded(@Nullable InputFile file, @Nullable InputFile video,
-                                        @Nullable Double videStartTimestamp) {
+                                                @Nullable Double videStartTimestamp) {
         return new InputChatPhotoSpec(InputChatUploadedPhoto.builder()
                 .file(file)
                 .video(video)

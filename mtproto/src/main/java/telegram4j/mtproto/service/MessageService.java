@@ -702,6 +702,10 @@ public class MessageService extends RpcService {
                 .flatMapIterable(Function.identity());
     }
 
+    public Mono<Boolean> setInlineBotResults(SetInlineBotResults request) {
+        return client.sendAwait(request);
+    }
+
     // Message interactions
 
     @BotCompatible
@@ -751,6 +755,7 @@ public class MessageService extends RpcService {
 
     // Short-send related updates object should be transformed to the updateShort or baseUpdates.
     // https://core.telegram.org/api/updates-sequence
+
     private Mono<Tuple2<BaseMessageFields, Updates>> transformMessageUpdate(BaseSendMessageRequest request, Updates updates) {
         return toPeer(request.peer())
                 .zipWith(Mono.justOrEmpty(request.sendAs())

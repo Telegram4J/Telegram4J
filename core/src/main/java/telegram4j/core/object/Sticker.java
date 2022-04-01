@@ -3,7 +3,6 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.MaskCoordinates;
-import telegram4j.core.spec.IdFields;
 import telegram4j.tl.*;
 
 import java.util.Objects;
@@ -74,10 +73,10 @@ public class Sticker extends Document {
     /**
      * Gets id of sticker set where this sticker is placed.
      *
-     * @return The {@link IdFields.StickerSetId} id of sticker set.
+     * @return The {@link InputStickerSet} id of sticker set.
      */
-    public IdFields.StickerSetId getStickerSet() {
-        return IdFields.StickerSetId.from(stickerData.stickerset());
+    public InputStickerSet getStickerSet() {
+        return stickerData.stickerset();
     }
 
     /**

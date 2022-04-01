@@ -4,10 +4,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.*;
-import telegram4j.core.spec.IdFields;
 import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
+import telegram4j.tl.InputStickerSet;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -328,7 +328,7 @@ public interface Channel extends Chat {
      * @param stickerSetId The id of sticker set to associate.
      * @return A {@link Mono} emitting on successful completion boolean, indicates result.
      */
-    Mono<Boolean> setStickers(IdFields.StickerSetId stickerSetId);
+    Mono<Boolean> setStickers(InputStickerSet stickerSetId);
 
     /**
      * Retrieve channel participant by user id.

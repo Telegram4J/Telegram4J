@@ -1,0 +1,25 @@
+package telegram4j.core.spec;
+
+import org.immutables.value.Value;
+import telegram4j.core.spec.media.InputMediaSpec;
+import telegram4j.core.util.EntityParser;
+
+import java.util.Optional;
+import java.util.function.Function;
+
+@Value.Immutable
+interface EditInlineMessageSpecDef extends Spec {
+
+    @Value.Default
+    default boolean noWebpage() {
+        return false;
+    }
+
+    Optional<String> message();
+
+    Optional<InputMediaSpec> media();
+
+    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
+
+    Optional<Function<String, EntityParser>> parser();
+}
