@@ -17,6 +17,11 @@ public class GeoPoint implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public MTProtoTelegramClient getClient() {
+        return client;
+    }
+
     /**
      * Gets longitude coordinates of geo point.
      *
@@ -51,11 +56,6 @@ public class GeoPoint implements TelegramObject {
      */
     public Optional<Integer> getAccuracyRadius() {
         return Optional.ofNullable(data.accuracyRadius());
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override
