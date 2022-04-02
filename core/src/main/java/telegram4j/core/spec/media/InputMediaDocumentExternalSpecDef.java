@@ -9,13 +9,8 @@ import telegram4j.tl.InputMediaDocumentExternal;
 import java.time.Duration;
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaDocumentExternalSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.DOCUMENT_EXTERNAL;
-    }
 
     String url();
 

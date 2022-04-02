@@ -15,7 +15,6 @@ public class MTProtoOptions {
     protected final TcpClient tcpClient;
     protected final Supplier<Transport> transport;
     protected final StoreLayout storeLayout;
-    protected final int acksSendThreshold;
     protected final Sinks.EmitFailureHandler emissionHandler;
     protected final RetryBackoffSpec retry;
     protected final RetryBackoffSpec authRetry;
@@ -23,15 +22,13 @@ public class MTProtoOptions {
     protected final List<ResponseTransformer> responseTransformers;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
-                          Supplier<Transport> transport, StoreLayout storeLayout,
-                          int acksSendThreshold, Sinks.EmitFailureHandler emissionHandler,
+                          Supplier<Transport> transport, StoreLayout storeLayout, Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec retry, RetryBackoffSpec authRetry,
                           IntPredicate gzipPackingPredicate, List<ResponseTransformer> responseTransformers) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
         this.transport = transport;
         this.storeLayout = storeLayout;
-        this.acksSendThreshold = acksSendThreshold;
         this.emissionHandler = emissionHandler;
         this.retry = retry;
         this.authRetry = authRetry;
@@ -53,10 +50,6 @@ public class MTProtoOptions {
 
     public StoreLayout getStoreLayout() {
         return storeLayout;
-    }
-
-    public int getAcksSendThreshold() {
-        return acksSendThreshold;
     }
 
     public Sinks.EmitFailureHandler getEmissionHandler() {

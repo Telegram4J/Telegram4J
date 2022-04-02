@@ -9,13 +9,8 @@ import telegram4j.tl.InputMediaPhotoExternal;
 import java.time.Duration;
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaPhotoExternalSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.PHOTO_EXTERNAL;
-    }
 
     String url();
 

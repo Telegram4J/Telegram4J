@@ -9,7 +9,6 @@ import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.BasePhoto;
 import telegram4j.tl.InputPeer;
-import telegram4j.tl.InputPeerEmpty;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,18 +25,17 @@ public class Photo implements TelegramObject {
     private final String fileReferenceId;
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
-        this(client, data, InputPeerEmpty.instance(), chatPeer, messageId);
-    }
-
-    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer peer, InputPeer chatPeer, int messageId) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
 
-        if (peer.identifier() != InputPeerEmpty.ID) {
-            this.fileReferenceId = FileReferenceId.ofChatPhoto(data, -1, peer).serialize();
-        } else {
-            this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer).serialize();
-        }
+        this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer).serialize();
+    }
+
+    public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
+        this.client = Objects.requireNonNull(client, "client");
+        this.data = Objects.requireNonNull(data, "data");
+
+        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, messageId, peer).serialize();
     }
 
     @Override

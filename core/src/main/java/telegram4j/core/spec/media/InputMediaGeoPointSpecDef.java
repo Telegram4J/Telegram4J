@@ -9,13 +9,8 @@ import telegram4j.tl.InputMediaGeoPoint;
 
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaGeoPointSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.GEO_POINT;
-    }
 
     double latitide();
 

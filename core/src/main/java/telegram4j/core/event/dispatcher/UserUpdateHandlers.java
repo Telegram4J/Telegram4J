@@ -137,5 +137,4 @@ class UserUpdateHandlers {
 
         return Flux.just(new UpdateUserTypingEvent(context.getClient(), userId, context.getUpdate().action()));
     }
-
 }

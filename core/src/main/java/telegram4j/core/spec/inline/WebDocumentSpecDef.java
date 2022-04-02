@@ -12,10 +12,6 @@ interface WebDocumentSpecDef extends Spec {
 
     Optional<SizeSpec> imageSize();
 
-    Optional<Integer> height();
-
-    Optional<Integer> size();
-
     Optional<String> mimeType();
 }
 

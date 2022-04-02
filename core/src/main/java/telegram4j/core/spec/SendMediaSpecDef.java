@@ -37,7 +37,7 @@ interface SendMediaSpecDef extends Spec {
 
     String message();
 
-    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
+    Optional<telegram4j.core.spec.markup.ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
 

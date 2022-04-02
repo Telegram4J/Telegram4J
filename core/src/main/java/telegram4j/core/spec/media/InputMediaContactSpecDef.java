@@ -6,13 +6,8 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaContact;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaContactSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.CONTACT;
-    }
 
     String phoneNumber();
 

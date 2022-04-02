@@ -9,13 +9,8 @@ import telegram4j.tl.InputMediaGeoLive;
 
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaGeoLiveSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.GEO_LIVE;
-    }
 
     @Value.Default
     default boolean stopped() {

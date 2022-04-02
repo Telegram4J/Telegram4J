@@ -31,7 +31,7 @@ interface SendMessageSpecDef extends Spec {
     }
 
     @Value.Default
-    default boolean noforwards() {
+    default boolean noForwards() {
         return false;
     }
 
@@ -41,7 +41,8 @@ interface SendMessageSpecDef extends Spec {
 
     Optional<EntityParserFactory> parser();
 
-    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
+    // Full qualification is need due to immutables doesnt able to import spec
+    Optional<telegram4j.core.spec.markup.ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
 

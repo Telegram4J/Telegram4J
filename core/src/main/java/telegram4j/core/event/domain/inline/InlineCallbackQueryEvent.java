@@ -26,10 +26,21 @@ public class InlineCallbackQueryEvent extends CallbackEvent {
         this.messageId = messageId;
     }
 
+    /**
+     * Gets id of this inline message.
+     *
+     * @return The id of this inline message.
+     */
     public InlineMessageId getMessageId() {
         return messageId;
     }
 
+    /**
+     * Request to edit inline message with given specification.
+     *
+     * @param spec The specification for editing inline message.
+     * @return A {@link Mono} which emitting on completion boolean which displays completion state.
+     */
     public Mono<Boolean> edit(EditInlineMessageSpec spec) {
         return Mono.defer(() -> {
             var parsed = spec.parser()

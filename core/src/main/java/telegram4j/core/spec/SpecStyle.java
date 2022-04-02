@@ -15,7 +15,6 @@ import java.lang.annotation.Target;
         visibility = Value.Style.ImplementationVisibility.PUBLIC,
         allMandatoryParameters = true,
         depluralize = true,
-        instance = "create",
         jdkOnly = true
 )
 public @interface SpecStyle {

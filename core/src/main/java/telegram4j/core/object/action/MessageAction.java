@@ -15,10 +15,10 @@ public interface MessageAction extends TelegramObject {
         CHAT_EDIT_TITLE,
 
         /** Group profile changed. */
-        CHAT_EDIT_PHOTO,
+        EDIT_CHAT_PHOTO,
 
         /** Group profile photo removed. */
-        CHAT_DELETE_PHOTO,
+        DELETE_CHAT_PHOTO,
 
         /** New member in the group. */
         CHAT_ADD_USER,

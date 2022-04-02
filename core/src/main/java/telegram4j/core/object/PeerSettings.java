@@ -66,14 +66,30 @@ public class PeerSettings implements TelegramObject {
             this.flag = 1 << value;
         }
 
+        /**
+         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
+         *
+         * @return The flag shift position.
+         */
         public int getValue() {
             return value;
         }
 
+        /**
+         * Gets bit-mask for flag.
+         *
+         * @return The bit-mask for flag.
+         */
         public int getFlag() {
             return flag;
         }
 
+        /**
+         * Computes {@link EnumSet} from raw {@link telegram4j.tl.PeerSettings} data.
+         *
+         * @param data The message data.
+         * @return The {@link EnumSet} of the {@link telegram4j.tl.PeerSettings} flags.
+         */
         public static EnumSet<Flag> of(telegram4j.tl.PeerSettings data) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
             int flags = data.flags();

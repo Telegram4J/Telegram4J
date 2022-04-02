@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.AuthorizationResources;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.GroupChat;
 import telegram4j.core.object.chat.PrivateChat;
@@ -13,14 +14,12 @@ import java.util.OptionalLong;
 /** The {@link PeerEntity} identifier with optional access hash. */
 public final class Id implements Comparable<Id> {
 
-    /** Number alias for empty user/channel's access hash.  */
-    private static final long ACCESS_HASH_UNAVAILABLE = 0;
-
     private final Type type;
     private final long value;
+    @Nullable
     private final Object context;
 
-    private Id(Type type, long value, Object context) {
+    private Id(Type type, long value, @Nullable Object context) {
         this.type = Objects.requireNonNull(type, "type");
         this.value = value;
         this.context = context;
@@ -33,7 +32,7 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} of chat.
      */
     public static Id ofChat(long value) {
-        return new Id(Type.CHAT, value, ACCESS_HASH_UNAVAILABLE);
+        return new Id(Type.CHAT, value, null);
     }
 
     /**
@@ -93,9 +92,9 @@ public final class Id implements Comparable<Id> {
      */
     public static Id of(Peer peer) {
         switch (peer.identifier()) {
-            case PeerChannel.ID: return new Id(Type.CHANNEL, ((PeerChannel) peer).channelId(), ACCESS_HASH_UNAVAILABLE);
-            case PeerChat.ID: return new Id(Type.CHAT, ((PeerChat) peer).chatId(), ACCESS_HASH_UNAVAILABLE);
-            case PeerUser.ID: return new Id(Type.USER, ((PeerUser) peer).userId(), ACCESS_HASH_UNAVAILABLE);
+            case PeerChannel.ID: return new Id(Type.CHANNEL, ((PeerChannel) peer).channelId(), null);
+            case PeerChat.ID: return new Id(Type.CHAT, ((PeerChat) peer).chatId(), null);
+            case PeerUser.ID: return new Id(Type.USER, ((PeerUser) peer).userId(), null);
             default: throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
@@ -125,7 +124,6 @@ public final class Id implements Comparable<Id> {
             default: throw new IllegalArgumentException("Unknown input user type: " + inputUser);
         }
     }
-
 
     /**
      * Create new id from {@link InputChannel} object.
@@ -195,7 +193,7 @@ public final class Id implements Comparable<Id> {
     }
 
     private static Id of(Type type, long value, @Nullable Long accessHash) {
-        return new Id(type, value, accessHash != null ? accessHash : ACCESS_HASH_UNAVAILABLE);
+        return new Id(type, value, accessHash);
     }
 
     /**
@@ -231,9 +229,8 @@ public final class Id implements Comparable<Id> {
      * @return The access hash of this id, if present and applicable.
      */
     public OptionalLong getAccessHash() {
-        long accessHash0;
-        if (context instanceof Long && (accessHash0 = (long) context) != ACCESS_HASH_UNAVAILABLE) {
-            return OptionalLong.of(accessHash0);
+        if (context instanceof Long) {
+            return OptionalLong.of((long) context);
         }
         return OptionalLong.empty();
     }
@@ -298,6 +295,12 @@ public final class Id implements Comparable<Id> {
         CHANNEL,
     }
 
+    /**
+     * Context for accessing to user/channel which haven't access hash.
+     * Available to use only from {@link AuthorizationResources.Type#USER users accounts}.
+     *
+     * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
+     */
     public static final class MinInformation {
         private final Id peerId;
         private final int messageId;
@@ -307,10 +310,20 @@ public final class Id implements Comparable<Id> {
             this.messageId = messageId;
         }
 
+        /**
+         * Gets id of peer where this user/channel was seen.
+         *
+         * @return The id of peer where this user/channel was seen.
+         */
         public Id getPeerId() {
             return peerId;
         }
 
+        /**
+         * Gets id of message where this user/channel was seen.
+         *
+         * @return The id of message where this user/channel was seen.
+         */
         public int getMessageId() {
             return messageId;
         }

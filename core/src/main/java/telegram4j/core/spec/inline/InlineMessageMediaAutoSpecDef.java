@@ -5,6 +5,9 @@ import telegram4j.core.util.EntityParserFactory;
 
 import java.util.Optional;
 
+/**
+ * Inline message with media from underling {@link InlineResultSpec}.
+ */
 @Value.Immutable
 interface InlineMessageMediaAutoSpecDef extends InlineMessageSpec {
 

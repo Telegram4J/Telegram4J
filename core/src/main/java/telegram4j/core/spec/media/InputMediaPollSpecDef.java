@@ -14,13 +14,8 @@ import telegram4j.tl.Poll;
 import java.util.List;
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaPollSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.POLL;
-    }
 
     Poll poll();
 

@@ -88,18 +88,39 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, authHandler));
     }
 
+    /**
+     * Gets {@link UpdatesManager} resource to handle incoming {@link Updates} from MTProto
+     * client and controlling updates gaps.
+     *
+     * @return The {@link UpdatesManager} resource to handle {@link Updates}.
+     */
     public UpdatesManager getUpdatesManager() {
         return updatesManager;
     }
 
+    /**
+     * Gets {@link FileReferenceManager} resource to handle and refresh {@link FileReferenceId} for documents and photos.
+     *
+     * @return The {@link FileReferenceManager} resource to handle and refresh {@link FileReferenceId} for documents and photos.
+     */
     public FileReferenceManager getFileReferenceManager() {
         return fileReferenceManager;
     }
 
+    /**
+     * Gets whether current client is bot.
+     *
+     * @return {@code true} if current client is bot.
+     */
     public boolean isBot() {
         return authResources.getType() == AuthorizationResources.Type.BOT;
     }
 
+    /**
+     * Gets id of <i>current</i> user.
+     *
+     * @return The id of <i>current</i> user.
+     */
     public Id getSelfId() {
         return Objects.requireNonNull(selfId.get(), "Self id has not yet resolved.");
     }
@@ -245,7 +266,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         var min = channelId.getMinInformation().orElse(null);
         if (min != null) {
             if (isBot()) {
-                return Mono.error(new IllegalArgumentException("Min ids can be used for bots"));
+                return Mono.error(new IllegalArgumentException("Min ids can not be used for bots"));
             }
 
             return asInputPeer(min.getPeerId())
@@ -277,7 +298,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         var min = userId.getMinInformation().orElse(null);
         if (min != null) {
             if (isBot()) {
-                return Mono.error(new IllegalArgumentException("Min ids can be used for bots"));
+                return Mono.error(new IllegalArgumentException("Min ids can not be used for bots"));
             }
 
             return asInputPeer(min.getPeerId())
@@ -308,7 +329,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 var min = peerId.getMinInformation().orElse(null);
                 if (min != null) {
                     if (isBot()) {
-                        throw new IllegalArgumentException("Min ids can be used for bots");
+                        throw new IllegalArgumentException("Min ids can not be used for bots");
                     }
 
                     InputPeer p = asResolvedInputPeer(min.getPeerId());
@@ -324,7 +345,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 var min = peerId.getMinInformation().orElse(null);
                 if (min != null) {
                     if (isBot()) {
-                        throw new IllegalArgumentException("Min ids can be used for bots");
+                        throw new IllegalArgumentException("Min ids can not be used for bots");
                     }
 
                     InputPeer p = asResolvedInputPeer(min.getPeerId());

@@ -95,8 +95,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, ImmutableInputPeerChannel.of(minData.id(),
-                        Objects.requireNonNull(minData.accessHash())), -1));
+                .map(d -> new Photo(client, d, -1, client.asResolvedInputPeer(getId())));
     }
 
     @Override

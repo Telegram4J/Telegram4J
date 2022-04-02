@@ -62,6 +62,7 @@ import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
 import telegram4j.core.spec.inline.*;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChat;
 import telegram4j.tl.*;
@@ -72,6 +73,7 @@ import telegram4j.tl.users.UserFull;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -252,10 +254,9 @@ public final class EntityFactory {
                 return new MessageActionChatAddUser(client, (telegram4j.tl.MessageActionChatAddUser) data);
             case telegram4j.tl.MessageActionChatCreate.ID:
                 return new MessageActionChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
-            case telegram4j.tl.MessageActionChatDeletePhoto.ID:
-                return new BaseMessageAction(client, MessageAction.Type.CHAT_DELETE_PHOTO);
             case telegram4j.tl.MessageActionChatDeleteUser.ID:
                 return new MessageActionChatDeleteUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
+            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageActionChatEditPhoto(client);
             case telegram4j.tl.MessageActionChatEditPhoto.ID:
                 return new MessageActionChatEditPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data, peer, messageId);
             case telegram4j.tl.MessageActionChatEditTitle.ID:
@@ -473,11 +474,10 @@ public final class EntityFactory {
                         .map(ImmutableInputBotInlineResultPhoto.Builder::build);
             } catch (IllegalArgumentException e) { // may be just an url
                 String url = r.photo();
+                WebDocumentSpec thumb = r.thumb().orElseGet(() -> WebDocumentSpec.of(url));
 
                 var builder = BaseInputBotInlineResult.builder()
                         .type("photo")
-                        .title(r.title().orElse(null))
-                        .description(r.description().orElse(null))
                         .id(r.id())
                         .url(url);
 
@@ -493,7 +493,7 @@ public final class EntityFactory {
                         ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
 
                 builder.content(contentBuilder.build());
-                r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
+                builder.thumb(createThumbnail(thumb));
 
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableBaseInputBotInlineResult.Builder::build);
@@ -501,12 +501,24 @@ public final class EntityFactory {
         } else if (spec instanceof InlineResultFileSpec) {
             InlineResultFileSpec r = (InlineResultFileSpec) spec;
 
+            DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
+            if (documentType == DocumentType.UNKNOWN) {
+                return Mono.error(new IllegalArgumentException("Unexpected document type."));
+            }
+
+            String type = documentType == DocumentType.GENERAL ? "file" : documentType.name().toLowerCase(Locale.ROOT);
             try {
-                InputDocument document = FileReferenceId.deserialize(r.file()).asInputDocument();
+                FileReferenceId fileRefId = FileReferenceId.deserialize(r.file());
+                InputDocument document = fileRefId.asInputDocument();
+
+                if (r.type().isPresent() && fileRefId.getDocumentType() != r.type().orElseThrow()) {
+                    return Mono.error(new IllegalArgumentException("Document type mismatch. File ref id: "
+                            + fileRefId.getDocumentType() + ", type: " + documentType));
+                }
 
                 var builder = InputBotInlineResultDocument.builder()
-                        .type("file")
-                        .title(r.title().orElse(null))
+                        .type(type)
+                        .title(r.title())
                         .description(r.description().orElse(null))
                         .document(document)
                         .id(r.id());
@@ -515,10 +527,16 @@ public final class EntityFactory {
                         .map(ImmutableInputBotInlineResultDocument.Builder::build);
             } catch (IllegalArgumentException e) { // may be just an url
                 String url = r.file();
+                String mimeType = r.mimeType().orElseThrow(() -> new IllegalArgumentException(
+                        "Mime type must be included with urls."));
+
+                if (!mimeType.equalsIgnoreCase("application/pdf") && !mimeType.equalsIgnoreCase("application/zip")) {
+                    return Mono.error(new IllegalStateException("Not allowed mime type for web file: " + mimeType));
+                }
 
                 var builder = BaseInputBotInlineResult.builder()
-                        .type("file")
-                        .title(r.title().orElse(null))
+                        .type(type)
+                        .title(r.title())
                         .description(r.description().orElse(null))
                         .id(r.id())
                         .url(url);
@@ -526,14 +544,13 @@ public final class EntityFactory {
                 var contentBuilder = InputWebDocument.builder()
                         .url(url)
                         .size(0)
-                        .mimeType(r.mimeType().orElseThrow(() -> new IllegalArgumentException(
-                                "Mime type must be included with urls.")));
+                        .mimeType(mimeType);
 
                 Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
                         ImmutableDocumentAttributeFilename.of(s)));
 
                 builder.content(contentBuilder.build());
-                builder.thumb(createThumbnail(r.thumb()));
+                r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
 
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableBaseInputBotInlineResult.Builder::build);

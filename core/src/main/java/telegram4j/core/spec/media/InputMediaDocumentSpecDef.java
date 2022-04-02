@@ -10,13 +10,8 @@ import telegram4j.tl.InputMediaDocument;
 import java.time.Duration;
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaDocumentSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.DOCUMENT;
-    }
 
     String document();
 

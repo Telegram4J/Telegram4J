@@ -61,7 +61,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private TcpClient tcpClient;
     private Supplier<Transport> transport;
-    private int acksSendThreshold = 3;
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
     private IntPredicate gzipPackingPredicate;
@@ -102,19 +101,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      */
     public MTProtoBootstrap<O> setStoreLayout(StoreLayout storeLayout) {
         this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
-        return this;
-    }
-
-    /**
-     * Sets threshold for not-acknowledged messages buffer.
-     * <p>
-     * If custom threshold doesn't set, {@literal 3} will be used as threshold.
-     *
-     * @param acksSendThreshold A new threshold for acknowledge buffer.
-     * @return This builder.
-     */
-    public MTProtoBootstrap<O> setAcksSendThreshold(int acksSendThreshold) {
-        this.acksSendThreshold = acksSendThreshold;
         return this;
     }
 
@@ -303,7 +289,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
-                            storeLayout, acksSendThreshold, EmissionHandlers.DEFAULT_PARKING,
+                            storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initRetry(), initAuthRetry(), initGzipPackingPredicate(),
                             Collections.unmodifiableList(responseTransformers))));
 

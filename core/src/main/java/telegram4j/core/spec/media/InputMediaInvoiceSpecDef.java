@@ -7,19 +7,14 @@ import telegram4j.tl.*;
 
 import java.util.Optional;
 
-// TODO too raw mapping
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaInvoiceSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.INVOICE;
-    }
 
     String title();
 
     String description();
 
+    // TODO
     Optional<InputWebDocument> photo();
 
     Invoice invoice();

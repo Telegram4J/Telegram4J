@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Function;
 
-@Value.Immutable(singleton = true)
+@Value.Immutable
 interface EditMessageSpecDef extends Spec {
 
     @Value.Default
@@ -20,7 +20,7 @@ interface EditMessageSpecDef extends Spec {
 
     Optional<InputMediaSpec> media();
 
-    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
+    Optional<telegram4j.core.spec.markup.ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
 

@@ -117,7 +117,7 @@ public class User implements PeerEntity {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, client.asResolvedInputPeer(getId()), -1));
+                .map(d -> new Photo(client, d, -1, client.asResolvedInputPeer(getId())));
     }
 
     public Optional<UserStatus> getStatus() {

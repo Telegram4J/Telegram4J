@@ -25,9 +25,9 @@ public class MessageMediaPhoto extends BaseMessageMedia {
         this.peer = Objects.requireNonNull(peer, "peer");
     }
 
-    public Optional<Photo> photo() {
+    public Optional<Photo> getPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
-                .map(d -> new Photo(getClient(), d, peer, messageId));
+                .map(d -> new Photo(client, d, peer, messageId));
     }
 
     public Optional<Duration> getAutoDeleteDuration() {

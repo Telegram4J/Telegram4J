@@ -9,13 +9,8 @@ import telegram4j.tl.InputMediaVenue;
 
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaVenueSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.VENUE;
-    }
 
     double latitide();
 

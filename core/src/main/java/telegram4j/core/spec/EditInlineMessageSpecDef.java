@@ -19,7 +19,7 @@ interface EditInlineMessageSpecDef extends Spec {
 
     Optional<InputMediaSpec> media();
 
-    Optional<MessageFields.ReplyMarkupSpec> replyMarkup();
+    Optional<telegram4j.core.spec.markup.ReplyMarkupSpec> replyMarkup();
 
     Optional<Function<String, EntityParser>> parser();
 }

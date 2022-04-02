@@ -78,7 +78,7 @@ abstract class BaseChat implements Chat {
                     .noWebpage(spec.noWebpage())
                     .background(spec.background())
                     .clearDraft(spec.clearDraft())
-                    .noforwards(spec.noforwards())
+                    .noforwards(spec.noForwards())
                     .replyToMsgId(spec.replyToMessageId().orElse(null))
                     .message(txt)
                     .entities(ent)

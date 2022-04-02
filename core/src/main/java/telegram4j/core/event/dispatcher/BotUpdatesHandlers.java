@@ -8,14 +8,11 @@ import telegram4j.core.event.domain.inline.CallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineCallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.object.GeoPoint;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.InlineMessageId;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.BaseGeoPoint;
-import telegram4j.tl.UpdateBotCallbackQuery;
-import telegram4j.tl.UpdateBotInlineQuery;
-import telegram4j.tl.UpdateInlineBotCallbackQuery;
+import telegram4j.tl.*;
 
 import java.util.Optional;
 
@@ -45,7 +42,18 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
 
         var user = EntityFactory.createUser(client, context.getUsers().get(context.getUpdate().userId()));
-        Id peerId = Id.of(context.getUpdate().peer());
+        var chat = Optional.of(context.getUpdate().peer())
+                .map(p -> {
+                    switch (p.identifier()) {
+                        case PeerUser.ID: return new PrivateChat(client, user, null);
+                        case PeerChat.ID:
+                        case PeerChannel.ID:
+                            long rawId = TlEntityUtil.getRawPeerId(p);
+                            return EntityFactory.createChat(client, context.getChats().get(rawId), null);
+                        default: throw new IllegalStateException("Unknown peer type: " + p);
+                    }
+                })
+                .orElseThrow();
         ByteBuf data = Optional.ofNullable(context.getUpdate().data())
                 .map(Unpooled::wrappedBuffer)
                 .map(ByteBuf::asReadOnly)
@@ -53,7 +61,7 @@ class BotUpdatesHandlers {
                 .orElse(null);
 
         return Flux.just(new CallbackQueryEvent(client, context.getUpdate().queryId(),
-                user, peerId, context.getUpdate().msgId(),
+                user, chat, context.getUpdate().msgId(),
                 context.getUpdate().chatInstance(), data,
                 context.getUpdate().gameShortName()));
     }

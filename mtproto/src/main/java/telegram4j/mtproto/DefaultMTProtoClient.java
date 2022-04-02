@@ -65,7 +65,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger(DefaultMTProtoClient.class);
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
-    private static final int maxMissedPong = 1;
+    private static final int MAX_MISSED_PONG = 1;
+    private static final int ACK_SEND_THRESHOLD = 3;
     private static final Throwable RETRY = new RetryConnectException();
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
     private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(30);
@@ -395,7 +396,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         lastPong.compareAndSet(0, now);
 
                         if (lastPing - lastPong.get() > 0) {
-                            if (missedPong.incrementAndGet() >= maxMissedPong) {
+                            if (missedPong.incrementAndGet() >= MAX_MISSED_PONG) {
                                 // sessionId = random.nextLong();
                                 seqNo.set(0);
                                 lastMessageId = 0;
@@ -820,7 +821,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 acknowledgments.add(messageId);
             }
 
-            if (acknowledgments.size() < options.getAcksSendThreshold()) {
+            if (acknowledgments.size() < ACK_SEND_THRESHOLD) {
                 return Mono.empty();
             }
 

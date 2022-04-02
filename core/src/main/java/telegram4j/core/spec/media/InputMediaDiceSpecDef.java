@@ -6,13 +6,8 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.ImmutableInputMediaDice;
 import telegram4j.tl.InputMedia;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaDiceSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.DICE;
-    }
 
     String emoticon();
 

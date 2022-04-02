@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.core.spec.markup.KeyboardButtonSpec;
 import telegram4j.tl.*;
 
 import java.util.Objects;
@@ -12,7 +13,7 @@ import java.util.Optional;
 /**
  * Representation of various types of markup button.
  *
- * @see telegram4j.core.spec.MessageFields.KeyboardButtonSpec
+ * @see KeyboardButtonSpec
  */
 public final class KeyboardButton implements TelegramObject {
 

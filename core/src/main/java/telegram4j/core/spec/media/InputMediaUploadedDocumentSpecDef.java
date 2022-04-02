@@ -14,13 +14,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaUploadedDocumentSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.UPLOADED_DOCUMENT;
-    }
 
     @Value.Default
     default boolean noSoundVideo() {

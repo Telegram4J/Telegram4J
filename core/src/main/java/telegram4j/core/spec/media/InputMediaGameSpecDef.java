@@ -7,15 +7,9 @@ import telegram4j.tl.ImmutableInputMediaGame;
 import telegram4j.tl.InputGame;
 import telegram4j.tl.InputMedia;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaGameSpecDef extends InputMediaSpec {
 
-    @Override
-    default Type type() {
-        return Type.GAME;
-    }
-
-    // TODO: unwrap?
     InputGame game();
 
     @Override

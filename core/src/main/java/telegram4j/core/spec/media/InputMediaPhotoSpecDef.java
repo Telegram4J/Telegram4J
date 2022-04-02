@@ -10,13 +10,8 @@ import telegram4j.tl.InputMediaPhoto;
 import java.time.Duration;
 import java.util.Optional;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaPhotoSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.PHOTO;
-    }
 
     String photo();
 

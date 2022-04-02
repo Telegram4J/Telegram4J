@@ -71,7 +71,7 @@ public final class GroupChat extends BaseChat {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
+                .map(d -> new Photo(client, d, -1, ImmutableInputPeerChat.of(minData.id())));
     }
 
     @Override

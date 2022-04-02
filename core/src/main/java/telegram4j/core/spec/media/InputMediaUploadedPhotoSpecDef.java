@@ -13,13 +13,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Value.Immutable(builder = false)
+@Value.Immutable
 interface InputMediaUploadedPhotoSpecDef extends InputMediaSpec {
-
-    @Override
-    default Type type() {
-        return Type.UPLOADED_PHOTO;
-    }
 
     InputFile file();
 
@@ -30,10 +25,10 @@ interface InputMediaUploadedPhotoSpecDef extends InputMediaSpec {
     @Override
     default Mono<InputMedia> asData(MTProtoTelegramClient client) {
         return Mono.fromCallable(() -> stickers()
-                .map(list -> list.stream()
-                        .map(s -> FileReferenceId.deserialize(s).asInputDocument())
-                        .collect(Collectors.toList()))
-                .orElse(null))
+                        .map(list -> list.stream()
+                                .map(s -> FileReferenceId.deserialize(s).asInputDocument())
+                                .collect(Collectors.toList()))
+                        .orElse(null))
                 .map(stickers -> InputMediaUploadedPhoto.builder()
                         .file(file())
                         .stickers(stickers)

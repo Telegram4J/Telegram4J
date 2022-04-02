@@ -232,7 +232,7 @@ public interface Channel extends Chat {
     Optional<Integer> getOnlineCount();
 
     /**
-     * Gets id of linked (discussion>) channel, if present
+     * Gets id of linked (discussion) channel, if present
      * and if detailed information about channel is available.
      *
      * @see <a href="https://core.telegram.org/api/discussion">Discussion Groups</a>
