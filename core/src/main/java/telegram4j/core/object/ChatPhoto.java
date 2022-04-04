@@ -75,7 +75,6 @@ public class ChatPhoto implements TelegramObject {
 
     /**
      * Gets expanded stripped thumbnail for photo, if present.
-     * Don't forget after use {@link ByteBuf#release() release} buffer.
      *
      * @return The expanded stripped thumbnail for photo, if present.
      */

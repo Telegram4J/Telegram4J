@@ -5,7 +5,6 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Id;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.TelegramObject;
-import telegram4j.tl.InputPeer;
 
 import java.util.List;
 import java.util.Objects;
@@ -30,8 +29,6 @@ public class PollResults implements TelegramObject {
     /**
      * Gets whether poll results is minimal and if {@literal true}, option
      * chosen by the <i>current</i> user is not included.
-     * For getting detailed information about poll results use
-     * {@link telegram4j.mtproto.service.MessageService#getPollResults(InputPeer, int)} method.
      *
      * @return Whether poll results in minimal.
      */

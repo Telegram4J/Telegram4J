@@ -14,10 +14,21 @@ public class MessageMediaDice extends BaseMessageMedia {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    /**
+     * Gets value of dice.
+     *
+     * @see <a href="https://core.telegram.org/api/dice">Dice</a>
+     * @return The value of dice.
+     */
     public int getValue() {
         return data.value();
     }
 
+    /**
+     * Gets dice unicode emoji.
+     *
+     * @return The dice unicode emoji.
+     */
     public String getEmoticon() {
         return data.emoticon();
     }

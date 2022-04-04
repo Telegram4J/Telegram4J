@@ -4,6 +4,7 @@ import org.immutables.value.Value;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 
+import java.time.Duration;
 import java.util.Optional;
 
 @Value.Immutable
@@ -17,6 +18,10 @@ interface InlineResultFileSpecDef extends InlineResultSpec {
     String title();
 
     Optional<String> description();
+
+    Optional<Duration> duration();
+
+    Optional<SizeSpec> size();
 
     /**
      * @return The serialized {@link FileReferenceId} of file or URL.

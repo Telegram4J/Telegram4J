@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * Chat bot information.
+ */
 public class BotInfo implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -22,14 +25,29 @@ public class BotInfo implements TelegramObject {
         return client;
     }
 
-    public Id getUserId() {
+    /**
+     * Gets id of the bot.
+     *
+     * @return The id of the bot.
+     */
+    public Id getBotId() {
         return Id.ofUser(data.userId(), null);
     }
 
+    /**
+     * Gets text description of the bot.
+     *
+     * @return The text description of the bot.
+     */
     public String getDescription() {
         return data.description();
     }
 
+    /**
+     * Gets list of the bot commands.
+     *
+     * @return The {@link List} of the bot commands.
+     */
     public List<BotCommand> getCommands() {
         return data.commands().stream()
                 .map(d -> new BotCommand(client, d))

@@ -16,10 +16,20 @@ public class MessageMediaPoll extends BaseMessageMedia {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    /**
+     * Gets information about poll.
+     *
+     * @return The {@link Poll} object.
+     */
     public Poll getPoll() {
         return new Poll(client, data.poll());
     }
 
+    /**
+     * Gets information about poll results.
+     *
+     * @return The {@link PollResults} object.
+     */
     public PollResults getResults() {
         return new PollResults(client, data.results());
     }

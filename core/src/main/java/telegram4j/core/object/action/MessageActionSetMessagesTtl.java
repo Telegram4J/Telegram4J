@@ -15,7 +15,7 @@ public class MessageActionSetMessagesTtl extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public Duration getDuration() {
+    public Duration getCurrentDuration() {
         return Duration.ofSeconds(data.period());
     }
 

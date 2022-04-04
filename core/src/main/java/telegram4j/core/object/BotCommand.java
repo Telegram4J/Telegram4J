@@ -5,6 +5,9 @@ import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
+/**
+ * Bot command object.
+ */
 public class BotCommand implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -20,10 +23,20 @@ public class BotCommand implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets name of command in format <b>/command name</b>.
+     *
+     * @return The name of command.
+     */
     public String getCommand() {
         return data.command();
     }
 
+    /**
+     * Gets text description of command.
+     *
+     * @return The text description of command.
+     */
     public String getDescription() {
         return data.description();
     }

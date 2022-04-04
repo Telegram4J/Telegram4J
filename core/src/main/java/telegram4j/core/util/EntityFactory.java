@@ -71,6 +71,7 @@ import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
@@ -546,6 +547,38 @@ public final class EntityFactory {
                         .size(0)
                         .mimeType(mimeType);
 
+                switch (documentType) {
+                    case VIDEO:
+                    case GIF: {
+                        int duration = r.duration()
+                                .map(Duration::getSeconds)
+                                .map(Math::toIntExact)
+                                .orElseThrow(() -> new IllegalStateException("Duration for video/gif documents must be set."));
+
+                        SizeSpec size = r.size()
+                                .orElseThrow(() -> new IllegalStateException("Size for video/gif documents must be set."));
+
+                        contentBuilder.addAttribute(DocumentAttributeVideo.builder()
+                                .h(size.height())
+                                .w(size.width())
+                                .duration(duration)
+                                .build());
+                        break;
+                    }
+                    case AUDIO:
+                    case VOICE:
+                        int duration = r.duration()
+                                .map(Duration::getSeconds)
+                                .map(Math::toIntExact)
+                                .orElseThrow(() -> new IllegalStateException("Duration for voice/audio documents must be set."));
+
+                        contentBuilder.addAttribute(DocumentAttributeAudio.builder()
+                                .voice(documentType == DocumentType.VOICE)
+                                .duration(duration)
+                                .build());
+                        break;
+                }
+
                 Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
                         ImmutableDocumentAttributeFilename.of(s)));
 
@@ -626,29 +659,20 @@ public final class EntityFactory {
                             .entities(ent)))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(Mono.fromSupplier(builder::build)));
-            // } else if (message instanceof InlineMessageMediaContactSpec) {
-            //     InlineMessageMediaContactSpec m = (InlineMessageMediaContactSpec) message;
-
-            // } else if (message instanceof InlineMessageMediaGeoSpec) {
-            //     InlineMessageMediaGeoSpec m = (InlineMessageMediaGeoSpec) message;
-
-            // } else if (message instanceof InlineMessageMediaInvoiceSpec) {
-            //     InlineMessageMediaInvoiceSpec m = (InlineMessageMediaInvoiceSpec) message;
-
         } else if (message instanceof InlineMessageMediaVenueSpec) {
             InlineMessageMediaVenueSpec m = (InlineMessageMediaVenueSpec) message;
 
             return Mono.just(InputBotInlineMessageMediaVenue.builder()
                             .geoPoint(BaseInputGeoPoint.builder()
-                                    .lat(m.latitide())
-                                    .longState(m.longtitude())
-                                    .accuracyRadius(m.accuracyRadius().orElse(null))
+                                    .lat(m.media().latitide())
+                                    .longState(m.media().longtitude())
+                                    .accuracyRadius(m.media().accuracyRadius().orElse(null))
                                     .build())
-                            .title(m.title())
-                            .provider(m.provider())
-                            .venueType(m.venueType())
-                            .venueId(m.venueId())
-                            .address(m.address()))
+                            .title(m.media().title())
+                            .provider(m.media().provider())
+                            .venueType(m.media().venueType())
+                            .venueId(m.media().venueId())
+                            .address(m.media().address()))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(Mono.fromSupplier(builder::build)));
         } else {

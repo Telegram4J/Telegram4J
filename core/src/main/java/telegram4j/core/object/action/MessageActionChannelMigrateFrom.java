@@ -15,7 +15,7 @@ public class MessageActionChannelMigrateFrom extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public String getTitle() {
+    public String getChatTitle() {
         return data.title();
     }
 

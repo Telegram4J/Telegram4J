@@ -14,7 +14,7 @@ public class MessageActionChannelCreate extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public String getTitle() {
+    public String getChannelTitle() {
         return data.title();
     }
 

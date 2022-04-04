@@ -230,7 +230,7 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets reply information, if message is not service and data present.
+     * Gets information about message thread, if message is not service and data present.
      *
      * @return The {@link MessageReplies} of message, if it's not service and data present.
      */

@@ -16,7 +16,6 @@ public class MessageActionGroupCallScheduled extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    // TODO: mapping
     public InputGroupCall getCall() {
         return data.call();
     }

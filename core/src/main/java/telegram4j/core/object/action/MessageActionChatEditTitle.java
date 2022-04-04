@@ -14,7 +14,7 @@ public class MessageActionChatEditTitle extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public String getTitle() {
+    public String getCurrentTitle() {
         return data.title();
     }
 

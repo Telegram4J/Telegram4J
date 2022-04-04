@@ -14,7 +14,12 @@ public class MessageActionSetChatTheme extends BaseMessageAction {
         this.data = Objects.requireNonNull(data, "data");
     }
 
-    public String getEmoticon() {
+    /**
+     * Gets unicode emoji of dice.
+     *
+     * @return The unicode emoji of dice.
+     */
+    public String getCurrentEmoticon() {
         return data.emoticon();
     }
 
