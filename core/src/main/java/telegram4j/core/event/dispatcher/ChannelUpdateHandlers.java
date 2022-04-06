@@ -2,7 +2,7 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import telegram4j.core.event.domain.chat.ChannelParticipantUpdateEvent;
+import telegram4j.core.event.domain.chat.ChatParticipantUpdateEvent;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
@@ -27,7 +27,7 @@ class ChannelUpdateHandlers {
     // Update handler
     // =====================
 
-    static Flux<ChannelParticipantUpdateEvent> handleUpdateChannelParticipant(StatefulUpdateContext<UpdateChannelParticipant, Void> context) {
+    static Flux<ChatParticipantUpdateEvent> handleUpdateChannelParticipant(StatefulUpdateContext<UpdateChannelParticipant, Void> context) {
         UpdateChannelParticipant upd = context.getUpdate();
 
         // to resolve:
@@ -64,9 +64,9 @@ class ChannelUpdateHandlers {
                 .map(d -> new ChatParticipant(context.getClient(), peer, d, channel.getId()))
                 .orElse(null);
 
-        return Flux.just(new ChannelParticipantUpdateEvent(context.getClient(),
-                channel, timestamp, actor, oldParticipant, currentParticipant,
-                invite, upd.qts()));
+        return Flux.just(new ChatParticipantUpdateEvent(context.getClient(),
+                timestamp, oldParticipant, currentParticipant,
+                invite, upd.qts(), channel, actor));
     }
 
 }

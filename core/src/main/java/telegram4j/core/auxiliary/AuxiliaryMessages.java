@@ -7,6 +7,7 @@ import telegram4j.core.object.chat.Chat;
 
 import java.util.List;
 
+/** Container with found {@link Message}s with auxiliary {@link Chat} and {@link User} objects. */
 public class AuxiliaryMessages {
     private final MTProtoTelegramClient client;
     private final List<Message> messages;
@@ -25,14 +26,29 @@ public class AuxiliaryMessages {
         return client;
     }
 
+    /**
+     * Gets list of found {@link Message}s.
+     *
+     * @return The {@link List} of found {@link Message}s.
+     */
     public List<Message> getMessages() {
         return messages;
     }
 
+    /**
+     * Gets list of {@link Chat}s mentioned in messages.
+     *
+     * @return The {@link List} of {@link Chat} mentioned in messages.
+     */
     public List<Chat> getChats() {
         return chats;
     }
 
+    /**
+     * Gets list of {@link User}s mentioned in messages.
+     *
+     * @return The {@link List} of {@link User} mentioned in messages.
+     */
     public List<User> getUsers() {
         return users;
     }

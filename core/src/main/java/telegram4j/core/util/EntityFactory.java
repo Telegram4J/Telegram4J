@@ -608,7 +608,7 @@ public final class EntityFactory {
     private static InputWebDocument createThumbnail(WebDocumentSpec spec) {
 
         var thumbBuilder = InputWebDocument.builder()
-                .mimeType("image/jpeg")
+                .mimeType(spec.mimeType().orElse("image/jpeg"))
                 .size(0)
                 .url(spec.url());
 

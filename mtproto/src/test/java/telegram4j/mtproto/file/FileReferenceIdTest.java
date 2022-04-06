@@ -18,7 +18,6 @@ class FileReferenceIdTest {
                 // ignored fields
                 .mimeType("")
                 .size(-1)
-                .attributes(List.of())
                 .build(), 2, InputPeerSelf.instance());
         var expWebDocument = ofDocument(BaseWebDocument.builder()
                 .url("https://www.google.com")
@@ -26,7 +25,6 @@ class FileReferenceIdTest {
                 // ignored fields
                 .mimeType("")
                 .size(-1)
-                .attributes(List.of())
                 .build(), 2, InputPeerSelf.instance());
         var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(1337, 2),
                 PhotoSizeType.CHAT_PHOTO_BIG, -1, InputPeerSelf.instance());
@@ -34,7 +32,7 @@ class FileReferenceIdTest {
                 .id(1337)
                 .accessHash(-1111)
                 .fileReference(CryptoUtil.random.generateSeed(8))
-                .date(Math.toIntExact(System.currentTimeMillis() / 1000))
+                .date(0)
                 .sizes(List.of(BasePhotoSize.builder()
                         .type("i")
                         .w(100)
@@ -47,7 +45,7 @@ class FileReferenceIdTest {
                 .id(1337)
                 .accessHash(-1111)
                 .fileReference(CryptoUtil.random.generateSeed(8))
-                .date(Math.toIntExact(System.currentTimeMillis() / 1000))
+                .date(0)
                 .thumbs(List.of(BasePhotoSize.builder()
                         .type("i")
                         .w(100)
@@ -58,13 +56,12 @@ class FileReferenceIdTest {
                 // ignored fields
                 .mimeType("")
                 .size(-1)
-                .attributes(List.of())
                 .build(), 1, InputPeerSelf.instance());
         var expPhoto = ofPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
                 .fileReference(CryptoUtil.random.generateSeed(8))
-                .date(Math.toIntExact(System.currentTimeMillis() / 1000))
+                .date(0)
                 .sizes(List.of(BasePhotoSize.builder()
                         .type("i")
                         .w(100)

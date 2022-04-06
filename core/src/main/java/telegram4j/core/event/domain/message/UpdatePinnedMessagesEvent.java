@@ -9,9 +9,7 @@ import telegram4j.tl.ImmutableInputMessageID;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Event when the message(s) were pinned/unpinned from the chat/channel.
- */
+/** Event when the message(s) were pinned/unpinned from the chat/channel. */
 public class UpdatePinnedMessagesEvent extends MessageEvent {
 
     private final boolean pinned;

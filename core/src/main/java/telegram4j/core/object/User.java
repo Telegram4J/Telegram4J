@@ -12,6 +12,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Representation for available min/full users.
+ */
 public class User implements PeerEntity {
 
     private final MTProtoTelegramClient client;
@@ -109,25 +112,51 @@ public class User implements PeerEntity {
         return Optional.ofNullable(minData.phone());
     }
 
+    /**
+     * Gets the low quality user photo, if present.
+     *
+     * @return The {@link ChatPhoto photo} of user, if present.
+     */
     public Optional<ChatPhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
                 .map(c -> new ChatPhoto(client, c, client.asResolvedInputPeer(getId()), -1));
     }
 
+    /**
+     * Gets the normal user photo, if present
+     * and if detailed information about user is available.
+     *
+     * @return The {@link Photo photo} of user, if present.
+     */
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
                 .map(d -> new Photo(client, d, -1, client.asResolvedInputPeer(getId())));
     }
 
+    /**
+     * Gets current online status of user, if present.
+     *
+     * @return The {@link UserStatus} of user, if present.
+     */
     public Optional<UserStatus> getStatus() {
         return Optional.ofNullable(minData.status()).map(d -> EntityFactory.createUserStatus(client, d));
     }
 
+    /**
+     * Gets incremental version of the bot info, if user is bot.
+     *
+     * @return The incremental version of the bot info, if user is bot.
+     */
     public Optional<Integer> getBotInfoVersion() {
         return Optional.ofNullable(minData.botInfoVersion());
     }
 
+    /**
+     * Gets list of reasons for why access to this user must be restricted, if present.
+     *
+     * @return The list of reasons for why access to this user must be restricted, if present.
+     */
     public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(minData.restrictionReason())
                 .map(list -> list.stream()
@@ -135,16 +164,31 @@ public class User implements PeerEntity {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets placeholder for inline query text field, if bot is user.
+     *
+     * @return The placeholder for inline query text field, if bot is user.
+     */
     public Optional<String> getBotInlinePlaceholder() {
         return Optional.ofNullable(minData.botInlinePlaceholder());
     }
 
+    /**
+     * Gets the user's language in OS ISO 639-1 format.
+     *
+     * @return The ISO 639-1 lang code of the user locale.
+     */
     public Optional<String> getLangCode() {
         return Optional.ofNullable(minData.langCode());
     }
 
     // FullUser fields
 
+    /**
+     * Gets user's bio/about text.
+     *
+     * @return The user's bio text.
+     */
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(UserFull::about);
     }

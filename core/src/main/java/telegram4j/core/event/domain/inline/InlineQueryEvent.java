@@ -45,22 +45,48 @@ public class InlineQueryEvent extends BotEvent {
         return user;
     }
 
+    /**
+     * Gets query text.
+     *
+     * @return The query text.
+     */
     public String getQuery() {
         return query;
     }
 
+    /**
+     * Gets attached to query {@link GeoPoint geo position}, if present.
+     *
+     * @return The attached {@link GeoPoint geo position}, if present.
+     */
     public Optional<GeoPoint> getGeo() {
         return Optional.ofNullable(geo);
     }
 
+    /**
+     * Gets type of chat where this query was created, if present.
+     *
+     * @return The {@link InlineQueryPeerType} of query creation location, if present.
+     */
     public Optional<InlineQueryPeerType> getPeerType() {
         return Optional.ofNullable(peerType);
     }
 
+    /**
+     * Gets textually offset for query results, might be empty string.
+     *
+     * @return The textually offset for query results.
+     */
     public String getOffset() {
         return offset;
     }
 
+    /**
+     * Request to set answer for this inline query.
+     *
+     * @param spec The specification for inline query answer.
+     * @return A {@link Mono} which emitting on completion boolean which displays completion state.
+     */
     public Mono<Boolean> answer(AnswerInlineCallbackQuerySpec spec) {
         return Mono.defer(() -> Flux.fromIterable(spec.results())
                 .flatMap(e -> EntityFactory.createInlineResult(client, e))

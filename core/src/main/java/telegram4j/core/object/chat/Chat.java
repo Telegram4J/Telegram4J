@@ -39,7 +39,8 @@ public interface Chat extends PeerEntity {
      * Gets the normal chat photo, if present
      * and if detailed information about chat is available.
      *
-     * @return The {@link Photo photo} of chat, if present and available.
+     * @return The {@link Photo photo} of chat, if present and
+     * if detailed information about chat is available
      */
     Optional<Photo> getPhoto();
 
