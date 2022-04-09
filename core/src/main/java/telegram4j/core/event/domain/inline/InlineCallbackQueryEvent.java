@@ -5,16 +5,17 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.InlineMessageId;
 import telegram4j.core.object.User;
 import telegram4j.core.spec.EditInlineMessageSpec;
-import telegram4j.core.util.EntityParserSupport;
+import telegram4j.core.util.InlineMessageId;
+import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.request.messages.EditInlineBotMessage;
 
 import java.util.List;
 
 import static reactor.function.TupleUtils.function;
 
+/** Event of ordinary inline button triggered from the inline query. */
 public class InlineCallbackQueryEvent extends CallbackEvent {
 
     private final InlineMessageId messageId;

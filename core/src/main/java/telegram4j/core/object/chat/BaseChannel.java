@@ -15,6 +15,7 @@ import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;

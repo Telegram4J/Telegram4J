@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 
+/** Event of ordinary inline button callback. */
 public class CallbackQueryEvent extends CallbackEvent {
     private final int messageId;
     private final Chat chat;

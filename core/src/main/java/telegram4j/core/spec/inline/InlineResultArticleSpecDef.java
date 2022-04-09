@@ -2,14 +2,16 @@ package telegram4j.core.spec.inline;
 
 import org.immutables.value.Value;
 
+import java.util.Optional;
+
 @Value.Immutable
 interface InlineResultArticleSpecDef extends InlineResultSpec {
 
     String title();
 
-    String description();
+    Optional<String> description();
 
     String url();
 
-    WebDocumentSpec thumb();
+    Optional<WebDocumentSpec> thumb();
 }

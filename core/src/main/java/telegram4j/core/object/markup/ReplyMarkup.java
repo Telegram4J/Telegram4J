@@ -13,6 +13,11 @@ public abstract class ReplyMarkup implements TelegramObject {
         this.client = Objects.requireNonNull(client, "client");
     }
 
+    /**
+     * Gets type of reply markup.
+     *
+     * @return The {@link Type} of reply markup.
+     */
     public abstract Type getType();
 
     @Override

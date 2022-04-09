@@ -9,7 +9,8 @@ import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.util.EntityFactory;
-import telegram4j.core.util.EntityParserSupport;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.BaseMessage;
 import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.MessageEmpty;
@@ -158,7 +159,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets id of an inline bot that generated this message, if message it's not service and id present.
      *
-     * @return The {@link Id} of an inline bot that generated this message, if message it's not service and id present.
+     * @return The {@link Id} of an inline bot that generated this message, if present.
      */
     public Optional<Id> getViaBotId() {
         return Optional.ofNullable(baseData)
@@ -167,9 +168,9 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets text of message, if it's not service.
+     * Gets text of message, if it's not service message.
      *
-     * @return The raw text of message, if it's not service.
+     * @return The raw text of message, if present.
      */
     public Optional<String> getMessage() {
         return Optional.ofNullable(baseData).map(BaseMessage::message);
@@ -178,7 +179,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets media of message, if message is not service and data present.
      *
-     * @return The media of message, if message is not service and data present.
+     * @return The media of message, if present.
      */
     public Optional<MessageMedia> getMedia() {
         return Optional.ofNullable(baseData)
@@ -190,7 +191,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets bot reply markup (e.g. keyboard), if message is not service and data present.
      *
-     * @return The bot reply markup, if message is not service and data present.
+     * @return The bot reply markup, if present.
      */
     public Optional<ReplyMarkup> getReplyMarkup() {
         return Optional.ofNullable(baseData)
@@ -201,7 +202,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets markup entities for {@link #getMessage() text}, if message is not service and data present.
      *
-     * @return The {@link List} of markup entities for {@link #getMessage() text}, if message is not service and data present.
+     * @return The {@link List} of markup entities for {@link #getMessage() text}, if present.
      */
     public Optional<List<MessageEntity>> getEntities() {
         return Optional.ofNullable(baseData)
@@ -214,7 +215,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets views count of channel post, if message is not service and data present.
      *
-     * @return The views count of channel post, if message is not service and data present.
+     * @return The views count of channel post, if present.
      */
     public Optional<Integer> getViews() {
         return Optional.ofNullable(baseData).map(BaseMessage::views);
@@ -223,7 +224,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets forwards count, if message is not service and data present.
      *
-     * @return The forwards count of message, if it's not service and data present.
+     * @return The forwards count of message, if present.
      */
     public Optional<Integer> getForwards() {
         return Optional.ofNullable(baseData).map(BaseMessage::forwards);
@@ -232,7 +233,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets information about message thread, if message is not service and data present.
      *
-     * @return The {@link MessageReplies} of message, if it's not service and data present.
+     * @return The {@link MessageReplies} of message, if present.
      */
     public Optional<MessageReplies> getReplies() {
         return Optional.ofNullable(baseData)
@@ -243,7 +244,7 @@ public final class Message implements TelegramObject {
     /**
      * Gets timestamp of the last message editing, if message is not service and data present.
      *
-     * @return The {@link Instant} of the last message editing, if message is not service and data present.
+     * @return The {@link Instant} of the last message editing, if present.
      */
     public Optional<Instant> getEditTimestamp() {
         return Optional.ofNullable(baseData)
@@ -254,16 +255,16 @@ public final class Message implements TelegramObject {
     /**
      * Gets display name of the channel post's author, if message is not service and name present.
      *
-     * @return The display name of the channel post's author, if message is not service and name present.
+     * @return The display name of the channel post's author, if present.
      */
     public Optional<String> getPostAuthor() {
         return Optional.ofNullable(baseData).map(BaseMessage::postAuthor);
     }
 
     /**
-     * Gets id of the group of multimedia/album, if present.
+     * Gets id of the group of multimedia/album, if message is not service and id present
      *
-     * @return The id of the group of multimedia/album, if message is not service and id present.
+     * @return The id of the group of multimedia/album, if present.
      */
     public Optional<Long> getGroupedId() {
         return Optional.ofNullable(baseData).map(BaseMessage::groupedId);
@@ -273,7 +274,7 @@ public final class Message implements TelegramObject {
      * Gets {@link List} of {@link RestrictionReason} for why access to this message must be restricted,
      * if message is not service and list present.
      *
-     * @return The {@link List} of the {@link RestrictionReason}, if message is not service and list present.
+     * @return The {@link List} of the {@link RestrictionReason}, if present.
      */
     public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(baseData)
@@ -283,12 +284,23 @@ public final class Message implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets information about reactions, if message is not service and id present
+     *
+     * @return The information about reactions, if present.
+     */
+    public Optional<MessageReactions> getReactions() {
+        return Optional.ofNullable(baseData)
+                .map(BaseMessage::reactions)
+                .map(d -> new MessageReactions(client, d));
+    }
+
     // MessageService fields
 
     /**
      * Gets action about which the service message notifies, if message is service.
      *
-     * @return The service message action, if message is service.
+     * @return The service message action, if present.
      */
     public Optional<MessageAction> getAction() {
         return Optional.ofNullable(serviceData)
@@ -331,8 +343,7 @@ public final class Message implements TelegramObject {
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(editMessage -> client.getServiceHolder()
-                            .getMessageService().editMessage(editMessage))
+                    .flatMap(client.getServiceHolder().getMessageService()::editMessage)
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
         });
     }

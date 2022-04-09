@@ -2,7 +2,8 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.util.EntityParserSupport;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.*;
 
 import java.util.Objects;
@@ -13,7 +14,7 @@ import java.util.Optional;
  * <p>
  * For parsing entities use {@link EntityParserSupport} utility.
  */
-public class MessageEntity implements TelegramObject {
+public final class MessageEntity implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.MessageEntity data;

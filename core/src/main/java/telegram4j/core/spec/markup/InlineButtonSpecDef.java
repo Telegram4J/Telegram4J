@@ -2,8 +2,8 @@ package telegram4j.core.spec.markup;
 
 import org.immutables.value.Value;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.markup.KeyboardButton;
+import telegram4j.core.util.Id;
 
 import java.util.Optional;
 

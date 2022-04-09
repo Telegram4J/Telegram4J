@@ -8,9 +8,9 @@ import telegram4j.core.event.domain.inline.CallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineCallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.object.GeoPoint;
-import telegram4j.core.object.InlineMessageId;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.core.util.InlineMessageId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 

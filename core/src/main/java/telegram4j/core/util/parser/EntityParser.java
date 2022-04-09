@@ -1,4 +1,4 @@
-package telegram4j.core.util;
+package telegram4j.core.util.parser;
 
 /**
  * Interface of <a href="https://core.telegram.org/type/MessageEntity">message entity</a> parser

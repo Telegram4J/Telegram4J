@@ -3,7 +3,7 @@ package telegram4j.core;
 import reactor.netty.http.client.HttpClient;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.EventDispatcher;
-import telegram4j.core.util.EntityParserFactory;
+import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.store.StoreLayout;
 
 import java.util.Objects;

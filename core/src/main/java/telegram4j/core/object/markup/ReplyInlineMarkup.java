@@ -7,6 +7,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * Representation of inline keyboard.
+ *
+ * <a href="https://core.telegram.org/bots#inline-keyboards-and-on-the-fly-updating">Inline Keyboards</a>
+ */
 public final class ReplyInlineMarkup extends ReplyMarkup {
 
     private final telegram4j.tl.ReplyInlineMarkup data;

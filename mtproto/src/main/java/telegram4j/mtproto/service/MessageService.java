@@ -706,6 +706,18 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
+    // Docs lie - bots can't use method
+    public Mono<Updates> getMessagesReactions(InputPeer peer, Iterable<Integer> messageIds) {
+        return client.sendAwait(GetMessagesReactions.builder()
+                .peer(peer)
+                .id(messageIds)
+                .build());
+    }
+
+    public Mono<MessageReactionsList> getMessageReactionsList(GetMessageReactionsList request) {
+        return client.sendAwait(request);
+    }
+
     // Message interactions
 
     @BotCompatible

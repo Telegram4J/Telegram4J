@@ -61,6 +61,7 @@ import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
 import telegram4j.core.spec.inline.*;
+import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -443,9 +444,10 @@ public final class EntityFactory {
             var builder = BaseInputBotInlineResult.builder()
                     .type("article")
                     .title(r.title())
-                    .description(r.description())
                     .id(r.id())
                     .url(r.url());
+
+            r.description().ifPresent(builder::description);
 
             var contentBuilder = InputWebDocument.builder()
                     .url(r.url())
@@ -456,7 +458,8 @@ public final class EntityFactory {
                     ImmutableDocumentAttributeFilename.of(s)));
 
             builder.content(contentBuilder.build());
-            builder.thumb(createThumbnail(r.thumb()));
+
+            r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
 
             return sendMessage.map(builder::sendMessage)
                     .map(ImmutableBaseInputBotInlineResult.Builder::build);
@@ -499,8 +502,8 @@ public final class EntityFactory {
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableBaseInputBotInlineResult.Builder::build);
             }
-        } else if (spec instanceof InlineResultFileSpec) {
-            InlineResultFileSpec r = (InlineResultFileSpec) spec;
+        } else if (spec instanceof InlineResultDocumentSpec) {
+            InlineResultDocumentSpec r = (InlineResultDocumentSpec) spec;
 
             DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
             if (documentType == DocumentType.UNKNOWN) {

@@ -1,7 +1,9 @@
-package telegram4j.core.object;
+package telegram4j.core.util;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.AuthorizationResources;
+import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.GroupChat;
 import telegram4j.core.object.chat.PrivateChat;

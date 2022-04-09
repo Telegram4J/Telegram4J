@@ -2,8 +2,8 @@ package telegram4j.core.event.domain.user;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.UserStatus;
+import telegram4j.core.util.Id;
 
 import java.util.Optional;
 

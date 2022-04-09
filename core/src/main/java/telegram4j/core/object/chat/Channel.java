@@ -5,6 +5,8 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.InputChatPhotoSpec;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 import telegram4j.tl.InputStickerSet;

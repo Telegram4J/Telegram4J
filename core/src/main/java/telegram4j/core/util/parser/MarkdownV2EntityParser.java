@@ -1,10 +1,10 @@
-package telegram4j.core.util;
+package telegram4j.core.util.parser;
 
 import telegram4j.core.object.MessageEntity;
 
 import java.util.regex.Matcher;
 
-import static telegram4j.core.util.EntityParserSupport.USER_LINK_ID_PATTERN;
+import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTERN;
 
 class MarkdownV2EntityParser implements EntityParser {
 

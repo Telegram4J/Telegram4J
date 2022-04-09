@@ -7,6 +7,7 @@ import telegram4j.tl.InputPeer;
 import java.util.List;
 import java.util.Objects;
 
+/** Container object with found deleted messages and peer id. */
 public class ResolvedDeletedMessages {
 
     private final InputPeer peer;

@@ -2,11 +2,11 @@ package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.PeerEntity;
-import telegram4j.core.object.PeerId;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 import telegram4j.tl.InputMessage;
 
 /** Interface to accessing telegram entities. */

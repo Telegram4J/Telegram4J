@@ -3,7 +3,10 @@ package telegram4j.core.object.chat;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.*;
+import telegram4j.core.object.ChatBannedRightsSettings;
+import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.TelegramObject;
+import telegram4j.core.util.Id;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 

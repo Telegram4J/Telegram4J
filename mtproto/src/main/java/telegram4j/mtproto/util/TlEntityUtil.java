@@ -86,9 +86,8 @@ public class TlEntityUtil {
     }
 
     public static String stripUsername(String username) {
-        return username.toLowerCase().trim()
-                .replace(".", "")
-                .replace("@", "");
+        username = username.toLowerCase().trim();
+        return username.startsWith("@") ? username.substring(1) : username;
     }
 
     public static long getRawPeerId(Peer peer) {

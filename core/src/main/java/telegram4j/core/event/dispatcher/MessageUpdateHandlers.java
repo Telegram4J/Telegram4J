@@ -8,12 +8,12 @@ import telegram4j.core.event.domain.message.DeleteMessagesEvent;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.event.domain.message.UpdatePinnedMessagesEvent;
-import telegram4j.core.object.Id;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.core.util.Id;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 

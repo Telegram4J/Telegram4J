@@ -7,6 +7,8 @@ import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 
 import java.time.Duration;
 import java.util.Optional;

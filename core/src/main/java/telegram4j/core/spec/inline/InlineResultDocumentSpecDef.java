@@ -8,7 +8,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 @Value.Immutable
-interface InlineResultFileSpecDef extends InlineResultSpec {
+interface InlineResultDocumentSpecDef extends InlineResultSpec {
 
     /**
      * @return The type of web file, if absent {@link DocumentType#GENERAL} would be used. Must be not {@link DocumentType#UNKNOWN}.

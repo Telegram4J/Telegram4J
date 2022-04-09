@@ -1,4 +1,4 @@
-package telegram4j.core.util;
+package telegram4j.core.util.parser;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.MessageEntity;

@@ -1,8 +1,8 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
-import telegram4j.core.object.PeerId;
-import telegram4j.core.util.EntityParserFactory;
+import telegram4j.core.util.PeerId;
+import telegram4j.core.util.parser.EntityParserFactory;
 
 import java.time.Instant;
 import java.util.Optional;

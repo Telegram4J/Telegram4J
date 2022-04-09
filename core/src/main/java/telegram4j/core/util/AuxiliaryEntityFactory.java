@@ -5,7 +5,6 @@ import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessagesSlice;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
-import telegram4j.core.object.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.SendAsPeers;

@@ -2,7 +2,7 @@ package telegram4j.core.spec;
 
 import org.immutables.value.Value;
 import telegram4j.core.spec.media.InputMediaSpec;
-import telegram4j.core.util.EntityParser;
+import telegram4j.core.util.parser.EntityParser;
 
 import java.util.Optional;
 import java.util.function.Function;

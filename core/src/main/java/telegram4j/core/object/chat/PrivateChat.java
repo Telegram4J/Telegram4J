@@ -2,7 +2,11 @@ package telegram4j.core.object.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.*;
+import telegram4j.core.object.ChatPhoto;
+import telegram4j.core.object.PeerNotifySettings;
+import telegram4j.core.object.Photo;
+import telegram4j.core.object.User;
+import telegram4j.core.util.Id;
 
 import java.time.Duration;
 import java.util.Objects;

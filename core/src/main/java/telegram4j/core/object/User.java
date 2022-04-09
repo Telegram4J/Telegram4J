@@ -5,6 +5,8 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
