@@ -10,7 +10,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Shared MTProto telegram client resources. */
-public class MTProtoResources {
+public final class MTProtoResources {
     private final StoreLayout storeLayout;
     private final EventDispatcher eventDispatcher;
     @Nullable

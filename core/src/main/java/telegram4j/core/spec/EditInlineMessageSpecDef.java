@@ -7,7 +7,7 @@ import telegram4j.core.util.parser.EntityParser;
 import java.util.Optional;
 import java.util.function.Function;
 
-@Value.Immutable
+@Value.Immutable(singleton = true)
 interface EditInlineMessageSpecDef extends Spec {
 
     @Value.Default

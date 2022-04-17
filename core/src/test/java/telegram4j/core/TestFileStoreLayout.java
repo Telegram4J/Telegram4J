@@ -37,6 +37,10 @@ public class TestFileStoreLayout implements StoreLayout {
     private volatile AuthorizationKeyHolder authKey;
     private volatile ImmutableState state;
 
+    public TestFileStoreLayout(StoreLayout storeLayout) {
+        this(ByteBufAllocator.DEFAULT, storeLayout);
+    }
+
     public TestFileStoreLayout(ByteBufAllocator allocator, StoreLayout delegate) {
         this.allocator = allocator;
         this.delegate = delegate;

@@ -1,6 +1,5 @@
 package telegram4j.core;
 
-import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -34,7 +33,10 @@ public class MTProtoBotExample {
         String botAuthToken = System.getenv("T4J_TOKEN");
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
-                .setStoreLayout(new TestFileStoreLayout(ByteBufAllocator.DEFAULT, new StoreLayoutImpl(Function.identity())))
+                .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
+                // default params can't be generated for test sources
+                .setInitConnectionParams(new InitConnectionParams("test", "test",
+                        "en", "", "test", "en", null, null))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getServiceHolder().getBotService()

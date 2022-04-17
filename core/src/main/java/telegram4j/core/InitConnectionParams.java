@@ -15,7 +15,7 @@ import java.util.TimeZone;
  * Striped down version of {@link telegram4j.tl.request.InitConnection} settings,
  * used in connection initialization.
  */
-public class InitConnectionParams {
+public final class InitConnectionParams {
     private final String appVersion;
     private final String deviceModel;
     private final String langCode;

@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 /** Settings of user and bot auth resources. */
-public class AuthorizationResources {
+public final class AuthorizationResources {
     private final int apiId;
     private final String apiHash;
     @Nullable
