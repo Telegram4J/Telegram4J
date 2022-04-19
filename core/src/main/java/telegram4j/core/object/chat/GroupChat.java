@@ -313,6 +313,19 @@ public final class GroupChat extends BaseChat {
                         .editChatPhoto(minData.id(), c));
     }
 
+    /**
+     * Requests to edit group description.
+     *
+     * @param newAbout The new description to set.
+     * @return A {@link Mono} emitting on successful completion completion status.
+     */
+    public Mono<Boolean> editAbout(String newAbout) {
+        InputPeer peer = client.asResolvedInputPeer(getId());
+
+        return client.getServiceHolder().getChatService()
+                .editChatAbout(peer, newAbout);
+    }
+
     @Override
     public String toString() {
         return "GroupChat{" +

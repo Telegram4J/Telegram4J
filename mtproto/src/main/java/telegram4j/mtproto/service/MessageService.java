@@ -470,14 +470,9 @@ public class MessageService extends RpcService {
     public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
         return client.sendAwait(request)
                 .flatMap(u -> {
-                    switch (u.identifier()) {
-                        case BaseUpdates.ID:
-                            // This method can return 0-2 updates in a BaseUpdates and I don't know what I should return
-                            client.updates().emitNext(u, DEFAULT_PARKING);
+                    client.updates().emitNext(u, DEFAULT_PARKING);
 
-                            return Mono.empty();
-                        default: return Mono.error(new IllegalStateException("Unknown updates type: " + u));
-                    }
+                    return Mono.empty();
                 });
     }
 
@@ -625,7 +620,8 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableReadDiscussion.of(peer, msgId, readMaxId));
     }
 
-    public Mono<AffectedHistory> unpingAllMessages(InputPeer peer) {
+    @BotCompatible
+    public Mono<AffectedHistory> unpinAllMessages(InputPeer peer) {
         return client.sendAwait(ImmutableUnpinAllMessages.of(peer));
     }
 

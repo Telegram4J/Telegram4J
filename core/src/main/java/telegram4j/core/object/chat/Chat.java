@@ -9,6 +9,7 @@ import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
+import telegram4j.tl.messages.AffectedHistory;
 
 import java.time.Duration;
 import java.util.Optional;
@@ -127,6 +128,13 @@ public interface Chat extends PeerEntity {
      * @return A {@link Mono} emitting on successful completion {@link AuxiliarySendAs} container.
      */
     Mono<AuxiliarySendAs> getSendAs();
+
+    /**
+     * Requests tp unpin all messages in chat.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link AffectedHistory} with affected history range.
+     */
+    Mono<AffectedHistory> unpinAllMessages();
 
     /** All types of telegram chat. */
     enum Type {

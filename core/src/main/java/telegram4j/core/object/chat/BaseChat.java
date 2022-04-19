@@ -18,6 +18,7 @@ import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.InputPeer;
 import telegram4j.tl.InputPeerEmpty;
+import telegram4j.tl.messages.AffectedHistory;
 import telegram4j.tl.request.messages.ForwardMessages;
 import telegram4j.tl.request.messages.SendMedia;
 import telegram4j.tl.request.messages.SendMessage;
@@ -163,6 +164,13 @@ abstract class BaseChat implements Chat {
 
         return client.getServiceHolder().getChatService().getSendAs(peer)
                 .map(s -> AuxiliaryEntityFactory.createSendAs(client, s));
+    }
+
+    @Override
+    public Mono<AffectedHistory> unpinAllMessages() {
+        InputPeer peer = client.asResolvedInputPeer(getId());
+
+        return client.getServiceHolder().getMessageService().unpinAllMessages(peer);
     }
 
     @Override

@@ -71,6 +71,7 @@ public class ChatService extends RpcService {
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
+    @BotCompatible
     public Mono<Void> editChatTitle(long chatId, String title) {
         return client.sendAwait(ImmutableEditChatTitle.of(chatId, title))
                 .flatMap(u -> {
@@ -80,6 +81,7 @@ public class ChatService extends RpcService {
                 });
     }
 
+    @BotCompatible
     public Mono<Void> editChatPhoto(long chatId, InputChatPhoto photo) {
         return client.sendAwait(ImmutableEditChatPhoto.of(chatId, photo))
                 .flatMap(u -> {
@@ -93,6 +95,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableAddChatUser.of(chatId, user, forwardLimit));
     }
 
+    @BotCompatible
     public Mono<Void> deleteChatUser(long chatId, InputUser userId, boolean revokeHistory) {
         return client.sendAwait(DeleteChatUser.builder().revokeHistory(revokeHistory).chatId(chatId).userId(userId).build())
                 .flatMap(u -> {
@@ -369,5 +372,10 @@ public class ChatService extends RpcService {
 
     public Mono<SendAsPeers> getSendAs(InputPeer peer) {
         return client.sendAwait(ImmutableGetSendAs.of(peer));
+    }
+
+    @BotCompatible
+    public Mono<Boolean> editChatAbout(InputPeer peer, String about) {
+        return client.sendAwait(ImmutableEditChatAbout.of(peer, about));
     }
 }

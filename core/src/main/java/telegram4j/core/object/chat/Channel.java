@@ -350,6 +350,14 @@ public interface Channel extends Chat {
      */
     Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit);
 
+    /**
+     * Requests to edit channel description.
+     *
+     * @param newAbout The new description to set.
+     * @return A {@link Mono} emitting on successful completion completion status.
+     */
+    Mono<Boolean> editAbout(String newAbout);
+
     /** Available channel flags. */
     enum Flag {
         // ChannelMin flags

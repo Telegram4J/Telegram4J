@@ -1,18 +1,24 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Flux;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.PaginationSupport;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.photos.Photos;
+import telegram4j.tl.photos.PhotosSlice;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static telegram4j.mtproto.util.TlEntityUtil.toInputUser;
 
 /**
  * Representation for available min/full users.
@@ -237,6 +243,29 @@ public class User implements PeerEntity {
 
     public Optional<String> getPrivateForwardName() {
         return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
+    }
+
+    // Interaction methods
+
+    /**
+     * Retrieve user profile {@link Photo photo}s by specified pagination parameters.
+     *
+     * @see <a href="https://core.telegram.org/api/offsets">Pagonation</a>
+     * @param offset The number of photos to be skipped.
+     * @param maxId The id of max {@link Photo#getId()}.
+     * @param limit The number of photos to be returned.
+     * @return A {@link Flux} emitting {@link Photo} objects.
+     */
+    public Flux<Photo> getPhotos(int offset, long maxId, int limit) {
+        InputPeer p = client.asResolvedInputPeer(getId());
+        InputUser user = toInputUser(p);
+
+        return PaginationSupport.paginate(o -> client.getServiceHolder().getUserService()
+                .getUserPhotos(user, o, maxId, limit), c -> c instanceof PhotosSlice
+                        ? ((PhotosSlice) c).count() : c.photos().size(), offset, limit)
+                .flatMapIterable(Photos::photos)
+                .cast(BasePhoto.class)
+                .map(c -> new Photo(client, c, -1, p));
     }
 
     @Override

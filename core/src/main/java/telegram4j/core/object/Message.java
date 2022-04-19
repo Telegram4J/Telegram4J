@@ -8,6 +8,7 @@ import telegram4j.core.object.action.MessageAction;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.MessageMedia;
 import telegram4j.core.spec.EditMessageSpec;
+import telegram4j.core.spec.PinMessageSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
@@ -17,6 +18,7 @@ import telegram4j.tl.MessageEmpty;
 import telegram4j.tl.MessageService;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
+import telegram4j.tl.request.messages.UpdatePinnedMessage;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -363,6 +365,23 @@ public final class Message implements TelegramObject {
                 default: throw new IllegalStateException();
             }
         });
+    }
+
+    /**
+     * Requests to pin/unpin this message by specified parameters.
+     *
+     * @param spec The pin/unpin parameters.
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    public Mono<Void> pin(PinMessageSpec spec) {
+        return Mono.defer(() -> client.getServiceHolder().getMessageService()
+                .updatePinnedMessage(UpdatePinnedMessage.builder()
+                        .peer(client.asResolvedInputPeer(resolvedChatId))
+                        .id(getId())
+                        .unpin(spec.unpin())
+                        .silent(spec.silent())
+                        .pmOneside(spec.pmOneSide())
+                        .build()));
     }
 
     // Private methods

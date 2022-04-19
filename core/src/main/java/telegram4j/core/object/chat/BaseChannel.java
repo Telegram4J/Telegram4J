@@ -378,8 +378,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit) {
-        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
         Id id = getId();
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(id));
 
         return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
                 .getParticipants(channel, filter, o, limit, 0)
@@ -415,5 +415,13 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                 return new ChatParticipant(client, peerEntity, c, id);
                             });
                 });
+    }
+
+    @Override
+    public Mono<Boolean> editAbout(String newAbout) {
+        InputPeer channel = client.asResolvedInputPeer(getId());
+
+        return client.getServiceHolder().getChatService()
+                .editChatAbout(channel, newAbout);
     }
 }
