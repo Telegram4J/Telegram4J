@@ -6,32 +6,10 @@ import java.util.regex.Matcher;
 
 import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTERN;
 
-class MarkdownV2EntityParser implements EntityParser {
+class MarkdownV2EntityParser extends BaseEntityParser {
 
-    final StringBuilder striped;
-    final String str;
-
-    int cursor;
-    int offset; // offset without markup chars
-    EntityToken prev = EntityToken.UNKNOWN;
-
-    MarkdownV2EntityParser(String str) {
-        this.striped = new StringBuilder(str.length());
-        this.str = str;
-    }
-
-    @Override
-    public String source() {
-        return str;
-    }
-
-    @Override
-    public String striped() {
-        if (cursor < str.length()) {
-            throw new IllegalStateException("Parsing has not yet completed.");
-        }
-
-        return striped.toString();
+    MarkdownV2EntityParser(String source) {
+        super(source);
     }
 
     @Override

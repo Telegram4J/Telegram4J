@@ -142,12 +142,13 @@ public class Document implements TelegramObject {
      * @return The {@link List} of {@link PhotoSize thumbnails} for this document, if present.
      */
     public Optional<List<PhotoSize>> getThumbs() {
-        return data.identifier() == BaseDocument.ID
-                ? Optional.ofNullable(((BaseDocument) data).thumbs())
+        if (data.identifier() != BaseDocument.ID) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(((BaseDocument) data).thumbs())
                 .map(list -> list.stream()
                         .map(d -> EntityFactory.createPhotoSize(client, d))
-                        .collect(Collectors.toList()))
-                : Optional.empty();
+                        .collect(Collectors.toList()));
     }
 
     /**
@@ -156,12 +157,13 @@ public class Document implements TelegramObject {
      * @return The {@link List} of {@link VideoSize video thumbnails} for this document, if present.
      */
     public Optional<List<VideoSize>> getVideoThumbs() {
-        return data.identifier() == BaseDocument.ID
-                ? Optional.ofNullable(((BaseDocument) data).videoThumbs())
+        if (data.identifier() != BaseDocument.ID) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(((BaseDocument) data).videoThumbs())
                 .map(l -> l.stream()
                         .map(d -> new VideoSize(client, d))
-                        .collect(Collectors.toList()))
-                : Optional.empty();
+                        .collect(Collectors.toList()));
     }
 
     /**

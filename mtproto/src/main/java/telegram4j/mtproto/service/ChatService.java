@@ -370,6 +370,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableGetSponsoredMessages.of(channel));
     }
 
+    @BotCompatible
     public Mono<SendAsPeers> getSendAs(InputPeer peer) {
         return client.sendAwait(ImmutableGetSendAs.of(peer));
     }

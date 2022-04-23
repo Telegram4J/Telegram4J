@@ -13,7 +13,8 @@ import java.util.Optional;
 
 /**
  * Low-quality chat profile photo.
- * There are <b>2</b> versions available for download: small ({@link ChatPhoto#getSmallFileReferenceId()}) and big ({@link ChatPhoto#getBigFileReferenceId()}).
+ * There are <b>2</b> versions available for download: small ({@link ChatPhoto#getSmallFileReferenceId()})
+ * and big ({@link ChatPhoto#getBigFileReferenceId()}).
  */
 public class ChatPhoto implements TelegramObject {
     private final MTProtoTelegramClient client;
@@ -78,7 +79,7 @@ public class ChatPhoto implements TelegramObject {
      *
      * @return The expanded stripped thumbnail for photo, if present.
      */
-    public Optional<ByteBuf> getExpandedStrippedThumb() {
+    public Optional<ByteBuf> getThumb() {
         return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
     }
 

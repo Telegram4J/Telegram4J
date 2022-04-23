@@ -3,15 +3,15 @@ package telegram4j.core.util.parser;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.MessageEntity.Type;
 import telegram4j.tl.*;
 
-import java.util.Comparator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static reactor.util.function.Tuples.of;
 
 /** Markup parsing utilities. */
 public final class EntityParserSupport {
@@ -31,6 +31,13 @@ public final class EntityParserSupport {
             "(?<=^|[^$\\d_\\pL\\x{200c}])\\$(1INCH|[A-Z]{1,8})(?![$\\d_\\pL\\x{200c}])",
             Pattern.UNICODE_CASE);
     public static final Pattern BANK_CARD_PATTERN = Pattern.compile("(?<=^|[^+_\\pL\\d-.,])[\\d -]{13,}([^_\\pL\\d-]|$)");
+
+    private static final List<Tuple2<Pattern, Type>> PATTERNS =
+            List.of(of(EMAIL_PATTERN, Type.EMAIL_ADDRESS),
+                    of(HASHTAG_PATTERN, Type.HASHTAG),
+                    of(BOT_COMMAND_PATTERN, Type.BOT_COMMAND),
+                    of(CASHTAG_PATTERN, Type.CASHTAG),
+                    of(BANK_CARD_PATTERN, Type.BANK_CARD_NUMBER));
 
     private EntityParserSupport() {
     }
@@ -137,6 +144,42 @@ public final class EntityParserSupport {
             sink.complete();
         })
         .collectList()
-        .map(list -> Tuples.of(striped, list));
+        .doOnNext(list -> list.addAll(scanUniform(striped)))
+        .map(list -> of(striped, list));
+    }
+
+    public static List<MessageEntity> scanUniform(String text) {
+        List<MessageEntity> list = new ArrayList<>();
+
+        for (var t : PATTERNS) {
+            Matcher m = t.getT1().matcher(text);
+            if (!m.find()) {
+                continue;
+            }
+
+            int offset = m.start();
+            int length = m.end() - offset;
+
+            switch (t.getT2()) {
+                case EMAIL_ADDRESS:
+                    list.add(ImmutableMessageEntityEmail.of(offset, length));
+                    break;
+                case HASHTAG:
+                    list.add(ImmutableMessageEntityHashtag.of(offset, length));
+                    break;
+                case BOT_COMMAND:
+                    list.add(ImmutableMessageEntityBotCommand.of(offset, length));
+                    break;
+                case CASHTAG:
+                    list.add(ImmutableMessageEntityCashtag.of(offset, length));
+                    break;
+                case BANK_CARD_NUMBER:
+                    list.add(ImmutableMessageEntityBankCard.of(offset, length));
+                    break;
+                default: throw new IllegalStateException("Incorrect entity type: " + t);
+            }
+        }
+
+        return list;
     }
 }

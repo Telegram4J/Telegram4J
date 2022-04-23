@@ -1,7 +1,9 @@
 package telegram4j.core.object;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
+import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +29,35 @@ public class PeerSettings implements TelegramObject {
 
     public Optional<Integer> getGeoDistance() {
         return Optional.ofNullable(data.geoDistance());
+    }
+
+    public Optional<String> getRequestChatTitle() {
+        return Optional.ofNullable(data.requestChatTitle());
+    }
+
+    public Optional<Instant> getRequestChatTimestamp() {
+        return Optional.ofNullable(data.requestChatDate())
+                .map(Instant::ofEpochSecond);
+    }
+
+    @Override
+    public boolean equals(@Nullable Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PeerSettings that = (PeerSettings) o;
+        return data.equals(that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return data.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "PeerSettings{" +
+                "data=" + data +
+                '}';
     }
 
     public enum Flag {
@@ -56,7 +87,16 @@ public class PeerSettings implements TelegramObject {
         AUTOARCHIVED(7),
 
         /** Whether we can invite members to a <a href="https://core.telegram.org/api/channel">group or channel</a>. */
-        INVITE_MEMBERS(8);
+        INVITE_MEMBERS(8),
+
+        /**
+         * This flag is set if {@link #getRequestChatTitle()} and {@link #getRequestChatTimestamp()}
+         * fields are set and the join request is related to a channel
+         * (otherwise if only the request fields are set, the join request is related to a chat).
+         *
+         * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
+         */
+        REQUEST_CHAT_BROADCAST(10);
 
         private final int value;
         private final int flag;

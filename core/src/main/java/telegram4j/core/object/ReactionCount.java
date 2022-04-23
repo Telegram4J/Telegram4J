@@ -15,6 +15,11 @@ public class ReactionCount implements TelegramObject {
         this.data = Objects.requireNonNull(data, "data");
     }
 
+    @Override
+    public MTProtoTelegramClient getClient() {
+        return client;
+    }
+
     public boolean isChosen() {
         return data.chosen();
     }
@@ -25,11 +30,6 @@ public class ReactionCount implements TelegramObject {
 
     public int getCount() {
         return data.count();
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

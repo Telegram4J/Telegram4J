@@ -2,9 +2,9 @@ package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.Document;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.Video;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
@@ -34,34 +34,70 @@ public class Game implements TelegramObject {
         return client;
     }
 
+    /**
+     * Gets id of the game.
+     *
+     * @return The id of the game.
+     */
     public long getId() {
         return data.id();
     }
 
+    /**
+     * Gets access hash of the game.
+     *
+     * @return The access hash of the game.
+     */
     public long getAccessHash() {
         return data.accessHash();
     }
 
+    /**
+     * Gets short name of the game.
+     *
+     * @return The short name of the game.
+     */
     public String getShortName() {
         return data.shortName();
     }
 
+    /**
+     * Gets title of the game.
+     *
+     * @return The title of the game.
+     */
     public String getTitle() {
         return data.title();
     }
 
+    /**
+     * Gets description of the game.
+     *
+     * @return The description of the game.
+     */
     public String getDescription() {
         return data.description();
     }
 
-    public Optional<Photo> getPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
-                .map(p -> new Photo(client, p, peer, messageId));
+    /**
+     * Gets preview for the game.
+     *
+     * @return The preview for the game.
+     */
+    public Photo getPhoto() {
+        BasePhoto p = TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class);
+        Objects.requireNonNull(p);
+        return new Photo(client, p, peer, messageId);
     }
 
-    public Optional<Document> getDocument() {
+    /**
+     * Gets attached document, if present.
+     *
+     * @return The attached document, if present.
+     */
+    public Optional<Video> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                .map(d -> EntityFactory.createDocument(client, d, messageId, peer));
+                .map(d -> (Video) EntityFactory.createDocument(client, d, messageId, peer));
     }
 
     @Override

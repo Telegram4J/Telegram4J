@@ -10,5 +10,5 @@ public interface PhotoSize extends TelegramObject {
      *
      * @return The type of thumbnail.
      */
-    String getType();
+    char getType();
 }

@@ -37,8 +37,8 @@ public class VideoSize implements TelegramObject {
      *
      * @return The single-char type of applied transformations.
      */
-    public String getType() {
-        return data.type();
+    public char getType() {
+        return data.type().charAt(0);
     }
 
     /**

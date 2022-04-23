@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Geo point representation. */
-public class GeoPoint implements TelegramObject {
+public final class GeoPoint implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.BaseGeoPoint data;

@@ -22,8 +22,8 @@ public class PhotoSizeProgressive implements PhotoSize {
     }
 
     @Override
-    public String getType() {
-        return data.type();
+    public char getType() {
+        return data.type().charAt(0);
     }
 
     public int getWidth() {

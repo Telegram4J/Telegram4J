@@ -23,15 +23,15 @@ public class PhotoStrippedSize implements PhotoSize {
     }
 
     @Override
-    public String getType() {
-        return data.type();
+    public char getType() {
+        return data.type().charAt(0);
     }
 
-    public byte[] getContent() {
+    public byte[] getStrippedContent() {
         return data.bytes();
     }
 
-    public ByteBuf getExpandedContent() {
+    public ByteBuf getContent() {
         return TlEntityUtil.expandInlineThumb(data.bytes());
     }
 
