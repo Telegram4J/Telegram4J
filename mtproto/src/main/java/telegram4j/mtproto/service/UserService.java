@@ -132,8 +132,7 @@ public class UserService extends RpcService {
     }
 
     /**
-     * Search peers by substring of query.
-     * @apiNote This method not available for bots.
+     * Search peers by substring of their username/name.
      *
      * @param query The peer name substring
      * @param limit The max count of found peers

@@ -67,6 +67,7 @@ public class HelpService extends RpcService {
                 .ofType(UpdateServiceNotification.class);
     }
 
+    @BotCompatible
     public Mono<Boolean> setBotUpdatesStatus(int pendingUpdates, String message) {
         return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdates, message));
     }

@@ -40,7 +40,7 @@ public class UploadService extends RpcService {
     private static final int TEN_MB = 10 * 1024 * 1024;
     private static final int LIMIT_MB = 2000 * 1024 * 1024;
     private static final int PARALLELISM = 5;
-    private static final int PRECISE_LIMIT = 1024 << 10; // 1mb
+    private static final int PRECISE_LIMIT = 1024 * 1024; // 1mb
 
     public UploadService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
@@ -68,8 +68,6 @@ public class UploadService extends RpcService {
                 List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
                 DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.get(0);
 
-                Sinks.Empty<Void> done = Sinks.empty();
-
                 Mono<Void> initialize = Flux.range(0, PARALLELISM)
                         .map(i -> client.createMediaClient(mediaDc))
                         .doOnNext(clients::add)
@@ -80,12 +78,12 @@ public class UploadService extends RpcService {
                         .publishOn(Schedulers.boundedElastic())
                         .handle((req, sink) -> {
                             MTProtoClient client = clients.get(it.getAndUpdate(i -> i + 1 == PARALLELISM ? 0 : i + 1));
+
                             client.sendAwait(req)
                                     .filter(b -> b)
                                     .switchIfEmpty(Mono.error(new IllegalStateException("Failed to upload part #" + req.filePart())))
                                     .flatMap(b -> {
                                         if (suc.incrementAndGet() == req.fileTotalParts()) {
-                                            done.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                                             queue.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
                                             return Flux.fromIterable(clients)
                                                     .flatMap(MTProtoClient::close)
@@ -151,7 +149,7 @@ public class UploadService extends RpcService {
                     var request = ImmutableGetWebFile.of(location.asWebLocation()
                             .orElseThrow(() -> new IllegalArgumentException(
                                     "Default documents can't be downloaded as web.")),
-                            offset.get(), limit);
+                            0, limit);
 
                     return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
                             .mapNotNull(part -> {
@@ -181,7 +179,7 @@ public class UploadService extends RpcService {
                             .cdnSupported(false)
                             .location(location.asLocation().orElseThrow(() -> new IllegalArgumentException(
                                     "Web documents can't be downloaded as default files")))
-                            .offset(offset.get())
+                            .offset(0)
                             .limit(limit)
                             .build();
 

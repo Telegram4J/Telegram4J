@@ -228,6 +228,7 @@ public class MessageService extends RpcService {
                 .build());
     }
 
+    @BotCompatible
     public Mono<Document> getDocumentByHash(byte[] sha256, int size, String mimeType) {
         return client.sendAwait(ImmutableGetDocumentByHash.of(sha256, size, mimeType));
     }
@@ -334,14 +335,17 @@ public class MessageService extends RpcService {
         return client.sendAwait(request);
     }
 
+    @BotCompatible
     public Mono<Boolean> setInlineGameScore(SetInlineGameScore request) {
         return client.sendAwait(request);
     }
 
+    @BotCompatible
     public Mono<HighScores> getGameHighScores(InputPeer peer, int id, InputUser user) {
         return client.sendAwait(ImmutableGetGameHighScores.of(peer, id, user));
     }
 
+    @BotCompatible
     public Mono<HighScores> getInlineGameHighScores(InputBotInlineMessageID id, InputUser user) {
         return client.sendAwait(ImmutableGetInlineGameHighScores.of(id, user));
     }
@@ -351,9 +355,7 @@ public class MessageService extends RpcService {
     }
 
     public Mono<Chats> getAllChats(Iterable<Long> exceptIds) {
-        return client.sendAwait(GetAllChats.builder()
-                .exceptIds(exceptIds)
-                .build());
+        return client.sendAwait(GetAllChats.builder().exceptIds(exceptIds).build());
     }
 
     public Mono<WebPage> getWebPage(String url, int hash) {

@@ -29,6 +29,7 @@ public class FileReferenceId {
 
     static final char PREFIX = 'x';
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
+
     static final int MESSAGE_ID_MASK = 1 << 0;
     static final int PEER_MASK = 1 << 1;
     static final int ACCESS_HASH_MASK = 1 << 2;
@@ -104,7 +105,7 @@ public class FileReferenceId {
                 id = document0.id();
                 accessHash = document0.accessHash();
                 var thumbs = document0.thumbs();
-                firstThumbSize = thumbs != null ? thumbs.get(0).type() : "";
+                firstThumbSize = thumbs != null && !thumbs.isEmpty() ? thumbs.get(0).type() : "";
                 dcId = document0.dcId();
                 fileReference = document0.fileReference();
 
@@ -150,11 +151,12 @@ public class FileReferenceId {
         if (peer.identifier() == InputPeerEmpty.ID) {
             throw new IllegalArgumentException("Unexpected peer type: " + peer);
         }
-        var firstPhotoSize = chatPhoto.sizes().get(0);
+        var sizes = chatPhoto.sizes();
+        String photoSizeType = sizes.isEmpty() ? "" : sizes.get(0).type();
 
         return new FileReferenceId(Type.CHAT_PHOTO, DocumentType.UNKNOWN, PhotoSizeType.UNKNOWN,
                 chatPhoto.dcId(), chatPhoto.id(), chatPhoto.accessHash(),
-                chatPhoto.fileReference(), firstPhotoSize.type(),
+                chatPhoto.fileReference(), photoSizeType,
                 "", InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
@@ -200,11 +202,12 @@ public class FileReferenceId {
         if (messageId < 0) {
             throw new IllegalArgumentException("Message id must be positive.");
         }
-        var firstPhotoSize = photo.sizes().get(0);
+        var sizes = photo.sizes();
+        String photoSizeType = sizes.isEmpty() ? "" : sizes.get(0).type();
 
         return new FileReferenceId(Type.PHOTO, DocumentType.UNKNOWN,
                 PhotoSizeType.UNKNOWN, photo.dcId(), photo.id(), photo.accessHash(),
-                photo.fileReference(), firstPhotoSize.type(),
+                photo.fileReference(), photoSizeType,
                 "", InputStickerSetEmpty.instance(), -1, messageId, peer);
     }
 
@@ -218,7 +221,7 @@ public class FileReferenceId {
      */
     public static FileReferenceId ofStickerSet(InputStickerSet stickerSet, int version) {
         if (stickerSet.identifier() == InputStickerSetEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
+            throw new IllegalArgumentException("Unexpected stickerSet type.");
         }
         if (version < 0) {
             throw new IllegalArgumentException("Invalid sticker set thumbnail version.");
@@ -696,65 +699,61 @@ public class FileReferenceId {
 
     @Override
     public String toString() {
+        StringBuilder builder = new StringBuilder("FileReferenceId{");
+        builder.append("fileType=").append(fileType);
+
         switch (fileType) {
             case WEB_DOCUMENT:
-                return "FileReferenceId{" +
-                        "fileType=" + fileType +
-                        ", accessHash=" + accessHash +
-                        ", url='" + url + '\'' +
-                        ", documentType=" + documentType +
-                        ", messageId=" + messageId +
-                        ", peer=" + peer +
-                        '}';
+                builder.append(", ").append("accessHash=").append(accessHash);
+                builder.append(", ").append("url='").append(accessHash).append('\'');
+                builder.append(", ").append("documentType=").append(documentType);
+                builder.append(", ").append("messageId=").append(messageId);
+                builder.append(", ").append("peer=").append(peer);
+                break;
             case DOCUMENT:
-                return "FileReferenceId{" +
-                        "fileType=" + fileType +
-                        ", dcId=" + dcId +
-                        ", documentId=" + documentId +
-                        ", accessHash=" + accessHash +
-                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
-                        ", thumbSizeType=" + thumbSizeType +
-                        ", documentType=" + documentType +
-                        ", messageId=" + messageId +
-                        ", peer=" + peer +
-                        '}';
+                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("documentId=").append(documentId);
+                builder.append(", ").append("accessHash=").append(accessHash);
+                builder.append(", ").append("documentType=").append(documentType);
+                builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
+                builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
+                builder.append(", ").append("messageId=").append(messageId);
+                builder.append(", ").append("peer=").append(peer);
+                break;
             case STICKER_SET_THUMB:
-                return "FileReferenceId{" +
-                        "fileType=" + fileType +
-                        ", stickerSet=" + stickerSet +
-                        ", thumbVersion=" + thumbVersion +
-                        '}';
-            case PHOTO:
-                return "FileReferenceId{" +
-                        "fileType=" + fileType +
-                        ", dcId=" + dcId +
-                        ", documentId=" + documentId +
-                        ", accessHash=" + accessHash +
-                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
-                        ", thumbSizeType='" + thumbSizeType + '\'' +
-                        ", messageId=" + messageId +
-                        ", peer=" + peer +
-                        '}';
+                builder.append(", ").append("stickerSet=").append(stickerSet);
+                builder.append(", ").append("thumbVersion=").append(thumbVersion);
+                break;
             case CHAT_PHOTO:
-                String extended = sizeType != PhotoSizeType.UNKNOWN ?
-                        ", documentId=" + documentId +
-                        ", accessHash=" + accessHash +
-                        ", fileReference=" + ByteBufUtil.hexDump(fileReference) +
-                        ", thumbSizeType='" + thumbSizeType + '\''
-                        : "";
+                builder.append(", ").append("sizeType=").append(sizeType);
+                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("documentId=").append(documentId);
 
-                return "FileReferenceId{" +
-                        "fileType=" + fileType +
-                        ", sizeType=" + sizeType +
-                        ", dcId=" + dcId +
-                        ", documentId=" + documentId +
-                        extended +
-                        ", messageId=" + messageId +
-                        ", peer=" + peer +
-                        '}';
+                if (sizeType == PhotoSizeType.UNKNOWN) {
+                    builder.append(", ").append("accessHash=").append(accessHash);
+                    builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
+                    builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
+                }
+
+                builder.append(", ").append("messageId=").append(messageId);
+                builder.append(", ").append("peer=").append(peer);
+                break;
+            case PHOTO:
+                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("documentId=").append(documentId);
+                builder.append(", ").append("accessHash=").append(accessHash);
+                builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
+                builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
+                builder.append(", ").append("messageId=").append(messageId);
+                builder.append(", ").append("peer=").append(peer);
+                break;
             default:
                 throw new IllegalStateException();
         }
+
+        builder.append('}');
+
+        return builder.toString();
     }
 
     /**
@@ -771,7 +770,7 @@ public class FileReferenceId {
         /** Big chat photo size type, that's indicated {@link InputPeerPhotoFileLocation#big()} in {@literal true} state. */
         CHAT_PHOTO_BIG;
 
-        private static final PhotoSizeType[] ALL = values();
+        static final PhotoSizeType[] ALL = values();
     }
 
     /** Types of web or tg documents. */
@@ -800,7 +799,7 @@ public class FileReferenceId {
         /** Represents document with {@link DocumentAttributeSticker} attribute. */
         STICKER;
 
-        private static final DocumentType[] ALL = values();
+        static final DocumentType[] ALL = values();
 
         public static DocumentType fromAttributes(List<DocumentAttribute> attributes) {
             DocumentType type = GENERAL;
@@ -841,6 +840,6 @@ public class FileReferenceId {
         /** Type, representing chat/channel/user minimal or normal photo. */
         CHAT_PHOTO;
 
-        private static final Type[] ALL = values();
+        static final Type[] ALL = values();
     }
 }

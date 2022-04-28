@@ -5,6 +5,9 @@ import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessagesSlice;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
+import telegram4j.core.object.Message;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.SendAsPeers;
@@ -14,6 +17,7 @@ import telegram4j.tl.messages.Messages;
 import telegram4j.tl.messages.MessagesSlice;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -36,27 +40,10 @@ public final class AuxiliaryEntityFactory {
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-
                 var messages = data0.messages().stream()
                         .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
                         .filter(Objects::nonNull)
-                        .map(d -> {
-                            long peerId = TlEntityUtil.getRawPeerId(d.peerId());
-                            Id chatId;
-                            switch (d.peerId().identifier()) {
-                                case PeerChat.ID:
-                                case PeerChannel.ID:
-                                    chatId = chatsMap.get(peerId).getId();
-                                    break;
-                                case PeerUser.ID:
-                                    chatId = usersMap.get(peerId).getId();
-                                    break;
-                                default:
-                                    throw new IllegalStateException();
-                            }
-
-                            return EntityFactory.createMessage(client, d, chatId);
-                        })
+                        .map(d -> createMessage(client, d, chatsMap, usersMap))
                         .collect(Collectors.toUnmodifiableList());
                 var chats = List.copyOf(chatsMap.values());
                 var users = List.copyOf(usersMap.values());
@@ -76,27 +63,10 @@ public final class AuxiliaryEntityFactory {
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-
                 var messages = data0.messages().stream()
                         .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
                         .filter(Objects::nonNull)
-                        .map(d -> {
-                            long peerId = TlEntityUtil.getRawPeerId(d.peerId());
-                            Id chatId;
-                            switch (d.peerId().identifier()) {
-                                case PeerChat.ID:
-                                case PeerChannel.ID:
-                                    chatId = chatsMap.get(peerId).getId();
-                                    break;
-                                case PeerUser.ID:
-                                    chatId = usersMap.get(peerId).getId();
-                                    break;
-                                default:
-                                    throw new IllegalStateException();
-                            }
-
-                            return EntityFactory.createMessage(client, d, chatId);
-                        })
+                        .map(d -> createMessage(client, d, chatsMap, usersMap))
                         .collect(Collectors.toUnmodifiableList());
                 var chats = List.copyOf(chatsMap.values());
                 var users = List.copyOf(usersMap.values());
@@ -112,9 +82,7 @@ public final class AuxiliaryEntityFactory {
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-
-                var selfUser = usersMap.get(client.getSelfId().asLong());
-
+                User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, selfUser))
@@ -122,25 +90,9 @@ public final class AuxiliaryEntityFactory {
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
 
                 var messages = data0.messages().stream()
-                        .filter(m -> m.identifier() != MessageEmpty.ID)
-                        .map(m -> (BaseMessageFields) m)
-                        .map(d -> {
-                            long peerId = TlEntityUtil.getRawPeerId(d.peerId());
-                            Id chatId;
-                            switch (d.peerId().identifier()) {
-                                case PeerChat.ID:
-                                case PeerChannel.ID:
-                                    chatId = chatsMap.get(peerId).getId();
-                                    break;
-                                case PeerUser.ID:
-                                    chatId = usersMap.get(peerId).getId();
-                                    break;
-                                default:
-                                    throw new IllegalStateException();
-                            }
-
-                            return EntityFactory.createMessage(client, d, chatId);
-                        })
+                        .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
+                        .filter(Objects::nonNull)
+                        .map(d -> createMessage(client, d, chatsMap, usersMap))
                         .collect(Collectors.toUnmodifiableList());
                 var chats = List.copyOf(chatsMap.values());
                 var users = List.copyOf(usersMap.values());
@@ -174,5 +126,24 @@ public final class AuxiliaryEntityFactory {
                 .collect(Collectors.toUnmodifiableList());
 
         return new AuxiliarySendAs(client, peerIds, users, chats);
+    }
+
+    private static Message createMessage(MTProtoTelegramClient client, BaseMessageFields message,
+                                         Map<Long, Chat> chatsMap, Map<Long, User> usersMap) {
+        long peerId = TlEntityUtil.getRawPeerId(message.peerId());
+        Id chatId;
+        switch (message.peerId().identifier()) {
+            case PeerChat.ID:
+            case PeerChannel.ID:
+                chatId = chatsMap.get(peerId).getId();
+                break;
+            case PeerUser.ID:
+                chatId = usersMap.get(peerId).getId();
+                break;
+            default:
+                throw new IllegalStateException();
+        }
+
+        return EntityFactory.createMessage(client, message, chatId);
     }
 }
