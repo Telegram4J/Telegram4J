@@ -39,7 +39,7 @@ public class UploadService extends RpcService {
     private static final int PART_SIZE = 512 * 1024;
     private static final int TEN_MB = 10 * 1024 * 1024;
     private static final int LIMIT_MB = 2000 * 1024 * 1024;
-    private static final int PARALLELISM = 5;
+    private static final int PARALLELISM = 3;
     private static final int PRECISE_LIMIT = 1024 * 1024; // 1mb
 
     public UploadService(MTProtoClient client, StoreLayout storeLayout) {
@@ -49,24 +49,27 @@ public class UploadService extends RpcService {
     @BotCompatible
     public Mono<InputFile> saveFile(ByteBuf data, String name) {
         return Mono.defer(() -> {
-            long fileId = CryptoUtil.random.nextLong();
-            int parts = (int) Math.ceil((float) data.readableBytes() / PART_SIZE);
-            boolean big = data.readableBytes() > TEN_MB;
-
             if (data.readableBytes() > LIMIT_MB) {
                 return Mono.error(new IllegalArgumentException("File size is under limit. Size: "
                         + data.readableBytes() + ", limit: " + LIMIT_MB));
             }
 
+            boolean big = data.readableBytes() > TEN_MB;
+            long fileId = CryptoUtil.random.nextLong();
+            int parts = (int) Math.ceil((float) data.readableBytes() / PART_SIZE);
+
             if (big) {
                 Sinks.Many<SaveBigFilePart> queue = Sinks.many().multicast()
                         .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
 
-                AtomicInteger it = new AtomicInteger(0);
-                AtomicInteger suc = new AtomicInteger(0);
+                AtomicInteger it = new AtomicInteger();
+                AtomicInteger suc = new AtomicInteger();
 
                 List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
-                DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.get(0);
+                DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.stream()
+                        .filter(dc -> dc.getId() == client.getDatacenter().getId())
+                        .findFirst()
+                        .orElseThrow();
 
                 Mono<Void> initialize = Flux.range(0, PARALLELISM)
                         .map(i -> client.createMediaClient(mediaDc))
@@ -148,7 +151,7 @@ public class UploadService extends RpcService {
 
                     var request = ImmutableGetWebFile.of(location.asWebLocation()
                             .orElseThrow(() -> new IllegalArgumentException(
-                                    "Default documents can't be downloaded as web.")),
+                                    "Default or non-proxied documents can't be downloaded as web.")),
                             0, limit);
 
                     return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
@@ -162,8 +165,7 @@ public class UploadService extends RpcService {
                                 return part;
                             })
                             .repeat(() -> !complete.get());
-                })
-                .publishOn(Schedulers.boundedElastic());
+                });
     }
 
     @BotCompatible
@@ -195,7 +197,6 @@ public class UploadService extends RpcService {
                                 return part;
                             })
                             .repeat(() -> !complete.get());
-                })
-                .publishOn(Schedulers.boundedElastic());
+                });
     }
 }

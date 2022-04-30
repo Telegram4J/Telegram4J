@@ -163,9 +163,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      *
      * @param data The {@link ByteBuf} with file data.
      * @param filename The name for file.
-     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and CRC32.
+     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and CRC32 if applicable.
      */
-    public Mono<InputFile> saveFile(ByteBuf data, String filename) {
+    public Mono<InputFile> uploadFile(ByteBuf data, String filename) {
         return serviceHolder.getUploadService().saveFile(data, filename);
     }
 
@@ -176,21 +176,32 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @param fileReferenceId The serialized {@link FileReferenceId} of file.
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
-    public Flux<FilePart> getFile(String fileReferenceId) {
+    public Flux<FilePart> downloadFile(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .flatMapMany(loc -> {
-                    if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-                        if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
-                            return getFile0(loc);
-                        }
+                .flatMapMany(this::downloadFile);
+    }
 
-                        return serviceHolder.getUploadService().getWebFile(loc)
-                                .map(FilePart::ofWebFile);
-                    }
+    /**
+     * Request to download file by their reference from Telegram Media DC or
+     * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
+     *
+     * @param loc The location of file.
+     * @return A {@link Flux} emitting full or parts of downloading file.
+     */
+    public Flux<FilePart> downloadFile(FileReferenceId loc) {
+        return Flux.defer(() -> {
+            if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
+                if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
+                    return getFile0(loc);
+                }
 
-                    return serviceHolder.getUploadService().getFile(loc)
-                            .map(FilePart::ofFile);
-                });
+                return serviceHolder.getUploadService().getWebFile(loc)
+                        .map(FilePart::ofWebFile);
+            }
+
+            return serviceHolder.getUploadService().getFile(loc)
+                    .map(FilePart::ofFile);
+        });
     }
 
     private Flux<FilePart> getFile0(FileReferenceId loc) {

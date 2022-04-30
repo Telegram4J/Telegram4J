@@ -45,6 +45,7 @@ import telegram4j.tl.request.mtproto.PingDelayDisconnect;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,7 +59,7 @@ import java.util.stream.Collectors;
 
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.RpcException.prettyMethodName;
-import static telegram4j.mtproto.transport.IntermediateTransport.QUICK_ACK_MASK;
+import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
 public class DefaultMTProtoClient implements MTProtoClient {
@@ -92,7 +93,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final AtomicLong lastPong = new AtomicLong();
     private final AtomicInteger missedPong = new AtomicInteger();
 
-    private volatile long sessionId = random.nextLong();
+    private final long sessionId = random.nextLong();
     private volatile Sinks.Empty<Void> closeHook;
     private volatile AuthorizationKeyHolder authKey;
     private volatile Connection connection;
@@ -396,14 +397,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         lastPong.compareAndSet(0, now);
 
                         if (lastPing - lastPong.get() > 0) {
-                            if (missedPong.incrementAndGet() >= MAX_MISSED_PONG) {
-                                // sessionId = random.nextLong();
+                            int missed = missedPong.incrementAndGet();
+                            if (missed >= MAX_MISSED_PONG) {
                                 seqNo.set(0);
                                 lastMessageId = 0;
 
-                                log.debug("[C:0x{}] Session updated due server forgot it", id);
+                                if (missed == MAX_MISSED_PONG) {
+                                    log.debug("[C:0x{}] Session invalidated due server disconnect", id);
+                                }
 
-                                state.emitNext(State.DISCONNECTED, FAIL_FAST);
                                 return Mono.empty();
                             }
                         }
@@ -437,12 +439,26 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .doOnNext(key -> this.authKey = key)
                     .then();
 
+            Mono<Void> sendPending = Flux.defer(() -> Flux.fromIterable(requests.entrySet()))
+                    .doOnNext(e -> {
+                        if (rpcLog.isDebugEnabled()) {
+                            rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
+                                    Long.toHexString(e.getKey()), prettyMethodName(e.getValue().method));
+                        }
+                    })
+                    .map(Map.Entry::getValue)
+                    .filter(e -> e.method.identifier() != Ping.ID &&
+                            e.method.identifier() != PingDelayDisconnect.ID)
+                    .doOnNext(req -> outbound.emitNext(req, options.getEmissionHandler()))
+                    .then();
+
             Mono<Void> startSchedule = Mono.defer(() -> {
                 log.info("[C:0x{}] Connected to datacenter.", id);
                 state.emitNext(State.CONNECTED, options.getEmissionHandler());
                 pingEmitter.start(PING_QUERY_PERIOD);
                 ackEmitter.start(ACK_QUERY_PERIOD);
-                return Mono.when(ping, ack);
+
+                return Mono.when(ping, ack, sendPending);
             });
 
             Mono<Void> initialize = state.asFlux()
@@ -452,7 +468,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
 
             return Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
-                    .doOnError(t -> t != RETRY && !(t instanceof AbortedException) && !(t instanceof IOException), t -> {
+                    .doOnError(t -> !isRetryException(t), t -> {
                         if (t instanceof TransportException) {
                             TransportException t0 = (TransportException) t;
                             log.error("[C:0x" + id + "] Transport exception, code: " + t0.getCode(), t0);
@@ -466,7 +482,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
         .switchIfEmpty(reconnect())
         .retryWhen(options.getRetry()
-                .filter(t -> !close && (t == RETRY || t instanceof AbortedException || t instanceof IOException))
+                .filter(t -> !close && isRetryException(t))
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, options.getEmissionHandler());
                     log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
@@ -859,6 +875,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             return null;
         });
+    }
+
+    static boolean isRetryException(Throwable t) {
+        return t == RETRY || t instanceof AbortedException || t instanceof IOException;
     }
 
     static boolean isContentRelated(TlObject object) {
