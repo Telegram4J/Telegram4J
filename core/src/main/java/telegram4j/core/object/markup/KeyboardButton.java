@@ -157,7 +157,7 @@ public final class KeyboardButton implements TelegramObject {
      */
     public Optional<Id> getBotId() {
         if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
-            var inputUser = ((InputKeyboardButtonUrlAuth) data).bot();
+            InputUser inputUser = ((InputKeyboardButtonUrlAuth) data).bot();
             return Optional.of(Id.of(inputUser, client.getSelfId()));
         }
         return Optional.empty();
@@ -170,12 +170,11 @@ public final class KeyboardButton implements TelegramObject {
      */
     public Optional<Id> getUserId() {
         switch (data.identifier()) {
-            case KeyboardButtonUserProfile.ID:
-                return Optional.of(Id.ofUser(((KeyboardButtonUserProfile) data).userId(), null));
-            case InputKeyboardButtonUserProfile.ID:
-                return Optional.of(Id.of(((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
-            default:
-                return Optional.empty();
+            case KeyboardButtonUserProfile.ID: return Optional.of(Id.ofUser(
+                    ((KeyboardButtonUserProfile) data).userId(), null));
+            case InputKeyboardButtonUserProfile.ID: return Optional.of(Id.of(
+                    ((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
+            default: return Optional.empty();
         }
     }
 

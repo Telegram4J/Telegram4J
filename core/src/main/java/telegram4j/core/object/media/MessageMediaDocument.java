@@ -26,11 +26,21 @@ public class MessageMediaDocument extends BaseMessageMedia {
         this.peer = Objects.requireNonNull(peer, "peer");
     }
 
+    /**
+     * Gets document of the message, if it hasn't expired.
+     *
+     * @return The {@link Document} of the message, if it hasn't expired.
+     */
     public Optional<Document> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
                 .map(d -> EntityFactory.createDocument(client, d, messageId, peer));
     }
 
+    /**
+     * Gets {@link Duration} of the document self-destruction, if present.
+     *
+     * @return The {@link Duration} of the document self-destruction, if present.
+     */
     public Optional<Duration> getAutoDeleteDuration() {
         return Optional.ofNullable(data.ttlSeconds()).map(Duration::ofSeconds);
     }

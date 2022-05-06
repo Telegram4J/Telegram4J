@@ -395,12 +395,13 @@ public final class Message implements TelegramObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Message that = (Message) o;
-        return getBaseData().id() == that.getBaseData().id();
+        return resolvedChatId.equals(that.resolvedChatId) &&
+                getId() == that.getId();
     }
 
     @Override
     public int hashCode() {
-        return Integer.hashCode(getBaseData().id());
+        return Objects.hash(resolvedChatId, getId());
     }
 
     @Override
@@ -433,6 +434,12 @@ public final class Message implements TelegramObject {
 
         /** This is a legacy message: it has to be refetched with the new layer. */
         LEGACY(19),
+
+        /**
+         * Whether this message is <a href="https://telegram.org/blog/protected-content-delete-by-date-and-more">protected</a>
+         * and thus cannot be forwarded.
+         */
+        NO_FORWARDS(26),
 
         /** Whether the message should be shown as not modified to the user, even if an edit date is present. */
         EDIT_HIDE(21),

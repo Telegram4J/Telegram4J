@@ -25,11 +25,22 @@ public class MessageMediaPhoto extends BaseMessageMedia {
         this.peer = Objects.requireNonNull(peer, "peer");
     }
 
+
+    /**
+     * Gets photo of the message, if it hasn't expired.
+     *
+     * @return The {@link Photo} of the message, if it hasn't expired.
+     */
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
                 .map(d -> new Photo(client, d, peer, messageId));
     }
 
+    /**
+     * Gets {@link Duration} of the photo self-destruction, if present.
+     *
+     * @return The {@link Duration} of the photo self-destruction, if present.
+     */
     public Optional<Duration> getAutoDeleteDuration() {
         return Optional.ofNullable(data.ttlSeconds()).map(Duration::ofSeconds);
     }

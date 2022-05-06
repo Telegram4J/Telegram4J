@@ -534,7 +534,8 @@ public final class EntityFactory {
                 String mimeType = r.mimeType().orElseThrow(() -> new IllegalArgumentException(
                         "Mime type must be included with urls."));
 
-                if (!mimeType.equalsIgnoreCase("application/pdf") && !mimeType.equalsIgnoreCase("application/zip")) {
+                if (!mimeType.equalsIgnoreCase("application/pdf") &&
+                        !mimeType.equalsIgnoreCase("application/zip")) {
                     return Mono.error(new IllegalStateException("Not allowed mime type for web file: " + mimeType));
                 }
 

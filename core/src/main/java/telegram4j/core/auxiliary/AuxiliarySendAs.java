@@ -7,14 +7,15 @@ import telegram4j.core.util.Id;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public class AuxiliarySendAs {
     private final MTProtoTelegramClient client;
-    private final List<Id> peerIds;
+    private final Set<Id> peerIds;
     private final List<User> users;
     private final List<Chat> chats;
 
-    public AuxiliarySendAs(MTProtoTelegramClient client, List<Id> peerIds, List<User> users, List<Chat> chats) {
+    public AuxiliarySendAs(MTProtoTelegramClient client, Set<Id> peerIds, List<User> users, List<Chat> chats) {
         this.client = Objects.requireNonNull(client, "client");
         this.peerIds = Objects.requireNonNull(peerIds, "peerIds");
         this.users = Objects.requireNonNull(users, "users");
@@ -25,7 +26,7 @@ public class AuxiliarySendAs {
         return client;
     }
 
-    public List<Id> getPeerIds() {
+    public Set<Id> getPeerIds() {
         return peerIds;
     }
 

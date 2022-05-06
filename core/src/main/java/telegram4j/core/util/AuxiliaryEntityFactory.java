@@ -107,7 +107,7 @@ public final class AuxiliaryEntityFactory {
     public static AuxiliarySendAs createSendAs(MTProtoTelegramClient client, SendAsPeers data) {
         var peerIds = data.peers().stream()
                 .map(Id::of)
-                .collect(Collectors.toUnmodifiableList());
+                .collect(Collectors.toUnmodifiableSet());
 
         var users = data.users().stream()
                 .filter(u -> u.identifier() == BaseUser.ID)

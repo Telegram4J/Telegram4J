@@ -6,7 +6,7 @@ plugins {
 }
 
 ext {
-    reactor_bom_version = '2020.0.17'
+    reactor_bom_version = '2020.0.18'
     immutables_version = '2.9.0'
     javax_annotation = '1.3.2'
     junit_version = '5.8.2'

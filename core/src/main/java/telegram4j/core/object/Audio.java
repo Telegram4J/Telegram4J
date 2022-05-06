@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.DocumentAttributeAudio;
@@ -64,20 +63,6 @@ public class Audio extends Document {
      */
     public Optional<byte[]> getWaveform() {
         return Optional.ofNullable(audioData.waveform());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        Audio audio = (Audio) o;
-        return audioData.equals(audio.audioData);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), audioData);
     }
 
     @Override

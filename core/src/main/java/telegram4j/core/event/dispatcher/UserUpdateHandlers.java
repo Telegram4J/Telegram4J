@@ -89,7 +89,8 @@ class UserUpdateHandlers {
         Id userId = Id.ofUser(upd.userId(), null);
         UserNameFields old = context.getOld();
 
-        return Flux.just(new UpdateUserNameEvent(context.getClient(), userId, upd.firstName(), upd.lastName(), upd.username(), old));
+        return Flux.just(new UpdateUserNameEvent(context.getClient(), userId,
+                upd.firstName(), upd.lastName(), upd.username(), old));
     }
 
     static Flux<UpdateUserPhoneEvent> handleUpdateUserPhone(StatefulUpdateContext<UpdateUserPhone, String> context) {
@@ -102,10 +103,9 @@ class UserUpdateHandlers {
     static Flux<UpdateUserPhotoEvent> handleUpdateUserPhoto(StatefulUpdateContext<UpdateUserPhoto, UserProfilePhoto> context) {
         MTProtoTelegramClient client = context.getClient();
 
-        long userId = context.getUpdate().userId();
         // resolve input user for correct file ref id refreshing
-        return client.getMtProtoResources().getStoreLayout()
-                .resolveUser(userId)
+        return client.getMtProtoResources()
+                .getStoreLayout().resolveUser(context.getUpdate().userId())
                 .map(u -> Tuples.of(Id.of(u, client.getSelfId()), TlEntityUtil.toInputPeer(u)))
                 .map(TupleUtils.function((id, peer) -> {
                     Instant timestamp = Instant.ofEpochSecond(context.getUpdate().date());

@@ -158,6 +158,7 @@ class ChatUpdateHandlers {
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
+
                 User selfUser = Optional.ofNullable(upd.selfParticipant())
                         .map(p -> context.getUsers().get(context.getClient().getSelfId().asLong()))
                         .map(u -> EntityFactory.createUser(context.getClient(), u))
@@ -173,6 +174,7 @@ class ChatUpdateHandlers {
             }
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
+
                 GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
                         .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
                         .orElseThrow();

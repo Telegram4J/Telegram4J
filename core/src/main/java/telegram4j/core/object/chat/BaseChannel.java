@@ -358,7 +358,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                         case PeerChannel.ID:
                             peerEntity = d.chats().stream()
                                     .filter(u -> TlEntityUtil.isAvailableChat(u) && u.id() == participantId.asLong())
-                                    .map(u -> EntityFactory.createChat(client, u, null))
+                                    .map(u -> Objects.requireNonNull(EntityFactory.createChat(client, u, null)))
                                     .findFirst()
                                     .orElseThrow();
                             break;
