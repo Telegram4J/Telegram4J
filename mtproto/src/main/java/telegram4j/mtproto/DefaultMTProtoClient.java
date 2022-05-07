@@ -399,7 +399,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         if (lastPing - lastPong.get() > 0) {
                             int missed = missedPong.incrementAndGet();
                             if (missed >= MAX_MISSED_PONG) {
-                                seqNo.set(0);
                                 lastMessageId = 0;
 
                                 if (missed == MAX_MISSED_PONG) {
@@ -442,7 +441,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<Void> sendPending = Flux.defer(() -> Flux.fromIterable(requests.entrySet()))
                     .doOnNext(e -> {
                         if (rpcLog.isDebugEnabled()) {
-                            rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
+                            rpcLog.debug("[C:0x{}, M:0x{}] Re-Sending request: {}", id,
                                     Long.toHexString(e.getKey()), prettyMethodName(e.getValue().method));
                         }
                     })
@@ -730,6 +729,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             PendingRequest req = requests.get(messageId);
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
+
                 if (rpcError.errorCode() == 420) { // FLOOD_WAIT_X
                     String arg = rpcError.errorMessage().substring(
                             rpcError.errorMessage().lastIndexOf('_') + 1);
@@ -747,7 +747,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             .then();
                 }
 
-                obj = RpcException.create(rpcError, req);
+                obj = RpcException.create(rpcError, messageId, req);
             }
 
             resolve(messageId, obj);

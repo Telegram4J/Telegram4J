@@ -1,5 +1,6 @@
 package telegram4j.mtproto;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
@@ -8,7 +9,6 @@ import java.util.stream.IntStream;
 
 /** Subtype of {@link MTProtoException} which receives on RPC response. */
 public class RpcException extends MTProtoException {
-    private static final long serialVersionUID = -4159674899075462143L;
 
     private final RpcError error;
 
@@ -43,14 +43,18 @@ public class RpcException extends MTProtoException {
                 .replace("Immutable", "");
     }
 
-    static RpcException create(RpcError error, DefaultMTProtoClient.PendingRequest request) {
+    static RpcException create(RpcError error, long messageId, @Nullable DefaultMTProtoClient.PendingRequest request) {
         String orig = error.errorMessage();
         int argIdx = orig.indexOf("_X");
         String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
         String arg = argIdx != -1 ? orig.substring(argIdx) : null;
+        String hexMsgId = Long.toHexString(messageId);
+        String methodName = request != null
+                ? String.format("%s/0x%s", prettyMethodName(request.method), hexMsgId)
+                : String.format("0x%s", hexMsgId);
 
         String format = String.format("%s returned code: %d, message: %s%s",
-                prettyMethodName(request.method), error.errorCode(),
+                methodName, error.errorCode(),
                 message, arg != null ? ", param: " + arg : "");
 
         return new RpcException(format, error);
