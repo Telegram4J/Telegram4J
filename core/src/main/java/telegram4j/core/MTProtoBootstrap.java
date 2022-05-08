@@ -319,10 +319,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             composite.add(mtProtoClient.connect()
                     .doOnError(sink::error)
-                    .doFinally(signal -> {
-                        sink.success();
-                        disconnect.run();
-                    })
+                    .doFinally(signal -> disconnect.run())
                     .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
                             () -> log.debug("MTProto client completed")));
 
@@ -372,7 +369,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         // startup errors must close client
                                         .onErrorResume(e -> mtProtoClient.close()
                                                 .then(onDisconnect.asMono())
-                                                .then(Mono.empty()))
+                                                .then(Mono.fromRunnable(() -> sink.error(e))))
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(e -> authResources.getType() == Type.USER &&
