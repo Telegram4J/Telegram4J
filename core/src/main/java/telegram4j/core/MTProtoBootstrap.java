@@ -5,6 +5,7 @@ import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
@@ -307,26 +308,27 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     mtProtoResources, updatesMapper, selfId,
                     serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
 
-            Mono<Void> disconnect = Mono.fromRunnable(() -> {
+            Runnable disconnect = () -> {
                 eventDispatcher.shutdown();
                 telegramClient.getUpdatesManager().shutdown();
                 onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                log.info("All mtproto clients disconnected.");
-            });
+                log.info("MTProto client disconnected");
+            };
 
             Disposable.Composite composite = Disposables.composite();
 
             composite.add(mtProtoClient.connect()
+                    .doOnError(sink::error)
                     .doFinally(signal -> {
                         sink.success();
-                        onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                        disconnect.run();
                     })
                     .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
                             () -> log.debug("MTProto client completed")));
 
             composite.add(mtProtoClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
-                    .checkpoint("Event dispatch handler.")
+                    .checkpoint("Event dispatch handler")
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
                     .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t),
@@ -340,7 +342,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
                         switch (state) {
-                            case CLOSED: return disconnect;
+                            case CLOSED: return Mono.fromRunnable(disconnect);
                             case CONNECTED:
                                 // delegate all auth work to the user and trigger authorization only if auth key is new
                                 Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
@@ -367,15 +369,22 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .then();
 
                                 return mtProtoClient.sendAwait(invokeWithLayout)
+                                        // startup errors must close client
+                                        .onErrorResume(e -> mtProtoClient.close()
+                                                .then(onDisconnect.asMono())
+                                                .then(Mono.empty()))
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(e -> authResources.getType() == Type.USER &&
                                                         e instanceof RpcException &&
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
-                                        .then(fetchSelfId)
-                                        .then(telegramClient.getUpdatesManager().fillGap())
-                                        .doFinally(signal -> sink.success(telegramClient));
+                                        .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
+                                        .doFinally(signal -> {
+                                            if (signal == SignalType.ON_COMPLETE) {
+                                                sink.success(telegramClient);
+                                            }
+                                        });
                             default:
                                 return Mono.empty();
                         }

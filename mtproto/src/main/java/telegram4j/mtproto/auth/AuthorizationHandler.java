@@ -47,8 +47,6 @@ public final class AuthorizationHandler {
 
     public Mono<Void> start() {
         return Mono.defer(() -> {
-            log.debug("Auth key generation started!");
-
             byte[] nonce = random.generateSeed(16);
             context.setNonce(Unpooled.wrappedBuffer(nonce));
 
@@ -245,7 +243,6 @@ public final class AuthorizationHandler {
 
         context.setServerSalt(serverSalt);
 
-        log.debug("Auth key generation completed!");
         AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(client.getDatacenter(), context.getAuthKey().retain());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
         return Mono.empty();

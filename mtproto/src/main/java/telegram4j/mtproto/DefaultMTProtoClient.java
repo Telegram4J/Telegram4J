@@ -204,7 +204,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
                             .addComponents(true, bufs))
-                    .map(transport::decode)
+                    .mapNotNull(transport::decode)
                     .flatMap(payload -> {
                         if (payload.readableBytes() == Integer.BYTES) {
                             int val = payload.readIntLE();
@@ -444,6 +444,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             rpcLog.debug("[C:0x{}, M:0x{}] Re-Sending request: {}", id,
                                     Long.toHexString(e.getKey()), prettyMethodName(e.getValue().method));
                         }
+
+                        requests.remove(e.getKey());
                     })
                     .map(Map.Entry::getValue)
                     .filter(e -> e.method.identifier() != Ping.ID &&
