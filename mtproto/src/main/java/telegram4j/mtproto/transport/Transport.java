@@ -2,7 +2,6 @@ package telegram4j.mtproto.transport;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import reactor.util.annotation.Nullable;
 
 /** An MTProto TCP transport wrapping.  */
 public interface Transport {
@@ -34,7 +33,6 @@ public interface Transport {
      * @param payload The wrapped buffer payload.
      * @return The unwrapped payload if readable.
      */
-    @Nullable
     ByteBuf decode(ByteBuf payload);
 
     /**

@@ -204,9 +204,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .bufferUntil(transport::canDecode)
                     .map(bufs -> alloc.compositeBuffer(bufs.size())
                             .addComponents(true, bufs))
-                    .mapNotNull(transport::decode)
+                    .map(transport::decode)
                     .flatMap(payload -> {
-                        if (payload.readableBytes() == Integer.BYTES) {
+                        if (payload.readableBytes() == 4) {
                             int val = payload.readIntLE();
                             payload.release();
 
@@ -224,9 +224,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                 quickAckTokens.invalidate(val);
                                 return Mono.empty();
                             } else { // The error code writes as negative int32
-                                val *= -1;
                                 TransportException exc = TransportException.create(val);
-                                if (authKey == null && val == 404) { // retry authorization
+                                if (authKey == null && val == -404) { // retry authorization
                                     onAuthSink.emitError(new AuthorizationException(exc), FAIL_FAST);
                                     return Mono.empty();
                                 }
@@ -536,16 +535,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
-    public boolean updateTimeOffset(long serverTime) {
+    public void updateTimeOffset(long serverTime) {
         int updated = (int) (serverTime - System.currentTimeMillis() / 1000);
         boolean changed = Math.abs(timeOffset - updated) > 3;
-
         if (changed) {
             lastMessageId = 0;
             timeOffset = updated;
         }
-
-        return changed;
     }
 
     @Override
@@ -805,10 +801,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             switch (badMsgNotification.errorCode()) {
                 case 16: // msg_id too low
                 case 17: // msg_id too high
-                    if (updateTimeOffset(messageId)) {
-                        timeOffset = 0;
-                        lastMessageId = 0;
-                    }
+                    updateTimeOffset(messageId);
                     break;
                 case 48:
                     BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;

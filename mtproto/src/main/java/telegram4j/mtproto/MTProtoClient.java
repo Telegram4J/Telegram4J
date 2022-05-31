@@ -74,9 +74,8 @@ public interface MTProtoClient {
      * authorization key generation apply primary time synchronization
      *
      * @param serverTime The server unix time in seconds.
-     * @return A {@literal true} if time offset was updater, otherwise {@literal false}.
      */
-    boolean updateTimeOffset(long serverTime);
+    void updateTimeOffset(long serverTime);
 
     /**
      * Gets calculated server time offset used in message id generation.

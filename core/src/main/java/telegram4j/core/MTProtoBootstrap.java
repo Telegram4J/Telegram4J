@@ -5,7 +5,6 @@ import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
@@ -348,7 +347,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
                                 Mono<Void> fetchSelfId = Mono.defer(() -> {
                                             // bot user id writes before ':' char
-                                            if (authResources.getType() == Type.BOT && parseBotIdFromToken) {
+                                            if (parseBotIdFromToken && authResources.getType() == Type.BOT) {
                                                 return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
                                                         .map(t -> Long.parseLong(t.split(":", 2)[0]))
                                                         .orElseThrow(), null));
@@ -377,11 +376,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
                                         .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
-                                        .doFinally(signal -> {
-                                            if (signal == SignalType.ON_COMPLETE) {
-                                                sink.success(telegramClient);
-                                            }
-                                        });
+                                        .doOnSuccess(ignored -> sink.success(telegramClient));
                             default:
                                 return Mono.empty();
                         }

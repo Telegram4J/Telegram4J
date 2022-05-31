@@ -3,7 +3,6 @@ package telegram4j.mtproto.transport;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import reactor.util.annotation.Nullable;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -36,17 +35,12 @@ public class IntermediateTransport implements Transport {
         return Unpooled.wrappedBuffer(payload.alloc().buffer(4).writeIntLE(packetSize), payload);
     }
 
-    @Nullable
     @Override
     public ByteBuf decode(ByteBuf payload) {
         try {
             int length = payload.readIntLE();
             if (quickAck && (length & QUICK_ACK_MASK) != 0) {
                 return payload.slice(0, 4);
-            }
-
-            if (!payload.isReadable(length)) {
-                return null;
             }
 
             return payload.readSlice(length);
@@ -73,7 +67,8 @@ public class IntermediateTransport implements Transport {
 
             return completed.addAndGet(payloadLength + 4) == size.get();
         }
-        return size.get() == -1;
+        // packet is not slice
+        return true;
     }
 
     @Override

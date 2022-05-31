@@ -14,7 +14,7 @@ public class TransportException extends MTProtoException {
     public static boolean isError(int code) {
         switch (code) {
             case -404:
-            case -420: return true;
+            case -429: return true;
             default: return false;
         }
     }
@@ -23,11 +23,11 @@ public class TransportException extends MTProtoException {
         String message = null;
 
         switch (code) {
-            case 404:
+            case -404:
                 message = "Attempt to invoke a non-existent object/method.";
                 break;
 
-            case 429:
+            case -429:
                 message = "Too many connections are established to the same IP in a too short lapse of time.";
                 break;
         }
