@@ -6,7 +6,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.event.dispatcher.UpdatesMapper;
+import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
@@ -46,7 +46,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
-                          UpdatesMapper updatesMapper, AtomicReference<Id> selfId, ServiceHolder serviceHolder,
+                          Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
+                          AtomicReference<Id> selfId, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
@@ -55,10 +56,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         this.serviceHolder = serviceHolder;
         this.selfId = selfId;
         this.entityRetriever = entityRetriever.apply(this);
-        this.onDisconnect = onDisconnect;
-
-        this.updatesManager = new UpdatesManager(this, updatesMapper);
+        this.updatesManager = updatesManager.apply(this);
         this.fileReferenceManager = new FileReferenceManager(this);
+        this.onDisconnect = onDisconnect;
     }
 
     /**

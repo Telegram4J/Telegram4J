@@ -5,6 +5,7 @@ import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
@@ -18,8 +19,8 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.EventDispatcher;
+import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;
-import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
@@ -60,15 +61,16 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TcpClient tcpClient;
-    private Supplier<Transport> transport;
+    private Supplier<Transport> transport = () -> new IntermediateTransport(true);
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
-    private IntPredicate gzipPackingPredicate;
+    private IntPredicate gzipPackingPredicate = i -> i >= 1024 * 16;
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
-    private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory;
-    private UpdatesMapper updatesMapper = DefaultUpdatesMapper.instance;
+    private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory = RpcEntityRetriever::new;
+    private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
+            new DefaultUpdatesManager(c, DefaultUpdatesMapper.instance);
     private HttpClient httpClient;
 
     private InitConnectionParams initConnectionParams;
@@ -171,15 +173,15 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
-     * Sets updates mapper for event handling in the {@link UpdatesManager}.
+     * Sets updates manager factory for creating updates manager.
      * <p>
-     * If custom updates mapper doesn't set, {@link DefaultUpdatesMapper} will be used.
+     * If custom updates manager factory doesn't set, {@link DefaultUpdatesMapper} will be used.
      *
-     * @param updatesMapper A new {@link UpdatesMapper} for {@link UpdatesManager}.
+     * @param updatesManagerFactory A new factory for creating {@link UpdatesManager}.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setUpdatesMapper(UpdatesMapper updatesMapper) {
-        this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
+    public MTProtoBootstrap<O> setUpdatesMapper(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
+        this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory, "updatesManagerFactory");
         return this;
     }
 
@@ -288,9 +290,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
-                    new MTProtoOptions(initDataCenter(), initTcpClient(), initTransport(),
+                    new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
-                            initRetry(), initAuthRetry(), initGzipPackingPredicate(),
+                            initRetry(), initAuthRetry(), gzipPackingPredicate,
                             Collections.unmodifiableList(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
@@ -304,8 +306,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             AtomicReference<Id> selfId = new AtomicReference<>();
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
-                    mtProtoResources, updatesMapper, selfId,
-                    serviceHolder, initEntityRetrieverFactory(), onDisconnect.asMono());
+                    mtProtoResources, updatesManagerFactory, selfId,
+                    serviceHolder, entityRetrieverFactory, onDisconnect.asMono());
 
             Runnable disconnect = () -> {
                 eventDispatcher.shutdown();
@@ -376,7 +378,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
                                         .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
-                                        .doOnSuccess(ignored -> sink.success(telegramClient));
+                                        .doFinally(signal -> {
+                                            if (signal == SignalType.ON_COMPLETE) {
+                                                sink.success(telegramClient);
+                                            }
+                                        });
                             default:
                                 return Mono.empty();
                         }
@@ -416,13 +422,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         params.getParams().ifPresent(initConnection::params);
 
         return initConnection.build();
-    }
-
-    private Supplier<Transport> initTransport() {
-        if (transport != null) {
-            return transport;
-        }
-        return () -> new IntermediateTransport(true);
     }
 
     private TcpClient initTcpClient() {
@@ -467,20 +466,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return authRetry;
         }
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
-    }
-
-    private Function<MTProtoTelegramClient, EntityRetriever> initEntityRetrieverFactory() {
-        if (entityRetrieverFactory != null) {
-            return entityRetrieverFactory;
-        }
-        return RpcEntityRetriever::new;
-    }
-
-    private IntPredicate initGzipPackingPredicate() {
-        if (gzipPackingPredicate != null) {
-            return gzipPackingPredicate;
-        }
-        return i -> i >= 1024 * 16; // gzip packets if size is larger of 16kb
     }
 
     private HttpClient initHttpClient() {

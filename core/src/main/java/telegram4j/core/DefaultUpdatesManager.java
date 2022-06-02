@@ -9,6 +9,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
+import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
@@ -38,9 +39,9 @@ import java.util.stream.Collectors;
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 /** Manager for correct and complete work with general and channel updates. */
-public class UpdatesManager {
+public class DefaultUpdatesManager implements UpdatesManager {
 
-    private static final Logger log = Loggers.getLogger(UpdatesManager.class);
+    private static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
 
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
     private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
@@ -55,11 +56,12 @@ public class UpdatesManager {
     private volatile int date = -1;
     private volatile int seq = -1;
 
-    public UpdatesManager(MTProtoTelegramClient client, UpdatesMapper updatesMapper) {
+    public DefaultUpdatesManager(MTProtoTelegramClient client, UpdatesMapper updatesMapper) {
         this.client = Objects.requireNonNull(client, "client");
         this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
     }
 
+    @Override
     public Mono<Void> start() {
         Mono<Void> checkinInterval = stateInterval.ticks()
                 .flatMap(t -> fillGap())
@@ -68,6 +70,7 @@ public class UpdatesManager {
         return Mono.when(checkinInterval);
     }
 
+    @Override
     public Mono<Void> fillGap() {
         return client.getServiceHolder()
         .getUpdatesService().getState()
@@ -88,6 +91,7 @@ public class UpdatesManager {
         .then();
     }
 
+    @Override
     public Flux<Event> handle(Updates updates) {
         switch (updates.identifier()) {
             case UpdatesTooLong.ID:
@@ -229,8 +233,10 @@ public class UpdatesManager {
         }
     }
 
-    // private methods
-    // ================
+    @Override
+    public void shutdown() {
+        stateInterval.dispose();
+    }
 
     private void applyStateLocal(State state) {
         pts = state.pts();
@@ -741,9 +747,5 @@ public class UpdatesManager {
             default:
                 throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
-    }
-
-    public void shutdown() {
-        stateInterval.dispose();
     }
 }
