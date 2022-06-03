@@ -724,7 +724,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 }
             }
 
-            PendingRequest req = requests.get(messageId);
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
 
@@ -738,14 +737,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     }
 
                     // Need resend with delay.
-                    requests.remove(messageId);
-                    return Mono.justOrEmpty(req)
+                    return Mono.justOrEmpty(requests.remove(messageId))
                             .delayElement(delay)
                             .doOnNext(r -> outbound.emitNext(r, options.getEmissionHandler()))
                             .then();
                 }
 
-                obj = RpcException.create(rpcError, messageId, req);
+                PendingRequest req = requests.get(messageId);
+                // The error came to a forgotten request
+                if (req != null) {
+                    obj = RpcException.create(rpcError, messageId, req);
+                }
             }
 
             resolve(messageId, obj);
