@@ -19,13 +19,13 @@ public final class EntityParserSupport {
     public static final Pattern USER_LINK_ID_PATTERN = Pattern.compile("^tg://user\\?id=(\\d{1,19})$", Pattern.CASE_INSENSITIVE);
     // Patterns are taken from TDLib, https://github.com/tdlib/td/blob/master/td/telegram/MessageEntity.cpp
     public static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "([a-z0-9_-]{0,26}[.+]){0,10}[a-z0-9_-]{1,35}@(([a-z0-9][a-z0-9_-]{0,28})?[a-z0-9][.]){1,6}[a-z]{2,8}",
+            "([\\d\\w-]{0,26}[.+]){0,10}[\\d\\w-]{1,35}@(([a-z\\d][\\d\\w-]{0,28})?[a-z\\d][.]){1,6}[a-z]{2,8}",
             Pattern.CASE_INSENSITIVE);
     public static final Pattern HASHTAG_PATTERN = Pattern.compile(
             "(?<=^|[^\\d_\\pL\\x{200c}])#([\\d_\\pL\\x{200c}]{1,256})(?![\\d_\\pL\\x{200c}]*#)",
             Pattern.UNICODE_CASE);
     public static final Pattern BOT_COMMAND_PATTERN = Pattern.compile(
-            "(?<!\\b|[/<>])/([a-zA-Z0-9_]{1,64})(?:@([a-zA-Z0-9_]{3,32}))?(?!\\B|[/<>])",
+            "(?<!\\b|[/<>])/(\\w{1,64})(?:@(\\w{3,32}))?(?!\\B|[/<>])",
             Pattern.UNICODE_CASE);
     public static final Pattern CASHTAG_PATTERN = Pattern.compile(
             "(?<=^|[^$\\d_\\pL\\x{200c}])\\$(1INCH|[A-Z]{1,8})(?![$\\d_\\pL\\x{200c}])",

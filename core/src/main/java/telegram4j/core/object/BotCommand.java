@@ -5,9 +5,7 @@ import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
-/**
- * Bot command object.
- */
+/** Bot command object. */
 public class BotCommand implements TelegramObject {
 
     private final MTProtoTelegramClient client;

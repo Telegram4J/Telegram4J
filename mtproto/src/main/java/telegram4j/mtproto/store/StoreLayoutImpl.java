@@ -347,7 +347,8 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<UserNameFields> onUserNameUpdate(UpdateUserName payload) {
         return Mono.fromSupplier(() -> {
             var old = this.users.get(payload.userId());
-            UserNameFields fields = old != null ? new UserNameFields(old.min.username(), old.min.firstName(), old.min.lastName()) : null;
+            UserNameFields fields = old != null ? new UserNameFields(old.min.username(),
+                    old.min.firstName(), old.min.lastName()) : null;
 
             Optional.ofNullable(fields)
                     .map(UserNameFields::getUserName)

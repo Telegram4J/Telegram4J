@@ -1,4 +1,4 @@
-package telegram4j.core;
+package telegram4j.core.event;
 
 import reactor.bool.BooleanUtils;
 import reactor.core.publisher.Flux;
@@ -9,7 +9,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
-import telegram4j.core.event.UpdatesManager;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;

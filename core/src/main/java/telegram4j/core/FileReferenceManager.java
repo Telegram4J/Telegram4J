@@ -42,16 +42,14 @@ public class FileReferenceManager {
                                             .ofType(ChannelMessages.class)
                                             .flatMap(b -> findMessageAction(b, f));
                                 case InputPeerChat.ID:
-                                    return client.getServiceHolder()
-                                            .getMessageService()
+                                    return client.getServiceHolder().getMessageService()
                                             .getMessages(List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(BaseMessages.class)
                                             .flatMap(b -> findMessageAction(b, f));
                                 case InputPeerSelf.ID:
                                 case InputPeerUser.ID:
                                 case InputPeerUserFromMessage.ID:
-                                    return client.getServiceHolder()
-                                            .getUserService()
+                                    return client.getServiceHolder().getUserService()
                                             .getUserPhotos(TlEntityUtil.toInputUser(f.getPeer()),
                                                     0, -f.getDocumentId(), 1)
                                             .map(p -> p.photos().get(0))
@@ -62,7 +60,7 @@ public class FileReferenceManager {
                             }
                         case WEB_DOCUMENT:
                         case DOCUMENT:
-                        case PHOTO: // message id must is not -1
+                        case PHOTO: // message id must non -1
                             switch (f.getPeer().identifier()) {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:

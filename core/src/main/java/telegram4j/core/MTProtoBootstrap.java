@@ -18,6 +18,7 @@ import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
+import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;

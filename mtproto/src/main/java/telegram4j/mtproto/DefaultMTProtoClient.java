@@ -131,23 +131,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
         this(Type.DEFAULT, options.getDatacenter(), options);
     }
 
-    private TcpClient initTcpClient(TcpClient tcpClient) {
-        return tcpClient
-                .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
-                .observe((con, st) -> {
-                    if (st == ConnectionObserver.State.CONFIGURED) {
-                        log.debug("[C:0x{}] Connected to datacenter {}", id, dataCenter);
-                        log.debug("[C:0x{}] Sending transport identifier to the server", id);
-
-                        con.channel().writeAndFlush(transport.identifier(con.channel().alloc()))
-                                .addListener(f -> state.emitNext(State.CONFIGURED, options.getEmissionHandler()));
-                    } else if (!close && (st == ConnectionObserver.State.DISCONNECTING ||
-                            st == ConnectionObserver.State.RELEASED)) {
-                        state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
-                    }
-                });
-    }
-
     @Override
     public Mono<Void> connect() {
         return tcpClient.connect()
@@ -490,45 +473,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
-    private <T> Mono<T> reconnect() {
-        return Mono.defer(() -> {
-            if (close) {
-                return Mono.empty();
-            }
-
-            state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
-            return Mono.error(RETRY);
-        });
-    }
-
-    private Retry authRetry(AuthorizationHandler authHandler) {
-        return options.getAuthRetry()
-                .filter(t -> t instanceof AuthorizationException)
-                .doAfterRetryAsync(v -> authHandler.start())
-                .onRetryExhaustedThrow((spec, signal) -> {
-                    state.emitNext(State.CLOSED, options.getEmissionHandler());
-                    return new MTProtoException("Failed to generate auth key (" +
-                            signal.totalRetries() + "/" + spec.maxAttempts + ")");
-                })
-                .doAfterRetry(signal -> {
-                    log.debug("[C:0x{}] Retrying regernerate auth key (attempts: {})",
-                            id, signal.totalRetriesInARow());
-                    authContext.clear();
-                });
-    }
-
-    private Retry serverErrorRetry() {
-        return Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(2))
-                .maxBackoff(Duration.ofSeconds(15))
-                .filter(RpcException.isErrorCode(500))
-                .doAfterRetry(signal -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("[C:0x{}] Retrying request due to {} auth key for {} (attempts: {})",
-                                id, signal.failure().toString(), signal.totalRetriesInARow());
-                    }
-                });
-    }
-
     @Override
     public Sinks.Many<Updates> updates() {
         return updates;
@@ -639,6 +583,62 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .then();
     }
 
+    private TcpClient initTcpClient(TcpClient tcpClient) {
+        return tcpClient
+                .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
+                .observe((con, st) -> {
+                    if (st == ConnectionObserver.State.CONFIGURED) {
+                        log.debug("[C:0x{}] Connected to datacenter {}", id, dataCenter);
+                        log.debug("[C:0x{}] Sending transport identifier to the server", id);
+
+                        con.channel().writeAndFlush(transport.identifier(con.channel().alloc()))
+                                .addListener(f -> state.emitNext(State.CONFIGURED, options.getEmissionHandler()));
+                    } else if (!close && (st == ConnectionObserver.State.DISCONNECTING ||
+                            st == ConnectionObserver.State.RELEASED)) {
+                        state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+                    }
+                });
+    }
+
+    private <T> Mono<T> reconnect() {
+        return Mono.defer(() -> {
+            if (close) {
+                return Mono.empty();
+            }
+
+            state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+            return Mono.error(RETRY);
+        });
+    }
+
+    private Retry authRetry(AuthorizationHandler authHandler) {
+        return options.getAuthRetry()
+                .filter(t -> t instanceof AuthorizationException)
+                .doAfterRetryAsync(v -> authHandler.start())
+                .onRetryExhaustedThrow((spec, signal) -> {
+                    state.emitNext(State.CLOSED, options.getEmissionHandler());
+                    return new MTProtoException("Failed to generate auth key (" +
+                            signal.totalRetries() + "/" + spec.maxAttempts + ")");
+                })
+                .doAfterRetry(signal -> {
+                    log.debug("[C:0x{}] Retrying regernerate auth key (attempts: {})",
+                            id, signal.totalRetriesInARow());
+                    authContext.clear();
+                });
+    }
+
+    private Retry serverErrorRetry() {
+        return Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(2))
+                .maxBackoff(Duration.ofSeconds(15))
+                .filter(RpcException.isErrorCode(500))
+                .doAfterRetry(signal -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("[C:0x{}] Retrying request due to {} auth key for {} (attempts: {})",
+                                id, signal.failure().toString(), signal.totalRetriesInARow());
+                    }
+                });
+    }
+
     private long getMessageId() {
         long millis = System.currentTimeMillis();
         long seconds = millis / 1000;
@@ -681,6 +681,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             lastPong.set(System.nanoTime());
             missedPong.set(0);
+
             resolve(messageId, obj);
             return Mono.empty();
         }
