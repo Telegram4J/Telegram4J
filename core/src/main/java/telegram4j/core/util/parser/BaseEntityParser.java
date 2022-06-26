@@ -9,7 +9,7 @@ abstract class BaseEntityParser implements EntityParser {
 
     int cursor;
     int offset; // offset without markup chars
-    EntityToken prev = EntityToken.UNKNOWN;
+    EntityToken prev = null;
 
     BaseEntityParser(String source) {
         this.str = Objects.requireNonNull(source, "source");

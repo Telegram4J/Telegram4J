@@ -6,7 +6,44 @@ import java.util.regex.Matcher;
 
 import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTERN;
 
+/**
+ * Simple markdown markup parser.
+ * Tokens with {@link MessageEntity.Type#MENTION_NAME} and {@link MessageEntity.Type#PRE}
+ * types parse arguments using {@link String#trim()}
+ *
+ * <table class="striped">
+ * <caption style="display:none">genConv</caption>
+ * <thead>
+ * <tr><th scope="col" style="vertical-align:bottom"> Prefix/Suffix or Format
+ *     <th scope="col" style="vertical-align:bottom"> Token Type
+ * </thead>
+ * <tbody>
+ * <tr><th scope="row" style="vertical-align:top"> {@code ~~}
+ *     <td> {@link MessageEntity.Type#STRIKETHROUGH}
+ * <tr><th scope="row" style="vertical-align:top"> {@code **}
+ *     <td> {@link MessageEntity.Type#BOLD}
+ * <tr><th scope="row" style="vertical-align:top"> {@code _}
+ *     <td> {@link MessageEntity.Type#ITALIC}
+ * <tr><th scope="row" style="vertical-align:top"> {@code __}
+ *     <td> {@link MessageEntity.Type#UNDERLINE}
+ * <tr><th scope="row" style="vertical-align:top"> {@code [text](url)}
+ *     <td> {@link MessageEntity.Type#TEXT_URL} or if url matches
+ *     by {@link EntityParserSupport#USER_LINK_ID_PATTERN user link pattern}
+ *     will be interpreted as {@link MessageEntity.Type#MENTION_NAME}
+ * <tr><th scope="row" style="vertical-align:top"> {@code ||}
+ *     <td> {@link MessageEntity.Type#SPOILER}
+ * <tr><th scope="row" style="vertical-align:top"> {@code ```language\ntext```}
+ *     <td> {@link MessageEntity.Type#PRE} with optional programming/markup language argument
+ * <tr><th scope="row" style="vertical-align:top"> {@code `}
+ *     <td> {@link MessageEntity.Type#CODE}
+ *
+ * </tbody>
+ * </table>
+ *
+ */
 class MarkdownV2EntityParser extends BaseEntityParser {
+
+    int urlEnd = -1; // cached position of ')' in text url
 
     MarkdownV2EntityParser(String source) {
         super(source);
@@ -15,12 +52,12 @@ class MarkdownV2EntityParser extends BaseEntityParser {
     @Override
     public EntityToken nextToken() {
         if (cursor >= str.length()) {
-            return EntityToken.UNKNOWN;
+            return null;
         }
 
         for (; cursor < str.length(); cursor++) {
             char c = str.charAt(cursor);
-            if (c == '\\') {
+            if (cursor - 1 >= 0 && str.charAt(cursor - 1) == '\\') {
                 striped.append(c);
                 continue;
             }
@@ -53,7 +90,8 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                     if (prev.type() == MessageEntity.Type.TEXT_URL ||
                             prev.type() == MessageEntity.Type.MENTION_NAME) {
                         type = prev.type();
-                        length = str.indexOf(')', cursor) + 1 - cursor;
+                        length = urlEnd - cursor;
+                        urlEnd = -1;
                     }
                     break;
                 case '[':
@@ -61,6 +99,10 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                     int endText = -1;
                     int beginUrl = -1;
                     for (int i = cursor + 1; i < str.length(); i++) {
+                        if (i - 1 >= 0 && str.charAt(i - 1) == '\\') {
+                            continue;
+                        }
+
                         char n = str.charAt(i);
                         if (n == ')') {
                             endPos = i;
@@ -73,7 +115,8 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                     }
 
                     if (endText != -1 && beginUrl != -1 && endPos != -1) {
-                        arg = str.substring(beginUrl + 1, endPos);
+                        arg = str.substring(beginUrl + 1, endPos).trim();
+                        urlEnd = endPos + 1;
 
                         Matcher mentionName = USER_LINK_ID_PATTERN.matcher(arg);
                         if (mentionName.matches()) {
@@ -92,17 +135,20 @@ class MarkdownV2EntityParser extends BaseEntityParser {
 
                         int endArg = -1;
                         for (int i = cursor + 1; i < str.length(); i++) {
-                            if (Character.isWhitespace(str.charAt(i))) {
+                            if (str.charAt(i) == '\n') {
                                 endArg = i;
                                 break;
                             }
                         }
 
-                        type = MessageEntity.Type.PRE;
-                        length = 3;
                         if (endArg != -1) {
-                            arg = str.substring(cursor + 3, endArg);
-                            length += arg.length();
+                            type = MessageEntity.Type.PRE;
+                            length = 3;
+
+                            if (cursor + 3 != endArg) {
+                                arg = str.substring(cursor + 3, endArg).trim();
+                                length += arg.length();
+                            }
                         }
                     } else {
                         type = MessageEntity.Type.CODE;
@@ -136,6 +182,6 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                 return t;
             }
         }
-        return EntityToken.UNKNOWN;
+        return null;
     }
 }

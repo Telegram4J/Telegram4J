@@ -1,5 +1,7 @@
 package telegram4j.core.util.parser;
 
+import reactor.util.annotation.Nullable;
+
 /**
  * Interface of <a href="https://core.telegram.org/type/MessageEntity">message entity</a> parser
  * that can parse markup token and strip original text.
@@ -27,7 +29,8 @@ public interface EntityParser {
     /**
      * Finds the next markup token.
      *
-     * @return The next token of markup or {@link EntityToken#UNKNOWN} upon completion.
+     * @return The next token of markup or {@code null} indicating end of input.
      */
+    @Nullable
     EntityToken nextToken();
 }

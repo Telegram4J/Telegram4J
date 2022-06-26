@@ -6,7 +6,45 @@ import java.util.regex.Matcher;
 
 import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTERN;
 
-public class HtmlEntityParser extends BaseEntityParser {
+/**
+ * HTML-like text markup parser.
+ * In case when html tag is {@code <a href="url">text</a>}
+ * url argument can be optionally written
+ * in single ({@code '\''}) or double ({@code '"'}) quotes.
+ *
+ * <table class="striped">
+ * <caption style="display:none">genConv</caption>
+ * <thead>
+ * <tr><th scope="col" style="vertical-align:bottom"> HTML Tag
+ *     <th scope="col" style="vertical-align:bottom"> Token Type
+ * </thead>
+ * <tbody>
+ * <tr><th scope="row" style="vertical-align:top"> {@code <b>}
+ *     <td> {@link MessageEntity.Type#BOLD}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <i>}
+ *     <td> {@link MessageEntity.Type#ITALIC}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <u>}
+ *     <td> {@link MessageEntity.Type#UNDERLINE}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <s>}
+ *     <td> {@link MessageEntity.Type#STRIKETHROUGH}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <spoiler>}
+ *     <td> {@link MessageEntity.Type#SPOILER}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <code>}, {@code <c>}
+ *     <td> {@link MessageEntity.Type#CODE}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <a href="url">}
+ *     <td> {@link MessageEntity.Type#TEXT_URL} or if url matches
+ *     by {@link EntityParserSupport#USER_LINK_ID_PATTERN user link pattern}
+ *     will be interpreted as {@link MessageEntity.Type#MENTION_NAME}
+ * <tr><th scope="row" style="vertical-align:top"> {@code <pre language="url">}
+ *     <td> {@link MessageEntity.Type#PRE} with optional programming/markup language
+ *
+ * </tbody>
+ * </table>
+ *
+ */
+class HtmlEntityParser extends BaseEntityParser {
+
+    boolean prevOpen;
 
     HtmlEntityParser(String source) {
         super(source);
@@ -15,12 +53,18 @@ public class HtmlEntityParser extends BaseEntityParser {
     @Override
     public EntityToken nextToken() {
         if (cursor >= str.length()) {
-            return EntityToken.UNKNOWN;
+            return null;
         }
 
         for (; cursor < str.length(); cursor++) {
             char c = str.charAt(cursor);
-            if (c != '<') {
+            if (cursor - 1 >= 0 && str.charAt(cursor - 1) == '\\') {
+                striped.append(c);
+                continue;
+            }
+
+            if (c != '<' || cursor + 1 < str.length() &&
+                    str.charAt(cursor + 1) == '/' && !prevOpen) {
                 striped.append(c);
                 continue;
             }
@@ -34,6 +78,10 @@ public class HtmlEntityParser extends BaseEntityParser {
             int tokenEnd = -1;
             for (int i = cursor + 1; i < str.length(); i++) {
                 char n = str.charAt(i);
+                if (i - 1 >= 0 && str.charAt(i - 1) == '\\') {
+                    continue;
+                }
+
                 if (n == '>') {
                     endPos = i;
                     break;
@@ -45,8 +93,6 @@ public class HtmlEntityParser extends BaseEntityParser {
                     if (argBegin == -1) {
                         argBegin = i;
                     }
-                } else if (n == '<') { // invalid token
-                    break;
                 }
             }
 
@@ -57,6 +103,7 @@ public class HtmlEntityParser extends BaseEntityParser {
             tokenEnd = tokenEnd != -1 ? tokenEnd : endPos;
             int coffset = 1;
             char n = str.charAt(cursor + 1);
+            boolean open = n != '/';
             if (n == '/') {
                 n = str.charAt(cursor + 2);
                 coffset = 2;
@@ -84,7 +131,7 @@ public class HtmlEntityParser extends BaseEntityParser {
                 case 'a':
                     type = MessageEntity.Type.TEXT_URL;
                     String href;
-                    if (argBegin != -1 && (href = str.substring(argBegin, endPos)).contains("=")) {
+                    if (argBegin != -1 && open && (href = str.substring(argBegin, endPos)).contains("=")) {
                         String[] parts = href.split("=", 2);
                         if (parts[0].trim().equalsIgnoreCase("href")) {
                             arg = unqoute(parts[1]);
@@ -99,7 +146,9 @@ public class HtmlEntityParser extends BaseEntityParser {
                             type = MessageEntity.Type.UNKNOWN;
                         }
                     } else { // end of url/mention
-                        if (prev.type() != MessageEntity.Type.TEXT_URL && prev.type() != MessageEntity.Type.MENTION_NAME) {
+                        if (prev.type() != MessageEntity.Type.TEXT_URL &&
+                            prev.type() != MessageEntity.Type.MENTION_NAME) {
+                            // incorrect tag markup
                             type = MessageEntity.Type.UNKNOWN;
                         } else {
                             type = prev.type();
@@ -116,7 +165,7 @@ public class HtmlEntityParser extends BaseEntityParser {
                         length += 2;
 
                         String language;
-                        if (argBegin != -1 && (language = str.substring(argBegin, endPos)).contains("=")) {
+                        if (argBegin != -1 && open && (language = str.substring(argBegin, endPos)).contains("=")) {
                             String[] parts = language.split("=", 2);
                             if (parts[0].trim().equalsIgnoreCase("language")) {
                                 arg = unqoute(parts[1]);
@@ -145,18 +194,18 @@ public class HtmlEntityParser extends BaseEntityParser {
 
                 cursor += length;
                 prev = t;
+                prevOpen = open;
                 offset += length;
                 return t;
             }
         }
-        return EntityToken.UNKNOWN;
+        return null;
     }
 
     private String unqoute(String part) {
         char f = part.charAt(0);
         char e = part.charAt(part.length() - 1);
-        // The parser is very loyal to the markup, so the lines with beginning " and end ' chats will be valid
-        if ((f == '\'' || f == '"') && (e == '\'' || e == '"')) {
+        if ((f == '\'' || f == '"') && e == f) {
             return part.substring(1, part.length() - 1);
         }
         return part;

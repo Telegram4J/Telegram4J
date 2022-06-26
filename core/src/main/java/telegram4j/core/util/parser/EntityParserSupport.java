@@ -53,7 +53,7 @@ public final class EntityParserSupport {
     public static Mono<Tuple2<String, List<MessageEntity>>> parse(MTProtoTelegramClient client, EntityParser parser) {
         List<EntityToken> tokens = new LinkedList<>();
         EntityToken t;
-        while ((t = parser.nextToken()) != EntityToken.UNKNOWN) {
+        while ((t = parser.nextToken()) != null) {
             tokens.add(t);
         }
 
@@ -128,8 +128,7 @@ public final class EntityParserSupport {
                     case MENTION_NAME:
                         String arg = Objects.requireNonNull(begin.arg());
                         long userId = Long.parseLong(arg);
-                        client.getMtProtoResources()
-                                .getStoreLayout()
+                        client.getMtProtoResources().getStoreLayout()
                                 .resolveUser(userId)
                                 .map(p -> ImmutableInputMessageEntityMentionName.of(offset, length, p))
                                 .subscribe(sink::next, sink::error, sink::complete);
