@@ -49,7 +49,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public final class MTProtoBootstrap<O extends MTProtoOptions> {
@@ -65,7 +64,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Supplier<Transport> transport = () -> new IntermediateTransport(true);
     private RetryBackoffSpec retry;
     private RetryBackoffSpec authRetry;
-    private IntPredicate gzipPackingPredicate = i -> i >= 1024 * 16;
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
@@ -181,7 +179,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param updatesManagerFactory A new factory for creating {@link UpdatesManager}.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setUpdatesMapper(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
+    public MTProtoBootstrap<O> setUpdatesManager(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
         this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory, "updatesManagerFactory");
         return this;
     }
@@ -198,19 +196,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     public MTProtoBootstrap<O> setEntityRetrieverFactory(Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory) {
         this.entityRetrieverFactory = Objects.requireNonNull(entityRetrieverFactory, "entityRetrieverFactory");
-        return this;
-    }
-
-    /**
-     * Sets packet size predicate by which packets would be compressed with gzip.
-     * <p>
-     * If custom packet size predicate doesn't set, predicate with <b>16KB</b> package's size will be used.
-     *
-     * @param gzipPackingPredicate A new predicate for applying gzip to packets.
-     * @return This builder.
-     */
-    public MTProtoBootstrap<O> setGzipPackingPredicate(IntPredicate gzipPackingPredicate) {
-        this.gzipPackingPredicate = Objects.requireNonNull(gzipPackingPredicate, "gzipPackingPredicate");
         return this;
     }
 
@@ -293,7 +278,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
-                            initRetry(), initAuthRetry(), gzipPackingPredicate,
+                            initRetry(), initAuthRetry(),
                             Collections.unmodifiableList(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,

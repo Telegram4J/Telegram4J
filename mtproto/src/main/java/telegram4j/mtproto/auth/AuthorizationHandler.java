@@ -47,7 +47,9 @@ public final class AuthorizationHandler {
 
     public Mono<Void> start() {
         return Mono.defer(() -> {
-            byte[] nonce = random.generateSeed(16);
+            byte[] nonce = new byte[16];
+            random.nextBytes(nonce);
+
             context.setNonce(Unpooled.wrappedBuffer(nonce));
 
             return client.sendAuth(ImmutableReqPqMulti.of(nonce));
@@ -119,7 +121,9 @@ public final class AuthorizationHandler {
         byte[] pBytes = toByteArray(p);
         byte[] qBytes = toByteArray(q);
 
-        byte[] newNonce = random.generateSeed(32);
+        byte[] newNonce = new byte[32];
+        random.nextBytes(newNonce);
+
         context.setNewNonce(Unpooled.wrappedBuffer(newNonce));
 
         if (p.longValueExact() > q.longValueExact()) {
@@ -141,8 +145,9 @@ public final class AuthorizationHandler {
 
         ByteBuf pqInnerDataBuf = TlSerializer.serialize(alloc, pqInnerData);
         ByteBuf hash = sha1Digest(pqInnerDataBuf);
-        ByteBuf seed = Unpooled.wrappedBuffer(random.generateSeed(
-                255 - hash.readableBytes() - pqInnerDataBuf.readableBytes()));
+        byte[] seedb = new byte[255 - hash.readableBytes() - pqInnerDataBuf.readableBytes()];
+        random.nextBytes(seedb);
+        ByteBuf seed = Unpooled.wrappedBuffer(seedb);
         ByteBuf dataWithHash = Unpooled.wrappedBuffer(hash, pqInnerDataBuf, seed);
         ByteBuf encrypted = rsaEncrypt(dataWithHash, key);
 
@@ -180,7 +185,10 @@ public final class AuthorizationHandler {
         ServerDHInnerData serverDHInnerData = TlDeserializer.deserialize(answer);
         answer.release();
 
-        BigInteger b = fromByteArray(random.generateSeed(256));
+        byte[] bs = new byte[256];
+        random.nextBytes(bs);
+
+        BigInteger b = fromByteArray(bs);
         BigInteger g = BigInteger.valueOf(serverDHInnerData.g());
         BigInteger dhPrime = fromByteArray(serverDHInnerData.dhPrime());
         BigInteger gb = g.modPow(b, dhPrime);

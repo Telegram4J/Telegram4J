@@ -84,9 +84,9 @@ public class ChatPhoto implements TelegramObject {
     }
 
     /**
-     * Gets not-expanded stripped thumbnail for photo, if present.
+     * Gets raw stripped thumbnail for photo, if present.
      *
-     * @return The not-expanded stripped thumbnail for photo, if present.
+     * @return The raw stripped thumbnail for photo, if present.
      */
     public Optional<byte[]> getStrippedThumb() {
         return Optional.ofNullable(data.strippedThumb());

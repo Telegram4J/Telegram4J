@@ -179,7 +179,9 @@ public final class CryptoUtil {
         }
 
         int padding = factor - src.readableBytes() % factor;
-        return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(random.generateSeed(padding)));
+        byte[] paddingb = new byte[padding];
+        random.nextBytes(paddingb);
+        return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(paddingb));
     }
 
     public static void reverse(ByteBuf data) {

@@ -60,7 +60,7 @@ public class FileReferenceManager {
                             }
                         case WEB_DOCUMENT:
                         case DOCUMENT:
-                        case PHOTO: // message id must non -1
+                        case PHOTO: // message id must be present
                             switch (f.getPeer().identifier()) {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:

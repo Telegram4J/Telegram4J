@@ -7,7 +7,6 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
 import java.util.List;
-import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 public class MTProtoOptions {
@@ -18,13 +17,13 @@ public class MTProtoOptions {
     protected final Sinks.EmitFailureHandler emissionHandler;
     protected final RetryBackoffSpec retry;
     protected final RetryBackoffSpec authRetry;
-    protected final IntPredicate gzipPackingPredicate;
     protected final List<ResponseTransformer> responseTransformers;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
-                          Supplier<Transport> transport, StoreLayout storeLayout, Sinks.EmitFailureHandler emissionHandler,
+                          Supplier<Transport> transport, StoreLayout storeLayout,
+                          Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec retry, RetryBackoffSpec authRetry,
-                          IntPredicate gzipPackingPredicate, List<ResponseTransformer> responseTransformers) {
+                          List<ResponseTransformer> responseTransformers) {
         this.datacenter = datacenter;
         this.tcpClient = tcpClient;
         this.transport = transport;
@@ -32,7 +31,6 @@ public class MTProtoOptions {
         this.emissionHandler = emissionHandler;
         this.retry = retry;
         this.authRetry = authRetry;
-        this.gzipPackingPredicate = gzipPackingPredicate;
         this.responseTransformers = responseTransformers;
     }
 
@@ -62,10 +60,6 @@ public class MTProtoOptions {
 
     public RetryBackoffSpec getAuthRetry() {
         return authRetry;
-    }
-
-    public IntPredicate getGzipPackingPredicate() {
-        return gzipPackingPredicate;
     }
 
     public List<ResponseTransformer> getResponseTransformers() {

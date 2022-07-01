@@ -3,16 +3,16 @@ package telegram4j.mtproto.transport;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-
-import java.util.concurrent.atomic.AtomicInteger;
+import reactor.util.Logger;
+import reactor.util.Loggers;
 
 /** A MTProto transport which aligns data up to 4-byte. */
 public class IntermediateTransport implements Transport {
+    private static final Logger log = Loggers.getLogger(IntermediateTransport.class);
+
     public static final int ID = 0xeeeeeeee;
 
-    // size of current handling packet
-    private final AtomicInteger size = new AtomicInteger(-1);
-    private final AtomicInteger completed = new AtomicInteger(-1);
+    private int size = -1;
 
     private volatile boolean quickAck;
 
@@ -21,8 +21,8 @@ public class IntermediateTransport implements Transport {
     }
 
     @Override
-    public ByteBuf identifier(ByteBufAllocator allocator) {
-        return allocator.buffer(Integer.BYTES).writeIntLE(ID);
+    public ByteBuf identifier(ByteBufAllocator alloc) {
+        return alloc.buffer(Integer.BYTES).writeIntLE(ID);
     }
 
     @Override
@@ -36,42 +36,6 @@ public class IntermediateTransport implements Transport {
     }
 
     @Override
-    public ByteBuf decode(ByteBuf payload) {
-        try {
-            int length = payload.readIntLE();
-            if (quickAck && (length & QUICK_ACK_MASK) != 0) {
-                return payload.slice(0, 4);
-            }
-
-            return payload.readSlice(length);
-        } finally {
-            size.set(-1);
-            completed.set(-1);
-        }
-    }
-
-    @Override
-    public boolean canDecode(ByteBuf payload) {
-        int length = payload.getIntLE(0);
-
-        if (quickAck && size.get() == -1 && (length & QUICK_ACK_MASK) != 0) {
-            return true;
-        }
-
-        int payloadLength = payload.readableBytes() - 4;
-        if (length != payloadLength) { // is a part of stream
-            if (size.compareAndSet(-1, length)) { // header of a stream
-                completed.set(payloadLength);
-                return false;
-            }
-
-            return completed.addAndGet(payloadLength + 4) == size.get();
-        }
-        // packet is not slice
-        return true;
-    }
-
-    @Override
     public boolean supportQuickAck() {
         return quickAck;
     }
@@ -79,5 +43,60 @@ public class IntermediateTransport implements Transport {
     @Override
     public void setQuickAckState(boolean enable) {
         this.quickAck = enable;
+    }
+
+    @Override
+    public ByteBuf decode(ByteBuf payload) {
+        if (!payload.isReadable(4)) {
+            return null;
+        }
+
+        payload.markReaderIndex();
+        int length = payload.readIntLE();
+
+        if (quickAck && (length & QUICK_ACK_MASK) != 0) {
+            payload.resetReaderIndex();
+
+            return payload.readRetainedSlice(4);
+        }
+
+        int payloadLength = payload.readableBytes();
+        if (length != payloadLength) { // is a part of stream
+            if (size == -1) { // header of a stream
+                // log.debug("[header] {} / {}", payloadLength, length);
+
+                if (payloadLength >= length) {
+                    ByteBuf buf = payload.readRetainedSlice(length);
+                    size = -1;
+                    return buf;
+                }
+
+                size = length;
+                payload.resetReaderIndex();
+                return null;
+            } // case for big streams (untested)
+
+            payloadLength += 4; // return 4 bytes from length
+
+            // log.debug("[stream] {} / {}", payloadLength, size);
+            if (payloadLength >= size) { // completed
+                ByteBuf buf = payload.readRetainedSlice(size);
+                size = -1;
+                return buf;
+            } else {
+                payload.resetReaderIndex();
+                return null;
+            }
+        }
+
+        // if (size != -1) {
+        //     log.debug("[stream] {}", payloadLength);
+        // } else {
+        //     log.debug("[packet] r: {}", payloadLength);
+        // }
+
+        // packet is not slice
+        size = -1;
+        return payload.readRetainedSlice(length);
     }
 }
