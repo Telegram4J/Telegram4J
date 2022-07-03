@@ -78,7 +78,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private static final int ACK_SEND_THRESHOLD = 3;
     private static final Throwable RETRY = new RetryConnectException();
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
-    private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(30);
+    private static final Duration ACK_QUERY_PERIOD = Duration.ofSeconds(15);
     private static final int PING_TIMEOUT = (int) PING_QUERY_PERIOD.multipliedBy(2).getSeconds();
 
     private final DataCenter dataCenter;
@@ -151,7 +151,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             AuthorizationHandler authHandler = new AuthorizationHandler(this, authContext, onAuthSink, alloc);
 
-            connection.addHandlerFirst(new DelegateChannelHandler());
+            connection.addHandlerFirst(new DecodeChannelHandler());
 
             Mono<Void> stateHandler = state.asFlux()
                     .flatMap(state -> {
@@ -1036,8 +1036,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .collect(Collectors.joining(", ")));
         }
 
-        return sendAwait(MsgsAck.builder().msgIds(acknowledgments).build())
-                .and(Mono.fromRunnable(acknowledgments::clear));
+        var acks = MsgsAck.builder().msgIds(acknowledgments).build();
+        acknowledgments.clear();
+
+        return sendAwait(acks);
     }
 
     @SuppressWarnings("unchecked")
@@ -1134,7 +1136,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         }
     }
 
-    class DelegateChannelHandler extends ByteToMessageDecoder {
+    class DecodeChannelHandler extends ByteToMessageDecoder {
         @Override
         protected void decode(ChannelHandlerContext ctx, ByteBuf payload, List<Object> out) {
             ByteBuf buf = transport.decode(payload);
