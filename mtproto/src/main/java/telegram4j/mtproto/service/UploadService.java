@@ -2,7 +2,6 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
-import io.netty.util.internal.EmptyArrays;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -27,7 +26,6 @@ import telegram4j.tl.upload.WebFile;
 
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -100,13 +98,12 @@ public class UploadService extends RpcService {
 
                 Mono<Void> reader = Flux.range(0, parts)
                         .doOnNext(filePart -> {
-                            ByteBuf part = data.readBytes(Math.min(PART_SIZE, data.readableBytes()));
-                            byte[] partBytes = CryptoUtil.toByteArray(part);
+                            ByteBuf part = data.readSlice(Math.min(PART_SIZE, data.readableBytes()));
 
                             SaveBigFilePart req = SaveBigFilePart.builder()
                                     .fileId(fileId)
                                     .filePart(filePart)
-                                    .bytes(partBytes)
+                                    .bytes(part)
                                     .fileTotalParts(parts)
                                     .build();
 
@@ -122,11 +119,10 @@ public class UploadService extends RpcService {
 
             return Flux.range(0, parts)
                     .flatMap(filePart -> {
-                        ByteBuf part = data.readBytes(Math.min(PART_SIZE, data.readableBytes()));
-                        byte[] partBytes = CryptoUtil.toByteArray(part);
+                        ByteBuf partBytes = data.readSlice(Math.min(PART_SIZE, data.readableBytes()));
 
                         synchronized (md5) {
-                            md5.update(partBytes);
+                            md5.update(partBytes.nioBuffer());
                         }
 
                         SaveFilePart req = SaveFilePart.builder()
@@ -157,7 +153,7 @@ public class UploadService extends RpcService {
                     return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
                             .mapNotNull(part -> {
                                 offset.addAndGet(limit);
-                                if (part.fileType() == FileType.UNKNOWN || Arrays.equals(EmptyArrays.EMPTY_BYTES, part.bytes())) { // download completed
+                                if (part.fileType() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
                                     complete.set(true);
                                     return null;
                                 }
@@ -189,7 +185,7 @@ public class UploadService extends RpcService {
                             .cast(BaseFile.class)
                             .mapNotNull(part -> {
                                 offset.addAndGet(limit);
-                                if (part.type() == FileType.UNKNOWN || Arrays.equals(EmptyArrays.EMPTY_BYTES, part.bytes())) { // download completed
+                                if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
                                     complete.set(true);
                                     return null;
                                 }

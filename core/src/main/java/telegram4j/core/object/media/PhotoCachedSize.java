@@ -1,5 +1,6 @@
 package telegram4j.core.object.media;
 
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
@@ -33,7 +34,7 @@ public class PhotoCachedSize implements PhotoSize {
         return data.h();
     }
 
-    public byte[] getContent() {
+    public ByteBuf getContent() {
         return data.bytes();
     }
 

@@ -36,7 +36,7 @@ import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.EmissionHandlers;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
-import telegram4j.tl.api.TlObject;
+import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
@@ -236,7 +236,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
-     *
      * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono} and terminate client with disconnecting.
@@ -383,7 +382,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     // Resources initialization
     // ==========================
 
-    private InitConnection<TlObject> initConnection() {
+    private InitConnection<?, TlMethod<?>> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
                 : InitConnectionParams.getDefault();

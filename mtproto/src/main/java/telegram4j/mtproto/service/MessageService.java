@@ -1,5 +1,6 @@
 package telegram4j.mtproto.service;
 
+import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
@@ -118,12 +119,14 @@ public class MessageService extends RpcService {
         return client.sendAwait(ImmutableGetDhConfig.of(version, randomLength));
     }
 
-    public Mono<EncryptedChat> requestEncryption(InputUser user, int randomId, byte[] ga) {
-        return client.sendAwait(ImmutableRequestEncryption.of(user, randomId, ga));
+    public Mono<EncryptedChat> requestEncryption(InputUser user, int randomId, ByteBuf ga) {
+        return client.sendAwait(ImmutableRequestEncryption.of(user, randomId)
+                .withGA(ga));
     }
 
-    public Mono<EncryptedChat> acceptEncryption(InputEncryptedChat peer, byte[] ga, long fingerprint) {
-        return client.sendAwait(ImmutableAcceptEncryption.of(peer, ga, fingerprint));
+    public Mono<EncryptedChat> acceptEncryption(InputEncryptedChat peer, ByteBuf gb, long fingerprint) {
+        return client.sendAwait(ImmutableAcceptEncryption.of(peer, fingerprint)
+                .withGB(gb));
     }
 
     public Mono<Boolean> discardEncryption(boolean deleteEncryption, int chatId) {
@@ -229,8 +232,9 @@ public class MessageService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Document> getDocumentByHash(byte[] sha256, int size, String mimeType) {
-        return client.sendAwait(ImmutableGetDocumentByHash.of(sha256, size, mimeType));
+    public Mono<Document> getDocumentByHash(ByteBuf sha256, int size, String mimeType) {
+        return client.sendAwait(ImmutableGetDocumentByHash.of(size, mimeType)
+                .withSha256(sha256));
     }
 
     public Mono<SavedGifs> getSavedGifs(long hash) {
@@ -478,7 +482,7 @@ public class MessageService extends RpcService {
                 });
     }
 
-    public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<byte[]> options) {
+    public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<ByteBuf> options) {
         return client.sendAwait(SendVote.builder()
                 .peer(peer)
                 .msgId(msgId)
@@ -568,12 +572,12 @@ public class MessageService extends RpcService {
                 .build());
     }
 
-    public Mono<VotesList> getPollVotes(InputPeer peer, int id, @Nullable byte[] option,
+    public Mono<VotesList> getPollVotes(InputPeer peer, int id, @Nullable ByteBuf option,
                                         @Nullable String offset, int limit) {
         return client.sendAwait(GetPollVotes.builder()
                 .peer(peer)
                 .id(id)
-                .option(option) // It's ok
+                .option(option)
                 .offset(offset)
                 .limit(limit)
                 .build());

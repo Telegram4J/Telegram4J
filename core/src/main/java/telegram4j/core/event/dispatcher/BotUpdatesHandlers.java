@@ -1,7 +1,6 @@
 package telegram4j.core.event.dispatcher;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Flux;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.inline.CallbackQueryEvent;
@@ -26,11 +25,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
 
         var user = EntityFactory.createUser(client, context.getUsers().get(context.getUpdate().userId()));
-        ByteBuf data = Optional.ofNullable(context.getUpdate().data())
-                .map(Unpooled::wrappedBuffer)
-                .map(ByteBuf::asReadOnly)
-                .map(Unpooled::unreleasableBuffer) // no need release because it's byte array based buffer
-                .orElse(null);
+        ByteBuf data = context.getUpdate().data().orElse(null);
         InlineMessageId msgId = InlineMessageId.from(context.getUpdate().msgId());
 
         return Flux.just(new InlineCallbackQueryEvent(client, context.getUpdate().queryId(),
@@ -54,11 +49,7 @@ class BotUpdatesHandlers {
                     }
                 })
                 .orElseThrow();
-        ByteBuf data = Optional.ofNullable(context.getUpdate().data())
-                .map(Unpooled::wrappedBuffer)
-                .map(ByteBuf::asReadOnly)
-                .map(Unpooled::unreleasableBuffer)
-                .orElse(null);
+        ByteBuf data = context.getUpdate().data().orElse(null);
 
         return Flux.just(new CallbackQueryEvent(client, context.getUpdate().queryId(),
                 user, chat, context.getUpdate().msgId(),

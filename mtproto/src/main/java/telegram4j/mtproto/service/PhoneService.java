@@ -1,5 +1,6 @@
 package telegram4j.mtproto.service;
 
+import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
@@ -26,12 +27,14 @@ public class PhoneService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Mono<PhoneCall> acceptCall(InputPhoneCall peer, byte[] gB, PhoneCallProtocol protocol) {
-        return client.sendAwait(ImmutableAcceptCall.of(peer, gB, protocol));
+    public Mono<PhoneCall> acceptCall(InputPhoneCall peer, ByteBuf gb, PhoneCallProtocol protocol) {
+        return client.sendAwait(ImmutableAcceptCall.of(peer, protocol)
+                .withGB(gb));
     }
 
-    public Mono<PhoneCall> confirmCall(InputPhoneCall peer, byte[] gB, long keyFingerPrint, PhoneCallProtocol protocol) {
-        return client.sendAwait(ImmutableConfirmCall.of(peer, gB, keyFingerPrint, protocol));
+    public Mono<PhoneCall> confirmCall(InputPhoneCall peer, ByteBuf ga, long keyFingerPrint, PhoneCallProtocol protocol) {
+        return client.sendAwait(ImmutableConfirmCall.of(peer, keyFingerPrint, protocol)
+                .withGA(ga));
     }
 
     public Mono<Boolean> receivedCall(InputPhoneCall peer) {
@@ -51,8 +54,9 @@ public class PhoneService extends RpcService {
         return client.sendAwait(ImmutableSaveCallDebug.of(peer, ImmutableDataJSON.of(debugJson)));
     }
 
-    public Mono<Boolean> sendSignalingData(InputPhoneCall peer, byte[] data) {
-        return client.sendAwait(ImmutableSendSignalingData.of(peer, data));
+    public Mono<Boolean> sendSignalingData(InputPhoneCall peer, ByteBuf data) {
+        return client.sendAwait(ImmutableSendSignalingData.of(peer)
+                .withData(data));
     }
 
     public Mono<Updates> createGroupCall(InputPeer peer, int randomId, String title, int scheduleDate) {

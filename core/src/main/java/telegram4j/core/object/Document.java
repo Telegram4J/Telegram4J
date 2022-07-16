@@ -1,6 +1,6 @@
 package telegram4j.core.object;
 
-import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
@@ -97,13 +97,13 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets hex dump of the file reference, if document isn't web.
+     * Gets <i>immutable</i> {@link ByteBuf} of the file reference, if document isn't web.
      *
-     * @return The hex dump of the file reference, if document isn't web.
+     * @return The <i>immutable</i> {@link ByteBuf} of the file reference, if document isn't web.
      */
-    public Optional<String> getFileReference() {
+    public Optional<ByteBuf> getFileReference() {
         return data.identifier() == BaseDocument.ID
-                ? Optional.of(ByteBufUtil.hexDump(((BaseDocument) data).fileReference()))
+                ? Optional.of(((BaseDocument) data).fileReference())
                 : Optional.empty();
     }
 

@@ -1,5 +1,6 @@
 package telegram4j.core.object.poll;
 
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.TelegramObject;
@@ -46,7 +47,7 @@ public class PollAnswerVoters implements TelegramObject {
      *
      * @return The answer parameter in bytes.
      */
-    public byte[] getOption() {
+    public ByteBuf getOption() {
         return data.option();
     }
 

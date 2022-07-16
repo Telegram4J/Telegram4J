@@ -1,11 +1,11 @@
 package telegram4j.mtproto.util;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import telegram4j.mtproto.PublicRsaKey;
-import telegram4j.tl.TlSerialUtil;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -48,30 +48,24 @@ public final class CryptoUtil {
         return new BigInteger(1, data);
     }
 
+    public static BigInteger fromByteBuf(ByteBuf data) {
+        return new BigInteger(1, toByteArray(data));
+    }
+
     public static ByteBuf toByteBuf(BigInteger val) {
-        ByteBuf res = Unpooled.wrappedBuffer(val.toByteArray());
-        if (res.getByte(0) == 0) {
-            return res.slice(1, res.readableBytes() - 1);
+        byte[] res = val.toByteArray();
+        if (res[0] == 0) {
+            return Unpooled.wrappedBuffer(res, 1, res.length - 1);
         }
-        return res;
+        return Unpooled.wrappedBuffer(res);
     }
 
     public static byte[] toByteArray(ByteBuf buf) {
         try {
-            return TlSerialUtil.readBytes(buf, buf.readableBytes());
+            return ByteBufUtil.getBytes(buf);
         } finally {
             ReferenceCountUtil.safeRelease(buf);
         }
-    }
-
-    public static byte[] toByteArray(BigInteger val) {
-        byte[] res = val.toByteArray();
-        if (res[0] == 0) {
-            byte[] res2 = new byte[res.length - 1];
-            System.arraycopy(res, 1, res2, 0, res2.length);
-            return res2;
-        }
-        return res;
     }
 
     // from https://github.com/zhukov/webogram/blob/6c8b8474194ed8a76c4cf70db303c0c1cd86891f/app/js/lib/bin_utils.js#L597
@@ -149,7 +143,7 @@ public final class CryptoUtil {
     }
 
     public static ByteBuf rsaEncrypt(ByteBuf src, PublicRsaKey key) {
-        BigInteger num = fromByteArray(toByteArray(src));
+        BigInteger num = fromByteBuf(src);
         return toByteBuf(num.modPow(key.getExponent(), key.getModulus()));
     }
 
@@ -166,7 +160,7 @@ public final class CryptoUtil {
     }
 
     public static ByteBuf xor(ByteBuf a, ByteBuf b) {
-        ByteBuf res = a.alloc().buffer(a.readableBytes());
+        ByteBuf res = Unpooled.buffer(a.readableBytes());
         for (int i = 0, n = a.readableBytes(); i < n; i++) {
             res.writeByte((byte) (a.getByte(i) ^ b.getByte(i)));
         }

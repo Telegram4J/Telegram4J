@@ -1,5 +1,6 @@
 package telegram4j.core.spec.media;
 
+import io.netty.buffer.ByteBuf;
 import org.immutables.value.Value;
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
@@ -19,7 +20,7 @@ interface InputMediaPollSpecDef extends InputMediaSpec {
 
     Poll poll();
 
-    Optional<List<byte[]>> correctAnswers();
+    Optional<List<ByteBuf>> correctAnswers();
 
     Optional<String> solution();
 

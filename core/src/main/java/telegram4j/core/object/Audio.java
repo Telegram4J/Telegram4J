@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import io.netty.buffer.ByteBuf;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.DocumentAttributeAudio;
@@ -61,8 +62,8 @@ public class Audio extends Document {
      *
      * @return The waveform of voice message, if it is and present.
      */
-    public Optional<byte[]> getWaveform() {
-        return Optional.ofNullable(audioData.waveform());
+    public Optional<ByteBuf> getWaveform() {
+        return audioData.waveform();
     }
 
     @Override

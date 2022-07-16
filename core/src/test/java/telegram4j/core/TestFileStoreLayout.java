@@ -59,8 +59,8 @@ public class TestFileStoreLayout implements StoreLayout {
                     log.debug("Loading session information from the file store for dc №{}.", dc.getId());
                     String lines = String.join("", Files.readAllLines(fileName));
                     ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
-                    ByteBuf authKey = TlSerialUtil.deserializeBuf(buf);
-                    ByteBuf authKeyId = TlSerialUtil.deserializeBuf(buf);
+                    ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
+                    ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
                     this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
                     buf.release();
 
@@ -89,18 +89,19 @@ public class TestFileStoreLayout implements StoreLayout {
 
     private Mono<Void> save() {
         return Mono.fromCallable(() -> {
-            if (authKey == null) {
+            var key = authKey;
+            if (key == null) {
                 return null;
             }
 
-            log.debug("Saving session information to file store for dc №{}.", authKey.getDc().getId());
+            log.debug("Saving session information to file store for dc №{}.", key.getDc().getId());
 
-            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKey().retainedDuplicate());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, this.authKey.getAuthKeyId().retainedDuplicate());
+            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, key.getAuthKey().retainedDuplicate());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, key.getAuthKeyId().retainedDuplicate());
             ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
             ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
 
-            Path fileName = Path.of(String.format(DB_FILE, this.authKey.getDc().getId()));
+            Path fileName = Path.of(String.format(DB_FILE, key.getDc().getId()));
             try {
                 Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
             } finally {

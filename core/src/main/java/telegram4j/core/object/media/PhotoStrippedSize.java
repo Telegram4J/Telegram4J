@@ -27,7 +27,7 @@ public class PhotoStrippedSize implements PhotoSize {
         return data.type().charAt(0);
     }
 
-    public byte[] getStrippedContent() {
+    public ByteBuf getStrippedContent() {
         return data.bytes();
     }
 

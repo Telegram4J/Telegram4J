@@ -1,5 +1,6 @@
 package telegram4j.mtproto.file;
 
+import io.netty.buffer.Unpooled;
 import org.junit.jupiter.api.Test;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
@@ -31,7 +32,7 @@ class FileReferenceIdTest {
         var expMinPhoto = ofChatPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
-                .fileReference(CryptoUtil.random.generateSeed(8))
+                .fileReference(Unpooled.wrappedBuffer(CryptoUtil.random.generateSeed(8)))
                 .date(0)
                 .sizes(List.of(BasePhotoSize.builder()
                         .type("i")
@@ -44,7 +45,7 @@ class FileReferenceIdTest {
         var expDocument = ofDocument(BaseDocument.builder()
                 .id(1337)
                 .accessHash(-1111)
-                .fileReference(CryptoUtil.random.generateSeed(8))
+                .fileReference(Unpooled.wrappedBuffer(CryptoUtil.random.generateSeed(8)))
                 .date(0)
                 .thumbs(List.of(BasePhotoSize.builder()
                         .type("i")
@@ -60,7 +61,7 @@ class FileReferenceIdTest {
         var expPhoto = ofPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
-                .fileReference(CryptoUtil.random.generateSeed(8))
+                .fileReference(Unpooled.wrappedBuffer(CryptoUtil.random.generateSeed(8)))
                 .date(0)
                 .sizes(List.of(BasePhotoSize.builder()
                         .type("i")

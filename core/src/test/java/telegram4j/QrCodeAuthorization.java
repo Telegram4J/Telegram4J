@@ -7,6 +7,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.retry.Retry;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.UpdateLoginToken;
 import telegram4j.tl.UpdateShort;
@@ -69,7 +70,7 @@ public class QrCodeAuthorization {
                             .cast(BaseLoginToken.class)
                             .doOnNext(b -> timeout.set(Duration.between(Instant.now(), Instant.ofEpochSecond(b.expires()))))
                             .doOnNext(b -> {
-                                String token = java.util.Base64.getUrlEncoder().encodeToString(b.token());
+                                String token = java.util.Base64.getUrlEncoder().encodeToString(CryptoUtil.toByteArray(b.token()));
 
                                 String url = "tg://login?token=" + token;
                                 synchronized (System.out) {

@@ -58,7 +58,7 @@ public class CallbackEvent extends BotEvent {
      * @return The {@link ByteBuf} with callback data, if it's not a game callback.
      */
     public Optional<ByteBuf> getData() {
-        return Optional.ofNullable(data);
+        return Optional.ofNullable(data).map(ByteBuf::duplicate);
     }
 
     /**

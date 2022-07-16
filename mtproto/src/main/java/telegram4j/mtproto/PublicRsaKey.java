@@ -187,12 +187,12 @@ public final class PublicRsaKey {
      * @return The reversed tail in {@literal long} number of key hash.
      */
     public static long computeTail(ByteBufAllocator alloc, PublicRsaKey key) {
-        ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.modulus));
-        ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteArray(key.exponent));
+        ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.modulus));
+        ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.exponent));
 
-        ByteBuf conc = Unpooled.wrappedBuffer(modulusBytes, exponentBytes);
-        ByteBuf sha1 = CryptoUtil.sha1Digest(conc);
-        conc.release();
+        ByteBuf concat = Unpooled.wrappedBuffer(modulusBytes, exponentBytes);
+        ByteBuf sha1 = CryptoUtil.sha1Digest(concat);
+        concat.release();
 
         ByteBuf tail = sha1.slice(sha1.readableBytes() - 8, 8);
         CryptoUtil.reverse(tail);

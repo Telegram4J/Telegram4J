@@ -1,5 +1,6 @@
 package telegram4j.mtproto.file;
 
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.storage.FileType;
@@ -14,8 +15,7 @@ import java.util.Optional;
 public final class FilePart {
     private final FileType type;
     private final int mtime;
-    private final byte[] bytes;
-
+    private final ByteBuf bytes;
     private final int size;
     @Nullable
     private final String mimeType;
@@ -29,7 +29,7 @@ public final class FilePart {
      * @param size The file size in bytes, if present, otherwise {@code -1}.
      * @param mimeType The mime-type in a string, if present.
      */
-    public FilePart(FileType type, int mtime, byte[] bytes, int size, @Nullable String mimeType) {
+    public FilePart(FileType type, int mtime, ByteBuf bytes, int size, @Nullable String mimeType) {
         this.type = Objects.requireNonNull(type, "type");
         this.mtime = mtime;
         this.bytes = Objects.requireNonNull(bytes, "bytes");
@@ -77,12 +77,12 @@ public final class FilePart {
     }
 
     /**
-     * Gets <b>mutable</b> byte array with file part content.
+     * Gets <b>immutable</b> {@link ByteBuf} with file part content.
      *
-     * @return The byte array with file part content.
+     * @return The {@link ByteBuf} with file part content.
      */
-    public byte[] getBytes() {
-        return bytes;
+    public ByteBuf getBytes() {
+        return bytes.duplicate();
     }
 
     /**

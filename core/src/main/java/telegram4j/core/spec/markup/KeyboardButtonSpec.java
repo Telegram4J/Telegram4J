@@ -74,7 +74,8 @@ public interface KeyboardButtonSpec extends Spec {
                 case GAME: return Mono.from(Mono.just(ImmutableKeyboardButtonGame.of(text())));
                 case CALLBACK: {
                     InlineButtonSpecDef s = (InlineButtonSpecDef) this;
-                    return Mono.just(ImmutableKeyboardButtonCallback.of(text(), s.data().orElseThrow())
+                    return Mono.just(ImmutableKeyboardButtonCallback.of(text())
+                            .withData(s.data().orElseThrow())
                             .withRequiresPassword(s.requiresPassword().orElse(false)));
                 }
                 default: return Mono.error(new IllegalStateException());

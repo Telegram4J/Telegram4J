@@ -47,12 +47,15 @@ public final class AuthorizationHandler {
 
     public Mono<Void> start() {
         return Mono.defer(() -> {
-            byte[] nonce = new byte[16];
-            random.nextBytes(nonce);
+            byte[] nonceb = new byte[16];
+            random.nextBytes(nonceb);
 
-            context.setNonce(Unpooled.wrappedBuffer(nonce));
+            ByteBuf nonce = Unpooled.wrappedBuffer(nonceb);
+            context.setNonce(nonce);
 
-            return client.sendAuth(ImmutableReqPqMulti.of(nonce));
+            return client.sendAuth(ImmutableReqPqMulti.builder()
+                    .nonce(nonce)
+                    .build());
         });
     }
 
@@ -76,8 +79,7 @@ public final class AuthorizationHandler {
 
         if (obj instanceof DhGenRetry) {
             DhGenRetry dhGenRetry = (DhGenRetry) obj;
-            return handleDhGenRetry(dhGenRetry)
-                    .then(Mono.error(new AuthorizationException("Dh gen retry")));
+            return handleDhGenRetry(dhGenRetry);
         }
 
         if (obj instanceof DhGenFail) {
@@ -91,11 +93,8 @@ public final class AuthorizationHandler {
     }
 
     private Mono<Void> handleResPQ(ResPQ resPQ) {
-        byte[] serverNonce = resPQ.serverNonce();
-        byte[] nonce = resPQ.nonce();
-        byte[] pqBytes = resPQ.pq();
-
-        context.setServerNonce(Unpooled.wrappedBuffer(serverNonce));
+        ByteBuf serverNonce = resPQ.serverNonce();
+        ByteBuf nonce = resPQ.nonce();
 
         var fingerprints = resPQ.serverPublicKeyFingerprints();
         long fingerprint = -1;
@@ -115,16 +114,12 @@ public final class AuthorizationHandler {
                     Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
-        BigInteger pq = fromByteArray(pqBytes);
+        BigInteger pq = fromByteBuf(resPQ.pq());
         BigInteger p = BigInteger.valueOf(pqPrimeLeemon(pq.longValueExact()));
         BigInteger q = pq.divide(p);
-        byte[] pBytes = toByteArray(p);
-        byte[] qBytes = toByteArray(q);
 
-        byte[] newNonce = new byte[32];
-        random.nextBytes(newNonce);
-
-        context.setNewNonce(Unpooled.wrappedBuffer(newNonce));
+        ByteBuf pb = toByteBuf(p);
+        ByteBuf qb = toByteBuf(q);
 
         if (p.longValueExact() > q.longValueExact()) {
             return Mono.fromRunnable(() -> onAuthSink.emitError(
@@ -133,10 +128,18 @@ public final class AuthorizationHandler {
                     Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
+        byte[] newNonceb = new byte[32];
+        random.nextBytes(newNonceb);
+
+        ByteBuf newNonce = Unpooled.wrappedBuffer(newNonceb);
+
+        context.setNewNonce(newNonce);
+        context.setServerNonce(serverNonce);
+
         PQInnerData pqInnerData = PQInnerDataDc.builder()
-                .pq(pqBytes)
-                .p(pBytes)
-                .q(qBytes)
+                .pq(resPQ.pq())
+                .p(pb)
+                .q(qb)
                 .nonce(nonce)
                 .serverNonce(serverNonce)
                 .newNonce(newNonce)
@@ -154,9 +157,9 @@ public final class AuthorizationHandler {
         return client.sendAuth(ReqDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(serverNonce)
-                .encryptedData(toByteArray(encrypted))
-                .p(pBytes)
-                .q(qBytes)
+                .encryptedData(encrypted)
+                .p(pb)
+                .q(qb)
                 .publicKeyFingerprint(fingerprint)
                 .build());
     }
@@ -190,29 +193,29 @@ public final class AuthorizationHandler {
 
         BigInteger b = fromByteArray(bs);
         BigInteger g = BigInteger.valueOf(serverDHInnerData.g());
-        BigInteger dhPrime = fromByteArray(serverDHInnerData.dhPrime());
+        BigInteger dhPrime = fromByteBuf(serverDHInnerData.dhPrime());
         BigInteger gb = g.modPow(b, dhPrime);
 
-        BigInteger authKey = fromByteArray(serverDHInnerData.gA()).modPow(b, dhPrime);
+        BigInteger authKey = fromByteBuf(serverDHInnerData.gA()).modPow(b, dhPrime);
 
         context.setAuthKey(alignKeyZero(toByteBuf(authKey), 256));
         context.setAuthAuxHash(sha1Digest(context.getAuthKey()).slice(0, 8));
 
-        byte[] nonce = toByteArray(context.getNonce().retain());
-        byte[] serverNonce = toByteArray(context.getServerNonce().retain());
+        ByteBuf nonce = context.getNonce();
+        ByteBuf serverNonce = context.getServerNonce();
 
         ClientDHInnerData clientDHInnerData = ClientDHInnerData.builder()
                 .retryId(context.getRetry().getAndIncrement())
                 .nonce(nonce)
                 .serverNonce(serverNonce)
-                .gB(toByteArray(gb))
+                .gB(toByteBuf(gb))
                 .build();
 
         ByteBuf innerData = TlSerializer.serialize(alloc, clientDHInnerData);
         ByteBuf innerDataWithHash = align(Unpooled.wrappedBuffer(sha1Digest(innerData), innerData), 16);
 
         AES256IGECipher encrypter = new AES256IGECipher(true, aesKey, tmpAesIv);
-        byte[] dataWithHashEnc = toByteArray(encrypter.encrypt(innerDataWithHash));
+        ByteBuf dataWithHashEnc = encrypter.encrypt(innerDataWithHash);
 
         client.updateTimeOffset(serverDHInnerData.serverTime());
 
@@ -224,30 +227,20 @@ public final class AuthorizationHandler {
     }
 
     private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
-        ByteBuf newNonceHash1 = Unpooled.wrappedBuffer(dhGenOk.newNonceHash1());
         ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), DH_GEN_OK,
                 context.getAuthAuxHash()).slice(4, 16);
 
-        if (!newNonceHash1.equals(newNonceHash)) {
-            return Mono.fromRunnable(() -> {
-                String newNonceHash1Dump = ByteBufUtil.hexDump(newNonceHash1);
-                String newNonceHashDump = ByteBufUtil.hexDump(newNonceHash);
-                newNonceHash1.release();
-                newNonceHash.release();
-
-                onAuthSink.emitError(new AuthorizationException("New nonce hash mismatch, excepted: "
-                                + newNonceHashDump + ", but received: " + newNonceHash1Dump),
-                        Sinks.EmitFailureHandler.FAIL_FAST);
-            });
+        if (!dhGenOk.newNonceHash1().equals(newNonceHash)) {
+            return Mono.fromRunnable(() -> onAuthSink.emitError(new AuthorizationException("New nonce hash 1 mismatch, excepted: "
+                            + ByteBufUtil.hexDump(newNonceHash) + ", but received: "
+                            + ByteBufUtil.hexDump(dhGenOk.newNonceHash1())),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
-        newNonceHash1.release();
-        newNonceHash.release();
-
+        // TODO: can we just read 2 longs and XOR them?
         ByteBuf xorBuf = xor(context.getNewNonce().slice(0, 8),
                 context.getServerNonce().slice(0, 8));
         long serverSalt = xorBuf.readLongLE();
-        xorBuf.release();
 
         context.setServerSalt(serverSalt);
 
@@ -257,25 +250,15 @@ public final class AuthorizationHandler {
     }
 
     private Mono<Void> handleDhGenRetry(DhGenRetry dhGenRetry) {
-        ByteBuf newNonceHash2 = Unpooled.wrappedBuffer(dhGenRetry.newNonceHash2());
-        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), DH_GEN_RETRY,
-                context.getAuthAuxHash()).slice(4, 16);
+        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), DH_GEN_RETRY, context.getAuthAuxHash())
+                .slice(4, 16);
 
-        if (!newNonceHash2.equals(newNonceHash)) {
-            return Mono.fromRunnable(() -> {
-                String newNonceHash2Dump = ByteBufUtil.hexDump(newNonceHash2);
-                String newNonceHashDump = ByteBufUtil.hexDump(newNonceHash);
-                newNonceHash2.release();
-                newNonceHash.release();
-
-                onAuthSink.emitError(new AuthorizationException("New nonce hash mismatch, excepted: "
-                                + newNonceHashDump + ", but received: " + newNonceHash2Dump),
-                        Sinks.EmitFailureHandler.FAIL_FAST);
-            });
+        if (!dhGenRetry.newNonceHash2().equals(newNonceHash)) {
+            return Mono.fromRunnable(() -> onAuthSink.emitError(new AuthorizationException("New nonce hash 2 mismatch, excepted: "
+                            + ByteBufUtil.hexDump(newNonceHash) + ", but received: "
+                            + ByteBufUtil.hexDump(dhGenRetry.newNonceHash2())),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
-
-        newNonceHash2.release();
-        newNonceHash.release();
 
         ServerDHParams serverDHParams = context.getServerDHParams();
         log.debug("Retrying dh params extending, attempt: {}", context.getRetry());
@@ -283,25 +266,15 @@ public final class AuthorizationHandler {
     }
 
     private Mono<Void> handleDhGenFail(DhGenFail dhGenFail) {
-        ByteBuf newNonceHash3 = Unpooled.wrappedBuffer(dhGenFail.newNonceHash3());
-        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), DH_GEN_FAIL,
-                context.getAuthAuxHash()).slice(4, 16);
+        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), DH_GEN_FAIL, context.getAuthAuxHash())
+                .slice(4, 16);
 
-        if (!newNonceHash3.equals(newNonceHash)) {
-            return Mono.fromRunnable(() -> {
-                String newNonceHash3Dump = ByteBufUtil.hexDump(newNonceHash3);
-                String newNonceHashDump = ByteBufUtil.hexDump(newNonceHash);
-                newNonceHash3.release();
-                newNonceHash.release();
-
-                onAuthSink.emitError(new AuthorizationException("New nonce hash mismatch, excepted: "
-                                + newNonceHashDump + ", but received: " + newNonceHash3Dump),
-                        Sinks.EmitFailureHandler.FAIL_FAST);
-            });
+        if (!dhGenFail.newNonceHash3().equals(newNonceHash)) {
+            return Mono.fromRunnable(() -> onAuthSink.emitError(new AuthorizationException("New nonce hash 3 mismatch, excepted: "
+                            + ByteBufUtil.hexDump(newNonceHash) + ", but received: "
+                            + ByteBufUtil.hexDump(dhGenFail.newNonceHash3())),
+                    Sinks.EmitFailureHandler.FAIL_FAST));
         }
-
-        newNonceHash3.release();
-        newNonceHash.release();
 
         return Mono.fromRunnable(() -> onAuthSink.emitError(
                 new AuthorizationException("Failed to create an authorization key"),

@@ -248,7 +248,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             }
                         }
 
-                        long authKeyIdAsLong = authKey.getAuthKeyId().getLongLE(0);
+                        AuthorizationKeyHolder authKeyHolder = this.authKey;
+                        long authKeyIdAsLong = authKeyHolder.getAuthKeyId().getLongLE(0);
                         if (authKeyId != authKeyIdAsLong) {
                             return Mono.error(new MTProtoException("Incorrect auth key id. Received: 0x"
                                     + Long.toHexString(authKeyId) + ", but excepted: 0x"
@@ -259,7 +260,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         ByteBuf messageKey = buf.readRetainedSlice(16);
 
-                        ByteBuf authKey = this.authKey.getAuthKey();
+                        ByteBuf authKey = authKeyHolder.getAuthKey();
                         AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
 
                         ByteBuf decrypted = cipher.decrypt(buf.slice());
@@ -965,11 +966,11 @@ public class DefaultMTProtoClient implements MTProtoClient {
             var req = requests.remove(inf.reqMsgId());
             if (req != null) {
                 MsgsStateReq stater = (MsgsStateReq) req.method;
-                byte[] c = inf.info();
-                if (stater.msgIds().size() != c.length) {
+                ByteBuf c = inf.info();
+                if (stater.msgIds().size() != c.readableBytes()) {
                     rpcLog.error("[C:0x{}, M:0x{}] Received not all states. expected: {}, received: {}",
                             id, Long.toHexString(inf.reqMsgId()), stater.msgIds().size(),
-                            c.length);
+                            c.readableBytes());
 
                     return Mono.empty();
                 }
@@ -978,7 +979,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     StringJoiner st = new StringJoiner(", ");
                     int i = 0;
                     for (long msgId : stater.msgIds()) {
-                        st.add("0x" + Long.toHexString(msgId) + "/" + (c[i++] & 7));
+                        st.add("0x" + Long.toHexString(msgId) + "/" + (c.getByte(i++) & 7));
                     }
 
                     rpcLog.debug("[C:0x{}, M:0x{}] Received states: [{}]", id, Long.toHexString(inf.reqMsgId()), st);
@@ -992,7 +993,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         continue;
                     }
 
-                    int state = c[i++] & 7;
+                    int state = c.getByte(i++) & 7;
                     switch (state) {
                         case 1:
                         case 2:

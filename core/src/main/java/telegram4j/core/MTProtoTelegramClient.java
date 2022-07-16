@@ -22,6 +22,7 @@ import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.api.TlEncodingUtil;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.storage.FileType;
 
@@ -160,6 +161,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     /**
      * Request to upload file to Telegram Media DC.
+     * Method doesn't release incoming {@link ByteBuf}.
      *
      * @param data The {@link ByteBuf} with file data.
      * @param filename The name for file.
@@ -207,7 +209,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private Flux<FilePart> getFile0(FileReferenceId loc) {
         return mtProtoResources.getHttpClient()
                 .get().uri(loc.getUrl())
-                .responseSingle((res, buf) -> buf.asByteArray()
+                .responseSingle((res, buf) -> buf
+                        .map(TlEncodingUtil::copyAsUnpooled)
                         .map(bytes -> {
                             String mimeType = res.responseHeaders().getAsString(HttpHeaderNames.CONTENT_TYPE);
                             int size = res.responseHeaders().getInt(HttpHeaderNames.CONTENT_LENGTH, -1);

@@ -1,5 +1,6 @@
 package telegram4j.core.object.action;
 
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.PaymentCharge;
@@ -25,7 +26,7 @@ public class MessageActionPaymentSentMe extends BaseMessageAction {
         return data.totalAmount();
     }
 
-    public byte[] getPayload() {
+    public ByteBuf getPayload() {
         return data.payload();
     }
 

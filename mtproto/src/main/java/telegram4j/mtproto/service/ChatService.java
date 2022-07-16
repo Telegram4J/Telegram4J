@@ -1,5 +1,6 @@
 package telegram4j.mtproto.service;
 
+import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.BotCompatible;
@@ -362,8 +363,9 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableConvertToGigagroup.of(channel));
     }
 
-    public Mono<Boolean> viewSponsoredMessages(InputChannel channel, byte[] randomId) {
-        return client.sendAwait(ImmutableViewSponsoredMessage.of(channel, randomId));
+    public Mono<Boolean> viewSponsoredMessages(InputChannel channel, ByteBuf randomId) {
+        return client.sendAwait(ImmutableViewSponsoredMessage.of(channel)
+                .withRandomId(randomId));
     }
 
     public Mono<SponsoredMessages> getSponsoredMessages(InputChannel channel) {

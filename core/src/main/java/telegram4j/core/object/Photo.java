@@ -1,6 +1,6 @@
 package telegram4j.core.object;
 
-import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.PhotoSize;
@@ -80,12 +80,12 @@ public class Photo implements TelegramObject {
     }
 
     /**
-     * Gets hex dump of the file reference.
+     * Gets <i>immutable</i> {@link ByteBuf} of the file reference.
      *
-     * @return The hex dump of the file reference.
+     * @return The <i>immutable</i> {@link ByteBuf} of the file reference.
      */
-    public String getFileReference() {
-        return ByteBufUtil.hexDump(data.fileReference());
+    public ByteBuf getFileReference() {
+        return data.fileReference();
     }
 
     /**

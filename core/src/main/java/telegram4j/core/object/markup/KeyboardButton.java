@@ -1,5 +1,6 @@
 package telegram4j.core.object.markup;
 
+import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.TelegramObject;
@@ -53,7 +54,7 @@ public final class KeyboardButton implements TelegramObject {
      *
      * @return The callback data, if {@link #getType() type} is {@link Type#CALLBACK}.
      */
-    public Optional<byte[]> getData() {
+    public Optional<ByteBuf> getData() {
         return data.identifier() == KeyboardButtonCallback.ID
                 ? Optional.of(((KeyboardButtonCallback) data).data())
                 : Optional.empty();

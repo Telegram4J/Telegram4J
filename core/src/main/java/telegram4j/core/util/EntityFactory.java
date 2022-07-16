@@ -515,7 +515,7 @@ public final class EntityFactory {
                 FileReferenceId fileRefId = FileReferenceId.deserialize(r.file());
                 InputDocument document = fileRefId.asInputDocument();
 
-                if (r.type().isPresent() && fileRefId.getDocumentType() != r.type().orElseThrow()) {
+                if (r.type().map(t -> fileRefId.getDocumentType() != t).orElse(false)) {
                     return Mono.error(new IllegalArgumentException("Document type mismatch. File ref id: "
                             + fileRefId.getDocumentType() + ", type: " + documentType));
                 }

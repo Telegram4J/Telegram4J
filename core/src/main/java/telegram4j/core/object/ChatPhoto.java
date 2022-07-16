@@ -76,20 +76,22 @@ public class ChatPhoto implements TelegramObject {
 
     /**
      * Gets expanded stripped thumbnail for photo, if present.
+     * The returned buffer is modifiable unpooled array-based and does not require to be {@link ByteBuf#release() released}
      *
      * @return The expanded stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getThumb() {
-        return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
+        return data.strippedThumb().map(TlEntityUtil::expandInlineThumb);
     }
 
     /**
      * Gets raw stripped thumbnail for photo, if present.
+     * The returned buffer is unmodifiable and does not require to be {@link ByteBuf#release() released}
      *
      * @return The raw stripped thumbnail for photo, if present.
      */
-    public Optional<byte[]> getStrippedThumb() {
-        return Optional.ofNullable(data.strippedThumb());
+    public Optional<ByteBuf> getStrippedThumb() {
+        return data.strippedThumb();
     }
 
     /**

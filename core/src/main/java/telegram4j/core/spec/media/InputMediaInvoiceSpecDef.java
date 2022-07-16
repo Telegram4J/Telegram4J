@@ -1,5 +1,6 @@
 package telegram4j.core.spec.media;
 
+import io.netty.buffer.ByteBuf;
 import org.immutables.value.Value;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
@@ -19,7 +20,7 @@ interface InputMediaInvoiceSpecDef extends InputMediaSpec {
 
     Invoice invoice();
 
-    byte[] payload();
+    ByteBuf payload();
 
     String provider();
 

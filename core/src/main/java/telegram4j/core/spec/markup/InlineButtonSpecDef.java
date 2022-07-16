@@ -1,5 +1,6 @@
 package telegram4j.core.spec.markup;
 
+import io.netty.buffer.ByteBuf;
 import org.immutables.value.Value;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.object.markup.KeyboardButton;
@@ -14,7 +15,7 @@ abstract class InlineButtonSpecDef implements KeyboardButtonSpec {
         return InlineButtonSpec.of(KeyboardButton.Type.BUY, text);
     }
 
-    public static InlineButtonSpec callback(String text, boolean requiresPassword, byte[] data) {
+    public static InlineButtonSpec callback(String text, boolean requiresPassword, ByteBuf data) {
         return InlineButtonSpec.of(KeyboardButton.Type.CALLBACK, text)
                 .withRequiresPassword(requiresPassword)
                 .withData(data);
@@ -49,7 +50,7 @@ abstract class InlineButtonSpecDef implements KeyboardButtonSpec {
                 .withUrl(url);
     }
 
-    public abstract Optional<byte[]> data();
+    public abstract Optional<ByteBuf> data();
 
     public abstract Optional<String> query();
 

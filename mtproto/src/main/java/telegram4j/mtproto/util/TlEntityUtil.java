@@ -35,8 +35,8 @@ public class TlEntityUtil {
         }
     }
 
-    public static ByteBuf expandInlineThumb(byte[] bytes) {
-        if (bytes.length < 3 || bytes[0] != 0x01) {
+    public static ByteBuf expandInlineThumb(ByteBuf bytes) {
+        if (!bytes.isReadable(3) || bytes.getByte(0) != 0x01) {
             return Unpooled.EMPTY_BUFFER;
         }
 
@@ -60,16 +60,13 @@ public class TlEntityUtil {
                 "e3e4e5e6e7e8e9eaf2f3f4f5f6f7f8f9faffda000c03010002110311003f00");
 
         byte[] footer = ByteBufUtil.decodeHexDump("ffd9");
-        ByteBuf expanded = Unpooled.buffer(header.length + bytes.length - 3 + footer.length);
-        expanded.writeBytes(header);
 
-        expanded.setByte(164, bytes[1]);
-        expanded.setByte(166, bytes[2]);
-
-        expanded.writeBytes(bytes, 3, bytes.length - 3);
-        expanded.writeBytes(footer);
-
-        return Unpooled.unreleasableBuffer(expanded.asReadOnly());
+        return Unpooled.buffer(header.length + bytes.readableBytes() - 3 + footer.length)
+                .writeBytes(header)
+                .setByte(164, bytes.getByte(1))
+                .setByte(166, bytes.getByte(2))
+                .writeBytes(bytes, 3, bytes.readableBytes() - 3)
+                .writeBytes(footer);
     }
 
     public static boolean isAvailableChat(Chat chat) {

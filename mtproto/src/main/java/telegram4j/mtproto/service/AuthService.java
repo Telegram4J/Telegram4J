@@ -1,5 +1,6 @@
 package telegram4j.mtproto.service;
 
+import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
@@ -29,9 +30,9 @@ public class AuthService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<byte[]> logOut() {
+    public Mono<ByteBuf> logOut() {
         return client.sendAwait(LogOut.instance())
-                .mapNotNull(LoggedOut::futureAuthToken);
+                .flatMap(f -> Mono.justOrEmpty(f.futureAuthToken()));
     }
 
     public Mono<Boolean> resetAuthorizations() {
@@ -44,13 +45,15 @@ public class AuthService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Authorization> importAuthorization(int dcId, byte[] bytes) {
-        return client.sendAwait(ImmutableImportAuthorization.of(dcId, bytes));
+    public Mono<Authorization> importAuthorization(int dcId, ByteBuf bytes) {
+        return client.sendAwait(ImmutableImportAuthorization.of(dcId)
+                .withBytes(bytes));
     }
 
     @BotCompatible
-    public Mono<Boolean> bindTempAuthKey(long permAuthKeyId, long nonce, int expiresAt, byte[] encryptedMessage) {
-        return client.sendAwait(ImmutableBindTempAuthKey.of(permAuthKeyId, nonce, expiresAt, encryptedMessage));
+    public Mono<Boolean> bindTempAuthKey(long permAuthKeyId, long nonce, int expiresAt, ByteBuf encryptedMessage) {
+        return client.sendAwait(ImmutableBindTempAuthKey.of(permAuthKeyId, nonce, expiresAt)
+                .withEncryptedMessage(encryptedMessage));
     }
 
     @BotCompatible
@@ -92,12 +95,16 @@ public class AuthService extends RpcService {
                 .build());
     }
 
-    public Mono<LoginToken> importLoginToken(byte[] token) {
-        return client.sendAwait(ImmutableImportLoginToken.of(token));
+    public Mono<LoginToken> importLoginToken(ByteBuf token) {
+        return client.sendAwait(ImmutableImportLoginToken.builder()
+                .token(token)
+                .build());
     }
 
-    public Mono<telegram4j.tl.Authorization> acceptLoginToken(byte[] token) {
-        return client.sendAwait(ImmutableAcceptLoginToken.of(token));
+    public Mono<telegram4j.tl.Authorization> acceptLoginToken(ByteBuf token) {
+        return client.sendAwait(ImmutableAcceptLoginToken.builder()
+                .token(token)
+                .build());
     }
 
     public Mono<Boolean> checkRecoveryPassword(String code) {

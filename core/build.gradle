@@ -3,6 +3,7 @@ dependencies {
     api "io.projectreactor.netty:reactor-netty"
     api "io.projectreactor.addons:reactor-extra"
 
+    compileOnly "io.github.telegram4j:tl-parser-encoding:$tl_parser_version"
     compileOnly "org.immutables:value:$immutables_version"
     annotationProcessor "org.immutables:value:$immutables_version"
 

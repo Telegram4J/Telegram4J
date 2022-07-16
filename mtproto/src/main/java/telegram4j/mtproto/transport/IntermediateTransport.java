@@ -28,7 +28,7 @@ public class IntermediateTransport implements Transport {
     @Override
     public ByteBuf encode(ByteBuf payload, boolean quickAck) {
         int packetSize = payload.readableBytes();
-        if (this.quickAck && quickAck) {
+        if (quickAck && this.quickAck) {
             packetSize |= QUICK_ACK_MASK;
         }
 
@@ -54,7 +54,7 @@ public class IntermediateTransport implements Transport {
         payload.markReaderIndex();
         int length = payload.readIntLE();
 
-        if (quickAck && (length & QUICK_ACK_MASK) != 0) {
+        if ((length & QUICK_ACK_MASK) != 0 && quickAck) {
             payload.resetReaderIndex();
 
             return payload.readRetainedSlice(4);
