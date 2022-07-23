@@ -34,13 +34,15 @@ public final class ResettableInterval implements Disposable {
 
     @Override
     public void dispose() {
-        if (swap.get() != null) {
-            swap.get().dispose();
+        Disposable d = swap.get();
+        if (d != null) {
+            d.dispose();
         }
     }
 
     @Override
     public boolean isDisposed() {
-        return swap.get() != null && swap.get().isDisposed();
+        Disposable d = swap.get();
+        return d != null && d.isDisposed();
     }
 }

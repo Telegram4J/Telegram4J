@@ -761,9 +761,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         // For updates
         if (obj instanceof GzipPacked) {
             GzipPacked gzipPacked = (GzipPacked) obj;
-            ByteBuf buf = Unpooled.wrappedBuffer(gzipPacked.packedData());
-            obj = TlSerialUtil.decompressGzip(buf);
-            buf.release();
+            obj = TlSerialUtil.decompressGzip(gzipPacked.packedData());
         }
 
         if (obj instanceof RpcResult) {
@@ -777,10 +775,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             if (obj instanceof GzipPacked) {
                 GzipPacked gzipPacked = (GzipPacked) obj;
-
-                ByteBuf buf = Unpooled.wrappedBuffer(gzipPacked.packedData());
-                obj = TlSerialUtil.decompressGzip(buf);
-                buf.release();
+                obj = TlSerialUtil.decompressGzip(gzipPacked.packedData());
             }
 
             if (obj instanceof MsgsAck) {
@@ -800,6 +795,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     }
                 }
             }
+
+            PendingRequest req = requests.get(messageId);
 
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
@@ -823,16 +820,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             .then();
                 }
 
-                PendingRequest req = requests.get(messageId);
-                // The error came to a forgotten request
                 if (req != null) {
                     obj = RpcException.create(rpcError, messageId, req);
                 }
             }
 
             resolve(messageId, obj);
-            // TODO: check by ACKNOWLEDGED bit in state
-            if (transport.supportQuickAck()) { // already ack'ed
+            if (req != null && (req.state & ACKNOWLEDGED) != 0) { // already ack'ed
                 return Mono.empty();
             }
 
