@@ -177,7 +177,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Chat> getChatMinById(long chatId) {
+    public Mono<BaseChat> getChatMinById(long chatId) {
         return Mono.fromSupplier(() -> chats.get(chatId)).map(PartialFields::getMin);
     }
 
@@ -192,6 +192,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Channel> getChannelMinById(long channelId) {
+        return Mono.fromSupplier(() -> channels.get(channelId)).map(PartialFields::getMin);
+    }
+
+    @Override
     public Mono<telegram4j.tl.messages.ChatFull> getChannelFullById(long channelId) {
         return Mono.fromSupplier(() -> channels.get(channelId))
                 .filter(userInfo -> userInfo.full != null)
@@ -202,7 +207,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<User> getUserMinById(long userId) {
+    public Mono<BaseUser> getUserMinById(long userId) {
         return Mono.fromSupplier(() -> users.get(userId)).map(PartialFields::getMin);
     }
 

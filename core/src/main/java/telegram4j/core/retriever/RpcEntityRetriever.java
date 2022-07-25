@@ -13,6 +13,7 @@ import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.BaseChat;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputMessage;
 import telegram4j.tl.messages.MessagesNotModified;
@@ -65,8 +66,9 @@ public class RpcEntityRetriever implements EntityRetriever {
         }
 
         return storeLayout.getUserMinById(userId.asLong())
-                .switchIfEmpty(client.asInputUser(userId).flatMap(serviceHolder.getUserService()::getUser))
-                .ofType(BaseUser.class)
+                .switchIfEmpty(client.asInputUser(userId)
+                        .flatMap(serviceHolder.getUserService()::getUser)
+                        .ofType(BaseUser.class))
                 .map(u -> new User(client, u));
     }
 
@@ -84,40 +86,43 @@ public class RpcEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<Chat> getChatMinById(Id chatId) {
-        if (chatId.getType() == Id.Type.USER) {
-            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: [CHANNEL, CHAT], but given: USER"));
-        }
-
-        return storeLayout.getChatMinById(chatId.asLong())
-                .switchIfEmpty(Mono.defer(() -> {
-                    if (chatId.getType() == Id.Type.CHAT) {
-                        return serviceHolder.getChatService().getChat(chatId.asLong());
-                    }
-                    return client.asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel);
-                }))
-                .ofType(telegram4j.tl.Chat.class)
-                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+        return Mono.defer(() -> {
+            switch (chatId.getType()) {
+                case CHAT: return storeLayout.getChatMinById(chatId.asLong())
+                        .switchIfEmpty(client.getServiceHolder().getChatService()
+                                .getChat(chatId.asLong())
+                                .ofType(BaseChat.class));
+                case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
+                        .switchIfEmpty(client.asInputChannel(chatId)
+                                .flatMap(serviceHolder.getChatService()::getChannel)
+                                .ofType(telegram4j.tl.Channel.class));
+                case USER: return storeLayout.getUserMinById(chatId.asLong())
+                        .switchIfEmpty(client.asInputUser(chatId)
+                                .flatMap(serviceHolder.getUserService()::getUser)
+                                .ofType(BaseUser.class));
+                default: return Mono.error(new IllegalStateException());
+            }
+        })
+        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
-        if (chatId.getType() == Id.Type.USER) {
-            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: [CHANNEL, CHAT], but given: USER"));
-        }
-
         return Mono.defer(() -> {
-                    if (chatId.getType() == Id.Type.CHAT) {
-                        return storeLayout.getChatFullById(chatId.asLong());
-                    }
-                    return storeLayout.getChannelFullById(chatId.asLong());
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    if (chatId.getType() == Id.Type.CHAT) {
-                        return serviceHolder.getChatService().getFullChat(chatId.asLong());
-                    }
-                    return client.asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getFullChannel);
-                }))
-                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            switch (chatId.getType()) {
+                case CHAT: return storeLayout.getChatFullById(chatId.asLong())
+                        .switchIfEmpty(client.getServiceHolder().getChatService()
+                                .getFullChat(chatId.asLong()));
+                case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong())
+                        .switchIfEmpty(client.asInputChannel(chatId)
+                                .flatMap(serviceHolder.getChatService()::getFullChannel));
+                case USER: return storeLayout.getUserFullById(chatId.asLong())
+                        .switchIfEmpty(client.asInputUser(chatId)
+                                .flatMap(serviceHolder.getUserService()::getFullUser));
+                default: return Mono.error(new IllegalStateException());
+            }
+        })
+        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override

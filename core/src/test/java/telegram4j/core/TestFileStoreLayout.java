@@ -156,7 +156,7 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Chat> getChatMinById(long chatId) {
+    public Mono<BaseChat> getChatMinById(long chatId) {
         return delegate.getChatMinById(chatId);
     }
 
@@ -166,12 +166,17 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Channel> getChannelMinById(long channelId) {
+        return delegate.getChannelMinById(channelId);
+    }
+
+    @Override
     public Mono<ChatFull> getChannelFullById(long channelId) {
         return delegate.getChannelFullById(channelId);
     }
 
     @Override
-    public Mono<User> getUserMinById(long userId) {
+    public Mono<BaseUser> getUserMinById(long userId) {
         return delegate.getUserMinById(userId);
     }
 

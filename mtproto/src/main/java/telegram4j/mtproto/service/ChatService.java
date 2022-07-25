@@ -36,6 +36,7 @@ public class ChatService extends RpcService {
 
     /**
      * Retrieve minimal chat by given id.
+     * This method can return only {@link BaseChat}, {@link ChatForbidden} or {@link ChatEmpty} objects.
      *
      * @param id The id of chat
      * @return A {@link Mono} emitting on successful completion minimal information about chat
@@ -49,6 +50,8 @@ public class ChatService extends RpcService {
 
     /**
      * Retrieve minimal chats by their ids.
+     * This method can return container which contains only {@link BaseChat},
+     * {@link ChatForbidden} or {@link ChatEmpty} objects.
      *
      * @param ids An iterable of chat id elements
      * @return A {@link Mono} emitting on successful completion a list of
@@ -158,6 +161,7 @@ public class ChatService extends RpcService {
 
     /**
      * Retrieve minimal channel by given id.
+     * This method can return only {@link Channel} or {@link ChannelForbidden} objects.
      *
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion minimal information about channel
@@ -171,6 +175,7 @@ public class ChatService extends RpcService {
 
     /**
      * Retrieve minimal channels by their ids.
+     * This method can return container which contains only {@link Channel} or {@link ChannelForbidden} objects.
      *
      * @param ids An iterable of channel id elements
      * @return A {@link Mono} emitting on successful completion a list of

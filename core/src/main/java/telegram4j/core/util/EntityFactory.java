@@ -111,6 +111,7 @@ public final class EntityFactory {
         }
     }
 
+    // TODO: handle Chat/ChannelForbidden as exception(?)
     @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
                                   @Nullable User selfUser) {

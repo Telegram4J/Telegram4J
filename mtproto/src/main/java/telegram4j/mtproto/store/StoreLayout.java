@@ -100,13 +100,13 @@ public interface StoreLayout {
     Mono<Messages> getMessages(long channelId, Iterable<? extends InputMessage> messageIds);
 
     /**
-     * Retrieve minimal chat/channel information by specified id.
+     * Retrieve minimal chat information by specified id.
      *
-     * @param chatId The id of chat/channel.
+     * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link BaseChat} or {@link Channel} object.
+     * the {@link BaseChat} object.
      */
-    Mono<Chat> getChatMinById(long chatId);
+    Mono<BaseChat> getChatMinById(long chatId);
 
     /**
      * Retrieve detailed chat information by specified id.
@@ -118,7 +118,16 @@ public interface StoreLayout {
     Mono<ChatFull> getChatFullById(long chatId);
 
     /**
-     * Retrieve detailed chat/channel information by specified id.
+     * Retrieve minimal channel information by specified id.
+     *
+     * @param channelId The id of chat.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link Channel} object.
+     */
+    Mono<Channel> getChannelMinById(long channelId);
+
+    /**
+     * Retrieve detailed channel information by specified id.
      *
      * @param channelId The id of channel.
      * @return A {@link Mono} emitting on successful completion
@@ -132,7 +141,7 @@ public interface StoreLayout {
      * @param userId The id of user.
      * @return A {@link Mono} emitting on successful completion the {@link BaseUser} object.
      */
-    Mono<User> getUserMinById(long userId);
+    Mono<BaseUser> getUserMinById(long userId);
 
     /**
      * Retrieve detailed user information by specified id.

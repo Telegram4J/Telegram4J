@@ -31,14 +31,15 @@ public final class AuxiliaryEntityFactory {
             case ChannelMessages.ID: {
                 ChannelMessages data0 = (ChannelMessages) data;
 
-                var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
-                        .map(d -> EntityFactory.createChat(client, d, null))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
+                User selfUser = usersMap.get(client.getSelfId().asLong());
+                var chatsMap = data0.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
+                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var messages = data0.messages().stream()
                         .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
@@ -54,14 +55,15 @@ public final class AuxiliaryEntityFactory {
             case MessagesSlice.ID: {
                 MessagesSlice data0 = (MessagesSlice) data;
 
-                var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
-                        .map(d -> EntityFactory.createChat(client, d, null))
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var usersMap = data0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
+                User selfUser = usersMap.get(client.getSelfId().asLong());
+                var chatsMap = data0.chats().stream()
+                        .filter(TlEntityUtil::isAvailableChat)
+                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var messages = data0.messages().stream()
                         .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
