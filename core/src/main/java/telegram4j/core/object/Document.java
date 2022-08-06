@@ -132,8 +132,10 @@ public class Document implements TelegramObject {
      *
      * @return The size of document in the bytes.
      */
-    public int getSize() {
-        return data.size();
+    public long getSize() {
+        return data.identifier() == BaseDocument.ID
+                ? ((BaseDocument) data).size()
+                : ((WebDocument) data).size();
     }
 
     /**

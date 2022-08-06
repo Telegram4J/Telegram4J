@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.ImmutableDataJSON;
+import telegram4j.tl.InputInvoice;
 import telegram4j.tl.InputPeer;
 import telegram4j.tl.payments.*;
 import telegram4j.tl.request.payments.*;
@@ -15,10 +16,9 @@ public class PaymentsService extends RpcService {
         super(client, storeLayout);
     }
 
-    public Mono<PaymentForm> getPaymentForm(InputPeer peer, int msgId, @Nullable String themeParams) {
+    public Mono<PaymentForm> getPaymentForm(InputInvoice invoice, @Nullable String themeParams) {
         return client.sendAwait(GetPaymentForm.builder()
-                .peer(peer)
-                .msgId(msgId)
+                .invoice(invoice)
                 .themeParams(themeParams != null ? ImmutableDataJSON.of(themeParams) : null)
                 .build());
     }

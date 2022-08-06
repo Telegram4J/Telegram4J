@@ -8,6 +8,8 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.ChatInviteExported;
 import telegram4j.tl.UpdateChannelParticipant;
 
 import java.time.Instant;
@@ -48,6 +50,7 @@ class ChannelUpdateHandlers {
                 .map(d -> new User(context.getClient(), d))
                 .orElseThrow();
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
+                .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> {
                     User admin = Optional.ofNullable(context.getUsers().get(d.adminId()))
                             .map(u -> EntityFactory.createUser(context.getClient(), u))

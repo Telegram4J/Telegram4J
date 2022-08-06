@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.tl.NotificationSound;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -33,8 +34,17 @@ public class PeerNotifySettings implements TelegramObject {
         return Optional.ofNullable(data.muteUntil()).map(Instant::ofEpochSecond);
     }
 
-    public Optional<String> getSound() {
-        return Optional.ofNullable(data.sound());
+    // TODO: implement
+    public Optional<NotificationSound> getIosSound() {
+        return Optional.empty();
+    }
+
+    public Optional<NotificationSound> getAndroidSound() {
+        return Optional.empty();
+    }
+
+    public Optional<NotificationSound> getOtherSound() {
+        return Optional.empty();
     }
 
     @Override

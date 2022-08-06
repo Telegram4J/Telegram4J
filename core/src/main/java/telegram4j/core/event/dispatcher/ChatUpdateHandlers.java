@@ -8,6 +8,7 @@ import telegram4j.core.object.User;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.GroupChat;
 import telegram4j.core.util.EntityFactory;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Instant;
@@ -124,6 +125,7 @@ class ChatUpdateHandlers {
 
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
+                .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> {
                     User admin = Optional.ofNullable(context.getUsers().get(d.adminId()))
                             .map(u -> EntityFactory.createUser(context.getClient(), u))

@@ -149,6 +149,6 @@ public interface Chat extends PeerEntity {
         SUPERGROUP,
 
         /** Represents a {@link BroadcastChannel}. */
-        CHANNEL;
+        CHANNEL
     }
 }

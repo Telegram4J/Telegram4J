@@ -12,9 +12,9 @@ import java.util.Optional;
 @Value.Immutable
 interface InputMediaGeoPointSpecDef extends InputMediaSpec {
 
-    double latitide();
+    double latitude();
 
-    double longtitude();
+    double longitude();
 
     Optional<Integer> accuracyRadius();
 
@@ -22,8 +22,8 @@ interface InputMediaGeoPointSpecDef extends InputMediaSpec {
     default Mono<InputMedia> asData(MTProtoTelegramClient client) {
         return Mono.just(InputMediaGeoPoint.builder()
                 .geoPoint(BaseInputGeoPoint.builder()
-                        .lat(latitide())
-                        .longState(longtitude())
+                        .lat(latitude())
+                        .longitude(longitude())
                         .accuracyRadius(accuracyRadius().orElse(null))
                         .build())
                 .build());

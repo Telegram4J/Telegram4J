@@ -466,7 +466,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .then();
 
         Flux<Event> refetchDifference = Flux.defer(() -> {
-            if (diff.finalState()) {
+            if (diff.isFinal()) {
                 return Flux.empty();
             }
 

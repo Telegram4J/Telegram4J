@@ -377,6 +377,8 @@ public interface Channel extends Chat {
         /** Whether signatures are enabled (channels). */
         SIGNATURES(11),
 
+        MIN(12),
+
         /** This channel/supergroup is probably a scam. */
         SCAM(19),
 
@@ -405,7 +407,11 @@ public interface Channel extends Chat {
         GIGAGROUP(26),
 
         /** Whether this channel or group is protected, thus does not allow forwarding messages from it. */
-        NOFORWARDS(27),
+        NO_FORWARDS(27),
+
+        JOIN_TO_SEND(28),
+
+        JOIN_REQUEST(29),
 
         // ChannelFull flags
 
@@ -435,7 +441,11 @@ public interface Channel extends Chat {
          * if set, you won't receive messages from anonymous group
          * admins in <a href="https://core.telegram.org/api/discussion">discussion replies via @replies</a>.
          */
-        BLOCKED(22);
+        BLOCKED(22),
+
+        // ChannelFull flags2
+
+        CAN_DELETE_CHANNEL(0);
 
         private final int value;
         private final int flag;
@@ -473,10 +483,21 @@ public interface Channel extends Chat {
         public static EnumSet<Flag> of(@Nullable telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
             if (fullData != null) {
+                var values = values();
+
                 int flags = fullData.flags();
-                for (Flag value : values()) {
-                    if (value.ordinal() < CAN_VIEW_PARTICIPANTS.ordinal()) continue;
+                for (int i = CAN_VIEW_PARTICIPANTS.ordinal(); i < values.length; i++) {
+                    Flag value = values[i];
                     if ((flags & value.flag) != 0) {
+                        set.add(value);
+                    }
+                }
+
+                // well done, telegram, good solution
+                int flags2 = fullData.flags2();
+                for (int i = CAN_DELETE_CHANNEL.ordinal(); i < values.length; i++) {
+                    Flag value = values[i];
+                    if ((flags2 & value.flag) != 0) {
                         set.add(value);
                     }
                 }
@@ -494,9 +515,10 @@ public interface Channel extends Chat {
          */
         public static EnumSet<Flag> of(telegram4j.tl.Channel data) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
+            var values = values();
             int flags = data.flags();
-            for (Flag value : values()) {
-                if (value.ordinal() >= CALL_NOT_EMPTY.ordinal()) continue;
+            for (int i = 0; i < CAN_VIEW_PARTICIPANTS.ordinal(); i++) {
+                Flag value = values[i];
                 if ((flags & value.flag) != 0) {
                     set.add(value);
                 }

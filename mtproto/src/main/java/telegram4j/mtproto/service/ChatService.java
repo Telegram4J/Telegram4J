@@ -328,7 +328,7 @@ public class ChatService extends RpcService {
                 .build());
     }
 
-    public Mono<Boolean> deleteHistory(InputChannel channel, int maxId) {
+    public Mono<Updates> deleteHistory(InputChannel channel, int maxId) {
         return client.sendAwait(ImmutableDeleteHistory.of(channel, maxId));
     }
 

@@ -47,7 +47,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -288,7 +287,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .query(initConnection())
                     .build();
 
-            AtomicReference<Id> selfId = new AtomicReference<>();
+            Id[] selfId = {null};
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
                     mtProtoResources, updatesManagerFactory, selfId,
@@ -348,7 +347,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                     long ac = Objects.requireNonNull(self.accessHash());
                                                     return Id.ofUser(user.fullUser().id(), ac);
                                                 }))
-                                        .doOnNext(id -> selfId.compareAndSet(null, id))
+                                        .doOnNext(id -> selfId[0] = id)
                                         .then();
 
                                 return mtProtoClient.sendAwait(invokeWithLayout)

@@ -28,19 +28,18 @@ import telegram4j.tl.storage.FileType;
 
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
     /** The supported api scheme version. */
-    public static final int LAYER = 139;
+    public static final int LAYER = TlInfo.LAYER;
 
     private final AuthorizationResources authResources;
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
     private final FileReferenceManager fileReferenceManager;
-    private final AtomicReference<Id> selfId;
+    private final Id[] selfIdHolder;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
     private final Mono<Void> onDisconnect;
@@ -48,14 +47,14 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
                           Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
-                          AtomicReference<Id> selfId, ServiceHolder serviceHolder,
+                          Id[] selfIdHolder, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
-        this.selfId = selfId;
+        this.selfIdHolder = selfIdHolder;
         this.entityRetriever = entityRetriever.apply(this);
         this.updatesManager = updatesManager.apply(this);
         this.fileReferenceManager = new FileReferenceManager(this);
@@ -125,7 +124,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of <i>current</i> user.
      */
     public Id getSelfId() {
-        return Objects.requireNonNull(selfId.get(), "Self id has not yet resolved.");
+        return Objects.requireNonNull(selfIdHolder[0], "Self id has not yet resolved.");
     }
 
     public AuthorizationResources getAuthResources() {

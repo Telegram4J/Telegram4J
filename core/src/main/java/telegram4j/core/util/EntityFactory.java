@@ -166,6 +166,7 @@ public final class EntityFactory {
 
                 var exportedChatInvite = Optional.of(chatFull.fullChat())
                         .map(telegram4j.tl.ChatFull::exportedInvite)
+                        .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                         .map(d -> {
                             var admin = createUser(client, chatFull.users().stream()
                                     // This list is *usually* small, so there is no point in computing map
@@ -669,8 +670,8 @@ public final class EntityFactory {
 
             return Mono.just(InputBotInlineMessageMediaVenue.builder()
                             .geoPoint(BaseInputGeoPoint.builder()
-                                    .lat(m.media().latitide())
-                                    .longState(m.media().longtitude())
+                                    .lat(m.media().latitude())
+                                    .longitude(m.media().longitude())
                                     .accuracyRadius(m.media().accuracyRadius().orElse(null))
                                     .build())
                             .title(m.media().title())

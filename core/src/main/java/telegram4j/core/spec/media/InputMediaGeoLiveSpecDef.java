@@ -17,9 +17,9 @@ interface InputMediaGeoLiveSpecDef extends InputMediaSpec {
         return false;
     }
 
-    double latitide();
+    double latitude();
 
-    double longtitude();
+    double longitude();
 
     Optional<Integer> accuracyRadius();
 
@@ -33,8 +33,8 @@ interface InputMediaGeoLiveSpecDef extends InputMediaSpec {
     default Mono<InputMedia> asData(MTProtoTelegramClient client) {
         return Mono.just(InputMediaGeoLive.builder()
                 .geoPoint(BaseInputGeoPoint.builder()
-                        .lat(latitide())
-                        .longState(longtitude())
+                        .lat(latitude())
+                        .longitude(longitude())
                         .accuracyRadius(accuracyRadius().orElse(null))
                         .build())
                 .heading(heading().orElse(null))

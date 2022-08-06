@@ -28,7 +28,7 @@ public final class GeoPoint implements TelegramObject {
      * @return The longitude coordinates of geo point.
      */
     public double getLongitude() {
-        return data.longState();
+        return data.longitude();
     }
 
     /**

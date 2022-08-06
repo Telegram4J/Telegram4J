@@ -10,10 +10,10 @@ import java.util.Optional;
 public class ExportedChatInvite implements TelegramObject {
 
     private final MTProtoTelegramClient client;
-    private final telegram4j.tl.ExportedChatInvite data;
+    private final telegram4j.tl.ChatInviteExported data;
     private final User admin;
 
-    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ExportedChatInvite data, User admin) {
+    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ChatInviteExported data, User admin) {
         this.client = Objects.requireNonNull(client, "client");
         this.data = Objects.requireNonNull(data, "data");
         this.admin = admin;

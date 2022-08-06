@@ -95,7 +95,7 @@ public class InlineQueryEvent extends BotEvent {
                         .setInlineBotResults(SetInlineBotResults.builder()
                                 .queryId(getQueryId())
                                 .gallery(spec.gallery())
-                                .privateState(spec.privacy())
+                                .isPrivate(spec.privacy())
                                 .results(list)
                                 .nextOffset(spec.nextOffset().orElse(null))
                                 .switchPm(spec.switchPm().orElse(null))
