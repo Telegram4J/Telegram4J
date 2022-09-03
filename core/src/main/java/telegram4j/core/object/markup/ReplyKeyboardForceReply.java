@@ -13,7 +13,7 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
 
     public ReplyKeyboardForceReply(MTProtoTelegramClient client, telegram4j.tl.ReplyKeyboardForceReply data) {
         super(client);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override
@@ -32,7 +32,7 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
 
     /**
      * Gets whether this keyboard is only for specific users selected
-     * via @mention in the {@link Message#getMessage()} or via message reply.
+     * via @mention in the {@link Message#getContent()} or via message reply.
      *
      * @return {@code true} if keyboard is shown only for a specific user.
      */

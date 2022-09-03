@@ -174,7 +174,7 @@ public final class Message implements TelegramObject {
      *
      * @return The raw text of message, if present.
      */
-    public Optional<String> getMessage() {
+    public Optional<String> getContent() {
         return Optional.ofNullable(baseData).map(BaseMessage::message);
     }
 
@@ -202,9 +202,9 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets markup entities for {@link #getMessage() text}, if message is not service and data present.
+     * Gets markup entities for {@link #getContent() text}, if message is not service and data present.
      *
-     * @return The {@link List} of markup entities for {@link #getMessage() text}, if present.
+     * @return The {@link List} of markup entities for {@link #getContent() text}, if present.
      */
     public Optional<List<MessageEntity>> getEntities() {
         return Optional.ofNullable(baseData)

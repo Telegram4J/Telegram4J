@@ -11,7 +11,7 @@ public class EchoCommand implements Command {
     @Override
     public Publisher<?> execute(SendMessageEvent event) {
         return Mono.justOrEmpty(event.getChat())
-                .zipWith(Mono.justOrEmpty(event.getMessage().getMessage()))
+                .zipWith(Mono.justOrEmpty(event.getMessage().getContent()))
                 .flatMap(TupleUtils.function((c, t) -> {
                     int spc = t.indexOf(' ');
                     return c.sendMessage(SendMessageSpec.builder()
