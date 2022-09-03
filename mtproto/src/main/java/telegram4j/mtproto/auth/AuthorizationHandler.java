@@ -219,11 +219,15 @@ public final class AuthorizationHandler {
 
         client.updateTimeOffset(serverDHInnerData.serverTime());
 
-        return client.sendAuth(SetClientDHParams.builder()
+        var req = SetClientDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(serverNonce)
                 .encryptedData(dataWithHashEnc)
-                .build());
+                .build();
+
+        dataWithHashEnc.release();
+
+        return client.sendAuth(req);
     }
 
     private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {

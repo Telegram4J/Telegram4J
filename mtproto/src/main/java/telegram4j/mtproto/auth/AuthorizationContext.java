@@ -23,7 +23,7 @@ public final class AuthorizationContext {
     }
 
     public void setNonce(ByteBuf nonce) {
-        this.nonce = Objects.requireNonNull(nonce, "nonce");
+        this.nonce = Objects.requireNonNull(nonce);
     }
 
     public ByteBuf getNewNonce() {
@@ -31,7 +31,7 @@ public final class AuthorizationContext {
     }
 
     public void setNewNonce(ByteBuf newNonce) {
-        this.newNonce = Objects.requireNonNull(newNonce, "newNonce");
+        this.newNonce = Objects.requireNonNull(newNonce);
     }
 
     public ByteBuf getServerNonce() {
@@ -39,7 +39,7 @@ public final class AuthorizationContext {
     }
 
     public void setServerNonce(ByteBuf serverNonce) {
-        this.serverNonce = Objects.requireNonNull(serverNonce, "serverNonce");
+        this.serverNonce = Objects.requireNonNull(serverNonce);
     }
 
     public ByteBuf getAuthKey() {
@@ -47,7 +47,7 @@ public final class AuthorizationContext {
     }
 
     public void setAuthKey(ByteBuf authKey) {
-        this.authKey = Objects.requireNonNull(authKey, "authKey");
+        this.authKey = Objects.requireNonNull(authKey);
     }
 
     public long getServerSalt() {
@@ -63,7 +63,7 @@ public final class AuthorizationContext {
     }
 
     public void setAuthAuxHash(ByteBuf authAuxHash) {
-        this.authAuxHash = Objects.requireNonNull(authAuxHash, "authAuxHash");
+        this.authAuxHash = Objects.requireNonNull(authAuxHash);
     }
 
     public ServerDHParams getServerDHParams() {
@@ -71,7 +71,7 @@ public final class AuthorizationContext {
     }
 
     public void setServerDHParams(ServerDHParams serverDHParams) {
-        this.serverDHParams = Objects.requireNonNull(serverDHParams, "serverDHParams");
+        this.serverDHParams = Objects.requireNonNull(serverDHParams);
     }
 
     public AtomicInteger getRetry() {
