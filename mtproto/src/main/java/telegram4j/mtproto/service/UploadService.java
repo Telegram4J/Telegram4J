@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -25,6 +26,7 @@ import telegram4j.tl.upload.BaseFile;
 import telegram4j.tl.upload.WebFile;
 
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -115,7 +117,12 @@ public class UploadService extends RpcService {
                         .then(Mono.fromSupplier(() -> ImmutableInputFileBig.of(fileId, parts, name)));
             }
 
-            MessageDigest md5 = CryptoUtil.MD5.get();
+            MessageDigest md5;
+            try {
+                md5 = MessageDigest.getInstance("MD5");
+            } catch (NoSuchAlgorithmException e) {
+                throw Exceptions.propagate(e);
+            }
 
             return Flux.range(0, parts)
                     .flatMap(filePart -> {
