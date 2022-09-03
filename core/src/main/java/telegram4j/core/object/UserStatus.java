@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Simplified version of the {@link UserStatus user status}. */
+/** Simplified version of the {@link telegram4j.tl.UserStatus user status}. */
 public class UserStatus implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -24,8 +24,8 @@ public class UserStatus implements TelegramObject {
     public UserStatus(MTProtoTelegramClient client, Type type,
                       @Nullable Instant expiresTimestamp,
                       @Nullable Instant wasOnlineTimestamp) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.type = Objects.requireNonNull(type, "type");
+        this.client = Objects.requireNonNull(client);
+        this.type = Objects.requireNonNull(type);
         this.expiresTimestamp = expiresTimestamp;
         this.wasOnlineTimestamp = wasOnlineTimestamp;
     }
@@ -104,6 +104,6 @@ public class UserStatus implements TelegramObject {
         LAST_WEEK,
 
         /** Online status: <i>last seen last month</i>. */
-        LAST_MONTH;
+        LAST_MONTH
     }
 }

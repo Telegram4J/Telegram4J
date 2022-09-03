@@ -12,8 +12,8 @@ public abstract class RpcService {
     protected final StoreLayout storeLayout;
 
     public RpcService(MTProtoClient client, StoreLayout storeLayout) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
+        this.client = Objects.requireNonNull(client);
+        this.storeLayout = Objects.requireNonNull(storeLayout);
     }
 
     public final MTProtoClient getClient() {

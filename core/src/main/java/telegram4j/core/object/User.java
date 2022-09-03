@@ -31,14 +31,14 @@ public class User implements PeerEntity {
     private final UserFull fullData;
 
     public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.minData = Objects.requireNonNull(minData, "minData");
-        this.fullData = Objects.requireNonNull(fullData, "fullData");
+        this.client = Objects.requireNonNull(client);
+        this.minData = Objects.requireNonNull(minData);
+        this.fullData = Objects.requireNonNull(fullData);
     }
 
     public User(MTProtoTelegramClient client, BaseUser minData) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.minData = Objects.requireNonNull(minData, "minData");
+        this.client = Objects.requireNonNull(client);
+        this.minData = Objects.requireNonNull(minData);
         this.fullData = null;
     }
 
@@ -356,7 +356,13 @@ public class User implements PeerEntity {
         APPLY_MIN_PHOTO(25),
 
         /** If set, this user was reported by many users as a fake or scam user: be careful when interacting with them. */
-        FAKE(26);
+        FAKE(26),
+
+        BOT_ATTACH_MENU(27),
+
+        PREMIUM(28),
+
+        ATTACH_MENU_ENABLED(29);
 
         private final int value;
         private final int flag;
@@ -384,7 +390,7 @@ public class User implements PeerEntity {
             return flag;
         }
 
-        public static EnumSet<Flag> fromUserFull(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.User userMin) {
+        public static EnumSet<Flag> fromUserFull(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
 
             if (userFull != null) {
@@ -403,15 +409,10 @@ public class User implements PeerEntity {
             return set;
         }
 
-        public static EnumSet<Flag> fromUserMin(telegram4j.tl.User user) {
+        public static EnumSet<Flag> fromUserMin(telegram4j.tl.BaseUser user) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-            if (user instanceof UserEmpty) {
-                return set;
-            }
 
-            BaseUser user0 = (BaseUser) user;
-
-            int flags = user0.flags();
+            int flags = user.flags();
             for (Flag value : values()) {
                 // UserFull and UserMin flags has collision in bit positions
                 if (value.ordinal() < SELF.ordinal()) continue;

@@ -21,7 +21,7 @@ public class Sticker extends Document {
                    InputPeer peer, DocumentAttributeSticker stickerData, @Nullable DocumentAttributeImageSize sizeData,
                    @Nullable DocumentAttributeVideo videoData) {
         super(client, data, fileName, messageId, peer);
-        this.stickerData = Objects.requireNonNull(stickerData, "stickerData");
+        this.stickerData = Objects.requireNonNull(stickerData);
         this.sizeData = sizeData;
         this.videoData = videoData;
     }
@@ -32,11 +32,8 @@ public class Sticker extends Document {
      * @return The width of sticker.
      */
     public int getWidth() {
-        if (sizeData != null) {
-            return sizeData.w();
-        }
+        return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).w();
 
-        return Objects.requireNonNull(videoData).w();
     }
 
     /**
@@ -45,11 +42,8 @@ public class Sticker extends Document {
      * @return The height of sticker.
      */
     public int getHeight() {
-        if (sizeData != null) {
-            return sizeData.w();
-        }
+        return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).h();
 
-        return Objects.requireNonNull(videoData).h();
     }
 
     /**

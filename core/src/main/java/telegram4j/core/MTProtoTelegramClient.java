@@ -124,7 +124,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of <i>current</i> user.
      */
     public Id getSelfId() {
-        return Objects.requireNonNull(selfIdHolder[0], "Self id has not yet resolved.");
+        return Objects.requireNonNull(selfIdHolder[0]);
     }
 
     public AuthorizationResources getAuthResources() {

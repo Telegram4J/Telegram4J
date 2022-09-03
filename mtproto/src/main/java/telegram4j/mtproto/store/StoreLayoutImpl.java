@@ -603,7 +603,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private boolean isBot() {
         var userInfo = users.get(selfId);
-        Objects.requireNonNull(userInfo, "self user isn't yet retrieved.");
+        Objects.requireNonNull(userInfo);
         return userInfo.min.bot();
     }
 
@@ -774,7 +774,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
 
         PartialFields(M min, @Nullable F full) {
-            this.min = Objects.requireNonNull(min, "min");
+            this.min = Objects.requireNonNull(min);
             this.full = full;
         }
 

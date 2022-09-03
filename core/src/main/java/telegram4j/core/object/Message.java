@@ -44,16 +44,16 @@ public final class Message implements TelegramObject {
     private final Id resolvedChatId;
 
     public Message(MTProtoTelegramClient client, MessageService serviceData, Id resolvedChatId) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.resolvedChatId = Objects.requireNonNull(resolvedChatId, "resolvedChatId");
+        this.client = Objects.requireNonNull(client);
+        this.resolvedChatId = Objects.requireNonNull(resolvedChatId);
         this.baseData = null;
-        this.serviceData = Objects.requireNonNull(serviceData, "serviceData");
+        this.serviceData = Objects.requireNonNull(serviceData);
     }
 
     public Message(MTProtoTelegramClient client, BaseMessage baseData, Id resolvedChatId) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.baseData = Objects.requireNonNull(baseData, "baseData");
-        this.resolvedChatId = Objects.requireNonNull(resolvedChatId, "resolvedChatId");
+        this.client = Objects.requireNonNull(client);
+        this.baseData = Objects.requireNonNull(baseData);
+        this.resolvedChatId = Objects.requireNonNull(resolvedChatId);
         this.serviceData = null;
     }
 

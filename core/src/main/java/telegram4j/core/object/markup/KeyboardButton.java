@@ -22,8 +22,8 @@ public final class KeyboardButton implements TelegramObject {
     private final telegram4j.tl.KeyboardButton data;
 
     public KeyboardButton(MTProtoTelegramClient client, telegram4j.tl.KeyboardButton data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override
@@ -94,12 +94,16 @@ public final class KeyboardButton implements TelegramObject {
     }
 
     /**
-     * Gets url that will be opened on press, if {@link #getType() type} is {@link Type#URL}/{@link Type#URL_AUTH}.
+     * Gets url that will be opened on press, if {@link #getType() type} is one of this:
+     * {@link Type#URL}, {@link Type#URL_AUTH}, {@link Type#WEB_VIEW}, {@link Type#SIMPLE_WEB_VIEW}.
      *
-     * @return The url that will be opened on press, if {@link #getType() type} is {@link Type#URL}/{@link Type#URL_AUTH}.
+     * @return The url that will be opened on press, if {@link #getType() type} is one of this:
+     * {@link Type#URL}, {@link Type#URL_AUTH}, {@link Type#WEB_VIEW}, {@link Type#SIMPLE_WEB_VIEW}
      */
     public Optional<String> getUrl() {
         switch (data.identifier()) {
+            case KeyboardButtonWebView.ID: return Optional.of(((KeyboardButtonWebView) data).url());
+            case KeyboardButtonSimpleWebView.ID: return Optional.of(((KeyboardButtonSimpleWebView) data).url());
             case KeyboardButtonUrl.ID: return Optional.of(((KeyboardButtonUrl) data).url());
             case KeyboardButtonUrlAuth.ID: return Optional.of(((KeyboardButtonUrlAuth) data).url());
             case InputKeyboardButtonUrlAuth.ID: return Optional.of(((InputKeyboardButtonUrlAuth) data).url());
@@ -251,7 +255,11 @@ public final class KeyboardButton implements TelegramObject {
          * of this constructor must be opened, instead. If the user refuses the
          * authorization request but still wants to open the link, the {@code url} of this constructor must be used.
          */
-        URL_AUTH;
+        URL_AUTH,
+
+        SIMPLE_WEB_VIEW,
+
+        WEB_VIEW;
 
         /**
          * Gets type of raw {@link telegram4j.tl.KeyboardButton} object.
@@ -275,6 +283,8 @@ public final class KeyboardButton implements TelegramObject {
                 case KeyboardButtonRequestPoll.ID: return REQUEST_POLL;
                 case KeyboardButtonSwitchInline.ID: return SWITCH_INLINE;
                 case KeyboardButtonUrl.ID: return URL;
+                case KeyboardButtonSimpleWebView.ID: return SIMPLE_WEB_VIEW;
+                case KeyboardButtonWebView.ID: return WEB_VIEW;
                 default: throw new IllegalStateException("Unexpected keyboard button type: " + data);
             }
         }

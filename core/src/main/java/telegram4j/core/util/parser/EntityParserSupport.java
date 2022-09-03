@@ -7,7 +7,10 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.MessageEntity.Type;
 import telegram4j.tl.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -51,7 +54,7 @@ public final class EntityParserSupport {
      * @return A {@link Mono} emitting on successful completion {@link Tuple2} with striped text and list of parsed message entities.
      */
     public static Mono<Tuple2<String, List<MessageEntity>>> parse(MTProtoTelegramClient client, EntityParser parser) {
-        List<EntityToken> tokens = new LinkedList<>();
+        List<EntityToken> tokens = new ArrayList<>();
         EntityToken t;
         while ((t = parser.nextToken()) != null) {
             tokens.add(t);
@@ -126,12 +129,16 @@ public final class EntityParserSupport {
                         sink.next(ImmutableMessageEntityStrike.of(offset, length));
                         break;
                     case MENTION_NAME:
-                        String arg = Objects.requireNonNull(begin.arg());
+                        String arg = Objects.requireNonNull(begin.arg(), () ->
+                                "Absent userId value for token begin: " + begin);
                         long userId = Long.parseLong(arg);
                         client.getMtProtoResources().getStoreLayout()
                                 .resolveUser(userId)
                                 .map(p -> ImmutableInputMessageEntityMentionName.of(offset, length, p))
-                                .subscribe(sink::next, sink::error, sink::complete);
+                                .subscribe(sink::next, sink::error);
+                        break;
+                    case CUSTOM_EMOJI:
+                        // TODO
                         break;
                     case TEXT_URL:
                         sink.next(ImmutableMessageEntityTextUrl.of(offset, length,
@@ -175,7 +182,8 @@ public final class EntityParserSupport {
                 case BANK_CARD_NUMBER:
                     list.add(ImmutableMessageEntityBankCard.of(offset, length));
                     break;
-                default: throw new IllegalStateException("Incorrect entity type: " + t);
+                default:
+                    throw new IllegalStateException("Incorrect entity type: " + t);
             }
         }
 

@@ -21,7 +21,7 @@ public class SendMessageEvent extends MessageEvent {
     public SendMessageEvent(MTProtoTelegramClient client, Message message,
                             @Nullable Chat chat, @Nullable PeerEntity author) {
         super(client);
-        this.message = Objects.requireNonNull(message, "message");
+        this.message = Objects.requireNonNull(message);
         this.chat = chat;
         this.author = author;
     }

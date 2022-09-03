@@ -15,10 +15,10 @@ public class UpdateContext<U extends Update> {
     private final U update;
 
     protected UpdateContext(MTProtoTelegramClient client, Map<Long, Chat> chats, Map<Long, BaseUser> users, U update) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.chats = Objects.requireNonNull(chats, "chats");
-        this.users = Objects.requireNonNull(users, "users");
-        this.update = Objects.requireNonNull(update, "update");
+        this.client = Objects.requireNonNull(client);
+        this.chats = Objects.requireNonNull(chats);
+        this.users = Objects.requireNonNull(users);
+        this.update = Objects.requireNonNull(update);
     }
 
     public static <U extends Update> UpdateContext<U> create(MTProtoTelegramClient client, U update) {

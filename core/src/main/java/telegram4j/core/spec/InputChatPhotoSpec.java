@@ -14,13 +14,13 @@ public final class InputChatPhotoSpec {
     private final ImmutableInputChatUploadedPhoto uploaded;
 
     private InputChatPhotoSpec(String photo) {
-        this.photo = Objects.requireNonNull(photo, "photo");
+        this.photo = Objects.requireNonNull(photo);
         this.uploaded = null;
     }
 
     private InputChatPhotoSpec(ImmutableInputChatUploadedPhoto uploaded) {
         this.photo = null;
-        this.uploaded = Objects.requireNonNull(uploaded, "uploaded");
+        this.uploaded = Objects.requireNonNull(uploaded);
     }
 
     public static InputChatPhotoSpec of(String fileReferenceId) {

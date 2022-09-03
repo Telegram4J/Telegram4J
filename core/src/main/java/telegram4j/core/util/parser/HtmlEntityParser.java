@@ -43,6 +43,7 @@ import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTE
  *
  */
 class HtmlEntityParser extends BaseEntityParser {
+    // TODO: implement CUSTOM_EMOJI parsing
 
     boolean prevOpen;
 

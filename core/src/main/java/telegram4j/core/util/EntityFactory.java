@@ -382,9 +382,14 @@ public final class EntityFactory {
         telegram4j.tl.DocumentAttributeAudio audioData = null;
         telegram4j.tl.DocumentAttributeSticker stickerData = null;
         telegram4j.tl.DocumentAttributeImageSize sizeData = null;
+        // TODO: test
+        telegram4j.tl.DocumentAttributeCustomEmoji customEmojiData = null;
         String fileName = null;
         for (var a : data.attributes()) {
             switch (a.identifier()) {
+                case telegram4j.tl.DocumentAttributeCustomEmoji.ID:
+                    customEmojiData = (DocumentAttributeCustomEmoji) a;
+                    break;
                 case telegram4j.tl.DocumentAttributeHasStickers.ID:
                     hasStickers = true;
                     break;

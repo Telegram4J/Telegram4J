@@ -21,8 +21,8 @@ public final class MessageEntity implements TelegramObject {
     private final String content;
 
     public MessageEntity(MTProtoTelegramClient client, telegram4j.tl.MessageEntity data, String text) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
         this.content = text.substring(data.offset(), data.offset() + data.length());
     }
 
@@ -100,6 +100,17 @@ public final class MessageEntity implements TelegramObject {
         // InputMessageEntityMentionName doesn't handle because it's an input entity, that maps into the MessageEntityMentionName
         return data.identifier() == MessageEntityMentionName.ID
                 ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
+                : Optional.empty();
+    }
+
+    /**
+     * Gets id of the custom emoji.
+     *
+     * @return The id of custom emoji, if {@code getType() == Type.CUSTOM_EMOJI}.
+     */
+    public Optional<Long> getDocumentId() {
+        return data.identifier() == MessageEntityCustomEmoji.ID
+                ? Optional.of(((MessageEntityCustomEmoji) data).documentId())
                 : Optional.empty();
     }
 
@@ -182,6 +193,9 @@ public final class MessageEntity implements TelegramObject {
         /** Message entity representing a spoiler text. */
         SPOILER,
 
+        /** Message entity representing <a href="https://core.telegram.org/stickers#animated-emoji">custom emoji</a>. */
+        CUSTOM_EMOJI,
+
         /** Unknown message entity. */
         UNKNOWN;
 
@@ -212,6 +226,7 @@ public final class MessageEntity implements TelegramObject {
                 case MessageEntityBlockquote.ID: return BLOCK_QUOTE;
                 case MessageEntityBankCard.ID: return BANK_CARD_NUMBER;
                 case MessageEntitySpoiler.ID: return SPOILER;
+                case MessageEntityCustomEmoji.ID: return CUSTOM_EMOJI;
                 default: throw new IllegalArgumentException("Unknown message type: " + data);
             }
         }

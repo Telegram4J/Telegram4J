@@ -21,9 +21,9 @@ public class UpdateChannelUserTypingEvent extends UserEvent {
                                         Id fromId, SendMessageAction action,
                                         @Nullable Integer topMessageId) {
         super(client);
-        this.channelId = Objects.requireNonNull(channelId, "channelId");
-        this.fromId = Objects.requireNonNull(fromId, "fromId");
-        this.action = Objects.requireNonNull(action, "action");
+        this.channelId = Objects.requireNonNull(channelId);
+        this.fromId = Objects.requireNonNull(fromId);
+        this.action = Objects.requireNonNull(action);
         this.topMessageId = topMessageId;
     }
 

@@ -18,8 +18,8 @@ public class VideoSize implements TelegramObject {
     private final telegram4j.tl.VideoSize data;
 
     public VideoSize(MTProtoTelegramClient client, telegram4j.tl.VideoSize data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

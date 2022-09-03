@@ -10,7 +10,7 @@ public abstract class Event {
     protected final MTProtoTelegramClient client;
 
     protected Event(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
     }
 
     /**

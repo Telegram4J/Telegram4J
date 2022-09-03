@@ -67,12 +67,12 @@ public final class InitConnectionParams {
     public InitConnectionParams(String appVersion, String deviceModel, String langCode,
                                 String langPack, String systemVersion, String systemLangCode,
                                 @Nullable InputClientProxy proxy, @Nullable JsonNode params) {
-        this.appVersion = Objects.requireNonNull(appVersion, "appVersion");
-        this.deviceModel = Objects.requireNonNull(deviceModel, "deviceModel");
-        this.langCode = Objects.requireNonNull(langCode, "langCode");
-        this.langPack = Objects.requireNonNull(langPack, "langPack");
-        this.systemVersion = Objects.requireNonNull(systemVersion, "systemVersion");
-        this.systemLangCode = Objects.requireNonNull(systemLangCode, "systemLangCode");
+        this.appVersion = Objects.requireNonNull(appVersion);
+        this.deviceModel = Objects.requireNonNull(deviceModel);
+        this.langCode = Objects.requireNonNull(langCode);
+        this.langPack = Objects.requireNonNull(langPack);
+        this.systemVersion = Objects.requireNonNull(systemVersion);
+        this.systemLangCode = Objects.requireNonNull(systemLangCode);
         this.proxy = proxy;
         this.params = params;
     }

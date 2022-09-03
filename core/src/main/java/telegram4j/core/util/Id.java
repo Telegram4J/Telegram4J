@@ -22,7 +22,7 @@ public final class Id implements Comparable<Id> {
     private final Object context;
 
     private Id(Type type, long value, @Nullable Object context) {
-        this.type = Objects.requireNonNull(type, "type");
+        this.type = Objects.requireNonNull(type);
         this.value = value;
         this.context = context;
     }
@@ -308,7 +308,7 @@ public final class Id implements Comparable<Id> {
         private final int messageId;
 
         private MinInformation(Id peerId, int messageId) {
-            this.peerId = Objects.requireNonNull(peerId, "peerId");
+            this.peerId = Objects.requireNonNull(peerId);
             this.messageId = messageId;
         }
 

@@ -19,7 +19,7 @@ public class Video extends Document {
                  String fileName, int messageId, InputPeer peer,
                  DocumentAttributeVideo videoData, boolean hasStickers, boolean gif) {
         super(client, data, fileName, messageId, peer);
-        this.videoData = Objects.requireNonNull(videoData, "videoData");
+        this.videoData = Objects.requireNonNull(videoData);
         this.hasStickers = hasStickers;
         this.gif = gif;
     }

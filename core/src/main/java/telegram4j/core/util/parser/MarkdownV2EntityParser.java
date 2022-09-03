@@ -42,6 +42,7 @@ import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTE
  *
  */
 class MarkdownV2EntityParser extends BaseEntityParser {
+    // TODO: implement CUSTOM_EMOJI parsing
 
     int urlEnd = -1; // cached position of ')' in text url
 

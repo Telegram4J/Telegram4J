@@ -21,8 +21,8 @@ public class StickerSet implements TelegramObject {
     private final String fileReferenceId;
 
     public StickerSet(MTProtoTelegramClient client, telegram4j.tl.StickerSet data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
 
         this.fileReferenceId = Optional.ofNullable(data.thumbVersion())
                 .map(version -> FileReferenceId.ofStickerSet(
@@ -54,6 +54,14 @@ public class StickerSet implements TelegramObject {
 
     public boolean isAnimated() {
         return data.animated();
+    }
+
+    public boolean isVideos() {
+        return data.videos();
+    }
+
+    public boolean isEmojis() {
+        return data.emojis();
     }
 
     public Optional<Instant> getInstallTimestamp() {
@@ -89,6 +97,10 @@ public class StickerSet implements TelegramObject {
 
     public Optional<Integer> getThumbVersion() {
         return Optional.ofNullable(data.thumbVersion());
+    }
+
+    public Optional<Long> getThumbDocumentId() {
+        return Optional.ofNullable(data.thumbDocumentId());
     }
 
     public int getCount() {

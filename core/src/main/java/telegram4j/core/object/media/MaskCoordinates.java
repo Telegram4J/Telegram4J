@@ -12,8 +12,8 @@ public class MaskCoordinates implements TelegramObject {
     private final telegram4j.tl.MaskCoords data;
 
     public MaskCoordinates(MTProtoTelegramClient client, telegram4j.tl.MaskCoords data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override
