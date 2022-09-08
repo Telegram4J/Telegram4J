@@ -90,14 +90,13 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
         return Mono.fromSupplier(() -> {
             var ids = StreamSupport.stream(messageIds.spliterator(), false)
-                    // Search must match what the server gives out,
-                    // and the server does not return anything when sending this id.
-                    .filter(i -> i.identifier() != InputMessagePinned.ID)
                     .map(id -> {
                         switch (id.identifier()) {
                             case InputMessageID.ID: return ((InputMessageID) id).id();
+                            case InputMessagePinned.ID:
                             case InputMessageReplyTo.ID:
                             case InputMessageCallbackQuery.ID:
+                                throw new UnsupportedOperationException("Message id type: " + id);
                             default: throw new IllegalArgumentException("Unknown message id type: " + id);
                         }
                     })
@@ -143,6 +142,7 @@ public class StoreLayoutImpl implements StoreLayout {
                                         .orElse(null);
                             case InputMessageReplyTo.ID:
                             case InputMessageCallbackQuery.ID:
+                                throw new UnsupportedOperationException("Message id type: " + id);
                             default:
                                 throw new IllegalArgumentException("Unknown message id type: " + id);
                         }
@@ -283,7 +283,7 @@ public class StoreLayoutImpl implements StoreLayout {
                             .orElse(InputPeerEmpty.instance());
                     break;
                 default:
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("Unexpected update type: " + update);
             }
 
             long rawPeerId;
@@ -301,7 +301,7 @@ public class StoreLayoutImpl implements StoreLayout {
                     rawPeerId = -1;
                     break;
                 default:
-                    throw new IllegalStateException();
+                    throw new IllegalStateException("Unknown peer type: " + peer);
             }
 
             var messages = update.messages().stream()
@@ -732,7 +732,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     static class MessageId {
         final int messageId;
-        final long chatId;
+        final long chatId; // -1 for DM/Group Chats
 
         static MessageId create(BaseMessageFields message) {
             switch (message.peerId().identifier()) {
@@ -760,7 +760,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
         @Override
         public int hashCode() {
-            return Objects.hash(messageId, chatId);
+            return messageId ^ Long.hashCode(chatId);
         }
     }
 
@@ -788,9 +788,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
 
         public PartialFields<M, F> withMin(M min) {
-            if (Objects.equals(this.min, min)) {
-                return this;
-            }
+            if (this.min == min) return this;
             return new PartialFields<>(min, full);
         }
 

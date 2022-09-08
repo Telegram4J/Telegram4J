@@ -81,7 +81,9 @@ public interface StoreLayout {
 
     /**
      * Retrieve user/group chat's messages with auxiliary data by given ids.
-     * Ids with type {@link InputMessagePinned} will be ignored.
+     *
+     * @implNote Implementation can emit {@link UnsupportedOperationException} for types of the {@code InputMessage}
+     * which can't be handled.
      *
      * @param messageIds An iterable of message id elements.
      * @return A {@link Mono} emitting on successful completion
@@ -91,6 +93,9 @@ public interface StoreLayout {
 
     /**
      * Retrieve channel's messages with auxiliary data by given ids.
+     *
+     * @implNote Implementation can emit {@link UnsupportedOperationException} for types of the {@code InputMessage}
+     * which can't be handled.
      *
      * @param channelId The id of channel.
      * @param messageIds An iterable of message id elements.

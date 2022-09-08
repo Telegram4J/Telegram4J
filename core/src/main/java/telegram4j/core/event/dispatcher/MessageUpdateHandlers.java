@@ -83,6 +83,10 @@ class MessageUpdateHandlers {
     static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
+        // Typically reaction adding
+        if (message.equals(context.getOld())) {
+            return Flux.empty();
+        }
 
         var selfUser = Optional.ofNullable(context.getUsers().get(client.getSelfId().asLong()))
                 .map(u -> EntityFactory.createUser(client, u))

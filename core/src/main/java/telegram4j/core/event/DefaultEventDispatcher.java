@@ -18,9 +18,9 @@ public class DefaultEventDispatcher implements EventDispatcher {
     private final Sinks.EmitFailureHandler emissionHandler;
 
     public DefaultEventDispatcher(Scheduler eventScheduler, Sinks.Many<Event> sink, Sinks.EmitFailureHandler emissionHandler) {
-        this.eventScheduler = Objects.requireNonNull(eventScheduler, "eventScheduler");
-        this.sink = Objects.requireNonNull(sink, "sink");
-        this.emissionHandler = Objects.requireNonNull(emissionHandler, "emissionHandler");
+        this.eventScheduler = Objects.requireNonNull(eventScheduler);
+        this.sink = Objects.requireNonNull(sink);
+        this.emissionHandler = Objects.requireNonNull(emissionHandler);
     }
 
     @Override

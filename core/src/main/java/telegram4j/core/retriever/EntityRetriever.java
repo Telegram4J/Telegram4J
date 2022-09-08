@@ -62,7 +62,8 @@ public interface EntityRetriever {
 
     /**
      * Retrieve messages from user/group chats with auxiliary data by the specified message ids.
-     * Ids with {@link telegram4j.tl.InputMessagePinned pinned type} will be ignored.
+     * Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
+     * used for user/group chats.
      *
      * @implSpec Auxiliary data must contain chat and author if available.
      *

@@ -31,7 +31,7 @@ public class RpcEntityRetriever implements EntityRetriever {
     private final StoreLayout storeLayout;
 
     public RpcEntityRetriever(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
 
         this.serviceHolder = client.getServiceHolder();
         this.storeLayout = client.getMtProtoResources().getStoreLayout();

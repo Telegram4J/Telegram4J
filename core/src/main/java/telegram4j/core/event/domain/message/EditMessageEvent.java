@@ -24,7 +24,7 @@ public class EditMessageEvent extends MessageEvent {
                             @Nullable Message oldMessage, @Nullable Chat chat,
                             @Nullable PeerEntity author) {
         super(client);
-        this.newMessage = Objects.requireNonNull(newMessage, "newMessage");
+        this.newMessage = Objects.requireNonNull(newMessage);
         this.oldMessage = oldMessage;
         this.chat = chat;
         this.author = author;
