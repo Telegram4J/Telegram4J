@@ -109,7 +109,7 @@ subprojects {
 
                 pom {
                     name = 'Telegram4J'
-                    description = 'A java MTPtoro library for the Telegram API'
+                    description = 'A java MTProto library for the Telegram API'
                     url = 'https://github.com/Telegram4J/Telegram4J'
                     inceptionYear = '2021'
 

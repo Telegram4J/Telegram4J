@@ -276,7 +276,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
                         messageKey.release();
 
-                        long serverSalt = decrypted.readLongLE();
+                        decrypted.readLongLE();
                         long sessionId = decrypted.readLongLE();
                         if (this.sessionId != sessionId) {
                             return Mono.error(() -> new IllegalStateException("Incorrect session identifier. Current: 0x"
@@ -284,7 +284,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                     + Long.toHexString(sessionId)));
                         }
                         long messageId = decrypted.readLongLE();
-                        int seqNo = decrypted.readIntLE();
+                        decrypted.readIntLE();
                         int length = decrypted.readIntLE();
                         if (length % 4 != 0) {
                             return Mono.error(new IllegalStateException("Data isn't aligned by 4 bytes"));
@@ -483,8 +483,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<Void> ping = pingEmitter.ticks()
                     .flatMap(tick -> {
                         long now = System.nanoTime();
-                        lastPong.compareAndSet(0, now);
-
                         if (lastPing - lastPong.get() > 0) {
                             int missed = missedPong.incrementAndGet();
                             if (missed >= MAX_MISSED_PONG) {
@@ -757,13 +755,37 @@ public class DefaultMTProtoClient implements MTProtoClient {
         return no;
     }
 
-    private Mono<Void> handleServiceMessage(Object obj, long messageId) {
-        // For updates
+    private boolean handleMsgsAck(Object obj, long messageId) {
+        if (obj instanceof MsgsAck) {
+            MsgsAck msgsAck = (MsgsAck) obj;
+
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[C:0x{}, M:0x{}] Handling acknowledge for message(s): [{}]",
+                        id, Long.toHexString(messageId), msgsAck.msgIds().stream()
+                                .map(l -> String.format("0x%x", l))
+                                .collect(Collectors.joining(", ")));
+            }
+
+            for (long msgId : msgsAck.msgIds()) {
+                var req = requests.get(msgId);
+                if (req != null) {
+                    req.markState(s -> s | ACKNOWLEDGED);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private Object ungzip(Object obj) {
         if (obj instanceof GzipPacked) {
             GzipPacked gzipPacked = (GzipPacked) obj;
             obj = TlSerialUtil.decompressGzip(gzipPacked.packedData());
         }
+        return obj;
+    }
 
+    private Mono<Void> handleServiceMessage(Object obj, long messageId) {
         if (obj instanceof RpcResult) {
             RpcResult rpcResult = (RpcResult) obj;
             messageId = rpcResult.reqMsgId();
@@ -773,28 +795,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
             }
 
-            if (obj instanceof GzipPacked) {
-                GzipPacked gzipPacked = (GzipPacked) obj;
-                obj = TlSerialUtil.decompressGzip(gzipPacked.packedData());
-            }
+            obj = ungzip(obj);
 
-            if (obj instanceof MsgsAck) {
-                MsgsAck msgsAck = (MsgsAck) obj;
-
-                if (rpcLog.isDebugEnabled()) {
-                    rpcLog.debug("[C:0x{}, M:0x{}] Handling acknowledge for message(s): [{}]",
-                            id, Long.toHexString(messageId), msgsAck.msgIds().stream()
-                                    .map(l -> String.format("0x%x", l))
-                                    .collect(Collectors.joining(", ")));
-                }
-
-                for (long msgId : msgsAck.msgIds()) {
-                    var req = requests.get(msgId);
-                    if (req != null) {
-                        req.markState(s -> s | ACKNOWLEDGED);
-                    }
-                }
-            }
+            handleMsgsAck(obj, messageId);
 
             PendingRequest req = requests.get(messageId);
 
@@ -847,6 +850,18 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then();
         }
 
+        // Applicable for updates
+        obj = ungzip(obj);
+        if (obj instanceof Updates) {
+            Updates updates = (Updates) obj;
+            if (rpcLog.isTraceEnabled()) {
+                rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
+            }
+
+            this.updates.emitNext(updates, options.getEmissionHandler());
+            return Mono.empty();
+        }
+
         if (obj instanceof Pong) {
             Pong pong = (Pong) obj;
             messageId = pong.msgId();
@@ -892,23 +907,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
             return acknowledgmentMessage(messageId);
         }
 
-        // ? w h y
-        if (obj instanceof MsgsAck) {
-            MsgsAck msgsAck = (MsgsAck) obj;
-
-            if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Handling acknowledge for message(s): [{}]",
-                        id, Long.toHexString(messageId), msgsAck.msgIds().stream()
-                                .map(l -> String.format("0x%x", l))
-                                .collect(Collectors.joining(", ")));
-            }
-
-            for (long msgId : msgsAck.msgIds()) {
-                var req = requests.get(msgId);
-                if (req != null) {
-                    req.markState(s -> s | ACKNOWLEDGED);
-                }
-            }
+        // why not wrapped in RpcResult?
+        if (handleMsgsAck(obj, messageId)) {
+            return Mono.empty();
         }
 
         if (obj instanceof BadMsgNotification) {
@@ -943,15 +944,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         outbound.emitNext(r, options.getEmissionHandler());
                     })
                     .then();
-        }
-
-        if (obj instanceof Updates) {
-            Updates updates = (Updates) obj;
-            if (rpcLog.isTraceEnabled()) {
-                rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
-            }
-
-            this.updates.emitNext(updates, options.getEmissionHandler());
         }
 
         if (obj instanceof MsgsStateInfo) {
@@ -1003,8 +995,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     }
                 }
             }
+            return Mono.empty();
         }
 
+        if (log.isDebugEnabled()) {
+            log.debug("Unhandled payload: {}", obj);
+        }
         return Mono.empty();
     }
 

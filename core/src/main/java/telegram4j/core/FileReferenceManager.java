@@ -16,7 +16,7 @@ public class FileReferenceManager {
     private final MTProtoTelegramClient client;
 
     public FileReferenceManager(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
     }
 
     /**

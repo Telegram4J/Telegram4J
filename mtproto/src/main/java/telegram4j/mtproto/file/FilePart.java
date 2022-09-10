@@ -30,9 +30,9 @@ public final class FilePart {
      * @param mimeType The mime-type in a string, if present.
      */
     public FilePart(FileType type, int mtime, ByteBuf bytes, int size, @Nullable String mimeType) {
-        this.type = Objects.requireNonNull(type, "type");
+        this.type = Objects.requireNonNull(type);
         this.mtime = mtime;
-        this.bytes = Objects.requireNonNull(bytes, "bytes");
+        this.bytes = Objects.requireNonNull(bytes);
         this.size = size;
         this.mimeType = mimeType;
     }

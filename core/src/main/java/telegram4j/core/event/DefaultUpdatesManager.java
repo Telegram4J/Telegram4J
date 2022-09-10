@@ -57,8 +57,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
     private volatile int seq = -1;
 
     public DefaultUpdatesManager(MTProtoTelegramClient client, UpdatesMapper updatesMapper) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.updatesMapper = Objects.requireNonNull(updatesMapper, "updatesMapper");
+        this.client = Objects.requireNonNull(client);
+        this.updatesMapper = Objects.requireNonNull(updatesMapper);
     }
 
     @Override
@@ -108,6 +108,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                 Flux<Event> preApply = Flux.empty();
                 int updSeq = data.seq();
+                int seq = this.seq;
                 if (updSeq != 0 && seq + 1 < updSeq) {
                     log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", updSeq, updSeq + 1, seq);
                     preApply = getDifference();
@@ -116,12 +117,12 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
 
                 if (updSeq != 0) {
-                    seq = updSeq;
+                    this.seq = updSeq;
                 }
 
                 date = data.date();
 
-                return preApply.concatWith(handleUpdates0(List.of(), List.of(), data.updates(),
+                return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
                         data.chats(), data.users(), true));
             }
             case UpdatesCombined.ID: {
@@ -129,6 +130,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                 Flux<Event> preApply = Flux.empty();
                 int seqBegin = data.seqStart();
+                int seq = this.seq;
                 if (seqBegin != 0 && seq + 1 < seqBegin) {
                     log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, data.seq(), seq);
 
@@ -138,18 +140,19 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
 
                 if (data.seq() != 0) {
-                    seq = data.seq();
+                    this.seq = data.seq();
                 }
 
                 date = data.date();
 
-                return preApply.concatWith(handleUpdates0(List.of(), List.of(), data.updates(),
+                return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
                         data.chats(), data.users(), true));
             }
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
 
                 Flux<Event> preApply = Flux.empty();
+                int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
@@ -158,7 +161,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     return Flux.empty();
                 }
 
-                pts = data.pts();
+                this.pts = data.pts();
 
                 var message = BaseMessage.builder()
                         .out(data.out())
@@ -188,6 +191,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 UpdateShortMessage data = (UpdateShortMessage) updates;
 
                 Flux<Event> preApply = Flux.empty();
+                int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
@@ -196,7 +200,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     return Flux.empty();
                 }
 
-                pts = data.pts();
+                this.pts = data.pts();
 
                 var message = BaseMessage.builder()
                         .out(data.out())
@@ -318,16 +322,16 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             BaseDifference difference0 = (BaseDifference) difference;
 
                             return applyState(difference0.state())
-                                    .thenMany(handleUpdates0(difference0.newMessages(), difference0.newEncryptedMessages(),
-                                            difference0.otherUpdates(), difference0.chats(), difference0.users(), false));
+                                    .thenMany(handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
+                                            difference0.chats(), difference0.users(), false));
                         }
                         case DifferenceSlice.ID: {
                             DifferenceSlice difference0 = (DifferenceSlice) difference;
 
                             applyStateLocal(difference0.intermediateState());
 
-                            return handleUpdates0(difference0.newMessages(), difference0.newEncryptedMessages(),
-                                    difference0.otherUpdates(), difference0.chats(), difference0.users(), false)
+                            return handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
+                                    difference0.chats(), difference0.users(), false)
                                     .concatWith(getDifference());
                         }
                         default:
@@ -336,17 +340,17 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 });
     }
 
-    private Flux<Event> handleUpdates0(List<Message> newMessages, List<EncryptedMessage> newEncryptedMessages,
-                                       List<Update> otherUpdates, List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
+    private Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
+                                       List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
                                        boolean applyCheck) {
-        var chatsMap = chats.stream()
+        var chatsMap = Collections.unmodifiableMap(chats.stream()
                 .filter(TlEntityUtil::isAvailableChat)
-                .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
+                .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
 
-        var usersMap = users.stream()
+        var usersMap = Collections.unmodifiableMap(users.stream()
                 .filter(u -> u.identifier() == BaseUser.ID)
                 .map(u -> (BaseUser) u)
-                .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+                .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity())));
 
         var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
                 .map(c -> EntityFactory.createUser(client, c))
@@ -379,8 +383,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .getChannelFullById(u.channelId())
                         .switchIfEmpty(client.getMtProtoResources().getStoreLayout()
                                 .resolveChannel(u.channelId())
-                                .flatMap(c -> client.getServiceHolder().getChatService()
-                                        .getFullChannel(c))
+                                .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
                                 .then(Mono.empty()))
                         .map(ChatFull::fullChat)
                         .cast(ChannelFull.class)
@@ -488,19 +491,19 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case BaseChannelDifference.ID: {
                 BaseChannelDifference diff0 = (BaseChannelDifference) diff;
 
-                var chatsMap = diff0.chats().stream()
+                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
-                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
-                var usersMap = diff0.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
+                var usersMap = Collections.unmodifiableMap(diff0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(u -> (BaseUser) u)
-                        .collect(Collectors.toMap(BaseUser::id, Function.identity()));
+                        .collect(Collectors.toMap(BaseUser::id, Function.identity())));
 
                 var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
                         .map(c -> EntityFactory.createUser(client, c))
                         .orElse(null);
 
-                Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
+                Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
                         .ofType(BaseMessageFields.class)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
@@ -535,13 +538,13 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case ChannelDifferenceTooLong.ID: {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
 
-                var chatsMap = diff0.chats().stream()
+                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
                         .filter(TlEntityUtil::isAvailableChat)
-                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity()));
-                var usersMap = diff0.users().stream()
+                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
+                var usersMap = Collections.unmodifiableMap(diff0.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID)
                         .map(u -> (BaseUser) u)
-                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity()));
+                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity())));
 
                 var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
                         .map(c -> EntityFactory.createUser(client, c))
@@ -678,6 +681,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
             QtsUpdate qtsUpdate = (QtsUpdate) ctx.getUpdate();
 
             Flux<Event> preApply = Flux.empty();
+            int qts = this.qts;
             if (qts + 1 < qtsUpdate.qts()) {
                 log.debug("Updates gap found. Received qts: {}, local qts: {}", qtsUpdate.qts(), qts);
 
@@ -685,7 +689,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
             } else if (qts + 1 > qtsUpdate.qts()) {
                 return Flux.empty();
             } else {
-                qts = qtsUpdate.qts();
+                this.qts = qtsUpdate.qts();
             }
 
             return preApply.concatWith(mapUpdate);
