@@ -9,7 +9,10 @@ import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.*;
+import telegram4j.tl.BaseMessageFields;
+import telegram4j.tl.PeerChannel;
+import telegram4j.tl.PeerChat;
+import telegram4j.tl.PeerUser;
 import telegram4j.tl.channels.SendAsPeers;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.ChannelMessages;
@@ -32,12 +35,11 @@ public final class AuxiliaryEntityFactory {
                 ChannelMessages data0 = (ChannelMessages) data;
 
                 var usersMap = data0.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, selfUser))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
@@ -56,12 +58,11 @@ public final class AuxiliaryEntityFactory {
                 MessagesSlice data0 = (MessagesSlice) data;
 
                 var usersMap = data0.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, selfUser))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
@@ -81,12 +82,11 @@ public final class AuxiliaryEntityFactory {
                 BaseMessages data0 = (BaseMessages) data;
 
                 var usersMap = data0.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> EntityFactory.createUser(client, d))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
                         .map(d -> EntityFactory.createChat(client, d, selfUser))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
@@ -112,8 +112,8 @@ public final class AuxiliaryEntityFactory {
                 .collect(Collectors.toUnmodifiableSet());
 
         var users = data.users().stream()
-                .filter(u -> u.identifier() == BaseUser.ID)
                 .map(u -> EntityFactory.createUser(client, u))
+                .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());
 
         var selfUser = users.stream()
@@ -122,7 +122,6 @@ public final class AuxiliaryEntityFactory {
                 .orElse(null);
 
         var chats = data.chats().stream()
-                .filter(TlEntityUtil::isAvailableChat)
                 .map(c -> EntityFactory.createChat(client, c, selfUser))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());

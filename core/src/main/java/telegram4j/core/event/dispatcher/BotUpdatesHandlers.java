@@ -7,12 +7,16 @@ import telegram4j.core.event.domain.inline.CallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineCallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.object.GeoPoint;
-import telegram4j.core.object.chat.PrivateChat;
-import telegram4j.core.util.EntityFactory;
+import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.InlineMessageId;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.*;
+import telegram4j.tl.BaseGeoPoint;
+import telegram4j.tl.UpdateBotCallbackQuery;
+import telegram4j.tl.UpdateBotInlineQuery;
+import telegram4j.tl.UpdateInlineBotCallbackQuery;
 
+import java.util.Objects;
 import java.util.Optional;
 
 class BotUpdatesHandlers {
@@ -23,50 +27,41 @@ class BotUpdatesHandlers {
     static Flux<InlineCallbackQueryEvent> handleUpdateInlineBotCallbackQuery(
             StatefulUpdateContext<UpdateInlineBotCallbackQuery, Void> context) {
         MTProtoTelegramClient client = context.getClient();
+        UpdateInlineBotCallbackQuery upd = context.getUpdate();
 
-        var user = EntityFactory.createUser(client, context.getUsers().get(context.getUpdate().userId()));
-        ByteBuf data = context.getUpdate().data().orElse(null);
-        InlineMessageId msgId = InlineMessageId.from(context.getUpdate().msgId());
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        ByteBuf data = upd.data().orElse(null);
+        InlineMessageId msgId = InlineMessageId.from(upd.msgId());
 
-        return Flux.just(new InlineCallbackQueryEvent(client, context.getUpdate().queryId(),
-                user, context.getUpdate().chatInstance(), data,
-                context.getUpdate().gameShortName(), msgId));
+        return Flux.just(new InlineCallbackQueryEvent(client, upd.queryId(),
+                user, upd.chatInstance(), data,
+                upd.gameShortName(), msgId));
     }
 
     static Flux<CallbackQueryEvent> handleUpdateBotCallbackQuery(StatefulUpdateContext<UpdateBotCallbackQuery, Void> context) {
         MTProtoTelegramClient client = context.getClient();
+        UpdateBotCallbackQuery upd = context.getUpdate();
 
-        var user = EntityFactory.createUser(client, context.getUsers().get(context.getUpdate().userId()));
-        var chat = Optional.of(context.getUpdate().peer())
-                .map(p -> {
-                    switch (p.identifier()) {
-                        case PeerUser.ID: return new PrivateChat(client, user, null);
-                        case PeerChat.ID:
-                        case PeerChannel.ID:
-                            long rawId = TlEntityUtil.getRawPeerId(p);
-                            return EntityFactory.createChat(client, context.getChats().get(rawId), null);
-                        default: throw new IllegalStateException("Unknown peer type: " + p);
-                    }
-                })
-                .orElseThrow();
-        ByteBuf data = context.getUpdate().data().orElse(null);
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        Chat chat = context.getChatEntity(upd.peer()).orElseThrow();
+        ByteBuf data = upd.data().orElse(null);
 
-        return Flux.just(new CallbackQueryEvent(client, context.getUpdate().queryId(),
-                user, chat, context.getUpdate().msgId(),
-                context.getUpdate().chatInstance(), data,
-                context.getUpdate().gameShortName()));
+        return Flux.just(new CallbackQueryEvent(client, upd.queryId(),
+                user, chat, upd.msgId(),
+                upd.chatInstance(), data,
+                upd.gameShortName()));
     }
 
     static Flux<InlineQueryEvent> handleUpdateBotInlineQuery(StatefulUpdateContext<UpdateBotInlineQuery, Void> context) {
         MTProtoTelegramClient client = context.getClient();
+        UpdateBotInlineQuery upd = context.getUpdate();
 
-        var user = EntityFactory.createUser(client, context.getUsers().get(context.getUpdate().userId()));
-        GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(context.getUpdate().geo(), BaseGeoPoint.class))
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(upd.geo(), BaseGeoPoint.class))
                 .map(d -> new GeoPoint(client, d))
                 .orElse(null);
 
-        return Flux.just(new InlineQueryEvent(client, context.getUpdate().queryId(),
-                user, context.getUpdate().query(), geo,
-                context.getUpdate().peerType(), context.getUpdate().offset()));
+        return Flux.just(new InlineQueryEvent(client, upd.queryId(), user,
+                upd.query(), geo, upd.peerType(), upd.offset()));
     }
 }

@@ -23,10 +23,7 @@ import telegram4j.tl.channels.BaseChannelParticipants;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -42,7 +39,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     protected BaseChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
         super(client);
-        this.minData = Objects.requireNonNull(minData, "minData");
+        this.minData = Objects.requireNonNull(minData);
         this.fullData = null;
         this.exportedChatInvite = null;
     }
@@ -51,8 +48,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
                           ChannelFull fullData, telegram4j.tl.Channel minData,
                           @Nullable ExportedChatInvite exportedChatInvite) {
         super(client);
-        this.minData = Objects.requireNonNull(minData, "minData");
-        this.fullData = Objects.requireNonNull(fullData, "fullData");
+        this.minData = Objects.requireNonNull(minData);
+        this.fullData = Objects.requireNonNull(fullData);
         this.exportedChatInvite = exportedChatInvite;
     }
 
@@ -287,7 +284,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Channel> editAdmin(Id userId, EnumSet<ChatAdminRights> rights, String rank) {
+    public Mono<Channel> editAdmin(Id userId, Set<ChatAdminRights> rights, String rank) {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.asInputUser(userId)
@@ -301,7 +298,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Channel> editBanned(Id peerId, EnumSet<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp) {
+    public Mono<Channel> editBanned(Id peerId, Set<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp) {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.asInputPeer(peerId)
@@ -357,16 +354,16 @@ abstract class BaseChannel extends BaseChat implements Channel {
                         case PeerChat.ID:
                         case PeerChannel.ID:
                             peerEntity = d.chats().stream()
-                                    .filter(u -> TlEntityUtil.isAvailableChat(u) && u.id() == participantId.asLong())
-                                    .map(u -> Objects.requireNonNull(EntityFactory.createChat(client, u, null)))
+                                    .filter(u -> u.id() == participantId.asLong())
                                     .findFirst()
+                                    .map(u -> Objects.requireNonNull(EntityFactory.createChat(client, u, null)))
                                     .orElseThrow();
                             break;
                         case PeerUser.ID:
                             peerEntity = d.users().stream()
-                                    .filter(u -> u.identifier() == BaseUser.ID && u.id() == participantId.asLong())
-                                    .map(u -> EntityFactory.createUser(client, u))
+                                    .filter(u -> u.id() == participantId.asLong())
                                     .findFirst()
+                                    .map(u -> Objects.requireNonNull(EntityFactory.createUser(client, u)))
                                     .orElseThrow();
                             break;
                         default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
@@ -386,13 +383,12 @@ abstract class BaseChannel extends BaseChat implements Channel {
                 .cast(BaseChannelParticipants.class), BaseChannelParticipants::count, offset, limit)
                 .flatMap(data -> {
                     var chatsMap = data.chats().stream()
-                            .filter(TlEntityUtil::isAvailableChat)
                             .map(c -> EntityFactory.createChat(client, c, null))
                             .filter(Objects::nonNull)
                             .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                     var usersMap = data.users().stream()
-                            .filter(u -> u.identifier() == BaseUser.ID)
                             .map(u -> EntityFactory.createUser(client, u))
+                            .filter(Objects::nonNull)
                             .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                     return Flux.fromIterable(data.participants())

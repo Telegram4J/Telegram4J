@@ -19,10 +19,10 @@ public final class MTProtoResources {
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
                      @Nullable EntityParserFactory defaultEntityParser, HttpClient httpClient) {
-        this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
-        this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
+        this.storeLayout = Objects.requireNonNull(storeLayout);
+        this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         this.defaultEntityParser = defaultEntityParser;
-        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        this.httpClient = Objects.requireNonNull(httpClient);
     }
 
     /**

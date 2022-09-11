@@ -26,6 +26,7 @@ import telegram4j.core.event.domain.Event;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.retriever.RpcEntityRetriever;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.service.ServiceHolder;
@@ -36,6 +37,7 @@ import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.EmissionHandlers;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
+import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
@@ -69,6 +71,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory = RpcEntityRetriever::new;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, DefaultUpdatesMapper.instance);
+    private UnavailableChatPolicy unavailableChatPolicy;
     private HttpClient httpClient;
 
     private InitConnectionParams initConnectionParams;
@@ -100,7 +103,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setStoreLayout(StoreLayout storeLayout) {
-        this.storeLayout = Objects.requireNonNull(storeLayout, "storeLayout");
+        this.storeLayout = Objects.requireNonNull(storeLayout);
         return this;
     }
 
@@ -114,7 +117,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setTransport(Supplier<Transport> transport) {
-        this.transport = Objects.requireNonNull(transport, "transport");
+        this.transport = Objects.requireNonNull(transport);
         return this;
     }
 
@@ -122,11 +125,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * Sets netty's TCP client for all MTProto clients.
      * <p>
      * If custom client doesn't set, {@link TcpClient#create() pooled} implementation will be used.
+     *
      * @param tcpClient A new netty's {@link TcpClient} for MTProto clients.
      * @return This builder.
      */
     public MTProtoBootstrap<O> setTcpClient(TcpClient tcpClient) {
-        this.tcpClient = Objects.requireNonNull(tcpClient, "tcpClient");
+        this.tcpClient = Objects.requireNonNull(tcpClient);
         return this;
     }
 
@@ -140,7 +144,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setInitConnectionParams(InitConnectionParams initConnectionParams) {
-        this.initConnectionParams = Objects.requireNonNull(initConnectionParams, "initConnectionParams");
+        this.initConnectionParams = Objects.requireNonNull(initConnectionParams);
         return this;
     }
 
@@ -153,7 +157,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setEventDispatcher(EventDispatcher eventDispatcher) {
-        this.eventDispatcher = Objects.requireNonNull(eventDispatcher, "eventDispatcher");
+        this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         return this;
     }
 
@@ -166,7 +170,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setDataCenter(DataCenter dataCenter) {
-        this.dataCenter = Objects.requireNonNull(dataCenter, "dataCenter");
+        this.dataCenter = Objects.requireNonNull(dataCenter);
         return this;
     }
 
@@ -179,22 +183,27 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setUpdatesManager(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
-        this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory, "updatesManagerFactory");
+        this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory);
         return this;
     }
 
     public MTProtoBootstrap<O> setRetry(RetryBackoffSpec retry) {
-        this.retry = Objects.requireNonNull(retry, "retry");
+        this.retry = Objects.requireNonNull(retry);
         return this;
     }
 
     public MTProtoBootstrap<O> setAuthRetry(RetryBackoffSpec authRetry) {
-        this.authRetry = Objects.requireNonNull(authRetry, "authRetry");
+        this.authRetry = Objects.requireNonNull(authRetry);
         return this;
     }
 
     public MTProtoBootstrap<O> setEntityRetrieverFactory(Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory) {
-        this.entityRetrieverFactory = Objects.requireNonNull(entityRetrieverFactory, "entityRetrieverFactory");
+        this.entityRetrieverFactory = Objects.requireNonNull(entityRetrieverFactory);
+        return this;
+    }
+
+    public MTProtoBootstrap<O> setUnavailableChatPolicy(UnavailableChatPolicy policy) {
+        this.unavailableChatPolicy = Objects.requireNonNull(policy);
         return this;
     }
 
@@ -205,7 +214,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setDefaultEntityParserFactory(EntityParserFactory defaultEntityParserFactory) {
-        this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory, "defaultEntityParserFactory");
+        this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory);
         return this;
     }
 
@@ -216,7 +225,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> addResponseTransformer(ResponseTransformer responseTransformer) {
-        Objects.requireNonNull(responseTransformer, "responseTransformer");
+        Objects.requireNonNull(responseTransformer);
         responseTransformers.add(responseTransformer);
         return this;
     }
@@ -230,7 +239,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      */
     public MTProtoBootstrap<O> setHttpClient(HttpClient httpClient) {
-        this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
+        this.httpClient = Objects.requireNonNull(httpClient);
         return this;
     }
 
@@ -283,14 +292,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     defaultEntityParserFactory, initHttpClient());
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
-                    .layer(MTProtoTelegramClient.LAYER)
+                    .layer(TlInfo.LAYER)
                     .query(initConnection())
                     .build();
 
             Id[] selfId = {null};
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
-                    mtProtoResources, updatesManagerFactory, selfId,
+                    mtProtoResources, updatesManagerFactory, initUnavailableChatPolicy(), selfId,
                     serviceHolder, entityRetrieverFactory, onDisconnect.asMono());
 
             Runnable disconnect = () -> {
@@ -422,6 +431,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events"),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 EmissionHandlers.DEFAULT_PARKING);
+    }
+
+    private UnavailableChatPolicy initUnavailableChatPolicy() {
+        return unavailableChatPolicy != null ? unavailableChatPolicy : UnavailableChatPolicy.NULL_MAPPING;
     }
 
     private StoreLayout initStoreLayout() {

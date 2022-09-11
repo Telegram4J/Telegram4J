@@ -13,8 +13,6 @@ import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.BaseChat;
-import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputMessage;
 import telegram4j.tl.messages.MessagesNotModified;
 
@@ -66,10 +64,9 @@ public class RpcEntityRetriever implements EntityRetriever {
         }
 
         return storeLayout.getUserMinById(userId.asLong())
-                .switchIfEmpty(client.asInputUser(userId)
-                        .flatMap(serviceHolder.getUserService()::getUser)
-                        .ofType(BaseUser.class))
-                .map(u -> new User(client, u));
+                .map(u -> (telegram4j.tl.User) u)
+                .switchIfEmpty(client.asInputUser(userId).flatMap(serviceHolder.getUserService()::getUser))
+                .mapNotNull(u -> EntityFactory.createUser(client, u));
     }
 
     @Override
@@ -81,7 +78,7 @@ public class RpcEntityRetriever implements EntityRetriever {
 
         return storeLayout.getUserFullById(userId.asLong())
                 .switchIfEmpty(client.asInputUser(userId).flatMap(serviceHolder.getUserService()::getFullUser))
-                .map(u -> EntityFactory.createUser(client, u));
+                .mapNotNull(u -> EntityFactory.createUser(client, u));
     }
 
     @Override
@@ -89,17 +86,14 @@ public class RpcEntityRetriever implements EntityRetriever {
         return Mono.defer(() -> {
             switch (chatId.getType()) {
                 case CHAT: return storeLayout.getChatMinById(chatId.asLong())
-                        .switchIfEmpty(client.getServiceHolder().getChatService()
-                                .getChat(chatId.asLong())
-                                .ofType(BaseChat.class));
+                        .map(u -> (telegram4j.tl.Chat) u)
+                        .switchIfEmpty(client.getServiceHolder().getChatService().getChat(chatId.asLong()));
                 case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
-                        .switchIfEmpty(client.asInputChannel(chatId)
-                                .flatMap(serviceHolder.getChatService()::getChannel)
-                                .ofType(telegram4j.tl.Channel.class));
+                        .map(u -> (telegram4j.tl.Chat) u)
+                        .switchIfEmpty(client.asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel));
                 case USER: return storeLayout.getUserMinById(chatId.asLong())
-                        .switchIfEmpty(client.asInputUser(chatId)
-                                .flatMap(serviceHolder.getUserService()::getUser)
-                                .ofType(BaseUser.class));
+                        .map(u -> (telegram4j.tl.User) u)
+                        .switchIfEmpty(client.asInputUser(chatId).flatMap(serviceHolder.getUserService()::getUser));
                 default: return Mono.error(new IllegalStateException());
             }
         })

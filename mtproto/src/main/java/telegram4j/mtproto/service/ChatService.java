@@ -6,7 +6,6 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.AdminLogResults;
 import telegram4j.tl.channels.ChannelParticipant;
@@ -203,15 +202,12 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Channel> editAdmin(InputChannel channel, InputUser user, ChatAdminRights rights, String rank) {
+    public Mono<Chat> editAdmin(InputChannel channel, InputUser user, ChatAdminRights rights, String rank) {
         return client.sendAwait(ImmutableEditAdmin.of(channel, user, rights, rank))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
                     client.updates().emitNext(u, DEFAULT_PARKING);
-
-                    return Mono.justOrEmpty(u.chats().get(0))
-                            .filter(TlEntityUtil::isAvailableChat)
-                            .cast(Channel.class);
+                    return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
 
@@ -226,15 +222,12 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Channel> editBanned(InputChannel channel, InputPeer participant, ChatBannedRights rights) {
+    public Mono<Chat> editBanned(InputChannel channel, InputPeer participant, ChatBannedRights rights) {
         return client.sendAwait(ImmutableEditBanned.of(channel, participant, rights))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
                     client.updates().emitNext(u, DEFAULT_PARKING);
-
-                    return Mono.justOrEmpty(u.chats().get(0))
-                            .filter(TlEntityUtil::isAvailableChat)
-                            .cast(Channel.class);
+                    return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
 

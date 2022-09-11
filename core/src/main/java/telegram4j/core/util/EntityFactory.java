@@ -66,6 +66,7 @@ import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChat;
+import telegram4j.tl.Channel;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.contacts.ResolvedPeer;
@@ -76,6 +77,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -111,11 +113,23 @@ public final class EntityFactory {
         }
     }
 
-    // TODO: handle Chat/ChannelForbidden as exception(?)
     @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
                                   @Nullable User selfUser) {
         switch (possibleChat.identifier()) {
+            case UserEmpty.ID:
+            case ChatEmpty.ID: return null;
+            case ChatForbidden.ID:
+                switch (client.getUnavailableChatPolicy()) {
+                    case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
+                    case NULL_MAPPING: return null;
+                }
+            case ChannelForbidden.ID:
+                switch (client.getUnavailableChatPolicy()) {
+                    case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
+                    case NULL_MAPPING: return null;
+                }
+
             case UserFull.ID: {
                 UserFull userFull = (UserFull) possibleChat;
 
@@ -150,14 +164,32 @@ public final class EntityFactory {
                 if (channel.megagroup()) {
                     return new SupergroupChat(client, channel);
                 }
-
                 return new BroadcastChannel(client, channel);
             case ChatFull.ID:
                 ChatFull chatFull = (ChatFull) possibleChat;
 
                 var minData = chatFull.chats().stream()
-                        .filter(c -> TlEntityUtil.isAvailableChat(c) && c.id() == chatFull.fullChat().id())
+                        .filter(c -> c.id() == chatFull.fullChat().id())
                         .findFirst()
+                        .map(c -> {
+                            switch (c.identifier()) {
+                                case ChatEmpty.ID: return null;
+                                case ChatForbidden.ID:
+                                    switch (client.getUnavailableChatPolicy()) {
+                                        case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
+                                        case NULL_MAPPING: return null;
+                                    }
+                                case ChannelForbidden.ID:
+                                    switch (client.getUnavailableChatPolicy()) {
+                                        case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
+                                        case NULL_MAPPING: return null;
+                                    }
+                                case BaseChat.ID:
+                                case Channel.ID:
+                                    return c;
+                                default: throw new IllegalArgumentException("Unknown chat type: " + c);
+                            }
+                        })
                         .orElse(null);
 
                 if (minData == null) {
@@ -168,11 +200,12 @@ public final class EntityFactory {
                         .map(telegram4j.tl.ChatFull::exportedInvite)
                         .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                         .map(d -> {
-                            var admin = createUser(client, chatFull.users().stream()
+                            var admin = chatFull.users().stream()
                                     // This list is *usually* small, so there is no point in computing map
-                                    .filter(u -> u.identifier() == BaseUser.ID && u.id() == d.adminId())
+                                    .filter(u -> u.id() == d.adminId())
                                     .findFirst()
-                                    .orElseThrow());
+                                    .map(u -> createUser(client, u))
+                                    .orElseThrow();
 
                             return new ExportedChatInvite(client, d, admin);
                         })
@@ -185,13 +218,12 @@ public final class EntityFactory {
                     if (channelMin.megagroup()) {
                         return new SupergroupChat(client, channelFull, channelMin, exportedChatInvite);
                     }
-
                     return new BroadcastChannel(client, channelFull, channelMin, exportedChatInvite);
                 }
 
                 var usersMap = chatFull.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
                         .map(d -> createUser(client, d))
+                        .filter(Objects::nonNull)
                         .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                 var chat = (telegram4j.tl.BaseChatFull) chatFull.fullChat();
@@ -222,8 +254,10 @@ public final class EntityFactory {
         }
     }
 
+    @Nullable
     public static User createUser(MTProtoTelegramClient client, TlObject possibleUser) {
         switch (possibleUser.identifier()) {
+            case UserEmpty.ID: return null;
             case UserFull.ID: {
                 UserFull userFull = (UserFull) possibleUser;
 
@@ -232,7 +266,11 @@ public final class EntityFactory {
                                 u.id() == userFull.fullUser().id())
                         .map(u -> (BaseUser) u)
                         .findFirst()
-                        .orElseThrow();
+                        .orElse(null);
+
+                if (minData == null) {
+                    return null;
+                }
 
                 return new User(client, userFull.fullUser(), minData);
             }

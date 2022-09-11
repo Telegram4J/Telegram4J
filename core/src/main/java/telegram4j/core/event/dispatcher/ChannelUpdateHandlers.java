@@ -7,12 +7,12 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatInviteExported;
 import telegram4j.tl.UpdateChannelParticipant;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 class ChannelUpdateHandlers {
@@ -32,29 +32,18 @@ class ChannelUpdateHandlers {
     static Flux<ChatParticipantUpdateEvent> handleUpdateChannelParticipant(StatefulUpdateContext<UpdateChannelParticipant, Void> context) {
         UpdateChannelParticipant upd = context.getUpdate();
 
-        // to resolve:
-        // May be channel was unavailable and filtered out from chats map, just ignore event...
-        // Or handle? But how map Chat object in these cases?
         if (!context.getChats().containsKey(upd.channelId())) {
             return Flux.empty();
         }
 
-        Channel channel = Optional.ofNullable(context.getChats().get(upd.channelId()))
-                .map(d -> (Channel) EntityFactory.createChat(context.getClient(), d, null))
-                .orElseThrow();
+        Channel channel = (Channel) Objects.requireNonNull(context.getChats().get(upd.channelId()));
         // I can't be sure that ChatParticipant have user information attached because that field named as userId :/
-        User peer = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
-        User actor = Optional.ofNullable(context.getUsers().get(upd.actorId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
+        User peer = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        User actor = Objects.requireNonNull(context.getUsers().get(upd.actorId()));
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> {
-                    User admin = Optional.ofNullable(context.getUsers().get(d.adminId()))
-                            .map(u -> EntityFactory.createUser(context.getClient(), u))
-                            .orElseThrow();
+                    User admin = Objects.requireNonNull(context.getUsers().get(d.adminId()));
 
                     return new ExportedChatInvite(context.getClient(), d, admin);
                 })

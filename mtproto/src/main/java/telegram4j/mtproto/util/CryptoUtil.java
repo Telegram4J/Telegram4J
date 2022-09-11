@@ -20,21 +20,7 @@ public final class CryptoUtil {
 
     public static final SecureRandom random = new SecureRandom();
 
-    static ThreadLocal<MessageDigest> SHA1 = ThreadLocal.withInitial(() -> {
-        try {
-            return MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            throw Exceptions.propagate(e);
-        }
-    });
-
-    static ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> {
-        try {
-            return MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw Exceptions.propagate(e);
-        }
-    });
+    private static final ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> createDigest("SHA-256"));
 
     public static BigInteger fromByteArray(byte[] data) {
         return new BigInteger(1, data);
@@ -116,6 +102,14 @@ public final class CryptoUtil {
         return Math.min(n / g, g);
     }
 
+    private static MessageDigest createDigest(String alg) {
+        try {
+            return MessageDigest.getInstance(alg);
+        } catch (NoSuchAlgorithmException e) {
+            throw Exceptions.propagate(e);
+        }
+    }
+
     public static ByteBuf sha256Digest(ByteBuf... bufs) {
         MessageDigest sha256 = SHA256.get();
         sha256.reset();
@@ -126,7 +120,7 @@ public final class CryptoUtil {
     }
 
     public static ByteBuf sha1Digest(ByteBuf... bufs) {
-        MessageDigest sha1 = SHA1.get();
+        MessageDigest sha1 = createDigest("SHA-1");
         sha1.reset();
         for (ByteBuf b : bufs) {
             sha1.update(b.nioBuffer());

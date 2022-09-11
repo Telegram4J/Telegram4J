@@ -2,7 +2,6 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.message.DeleteMessagesEvent;
 import telegram4j.core.event.domain.message.EditMessageEvent;
@@ -19,8 +18,6 @@ import telegram4j.tl.*;
 
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 class MessageUpdateHandlers {
 
@@ -58,14 +55,9 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        var selfUser = Optional.ofNullable(context.getUsers().get(client.getSelfId().asLong()))
-                .map(u -> EntityFactory.createUser(client, u))
-                .orElse(null);
-        Chat chat = Optional.of(message.peerId())
-                .flatMap(p -> getChatEntity(context, p, selfUser))
-                .orElse(null);
-        var author = Optional.ofNullable(message.fromId())
-                .flatMap(p -> getPeerEntity(context, p))
+        Chat chat = context.getChatEntity(message.peerId()).orElse(null);
+        PeerEntity author = Optional.ofNullable(message.fromId())
+                .flatMap(context::getPeerEntity)
                 // fromId is often not set if the message was sent to the DM, so we will have to process it for convenience
                 .or(() -> Optional.ofNullable(chat)
                         .filter(c -> c.getType() == Chat.Type.PRIVATE)
@@ -83,19 +75,15 @@ class MessageUpdateHandlers {
     static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
+
         // Typically reaction adding
         if (message.equals(context.getOld())) {
             return Flux.empty();
         }
 
-        var selfUser = Optional.ofNullable(context.getUsers().get(client.getSelfId().asLong()))
-                .map(u -> EntityFactory.createUser(client, u))
-                .orElse(null);
-        Chat chat = Optional.of(message.peerId())
-                .flatMap(p -> getChatEntity(context, p, selfUser))
-                .orElse(null);
-        var author = Optional.ofNullable(message.fromId())
-                .flatMap(p -> getPeerEntity(context, p))
+        Chat chat = context.getChatEntity(message.peerId()).orElse(null);
+        PeerEntity author = Optional.ofNullable(message.fromId())
+                .flatMap(context::getPeerEntity)
                 .or(() -> Optional.ofNullable(chat)
                         .filter(c -> c.getType() == Chat.Type.PRIVATE)
                         .map(c -> ((PrivateChat) c).getUser()))
@@ -136,34 +124,5 @@ class MessageUpdateHandlers {
 
         return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId,
                 upd.messages(), upd.pts(), upd.ptsCount()));
-    }
-
-    private static Optional<Chat> getChatEntity(StatefulUpdateContext<?, ?> context,
-                                                Peer p, @Nullable telegram4j.core.object.User selfUser) {
-        long rawId = getRawPeerId(p);
-        switch (p.identifier()) {
-            case PeerChat.ID:
-            case PeerChannel.ID:
-                return Optional.ofNullable(context.getChats().get(rawId))
-                        .map(u -> EntityFactory.createChat(context.getClient(), u, null));
-            case PeerUser.ID:
-                return Optional.ofNullable(context.getUsers().get(rawId))
-                        .map(u -> EntityFactory.createChat(context.getClient(), u, selfUser));
-            default: throw new IllegalArgumentException("Unknown peer type: " + p);
-        }
-    }
-
-    private static Optional<PeerEntity> getPeerEntity(StatefulUpdateContext<?, ?> context, Peer p) {
-        long rawId = getRawPeerId(p);
-        switch (p.identifier()) {
-            case PeerUser.ID:
-                return Optional.ofNullable(context.getUsers().get(rawId))
-                        .map(u -> EntityFactory.createUser(context.getClient(), u));
-            case PeerChat.ID:
-            case PeerChannel.ID:
-                return Optional.ofNullable(context.getChats().get(rawId))
-                        .map(u -> EntityFactory.createChat(context.getClient(), u, null));
-            default: throw new IllegalArgumentException("Unknown peer type: " + p);
-        }
     }
 }

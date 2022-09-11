@@ -38,7 +38,7 @@ abstract class BaseChat implements Chat {
     protected final MTProtoTelegramClient client;
 
     protected BaseChat(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
     }
 
     @Override

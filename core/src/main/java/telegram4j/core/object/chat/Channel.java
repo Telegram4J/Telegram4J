@@ -15,6 +15,7 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface for Telegram channel (supergroups, broadcast channels and gigagroups).
@@ -293,21 +294,21 @@ public interface Channel extends Chat {
      * Requests to edit admin rights for specified user.
      *
      * @param userId The id of user to edit.
-     * @param rights The {@link EnumSet} with allowed admin rights.
+     * @param rights The {@link Set} with allowed admin rights.
      * @param rank The new display rank.
      * @return A {@link Mono} emitting on successful completion updated channel.
      */
-    Mono<Channel> editAdmin(Id userId, EnumSet<ChatAdminRights> rights, String rank);
+    Mono<Channel> editAdmin(Id userId, Set<ChatAdminRights> rights, String rank);
 
     /**
      * Requests to edit banned rights for specified peer.
      *
      * @param peerId The id of user/channel to edit.
-     * @param rights The {@link EnumSet} with disallowed rights.
+     * @param rights The {@link Set} with disallowed rights.
      * @param untilTimestamp The timestamp before which this overwrite active.
      * @return A {@link Mono} emitting on successful completion updated channel.
      */
-    Mono<Channel> editBanned(Id peerId, EnumSet<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp);
+    Mono<Channel> editBanned(Id peerId, Set<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp);
 
     /**
      * Requests to edit current channel photo.

@@ -20,7 +20,7 @@ public final class PrivateChat extends BaseChat {
 
     public PrivateChat(MTProtoTelegramClient client, User user, @Nullable User selfUser) {
         super(client);
-        this.user = Objects.requireNonNull(user, "user");
+        this.user = Objects.requireNonNull(user);
         this.selfUser = selfUser;
     }
 

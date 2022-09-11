@@ -15,6 +15,7 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
+import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FilePart;
@@ -31,14 +32,12 @@ import java.util.Objects;
 import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
-    /** The supported api scheme version. */
-    public static final int LAYER = TlInfo.LAYER;
-
     private final AuthorizationResources authResources;
     private final MTProtoClient mtProtoClient;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
     private final FileReferenceManager fileReferenceManager;
+    private final UnavailableChatPolicy unavailableChatPolicy;
     private final Id[] selfIdHolder;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
@@ -47,12 +46,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
                           Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
-                          Id[] selfIdHolder, ServiceHolder serviceHolder,
+                          UnavailableChatPolicy unavailableChatPolicy, Id[] selfIdHolder, ServiceHolder serviceHolder,
                           Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
         this.mtProtoClient = mtProtoClient;
         this.mtProtoResources = mtProtoResources;
+        this.unavailableChatPolicy = unavailableChatPolicy;
         this.serviceHolder = serviceHolder;
         this.selfIdHolder = selfIdHolder;
         this.entityRetriever = entityRetriever.apply(this);
@@ -372,6 +372,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             }
             default: throw new IllegalStateException();
         }
+    }
+
+    public UnavailableChatPolicy getUnavailableChatPolicy() {
+        return unavailableChatPolicy;
     }
 
     // EntityRetriever methods

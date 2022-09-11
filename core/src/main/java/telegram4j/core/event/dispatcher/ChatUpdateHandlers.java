@@ -7,11 +7,11 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.GroupChat;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -66,15 +66,9 @@ class ChatUpdateHandlers {
             return Flux.empty();
         }
 
-        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                .orElseThrow();
-        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
-        User inviter = Optional.ofNullable(context.getUsers().get(upd.inviterId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
+        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        User inviter = Objects.requireNonNull(context.getUsers().get(upd.inviterId()));
         Instant timestamp = Instant.ofEpochSecond(upd.date());
 
         return Flux.just(new ChatParticipantAddEvent(context.getClient(),
@@ -88,12 +82,8 @@ class ChatUpdateHandlers {
             return Flux.empty();
         }
 
-        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                .orElseThrow();
-        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
+        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
 
         return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chat, user,
                 upd.isAdmin(), upd.version()));
@@ -106,12 +96,8 @@ class ChatUpdateHandlers {
             return Flux.empty();
         }
 
-        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                .orElseThrow();
-        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
+        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
 
         return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chat, user, upd.version()));
     }
@@ -127,22 +113,14 @@ class ChatUpdateHandlers {
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> {
-                    User admin = Optional.ofNullable(context.getUsers().get(d.adminId()))
-                            .map(u -> EntityFactory.createUser(context.getClient(), u))
-                            .orElseThrow();
+                    User admin = Objects.requireNonNull(context.getUsers().get(d.adminId()));
 
                     return new ExportedChatInvite(context.getClient(), d, admin);
                 })
                 .orElse(null);
-        GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                .orElseThrow();
-        User user = Optional.ofNullable(context.getUsers().get(upd.userId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
-        User actor = Optional.ofNullable(context.getUsers().get(upd.actorId()))
-                .map(d -> new User(context.getClient(), d))
-                .orElseThrow();
+        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
+        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        User actor = Objects.requireNonNull(context.getUsers().get(upd.actorId()));
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
                 .map(d -> new ChatParticipant(context.getClient(), user, d, chat.getId()))
                 .orElse(null);
@@ -161,37 +139,26 @@ class ChatUpdateHandlers {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
 
-                User selfUser = Optional.ofNullable(upd.selfParticipant())
-                        .map(p -> context.getUsers().get(context.getClient().getSelfId().asLong()))
-                        .map(u -> EntityFactory.createUser(context.getClient(), u))
-                        .orElse(null);
-                GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                        .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                        .orElseThrow();
+                GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
-                        .map(d -> new ChatParticipant(context.getClient(), selfUser, d, chat.getId()))
+                        .map(d -> new ChatParticipant(context.getClient(),
+                                context.getUsers().get(d.userId()), d, chat.getId()))
                         .orElse(null);
 
-                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, selfParticipant, null, null));
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(),
+                        chat, selfParticipant, null, null));
             }
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
 
-                GroupChat chat = Optional.ofNullable(context.getChats().get(upd.chatId()))
-                        .map(d -> (GroupChat) EntityFactory.createChat(context.getClient(), d, null))
-                        .orElseThrow();
+                GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
                 var participants = upd.participants().stream()
-                        .map(d -> {
-                            User user = Optional.ofNullable(context.getUsers().get(d.userId()))
-                                    .map(u -> EntityFactory.createUser(context.getClient(), u))
-                                    .orElse(null);
-
-                            return new ChatParticipant(context.getClient(), user, d, chat.getId());
-                        })
+                        .map(d -> new ChatParticipant(context.getClient(),
+                                context.getUsers().get(d.userId()), d, chat.getId()))
                         .collect(Collectors.toUnmodifiableList());
-                int version = upd.version();
 
-                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat, null, version, participants));
+                return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat,
+                        null, upd.version(), participants));
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown chat participants type: " + chatParticipants));

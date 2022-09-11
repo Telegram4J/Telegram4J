@@ -21,7 +21,6 @@ import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.ResettableInterval;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.ImmutableChatFull;
@@ -343,36 +342,36 @@ public class DefaultUpdatesManager implements UpdatesManager {
     private Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
                                        List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
                                        boolean applyCheck) {
-        var chatsMap = Collections.unmodifiableMap(chats.stream()
-                .filter(TlEntityUtil::isAvailableChat)
-                .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
-
         var usersMap = Collections.unmodifiableMap(users.stream()
-                .filter(u -> u.identifier() == BaseUser.ID)
-                .map(u -> (BaseUser) u)
-                .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity())));
+                .map(u -> EntityFactory.createUser(client, u))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
-        var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
-                .map(c -> EntityFactory.createUser(client, c))
-                .orElse(null);
+        var selfUser = usersMap.get(client.getSelfId().asLong());
+
+        var chatsMap = Collections.unmodifiableMap(chats.stream()
+                .map(u -> EntityFactory.createChat(client, u, null))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
         Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(newMessages)
                 .ofType(BaseMessageFields.class)
                 .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                         .getStoreLayout().existMessage(message)))
                 .flatMap(data -> {
-                    var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
-                            .orElse(null);
+                    var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
 
                     var author = Optional.ofNullable(data.fromId())
-                            .flatMap(p -> mapPeer(p, chatsMap, usersMap))
+                            .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
                             .or(() -> Optional.ofNullable(chat)
                                     .filter(c -> c.getType() == Chat.Type.PRIVATE)
                                     .map(c -> ((PrivateChat) c).getUser()))
                             .orElse(null);
 
-                    return Mono.justOrEmpty(Optional.ofNullable(chat).map(Chat::getId))
-                            .switchIfEmpty(client.asInputPeer(Id.of(data.peerId())).map(p -> Id.of(p, client.getSelfId())))
+                    return Mono.justOrEmpty(chat)
+                            .map(Chat::getId)
+                            .switchIfEmpty(client.asInputPeer(Id.of(data.peerId()))
+                                    .map(p -> Id.of(p, client.getSelfId())))
                             .map(i -> EntityFactory.createMessage(client, data, i))
                             .map(m -> new SendMessageEvent(client, m, chat, author));
                 });
@@ -428,7 +427,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .concatWith(applyChannelDifference);
 
         return client.getMtProtoResources()
-                .getStoreLayout().onContacts(chatsMap.values(), usersMap.values())
+                .getStoreLayout().onContacts(chats, users)
                 .thenMany(concatedUpdates);
     }
 
@@ -491,28 +490,27 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case BaseChannelDifference.ID: {
                 BaseChannelDifference diff0 = (BaseChannelDifference) diff;
 
-                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
-                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
                 var usersMap = Collections.unmodifiableMap(diff0.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
-                        .map(u -> (BaseUser) u)
-                        .collect(Collectors.toMap(BaseUser::id, Function.identity())));
+                        .map(u -> EntityFactory.createUser(client, u))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
-                var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
-                        .map(c -> EntityFactory.createUser(client, c))
-                        .orElse(null);
+                var selfUser = usersMap.get(client.getSelfId().asLong());
+
+                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
+                        .map(u -> EntityFactory.createChat(client, u, null))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
                         .ofType(BaseMessageFields.class)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
-                            var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
-                                    .orElse(null);
+                            var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> mapPeer(p, chatsMap, usersMap))
+                                    .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
                                     .orElse(null);
 
                             var msg = EntityFactory.createMessage(client, data, channelId);
@@ -521,7 +519,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         });
 
                 Mono<Void> saveContacts = client.getMtProtoResources()
-                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+                        .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
                 return saveContacts.and(updatePts)
                         .thenMany(Flux.fromIterable(diff0.otherUpdates()))
@@ -538,28 +536,27 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case ChannelDifferenceTooLong.ID: {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
 
-                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
-                        .filter(TlEntityUtil::isAvailableChat)
-                        .collect(Collectors.toMap(telegram4j.tl.Chat::id, Function.identity())));
                 var usersMap = Collections.unmodifiableMap(diff0.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID)
-                        .map(u -> (BaseUser) u)
-                        .collect(Collectors.toMap(telegram4j.tl.User::id, Function.identity())));
+                        .map(u -> EntityFactory.createUser(client, u))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
-                var selfUser = Optional.ofNullable(usersMap.get(client.getSelfId().asLong()))
-                        .map(c -> EntityFactory.createUser(client, c))
-                        .orElse(null);
+                var selfUser = usersMap.get(client.getSelfId().asLong());
+
+                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
+                        .map(u -> EntityFactory.createChat(client, u, null))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
                         .ofType(BaseMessageFields.class)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
-                            var chat = mapChat(data.peerId(), chatsMap, usersMap, selfUser)
-                                    .orElse(null);
+                            var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> mapPeer(p, chatsMap, usersMap))
+                                    .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
                                     .orElse(null);
 
                             var msg = EntityFactory.createMessage(client, data, channelId);
@@ -568,7 +565,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         });
 
                 Mono<Void> saveContacts = client.getMtProtoResources()
-                        .getStoreLayout().onContacts(chatsMap.values(), usersMap.values());
+                        .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
                 return updatePts.and(saveContacts)
                         .thenMany(messageCreateEvents)
@@ -632,6 +629,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
             Flux<Event> preApply = Flux.empty();
             if (channelId == -1) { // common pts
+                int pts = this.pts;
                 if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
@@ -640,7 +638,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                     return Flux.empty();
                 } else {
-                    pts = ptsUpdate.pts();
+                    this.pts = ptsUpdate.pts();
                 }
 
                 return preApply.concatWith(mapUpdate);
@@ -721,35 +719,27 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .flatMapMany(diff -> handleChannelDifference(request, diff));
     }
 
-    private Optional<Chat> mapChat(Peer peer, Map<Long, telegram4j.tl.Chat> chatsMap,
-                                   Map<Long, BaseUser> usersMap, @Nullable User selfUser) {
+    @Nullable
+    private Chat getChatEntity(Peer peer, Map<Long, Chat> chatsMap,
+                               Map<Long, User> usersMap, @Nullable User selfUser) {
         long rawId = getRawPeerId(peer);
         switch (peer.identifier()) {
             case PeerUser.ID:
-                return Optional.ofNullable(usersMap.get(rawId))
-                        .map(u -> EntityFactory.createChat(client, u, selfUser));
+                User data = usersMap.get(rawId);
+                return data != null ? new PrivateChat(client, data, selfUser) : null;
             case PeerChat.ID:
-            case PeerChannel.ID:
-                return Optional.ofNullable(chatsMap.get(rawId))
-                        .map(c -> EntityFactory.createChat(client, c, null));
-            default:
-                throw new IllegalArgumentException("Unknown peer type: " + peer);
+            case PeerChannel.ID: return chatsMap.get(rawId);
+            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 
-    private Optional<PeerEntity> mapPeer(Peer peer, Map<Long, telegram4j.tl.Chat> chatsMap,
-                                         Map<Long, BaseUser> usersMap) {
+    private Optional<PeerEntity> getPeerEntity(Peer peer, Map<Long, Chat> chatsMap, Map<Long, User> usersMap) {
         long rawId = getRawPeerId(peer);
         switch (peer.identifier()) {
-            case PeerUser.ID:
-                return Optional.ofNullable(usersMap.get(rawId))
-                        .map(u -> EntityFactory.createUser(client, u));
+            case PeerUser.ID: return Optional.ofNullable(usersMap.get(rawId));
             case PeerChat.ID:
-            case PeerChannel.ID:
-                return Optional.ofNullable(chatsMap.get(rawId))
-                        .map(c -> EntityFactory.createChat(client, c, null));
-            default:
-                throw new IllegalArgumentException("Unknown peer type: " + peer);
+            case PeerChannel.ID: return Optional.ofNullable(chatsMap.get(rawId));
+            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 }
