@@ -13,8 +13,8 @@ public class ChatBannedRightsSettings implements TelegramObject {
     private final ChatBannedRights data;
 
     public ChatBannedRightsSettings(MTProtoTelegramClient client, ChatBannedRights data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

@@ -342,17 +342,17 @@ public class DefaultUpdatesManager implements UpdatesManager {
     private Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
                                        List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
                                        boolean applyCheck) {
-        var usersMap = Collections.unmodifiableMap(users.stream()
+        var usersMap = users.stream()
                 .map(u -> EntityFactory.createUser(client, u))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
         var selfUser = usersMap.get(client.getSelfId().asLong());
 
-        var chatsMap = Collections.unmodifiableMap(chats.stream()
+        var chatsMap = chats.stream()
                 .map(u -> EntityFactory.createChat(client, u, null))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
         Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(newMessages)
                 .ofType(BaseMessageFields.class)
@@ -490,17 +490,17 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case BaseChannelDifference.ID: {
                 BaseChannelDifference diff0 = (BaseChannelDifference) diff;
 
-                var usersMap = Collections.unmodifiableMap(diff0.users().stream()
+                var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                 var selfUser = usersMap.get(client.getSelfId().asLong());
 
-                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
+                var chatsMap = diff0.chats().stream()
                         .map(u -> EntityFactory.createChat(client, u, null))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
                         .ofType(BaseMessageFields.class)
@@ -536,17 +536,17 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case ChannelDifferenceTooLong.ID: {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
 
-                var usersMap = Collections.unmodifiableMap(diff0.users().stream()
+                var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                 var selfUser = usersMap.get(client.getSelfId().asLong());
 
-                var chatsMap = Collections.unmodifiableMap(diff0.chats().stream()
+                var chatsMap = diff0.chats().stream()
                         .map(u -> EntityFactory.createChat(client, u, null))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity())));
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
                         .ofType(BaseMessageFields.class)

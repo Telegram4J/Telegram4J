@@ -17,8 +17,8 @@ public class MessagePeerReaction implements TelegramObject {
     private final telegram4j.tl.MessagePeerReaction data;
 
     public MessagePeerReaction(MTProtoTelegramClient client, telegram4j.tl.MessagePeerReaction data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     /**

@@ -14,6 +14,7 @@ import telegram4j.core.event.domain.Event;
  *     <li>{@link ChatParticipantsUpdateEvent}: a batch event of participants updates.</li>
  * </ul>
  */
+// TODO: document ChatParticipantAdminEvent
 public abstract class ChatEvent extends Event {
 
     protected ChatEvent(MTProtoTelegramClient client) {

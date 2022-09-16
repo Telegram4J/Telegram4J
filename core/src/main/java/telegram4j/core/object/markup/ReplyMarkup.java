@@ -10,7 +10,7 @@ public abstract class ReplyMarkup implements TelegramObject {
     protected final MTProtoTelegramClient client;
 
     protected ReplyMarkup(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
     }
 
     /**

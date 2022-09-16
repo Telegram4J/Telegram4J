@@ -14,8 +14,8 @@ public class ResolvedDeletedMessages {
     private final List<BaseMessageFields> messages;
 
     public ResolvedDeletedMessages(InputPeer peer, List<BaseMessageFields> messages) {
-        this.peer = Objects.requireNonNull(peer, "peer");
-        this.messages = Objects.requireNonNull(messages, "messages");
+        this.peer = Objects.requireNonNull(peer);
+        this.messages = Objects.requireNonNull(messages);
     }
 
     public InputPeer getPeer() {

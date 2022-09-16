@@ -12,7 +12,7 @@ abstract class BaseEntityParser implements EntityParser {
     EntityToken prev = null;
 
     BaseEntityParser(String source) {
-        this.str = Objects.requireNonNull(source, "source");
+        this.str = Objects.requireNonNull(source);
         this.striped = new StringBuilder(source.length());
     }
 

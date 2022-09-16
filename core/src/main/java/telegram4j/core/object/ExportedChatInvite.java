@@ -14,8 +14,8 @@ public class ExportedChatInvite implements TelegramObject {
     private final User admin;
 
     public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ChatInviteExported data, User admin) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
         this.admin = admin;
     }
 

@@ -18,8 +18,8 @@ public class MessageReplyHeader implements TelegramObject {
     private final telegram4j.tl.MessageReplyHeader data;
 
     public MessageReplyHeader(MTProtoTelegramClient client, telegram4j.tl.MessageReplyHeader data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

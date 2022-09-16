@@ -12,8 +12,8 @@ public class BotCommand implements TelegramObject {
     private final telegram4j.tl.BotCommand data;
 
     public BotCommand(MTProtoTelegramClient client, telegram4j.tl.BotCommand data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

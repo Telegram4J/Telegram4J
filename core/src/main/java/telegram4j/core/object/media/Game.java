@@ -22,11 +22,11 @@ public class Game implements TelegramObject {
     private final InputPeer peer;
 
     public Game(MTProtoTelegramClient client, telegram4j.tl.Game data, int messageId, InputPeer peer) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
 
         this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.peer = Objects.requireNonNull(peer);
     }
 
     @Override

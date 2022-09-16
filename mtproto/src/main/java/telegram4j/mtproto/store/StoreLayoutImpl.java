@@ -420,7 +420,14 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onChatParticipant(UpdateChatParticipant payload) {
-        return Mono.empty();
+        return Mono.fromRunnable(() -> {
+            if (selfId == payload.userId() &&
+                    payload.prevParticipant() != null &&
+                    payload.newParticipant() == null) {
+
+                chats.remove(payload.chatId());
+            }
+        });
     }
 
     @Override
@@ -430,7 +437,14 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onChannelParticipant(UpdateChannelParticipant payload) {
-        return Mono.empty();
+        return Mono.fromRunnable(() -> {
+            if (selfId == payload.userId() &&
+                    payload.prevParticipant() != null &&
+                    payload.newParticipant() == null) {
+
+                channels.remove(payload.channelId());
+            }
+        });
     }
 
     @Override

@@ -20,8 +20,8 @@ public class ChannelLocation implements TelegramObject {
     private final telegram4j.tl.BaseChannelLocation data;
 
     public ChannelLocation(MTProtoTelegramClient client, BaseChannelLocation data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

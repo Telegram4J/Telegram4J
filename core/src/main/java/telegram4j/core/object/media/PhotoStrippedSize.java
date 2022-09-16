@@ -13,8 +13,8 @@ public class PhotoStrippedSize implements PhotoSize {
     private final telegram4j.tl.PhotoStrippedSize data;
 
     public PhotoStrippedSize(MTProtoTelegramClient client, telegram4j.tl.PhotoStrippedSize data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

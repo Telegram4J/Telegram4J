@@ -25,15 +25,15 @@ public class Photo implements TelegramObject {
     private final String fileReferenceId;
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
 
         this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer).serialize();
     }
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
 
         this.fileReferenceId = FileReferenceId.ofChatPhoto(data, messageId, peer).serialize();
     }

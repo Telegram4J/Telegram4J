@@ -11,8 +11,8 @@ public class RestrictionReason implements TelegramObject {
     private final telegram4j.tl.RestrictionReason data;
 
     public RestrictionReason(MTProtoTelegramClient client, telegram4j.tl.RestrictionReason data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

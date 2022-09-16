@@ -18,7 +18,7 @@ public final class ReplyInlineMarkup extends ReplyMarkup {
 
     public ReplyInlineMarkup(MTProtoTelegramClient client, telegram4j.tl.ReplyInlineMarkup data) {
         super(client);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

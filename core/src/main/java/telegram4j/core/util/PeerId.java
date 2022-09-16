@@ -16,12 +16,12 @@ public final class PeerId {
     private final Id id;
 
     private PeerId(String username) {
-        this.username = Objects.requireNonNull(username, "username");
+        this.username = Objects.requireNonNull(username);
         this.id = null;
     }
 
     private PeerId(Id id) {
-        this.id = Objects.requireNonNull(id, "id");
+        this.id = Objects.requireNonNull(id);
         this.username = null;
     }
 
@@ -44,7 +44,7 @@ public final class PeerId {
      */
     public static PeerId of(String username) {
         if (!username.startsWith("@")) {
-            throw new IllegalArgumentException("Malformed peer id: '" + username + "'");
+            throw new IllegalArgumentException("Malformed peer id: '" + username + '\'');
         }
         return new PeerId(username);
     }

@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.GroupChat;
@@ -105,7 +106,7 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     /**
      * Gets chat where participant was updated.
      *
-     * @return The {@link GroupChat} where participant was updated.
+     * @return The {@link GroupChat} or {@link Channel} where participant was updated.
      */
     public Chat getChat() {
         return chat;

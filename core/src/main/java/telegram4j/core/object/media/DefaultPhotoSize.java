@@ -11,8 +11,8 @@ public class DefaultPhotoSize implements PhotoSize {
     private final telegram4j.tl.BasePhotoSize data;
 
     public DefaultPhotoSize(MTProtoTelegramClient client, telegram4j.tl.BasePhotoSize data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

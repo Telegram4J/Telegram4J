@@ -31,8 +31,8 @@ public class Document implements TelegramObject {
 
     public Document(MTProtoTelegramClient client, BaseDocumentFields data,
                     @Nullable String fileName, int messageId, InputPeer peer) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
         this.fileName = fileName;
 
         this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer).serialize();

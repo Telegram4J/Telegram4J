@@ -12,8 +12,8 @@ public class PhotoPathSize implements PhotoSize {
     private final telegram4j.tl.PhotoPathSize data;
 
     public PhotoPathSize(MTProtoTelegramClient client, telegram4j.tl.PhotoPathSize data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

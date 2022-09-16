@@ -11,8 +11,8 @@ public class ReactionCount implements TelegramObject {
     private final telegram4j.tl.ReactionCount data;
 
     public ReactionCount(MTProtoTelegramClient client, telegram4j.tl.ReactionCount data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

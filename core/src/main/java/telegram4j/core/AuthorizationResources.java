@@ -19,8 +19,8 @@ public final class AuthorizationResources {
 
     AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
         this.apiId = apiId;
-        this.apiHash = Objects.requireNonNull(apiHash, "appHash");
-        this.botAuthToken = Objects.requireNonNull(botAuthToken, "botAuthToken");
+        this.apiHash = Objects.requireNonNull(apiHash);
+        this.botAuthToken = Objects.requireNonNull(botAuthToken);
         this.type = Type.BOT;
 
         this.authHandler = null;
@@ -28,8 +28,8 @@ public final class AuthorizationResources {
 
     AuthorizationResources(int apiId, String apiHash, Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
         this.apiId = apiId;
-        this.apiHash = Objects.requireNonNull(apiHash, "appHash");
-        this.authHandler = Objects.requireNonNull(authHandler, "authHandler");
+        this.apiHash = Objects.requireNonNull(apiHash);
+        this.authHandler = Objects.requireNonNull(authHandler);
         this.type = Type.USER;
 
         this.botAuthToken = null;

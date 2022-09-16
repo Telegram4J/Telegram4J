@@ -12,8 +12,8 @@ public class PhotoCachedSize implements PhotoSize {
     private final telegram4j.tl.PhotoCachedSize data;
 
     public PhotoCachedSize(MTProtoTelegramClient client, telegram4j.tl.PhotoCachedSize data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

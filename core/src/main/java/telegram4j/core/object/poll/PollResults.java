@@ -17,8 +17,8 @@ public class PollResults implements TelegramObject {
     private final telegram4j.tl.PollResults data;
 
     public PollResults(MTProtoTelegramClient client, telegram4j.tl.PollResults data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override

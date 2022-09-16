@@ -16,10 +16,10 @@ public class AuxiliarySendAs {
     private final List<Chat> chats;
 
     public AuxiliarySendAs(MTProtoTelegramClient client, Set<Id> peerIds, List<User> users, List<Chat> chats) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.peerIds = Objects.requireNonNull(peerIds, "peerIds");
-        this.users = Objects.requireNonNull(users, "users");
-        this.chats = Objects.requireNonNull(chats, "chats");
+        this.client = Objects.requireNonNull(client);
+        this.peerIds = Objects.requireNonNull(peerIds);
+        this.users = Objects.requireNonNull(users);
+        this.chats = Objects.requireNonNull(chats);
     }
 
     public MTProtoTelegramClient getClient() {

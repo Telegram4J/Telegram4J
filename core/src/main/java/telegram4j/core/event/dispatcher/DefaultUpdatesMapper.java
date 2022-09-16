@@ -21,21 +21,6 @@ public final class DefaultUpdatesMapper implements UpdatesMapper {
                 MessageUpdateHandlers::handleUpdateDeleteMessages);
         addHandler(UpdatePinnedMessagesFields.class, MessageUpdateHandlers::handleStateUpdatePinnedMessages,
                 MessageUpdateHandlers::handleUpdatePinnedMessages);
-        // user updates
-        addHandler(UpdateChannelUserTyping.class, UserUpdateHandlers::handleStateUpdateChannelUserTyping,
-                UserUpdateHandlers::handleUpdateChannelUserTyping);
-        addHandler(UpdateChatUserTyping.class, UserUpdateHandlers::handleStateUpdateChatUserTyping,
-                UserUpdateHandlers::handleUpdateChatUserTyping);
-        addHandler(UpdateUserName.class, UserUpdateHandlers::handleStateUpdateUserName,
-                UserUpdateHandlers::handleUpdateUserName);
-        addHandler(UpdateUserPhone.class, UserUpdateHandlers::handleStateUpdateUserPhone,
-                UserUpdateHandlers::handleUpdateUserPhone);
-        addHandler(UpdateUserPhoto.class, UserUpdateHandlers::handleStateUpdateUserPhoto,
-                UserUpdateHandlers::handleUpdateUserPhoto);
-        addHandler(UpdateUserStatus.class, UserUpdateHandlers::handleStateUpdateUserStatus,
-                UserUpdateHandlers::handleUpdateUserStatus);
-        addHandler(UpdateUserTyping.class, UserUpdateHandlers::handleStateUpdateUserTyping,
-                UserUpdateHandlers::handleUpdateUserTyping);
         // chat updates
         addHandler(UpdateChatParticipantAdd.class, ChatUpdateHandlers::handleStateUpdateChatParticipantAdd,
                 ChatUpdateHandlers::handleUpdateChatParticipantAdd);

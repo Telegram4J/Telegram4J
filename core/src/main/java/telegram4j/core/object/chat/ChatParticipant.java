@@ -33,17 +33,17 @@ public final class ChatParticipant implements TelegramObject {
     private final Id chatId;
 
     public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, ChannelParticipant data, Id chatId) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
         this.peer = peer;
-        this.data = Objects.requireNonNull(data, "data");
-        this.chatId = Objects.requireNonNull(chatId, "chatId");
+        this.data = Objects.requireNonNull(data);
+        this.chatId = Objects.requireNonNull(chatId);
     }
 
     public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, telegram4j.tl.ChatParticipant data, Id chatId) {
-        this.client = Objects.requireNonNull(client, "client");
+        this.client = Objects.requireNonNull(client);
         this.peer = peer;
-        this.data = Objects.requireNonNull(data, "data");
-        this.chatId = Objects.requireNonNull(chatId, "chatId");
+        this.data = Objects.requireNonNull(data);
+        this.chatId = Objects.requireNonNull(chatId);
     }
 
     @Override
