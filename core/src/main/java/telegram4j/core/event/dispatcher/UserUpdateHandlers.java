@@ -87,17 +87,16 @@ class UserUpdateHandlers {
         UpdateUserName upd = context.getUpdate();
 
         Id userId = Id.ofUser(upd.userId(), null);
-        UserNameFields old = context.getOld();
 
         return Flux.just(new UpdateUserNameEvent(context.getClient(), userId,
-                upd.firstName(), upd.lastName(), upd.username(), old));
+                upd.firstName(), upd.lastName(), upd.username(), context.getOld()));
     }
 
     static Flux<UpdateUserPhoneEvent> handleUpdateUserPhone(StatefulUpdateContext<UpdateUserPhone, String> context) {
         Id userId = Id.ofUser(context.getUpdate().userId(), null);
-        String old = context.getOld();
 
-        return Flux.just(new UpdateUserPhoneEvent(context.getClient(), userId, context.getUpdate().phone(), old));
+        return Flux.just(new UpdateUserPhoneEvent(context.getClient(), userId,
+                context.getUpdate().phone(), context.getOld()));
     }
 
     static Flux<UpdateUserPhotoEvent> handleUpdateUserPhoto(StatefulUpdateContext<UpdateUserPhoto, UserProfilePhoto> context) {
@@ -123,6 +122,11 @@ class UserUpdateHandlers {
     }
 
     static Flux<UpdateUserStatusEvent> handleUpdateUserStatus(StatefulUpdateContext<UpdateUserStatus, UserStatus> context) {
+        // I'm not sure about the possibility of this situation
+        if (context.getUpdate().status().identifier() == UserStatusEmpty.ID) {
+            return Flux.empty();
+        }
+
         Id userId = Id.ofUser(context.getUpdate().userId(), null);
         var currentStatus = createUserStatus(context.getClient(), context.getUpdate().status());
         var oldStatus = Optional.ofNullable(context.getOld())

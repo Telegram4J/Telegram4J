@@ -1,6 +1,5 @@
 package telegram4j.mtproto.service;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
@@ -9,23 +8,19 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.*;
-import telegram4j.tl.help.UserInfo;
 import telegram4j.tl.photos.Photo;
 import telegram4j.tl.photos.Photos;
 import telegram4j.tl.request.contacts.*;
-import telegram4j.tl.request.help.EditUserInfo;
-import telegram4j.tl.request.help.ImmutableGetUserInfo;
-import telegram4j.tl.request.photos.DeletePhotos;
+import telegram4j.tl.request.photos.ImmutableDeletePhotos;
 import telegram4j.tl.request.photos.ImmutableGetUserPhotos;
 import telegram4j.tl.request.photos.ImmutableUpdateProfilePhoto;
 import telegram4j.tl.request.photos.UploadProfilePhoto;
-import telegram4j.tl.request.users.GetUsers;
 import telegram4j.tl.request.users.ImmutableGetFullUser;
-import telegram4j.tl.request.users.SetSecureValueErrors;
+import telegram4j.tl.request.users.ImmutableGetUsers;
+import telegram4j.tl.request.users.ImmutableSetSecureValueErrors;
 import telegram4j.tl.users.UserFull;
 
 import java.util.List;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -35,6 +30,9 @@ public class UserService extends RpcService {
         super(client, storeLayout);
     }
 
+    // additional methods
+    // ======================
+
     /**
      * Retrieve minimal information about user and update cache.
      *
@@ -43,20 +41,22 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<User> getUser(InputUser userId) {
-        return getUsers(List.of(userId)).next();
+        return getUsers(List.of(userId)).map(u -> u.get(0));
     }
+
+    // user namespace
+    // ======================
 
     /**
      * Retrieve minimal information about list of users and update cache.
      *
      * @param userIds An iterable of user id elements
-     * @return A {@link Flux} emitting minimal users
+     * @return A {@link Mono} emitting list with minimal users
      */
     @BotCompatible
-    public Flux<User> getUsers(Iterable<? extends InputUser> userIds) {
-        return client.sendAwait(GetUsers.builder().addAllId(userIds).build())
-                .flatMapIterable(Function.identity())
-                .flatMap(u -> storeLayout.onUserUpdate(u)
+    public Mono<List<User>> getUsers(Iterable<? extends InputUser> userIds) {
+        return Mono.defer(() -> client.sendAwait(ImmutableGetUsers.of(userIds)))
+                .flatMap(u -> storeLayout.onContacts(List.of(), u)
                         .thenReturn(u));
     }
 
@@ -74,36 +74,18 @@ public class UserService extends RpcService {
     }
 
     public Mono<Boolean> setSecureValueErrors(InputUser id, Iterable<? extends SecureValueError> errors) {
-        return client.sendAwait(SetSecureValueErrors.builder()
-                .id(id)
-                .errors(errors)
-                .build());
+        return Mono.defer(() -> client.sendAwait(ImmutableSetSecureValueErrors.of(id, errors)));
     }
 
-    // They are methods form other RPC service, but user-related
-    // Methods from ContactsService
+    // contacts namespace
+    // ======================
 
-    /**
-     * Search peers by substring of query and update cache.
-     *
-     * @param username The peer full username
-     * @return A {@link Mono} emitting on successful completion an object contains
-     * info on users found by username and auxiliary data
-     */
-    @BotCompatible
-    public Mono<ResolvedPeer> resolveUsername(String username) {
-        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))))
-                .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
+    public Mono<List<Integer>> getContactsIds(long hash) {
+        return client.sendAwait(ImmutableGetContactIDs.of(hash));
     }
 
-    public Flux<Integer> getContactsIds(long hash) {
-        return client.sendAwait(ImmutableGetContactIDs.of(hash))
-                .flatMapIterable(Function.identity());
-    }
-
-    public Flux<ContactStatus> getStatuses() {
-        return client.sendAwait(GetStatuses.instance())
-                .flatMapIterable(Function.identity());
+    public Mono<List<ContactStatus>> getStatuses() {
+        return client.sendAwait(GetStatuses.instance());
     }
 
     public Mono<BaseContacts> getContacts(long hash) {
@@ -112,11 +94,15 @@ public class UserService extends RpcService {
     }
 
     public Mono<ImportedContacts> importContacts(Iterable<? extends InputContact> contacts) {
-        return client.sendAwait(ImportContacts.builder().contacts(contacts).build());
+        return Mono.defer(() -> client.sendAwait(ImmutableImportContacts.of(contacts)));
     }
 
     public Mono<Updates> deleteContacts(Iterable<? extends InputUser> ids) {
-        return client.sendAwait(DeleteContacts.builder().id(ids).build());
+        return Mono.defer(() -> client.sendAwait(ImmutableDeleteContacts.of(ids)));
+    }
+
+    public Mono<Boolean> deleteByPhones(List<String> phones) {
+        return Mono.defer(() -> client.sendAwait(ImmutableDeleteByPhones.of(phones)));
     }
 
     public Mono<Boolean> block(InputPeer peer) {
@@ -131,16 +117,21 @@ public class UserService extends RpcService {
         return client.sendAwait(ImmutableGetBlocked.of(offset, limit));
     }
 
-    /**
-     * Search peers by substring of their username/name.
-     *
-     * @param query The peer name substring
-     * @param limit The max count of found peers
-     * @return A {@link Mono} emitting on successful completion an object contains
-     * info on users found by name substring and auxiliary data
-     */
     public Mono<Found> search(String query, int limit) {
         return client.sendAwait(ImmutableSearch.of(query, limit));
+    }
+
+    /**
+     * Search peers by substring of query and update cache.
+     *
+     * @param username The peer full username
+     * @return A {@link Mono} emitting on successful completion an object contains
+     * info on users found by username and auxiliary data
+     */
+    @BotCompatible
+    public Mono<ResolvedPeer> resolveUsername(String username) {
+        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))))
+                .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
     }
 
     public Mono<TopPeers> getTopPeers(GetTopPeers request) {
@@ -155,9 +146,8 @@ public class UserService extends RpcService {
         return client.sendAwait(ResetSaved.instance());
     }
 
-    public Flux<SavedContact> getSaved() {
-        return client.sendAwait(GetSaved.instance())
-                .flatMapIterable(Function.identity());
+    public Mono<List<SavedContact>> getSaved() {
+        return client.sendAwait(GetSaved.instance());
     }
 
     public Mono<Boolean> toggleTopPeers(boolean enabled) {
@@ -180,38 +170,36 @@ public class UserService extends RpcService {
         return client.sendAwait(request);
     }
 
-    // Methods from HelpService
-
-    public Mono<UserInfo> getUserInfo(InputUser id) {
-        return client.sendAwait(ImmutableGetUserInfo.of(id));
+    public Mono<ResolvedPeer> resolvePhone(String phone) {
+        return client.sendAwait(ImmutableResolvePhone.of(phone));
     }
 
-    public Mono<UserInfo> editUserInfo(InputUser id, String message, Iterable<? extends MessageEntity> entities) {
-        return client.sendAwait(EditUserInfo.builder()
-                .userId(id)
-                .message(message)
-                .entities(entities)
-                .build());
-    }
+    // photos namespace
+    // ======================
 
-    // Methods from PhotoService
+    public Mono<Photo> updateProfilePhoto(InputPhoto photo) {
+        return client.sendAwait(ImmutableUpdateProfilePhoto.of(photo));
+    }
 
     public Mono<Photo> updateProfilePhoto(String photoFileReferenceId) {
-        return Mono.defer(() -> client.sendAwait(ImmutableUpdateProfilePhoto.of(
-                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto())));
+        return Mono.defer(() -> updateProfilePhoto(
+                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto()));
     }
 
     public Mono<Photo> uploadProfilePhoto(UploadProfilePhoto request) {
         return client.sendAwait(request);
     }
 
-    public Flux<Long> deletePhotos(Iterable<String> photosFileReferenceIds) {
-        return Flux.defer(() -> client.sendAwait(DeletePhotos.builder().id(
+    public Mono<List<Long>> deletePhotos(Iterable<InputPhoto> photos) {
+        return Mono.defer(() -> client.sendAwait(ImmutableDeletePhotos.of(photos)));
+    }
+
+    public Mono<List<Long>> deletePhotosIds(Iterable<String> photosFileReferenceIds) {
+        return Mono.defer(() -> client.sendAwait(ImmutableDeletePhotos.of(
                 StreamSupport.stream(photosFileReferenceIds.spliterator(), false)
                         .map(FileReferenceId::deserialize)
                         .map(FileReferenceId::asInputPhoto)
-                        .collect(Collectors.toList())).build())
-                .flatMapIterable(Function.identity()));
+                        .collect(Collectors.toUnmodifiableList()))));
     }
 
     @BotCompatible

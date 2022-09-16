@@ -1,10 +1,8 @@
 package telegram4j.mtproto.service;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.account.AutoDownloadSettings;
@@ -14,7 +12,7 @@ import telegram4j.tl.request.account.ImmutableUpdateNotifySettings;
 import telegram4j.tl.request.account.UpdateTheme;
 import telegram4j.tl.request.account.*;
 
-import java.util.function.Function;
+import java.util.List;
 
 public class AccountService extends RpcService {
 
@@ -27,11 +25,7 @@ public class AccountService extends RpcService {
     }
 
     public Mono<Boolean> unregisterDevice(int tokenType, String token, Iterable<Long> otherUids) {
-        return client.sendAwait(UnregisterDevice.builder()
-                .tokenType(tokenType)
-                .token(token)
-                .otherUids(otherUids)
-                .build());
+        return Mono.defer(() -> client.sendAwait(ImmutableUnregisterDevice.of(tokenType, token, otherUids)));
     }
 
     public Mono<Boolean> updateNotifySettings(InputNotifyPeer peer, InputPeerNotifySettings settings) {
@@ -80,14 +74,11 @@ public class AccountService extends RpcService {
     }
 
     public Mono<PrivacyRules> setPrivacy(InputPrivacyKey key, Iterable<? extends InputPrivacyRule> rules) {
-        return client.sendAwait(SetPrivacy.builder()
-                .key(key)
-                .rules(rules)
-                .build());
+        return Mono.defer(() -> client.sendAwait(ImmutableSetPrivacy.of(key, rules)));
     }
 
-    public Mono<Boolean> deleteAccount(String reason) {
-        return client.sendAwait(ImmutableDeleteAccount.of(reason));
+    public Mono<Boolean> deleteAccount(DeleteAccount request) {
+        return client.sendAwait(request);
     }
 
     public Mono<Integer> getAccountTtl() {
@@ -155,16 +146,12 @@ public class AccountService extends RpcService {
         return client.sendAwait(ResetWebAuthorizations.instance());
     }
 
-    public Flux<SecureValue> getAllSecureValues() {
-        return client.sendAwait(GetAllSecureValues.instance())
-                .flatMapIterable(Function.identity());
+    public Mono<List<SecureValue>> getAllSecureValues() {
+        return client.sendAwait(GetAllSecureValues.instance());
     }
 
-    public Flux<SecureValue> getSecureValue(Iterable<SecureValueType> types) {
-        return client.sendAwait(GetSecureValue.builder()
-                .types(types)
-                .build())
-                .flatMapIterable(Function.identity());
+    public Mono<List<SecureValue>> getSecureValue(Iterable<SecureValueType> types) {
+        return Mono.defer(() -> client.sendAwait(ImmutableGetSecureValue.of(types)));
     }
 
     public Mono<SecureValue> saveSecureValue(InputSecureValue value, long secureSecretId) {
@@ -181,16 +168,8 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableGetAuthorizationForm.of(botId, scope, publicKey));
     }
 
-    public Mono<Boolean> acceptAuthorization(long botId, String scope, String publicKey,
-                                             Iterable<? extends SecureValueHash> valueHashes,
-                                             SecureCredentialsEncrypted credentials) {
-        return client.sendAwait(AcceptAuthorization.builder()
-                .botId(botId)
-                .scope(scope)
-                .publicKey(publicKey)
-                .valueHashes(valueHashes)
-                .credentials(credentials)
-                .build());
+    public Mono<Boolean> acceptAuthorization(AcceptAuthorization request) {
+        return client.sendAwait(request);
     }
 
     public Mono<SentCode> sendVerifyPhoneCode(String phoneNumber, CodeSettings settings) {
@@ -270,24 +249,18 @@ public class AccountService extends RpcService {
     }
 
     public Mono<BaseDocument> uploadTheme(InputFile file, @Nullable InputFile thumb,
-                                      String fileName, String mimyType) {
-        return client.sendAwait(UploadTheme.builder()
-                .file(file)
-                .thumb(thumb)
-                .fileName(fileName)
-                .mimeType(mimyType)
-                .build())
+                                          String fileName, String mimeType) {
+        return client.sendAwait(ImmutableUploadTheme.of(file, fileName, mimeType)
+                        .withThumb(thumb))
                 .ofType(BaseDocument.class);
     }
 
-    public Mono<Theme> createTheme(String slug, String title, @Nullable String documentFileReferenceId,
+    public Mono<Theme> createTheme(String slug, String title, @Nullable InputDocument document,
                                    @Nullable Iterable<? extends InputThemeSettings> settings) {
         return Mono.defer(() -> client.sendAwait(CreateTheme.builder()
                 .slug(slug)
                 .title(title)
-                .document(documentFileReferenceId != null
-                        ? FileReferenceId.deserialize(documentFileReferenceId)
-                        .asInputDocument() : null)
+                .document(document)
                 .settings(settings)
                 .build()));
     }
@@ -321,11 +294,8 @@ public class AccountService extends RpcService {
         return client.sendAwait(GetContentSettings.instance());
     }
 
-    public Flux<WallPaper> getMultiWallPapers(Iterable<? extends InputWallPaper> wallPapers) {
-        return client.sendAwait(GetMultiWallPapers.builder()
-                .wallpapers(wallPapers)
-                .build())
-                .flatMapIterable(Function.identity());
+    public Mono<List<WallPaper>> getMultiWallPapers(Iterable<? extends InputWallPaper> wallPapers) {
+        return Mono.defer(() -> client.sendAwait(ImmutableGetMultiWallPapers.of(wallPapers)));
     }
 
     public Mono<GlobalPrivacySettings> getGlobalPrivacySettings() {
@@ -336,10 +306,9 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableSetGlobalPrivacySettings.of(settings));
     }
 
-    public Mono<Boolean> reportProfilePhoto(InputPeer peer, String photoFileReferenceId,
+    public Mono<Boolean> reportProfilePhoto(InputPeer peer, InputPhoto photo,
                                             ReportReason reason, String message) {
-        return Mono.defer(() -> client.sendAwait(ImmutableReportProfilePhoto.of(peer,
-                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto(), reason, message)));
+        return client.sendAwait(ImmutableReportProfilePhoto.of(peer, photo, reason, message));
     }
 
     public Mono<Boolean> declinePasswordReset() {

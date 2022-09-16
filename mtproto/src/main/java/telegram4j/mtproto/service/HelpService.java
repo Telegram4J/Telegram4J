@@ -11,7 +11,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.help.*;
 import telegram4j.tl.request.help.*;
 
-import java.util.function.Function;
+import java.util.List;
 
 public class HelpService extends RpcService {
 
@@ -19,22 +19,15 @@ public class HelpService extends RpcService {
         super(client, storeLayout);
     }
 
-    /**
-     * Retrieve current DC configuration.
-     *
-     * @return A {@link Mono} emitting on successful completion the {@link Config}.
-     */
+    // help namespace
+    // =========================
+
     @BotCompatible
     public Mono<Config> getConfig() {
         return client.sendAwait(GetConfig.instance());
     }
 
-    /**
-     * Retrieve current DC configuration of the nearest DC.
-     *
-     * @return A {@link Mono} emitting on successful completion the {@link NearestDc} of the nearest DC.
-     */
-    public Mono<NearestDc> getNearstDc() {
+    public Mono<NearestDc> getNearestDc() {
         return client.sendAwait(GetNearestDc.instance());
     }
 
@@ -54,29 +47,26 @@ public class HelpService extends RpcService {
     public Flux<UpdateServiceNotification> getAppChangelog(String prevAppVersion) {
         return client.sendAwait(ImmutableGetAppChangelog.of(prevAppVersion))
                 .flatMapMany(updates -> {
-                    switch (updates.identifier()) {
-                        case BaseUpdates.ID:
-                            BaseUpdates casted = (BaseUpdates) updates;
-                            client.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
+                    if (updates.identifier() == BaseUpdates.ID) {
+                        BaseUpdates casted = (BaseUpdates) updates;
+                        client.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
 
-                            return Flux.fromIterable(casted.updates());
-                        default:
-                            return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates.identifier()));
+                        return Flux.fromIterable(casted.updates());
                     }
+                    return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates.identifier()));
                 })
                 .ofType(UpdateServiceNotification.class);
     }
 
     @BotCompatible
-    public Mono<Boolean> setBotUpdatesStatus(int pendingUpdates, String message) {
-        return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdates, message));
+    public Mono<Boolean> setBotUpdatesStatus(int pendingUpdatesCount, String message) {
+        return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdatesCount, message));
     }
 
     @BotCompatible
-    public Flux<CdnPublicKey> getCdnConfig() {
+    public Mono<List<CdnPublicKey>> getCdnConfig() {
         return client.sendAwait(GetCdnConfig.instance())
-                .map(CdnConfig::publicKeys)
-                .flatMapIterable(Function.identity());
+                .map(CdnConfig::publicKeys);
     }
 
     public Mono<RecentMeUrls> getRecentMeUrls(String referer) {
@@ -101,7 +91,7 @@ public class HelpService extends RpcService {
     }
 
     public Mono<Boolean> saveAppLog(Iterable<? extends InputAppEvent> events) {
-        return client.sendAwait(SaveAppLog.builder().events(events).build());
+        return Mono.defer(() -> client.sendAwait(ImmutableSaveAppLog.of(events)));
     }
 
     public Mono<BasePassportConfig> getPassportConfig(int hash) {
@@ -111,6 +101,14 @@ public class HelpService extends RpcService {
 
     public Mono<String> getSupportName() {
         return client.sendAwait(GetSupportName.instance()).map(SupportName::name);
+    }
+
+    public Mono<UserInfo> getUserInfo(InputUser userId) {
+        return client.sendAwait(ImmutableGetUserInfo.of(userId));
+    }
+
+    public Mono<UserInfo> getUserInfo(InputUser userId, String message, List<MessageEntity> entities) {
+        return Mono.defer(() -> client.sendAwait(ImmutableEditUserInfo.of(userId, message, entities)));
     }
 
     public Mono<PromoData> getPromoData() {
@@ -127,5 +125,9 @@ public class HelpService extends RpcService {
 
     public Mono<CountriesList> getCountriesList(String langCode, int hash) {
         return client.sendAwait(ImmutableGetCountriesList.of(langCode, hash));
+    }
+
+    public Mono<PremiumPromo> getPremiumPromo() {
+        return client.sendAwait(GetPremiumPromo.instance());
     }
 }

@@ -88,9 +88,6 @@ public class UserStatus implements TelegramObject {
     /** Available types of user status. */
     public enum Type {
 
-        /** User status has not been set yet. */
-        EMPTY,
-
         /** Online status of the user. */
         ONLINE,
 

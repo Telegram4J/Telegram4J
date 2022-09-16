@@ -11,16 +11,10 @@ import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.tl.ImmutableBaseInputFile;
-import telegram4j.tl.ImmutableInputFileBig;
-import telegram4j.tl.InputFile;
-import telegram4j.tl.request.upload.GetFile;
-import telegram4j.tl.request.upload.ImmutableGetWebFile;
-import telegram4j.tl.request.upload.SaveBigFilePart;
-import telegram4j.tl.request.upload.SaveFilePart;
+import telegram4j.tl.*;
+import telegram4j.tl.request.upload.*;
 import telegram4j.tl.storage.FileType;
 import telegram4j.tl.upload.BaseFile;
 import telegram4j.tl.upload.WebFile;
@@ -45,6 +39,13 @@ public class UploadService extends RpcService {
     public UploadService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
     }
+
+    // additional methods
+    // =========================
+    // TODO list:
+    // upload.getCdnFile#395f69da file_token:bytes offset:long limit:int = upload.CdnFile;
+    // upload.reuploadCdnFile#9b2754a8 file_token:bytes request_token:bytes = Vector<FileHash>;
+    // upload.getCdnFileHashes#91dc3f31 file_token:bytes offset:long = Vector<FileHash>;
 
     @BotCompatible
     public Mono<InputFile> saveFile(ByteBuf data, String name) {
@@ -132,74 +133,74 @@ public class UploadService extends RpcService {
                             md5.update(partBytes.nioBuffer());
                         }
 
-                        SaveFilePart req = SaveFilePart.builder()
-                                .fileId(fileId)
-                                .filePart(filePart)
-                                .bytes(partBytes)
-                                .build();
-
-                        return client.sendAwait(req);
+                        return client.sendAwait(ImmutableSaveFilePart.of(fileId, filePart, partBytes));
                     })
                     .then(Mono.fromSupplier(() -> ImmutableBaseInputFile.of(fileId,
                             parts, name, ByteBufUtil.hexDump(md5.digest()))));
         });
     }
 
-    // TODO: bot compatible?
-    public Flux<WebFile> getWebFile(FileReferenceId location) {
-        return Flux.defer(() -> {
-                    AtomicInteger offset = new AtomicInteger();
-                    AtomicBoolean complete = new AtomicBoolean();
-                    int limit = PRECISE_LIMIT;
+    // upload namespace
+    // =========================
 
-                    var request = ImmutableGetWebFile.of(location.asWebLocation()
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "Default or non-proxied documents can't be downloaded as web.")),
-                            0, limit);
-
-                    return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
-                            .mapNotNull(part -> {
-                                offset.addAndGet(limit);
-                                if (part.fileType() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
-                                    complete.set(true);
-                                    return null;
-                                }
-
-                                return part;
-                            })
-                            .repeat(() -> !complete.get());
-                });
+    @BotCompatible
+    public Mono<Boolean> saveFilePart(long fileId, int filePart, ByteBuf bytes) {
+        return Mono.defer(() -> client.sendAwait(ImmutableSaveFilePart.of(fileId, filePart, bytes)));
     }
 
     @BotCompatible
-    public Flux<BaseFile> getFile(FileReferenceId location) {
+    public Flux<BaseFile> getFile(InputFileLocation location) {
         return Flux.defer(() -> {
-                    AtomicInteger offset = new AtomicInteger();
-                    AtomicBoolean complete = new AtomicBoolean();
-                    int limit = PRECISE_LIMIT;
-                    var headerRequest = GetFile.builder()
-                            .precise(true)
-                            // Support for downloading from CDN is probably unlikely
-                            // to be implemented soon because of its complexity and pointless
-                            .cdnSupported(false)
-                            .location(location.asLocation().orElseThrow(() -> new IllegalArgumentException(
-                                    "Web documents can't be downloaded as default files")))
-                            .offset(0)
-                            .limit(limit)
-                            .build();
+            AtomicInteger offset = new AtomicInteger();
+            AtomicBoolean complete = new AtomicBoolean();
+            int limit = PRECISE_LIMIT;
+            ImmutableGetFile request = ImmutableGetFile.of(ImmutableGetFile.PRECISE_MASK, location, 0, limit);
 
-                    return Flux.defer(() -> client.sendAwait(headerRequest.withOffset(offset.get())))
-                            .cast(BaseFile.class)
-                            .mapNotNull(part -> {
-                                offset.addAndGet(limit);
-                                if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
-                                    complete.set(true);
-                                    return null;
-                                }
+            return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
+                    .cast(BaseFile.class)
+                    .mapNotNull(part -> {
+                        offset.addAndGet(limit);
+                        if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
+                            complete.set(true);
+                            return null;
+                        }
 
-                                return part;
-                            })
-                            .repeat(() -> !complete.get());
-                });
+                        return part;
+                    })
+                    .repeat(() -> !complete.get());
+        });
+    }
+
+    @BotCompatible
+    public Mono<Boolean> saveFilePartBig(long fileId, int filePart, int fileTotalParts, ByteBuf bytes) {
+        return Mono.defer(() -> client.sendAwait(ImmutableSaveBigFilePart.of(fileId, filePart, fileTotalParts, bytes)));
+    }
+
+    // TODO: bot compatible?
+    public Flux<WebFile> getWebFile(InputWebFileLocation location) {
+        return Flux.defer(() -> {
+            AtomicInteger offset = new AtomicInteger();
+            AtomicBoolean complete = new AtomicBoolean();
+            int limit = PRECISE_LIMIT;
+
+            ImmutableGetWebFile request = ImmutableGetWebFile.of(location, 0, limit);
+
+            return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
+                    .mapNotNull(part -> {
+                        offset.addAndGet(limit);
+                        if (part.fileType() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
+                            complete.set(true);
+                            return null;
+                        }
+
+                        return part;
+                    })
+                    .repeat(() -> !complete.get());
+        });
+    }
+
+    @BotCompatible
+    public Mono<List<FileHash>> getFileHashes(InputFileLocation location, long offset) {
+        return client.sendAwait(ImmutableGetFileHashes.of(location, offset));
     }
 }

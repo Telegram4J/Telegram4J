@@ -19,15 +19,17 @@ class FileReferenceIdTest {
                 // ignored fields
                 .mimeType("")
                 .size(-1)
+                .attributes(List.of())
                 .build(), 2, InputPeerSelf.instance());
         var expWebDocument = ofDocument(BaseWebDocument.builder()
                 .url("https://www.google.com")
                 .accessHash(1337 >> 4)
                 // ignored fields
                 .mimeType("")
+                .attributes(List.of())
                 .size(-1)
                 .build(), 2, InputPeerSelf.instance());
-        var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(1337, 2),
+        var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(0, 1337, 2),
                 PhotoSizeType.CHAT_PHOTO_BIG, -1, InputPeerSelf.instance());
         var expMinPhoto = ofChatPhoto(BasePhoto.builder()
                 .id(1337)
@@ -57,6 +59,7 @@ class FileReferenceIdTest {
                 // ignored fields
                 .mimeType("")
                 .size(-1)
+                .attributes(List.of())
                 .build(), 1, InputPeerSelf.instance());
         var expPhoto = ofPhoto(BasePhoto.builder()
                 .id(1337)

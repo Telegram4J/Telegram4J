@@ -77,7 +77,7 @@ public class CallbackEvent extends BotEvent {
      * @return A {@link Mono} which emitting on completion boolean which displays completion state.
      */
     public Mono<Boolean> answer(AnswerCallbackQuerySpec spec) {
-        return Mono.defer(() -> client.getServiceHolder().getMessageService()
+        return Mono.defer(() -> client.getServiceHolder().getChatService()
                 .setBotCallbackAnswer(SetBotCallbackAnswer.builder()
                         .queryId(getQueryId())
                         .alert(spec.alert())

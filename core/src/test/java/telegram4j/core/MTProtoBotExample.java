@@ -45,7 +45,6 @@ public class MTProtoBotExample {
 
                     Mono<Void> updateCommands = client.getServiceHolder().getBotService()
                             .getBotCommands(BotCommandScopeChats.instance(), "en")
-                            .collectList()
                             .flatMap(list -> {
                                 var infos = commands.stream()
                                         .map(Command::getInfo)

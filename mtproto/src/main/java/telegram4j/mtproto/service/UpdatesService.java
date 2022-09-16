@@ -18,6 +18,9 @@ public class UpdatesService extends RpcService {
         super(client, storeLayout);
     }
 
+    // updates namespace
+    // =========================
+
     /**
      * Retrieve a current state of updates.
      *

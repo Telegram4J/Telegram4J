@@ -44,9 +44,13 @@ public interface KeyboardButtonSpec extends Spec {
                 case URL_AUTH: {
                     InlineButtonSpecDef s = (InlineButtonSpecDef) this;
                     return client.asInputUser(s.userId().orElseThrow())
-                            .map(id -> ImmutableInputKeyboardButtonUrlAuth.of(text(), s.url().orElseThrow(), id)
-                                    .withFwdText(s.forwardText().orElse(null))
-                                    .withRequestWriteAccess(s.requestWriteAccess().orElseThrow()));
+                            .map(id -> ImmutableInputKeyboardButtonUrlAuth.builder()
+                                    .text(text())
+                                    .fwdText(s.forwardText().orElse(null))
+                                    .requestWriteAccess(s.requestWriteAccess().orElse(false))
+                                    .bot(id)
+                                    .url(s.url().orElseThrow())
+                                    .build());
                 }
                 case DEFAULT: return Mono.just(ImmutableBaseKeyboardButton.of(text()));
                 case BUY: return Mono.just(ImmutableKeyboardButtonBuy.of(text()));
@@ -61,8 +65,9 @@ public interface KeyboardButtonSpec extends Spec {
                 }
                 case SWITCH_INLINE: {
                     InlineButtonSpecDef s = (InlineButtonSpecDef) this;
-                    return Mono.just(ImmutableKeyboardButtonSwitchInline.of(text(), s.query().orElseThrow())
-                            .withSamePeer(s.samePeer().orElseThrow()));
+                    return Mono.just(ImmutableKeyboardButtonSwitchInline.of(
+                            s.samePeer().orElse(false) ? ImmutableKeyboardButtonSwitchInline.SAME_PEER_MASK : 0,
+                            text(), s.query().orElseThrow()));
                 }
                 case REQUEST_POLL: {
                     ReplyButtonSpecDef s = (ReplyButtonSpecDef) this;
@@ -74,9 +79,9 @@ public interface KeyboardButtonSpec extends Spec {
                 case GAME: return Mono.from(Mono.just(ImmutableKeyboardButtonGame.of(text())));
                 case CALLBACK: {
                     InlineButtonSpecDef s = (InlineButtonSpecDef) this;
-                    return Mono.just(ImmutableKeyboardButtonCallback.of(text())
-                            .withData(s.data().orElseThrow())
-                            .withRequiresPassword(s.requiresPassword().orElse(false)));
+                    return Mono.just(ImmutableKeyboardButtonCallback.of(
+                            s.requiresPassword().orElse(false) ? ImmutableKeyboardButtonCallback.REQUIRES_PASSWORD_MASK : 0,
+                            text(), s.data().orElseThrow()));
                 }
                 default: return Mono.error(new IllegalStateException());
             }

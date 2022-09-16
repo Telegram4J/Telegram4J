@@ -8,13 +8,9 @@ public final class ServiceHolder {
     private final AuthService authService;
     private final AccountService accountService;
     private final ChatService chatService;
-    private final LangPackService langPackService;
-    private final PaymentsService paymentsService;
     private final PhoneService phoneService;
-    private final StatsService statsService;
     private final StickersService stickersService;
     private final HelpService helpService;
-    private final MessageService messageService;
     private final UploadService uploadService;
     private final UpdatesService updatesService;
     private final UserService userService;
@@ -24,13 +20,9 @@ public final class ServiceHolder {
         this.authService = new AuthService(client, storeLayout);
         this.accountService = new AccountService(client, storeLayout);
         this.chatService = new ChatService(client, storeLayout);
-        this.langPackService = new LangPackService(client, storeLayout);
-        this.paymentsService = new PaymentsService(client, storeLayout);
         this.phoneService = new PhoneService(client, storeLayout);
-        this.statsService = new StatsService(client, storeLayout);
         this.stickersService = new StickersService(client, storeLayout);
         this.helpService = new HelpService(client, storeLayout);
-        this.messageService = new MessageService(client, storeLayout);
         this.uploadService = new UploadService(client, storeLayout);
         this.updatesService = new UpdatesService(client, storeLayout);
         this.userService = new UserService(client, storeLayout);
@@ -49,20 +41,8 @@ public final class ServiceHolder {
         return chatService;
     }
 
-    public LangPackService getLangPackService() {
-        return langPackService;
-    }
-
-    public PaymentsService getPaymentsService() {
-        return paymentsService;
-    }
-
     public PhoneService getPhoneService() {
         return phoneService;
-    }
-
-    public StatsService getStatsService() {
-        return statsService;
     }
 
     public StickersService getStickersService() {
@@ -71,10 +51,6 @@ public final class ServiceHolder {
 
     public HelpService getHelpService() {
         return helpService;
-    }
-
-    public MessageService getMessageService() {
-        return messageService;
     }
 
     public UploadService getUploadService() {

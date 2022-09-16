@@ -37,7 +37,7 @@ public class TlEntityUtil {
 
     public static ByteBuf expandInlineThumb(ByteBuf bytes) {
         if (!bytes.isReadable(3) || bytes.getByte(0) != 0x01) {
-            return Unpooled.EMPTY_BUFFER;
+            throw new IllegalArgumentException();
         }
 
         byte[] header = ByteBufUtil.decodeHexDump(

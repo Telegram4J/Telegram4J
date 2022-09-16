@@ -91,7 +91,7 @@ public class InlineQueryEvent extends BotEvent {
         return Mono.defer(() -> Flux.fromIterable(spec.results())
                 .flatMap(e -> EntityFactory.createInlineResult(client, e))
                 .collectList()
-                .flatMap(list -> client.getServiceHolder().getMessageService()
+                .flatMap(list -> client.getServiceHolder().getChatService()
                         .setInlineBotResults(SetInlineBotResults.builder()
                                 .queryId(getQueryId())
                                 .gallery(spec.gallery())

@@ -37,12 +37,12 @@ public class FileReferenceManager {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:
                                     InputChannel channel = TlEntityUtil.toInputChannel(f.getPeer());
-                                    return client.getServiceHolder().getMessageService()
+                                    return client.getServiceHolder().getChatService()
                                             .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(ChannelMessages.class)
                                             .flatMap(b -> findMessageAction(b, f));
                                 case InputPeerChat.ID:
-                                    return client.getServiceHolder().getMessageService()
+                                    return client.getServiceHolder().getChatService()
                                             .getMessages(List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(BaseMessages.class)
                                             .flatMap(b -> findMessageAction(b, f));
@@ -65,7 +65,7 @@ public class FileReferenceManager {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:
                                     InputChannel channel = TlEntityUtil.toInputChannel(f.getPeer());
-                                    return client.getServiceHolder().getMessageService()
+                                    return client.getServiceHolder().getChatService()
                                             .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(ChannelMessages.class)
                                             .flatMap(b -> findMessageMedia(b, f));
@@ -73,7 +73,7 @@ public class FileReferenceManager {
                                 case InputPeerUser.ID:
                                 case InputPeerUserFromMessage.ID:
                                 case InputPeerChat.ID:
-                                    return client.getServiceHolder().getMessageService()
+                                    return client.getServiceHolder().getChatService()
                                             .getMessages(List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(BaseMessages.class)
                                             .flatMap(b -> findMessageMedia(b, f));

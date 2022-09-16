@@ -89,7 +89,6 @@ public final class EntityFactory {
 
     public static UserStatus createUserStatus(MTProtoTelegramClient client, telegram4j.tl.UserStatus data) {
         switch (data.identifier()) {
-            case UserStatusEmpty.ID: return new UserStatus(client, UserStatus.Type.EMPTY);
             case UserStatusLastMonth.ID: return new UserStatus(client, UserStatus.Type.LAST_MONTH);
             case UserStatusLastWeek.ID: return new UserStatus(client, UserStatus.Type.LAST_WEEK);
             case UserStatusOffline.ID:
@@ -690,7 +689,7 @@ public final class EntityFactory {
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(Mono.fromSupplier(builder::build)));
         } else if (message instanceof InlineMessageMediaGameSpec) {
-            return Mono.just(InputBotInlineMessageGame.instance())
+            return Mono.just(ImmutableInputBotInlineMessageGame.of())
                     .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
                             .defaultIfEmpty(r));
 

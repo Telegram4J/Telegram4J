@@ -1,6 +1,5 @@
 package telegram4j.core.event.dispatcher;
 
-import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Flux;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.inline.CallbackQueryEvent;
@@ -30,11 +29,10 @@ class BotUpdatesHandlers {
         UpdateInlineBotCallbackQuery upd = context.getUpdate();
 
         User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
-        ByteBuf data = upd.data().orElse(null);
         InlineMessageId msgId = InlineMessageId.from(upd.msgId());
 
         return Flux.just(new InlineCallbackQueryEvent(client, upd.queryId(),
-                user, upd.chatInstance(), data,
+                user, upd.chatInstance(), upd.data(),
                 upd.gameShortName(), msgId));
     }
 
@@ -44,11 +42,10 @@ class BotUpdatesHandlers {
 
         User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
         Chat chat = context.getChatEntity(upd.peer()).orElseThrow();
-        ByteBuf data = upd.data().orElse(null);
 
         return Flux.just(new CallbackQueryEvent(client, upd.queryId(),
                 user, chat, upd.msgId(),
-                upd.chatInstance(), data,
+                upd.chatInstance(), upd.data(),
                 upd.gameShortName()));
     }
 

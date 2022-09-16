@@ -86,13 +86,13 @@ public class RpcEntityRetriever implements EntityRetriever {
         return Mono.defer(() -> {
             switch (chatId.getType()) {
                 case CHAT: return storeLayout.getChatMinById(chatId.asLong())
-                        .map(u -> (telegram4j.tl.Chat) u)
+                        .cast(telegram4j.tl.Chat.class)
                         .switchIfEmpty(client.getServiceHolder().getChatService().getChat(chatId.asLong()));
                 case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
-                        .map(u -> (telegram4j.tl.Chat) u)
+                        .cast(telegram4j.tl.Chat.class)
                         .switchIfEmpty(client.asInputChannel(chatId).flatMap(serviceHolder.getChatService()::getChannel));
                 case USER: return storeLayout.getUserMinById(chatId.asLong())
-                        .map(u -> (telegram4j.tl.User) u)
+                        .cast(telegram4j.tl.User.class)
                         .switchIfEmpty(client.asInputUser(chatId).flatMap(serviceHolder.getUserService()::getUser));
                 default: return Mono.error(new IllegalStateException());
             }
@@ -123,7 +123,7 @@ public class RpcEntityRetriever implements EntityRetriever {
     public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
         return storeLayout.getMessages(messageIds)
                 .switchIfEmpty(client.getServiceHolder()
-                        .getMessageService()
+                        .getChatService()
                         .getMessages(messageIds))
                 .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
                 .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
@@ -139,7 +139,7 @@ public class RpcEntityRetriever implements EntityRetriever {
         return storeLayout.getMessages(channelId.asLong(), messageIds)
                 .switchIfEmpty(client.asInputChannel(channelId)
                         .flatMap(c -> client.getServiceHolder()
-                                .getMessageService()
+                                .getChatService()
                                 .getMessages(c, messageIds)))
                 .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
                 .map(d -> AuxiliaryEntityFactory.createMessages(client, d));

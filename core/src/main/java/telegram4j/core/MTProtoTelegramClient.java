@@ -196,11 +196,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     return getFile0(loc);
                 }
 
-                return serviceHolder.getUploadService().getWebFile(loc)
+                return serviceHolder.getUploadService()
+                        .getWebFile(loc.asWebLocation().orElseThrow())
                         .map(FilePart::ofWebFile);
             }
 
-            return serviceHolder.getUploadService().getFile(loc)
+            return serviceHolder.getUploadService()
+                    .getFile(loc.asLocation().orElseThrow())
                     .map(FilePart::ofFile);
         });
     }
@@ -227,7 +229,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>common</b> events.
      */
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
-        return serviceHolder.getMessageService().deleteMessages(revoke, ids);
+        return serviceHolder.getChatService().deleteMessages(revoke, ids);
     }
 
     /**
@@ -243,7 +245,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         }
 
         return asInputChannel(channelId)
-                .flatMap(p -> serviceHolder.getMessageService()
+                .flatMap(p -> serviceHolder.getChatService()
                         .deleteMessages(p, ids));
     }
 

@@ -2,7 +2,6 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.tl.NotificationSound;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -13,8 +12,8 @@ public class PeerNotifySettings implements TelegramObject {
     private final telegram4j.tl.PeerNotifySettings data;
 
     public PeerNotifySettings(MTProtoTelegramClient client, telegram4j.tl.PeerNotifySettings data) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override
@@ -35,17 +34,17 @@ public class PeerNotifySettings implements TelegramObject {
     }
 
     // TODO: implement
-    public Optional<NotificationSound> getIosSound() {
-        return Optional.empty();
-    }
+    // public Optional<NotificationSound> getIosSound() {
+    //     return Optional.empty();
+    // }
 
-    public Optional<NotificationSound> getAndroidSound() {
-        return Optional.empty();
-    }
+    // public Optional<NotificationSound> getAndroidSound() {
+    //     return Optional.empty();
+    // }
 
-    public Optional<NotificationSound> getOtherSound() {
-        return Optional.empty();
-    }
+    // public Optional<NotificationSound> getOtherSound() {
+    //     return Optional.empty();
+    // }
 
     @Override
     public boolean equals(@Nullable Object o) {

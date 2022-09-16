@@ -90,7 +90,7 @@ abstract class BaseChat implements Chat {
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(sendAs.doOnNext(builder::sendAs))
                             .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(client.getServiceHolder().getMessageService()::sendMessage)
+                    .flatMap(client.getServiceHolder().getChatService()::sendMessage)
                     .map(e -> EntityFactory.createMessage(client, e, getId()));
         });
     }
@@ -103,8 +103,7 @@ abstract class BaseChat implements Chat {
                         .flatMap(client::resolvePeer)
                         .flatMap(p -> client.asInputPeer(p.getId()))
                         .defaultIfEmpty(InputPeerEmpty.instance()))
-                .flatMapMany(function((toPeerResend, sendAs) -> client.getServiceHolder()
-                        .getMessageService()
+                .flatMapMany(function((toPeerResend, sendAs) -> client.getServiceHolder().getChatService()
                         .forwardMessages(ForwardMessages.builder()
                                 .id(spec.ids())
                                 .randomId(CryptoUtil.random.longs(spec.ids().size())
@@ -137,8 +136,7 @@ abstract class BaseChat implements Chat {
                 .flatMap(p -> client.asInputPeer(p.getId()))
                 .defaultIfEmpty(InputPeerEmpty.instance())
                 .zipWith(Mono.defer(() -> spec.media().asData(client)))
-                .flatMap(function((sendAs, media) -> client.getServiceHolder()
-                        .getMessageService()
+                .flatMap(function((sendAs, media) -> client.getServiceHolder().getChatService()
                         .sendMedia(SendMedia.builder()
                                 .media(media)
                                 .randomId(CryptoUtil.random.nextLong())
@@ -170,7 +168,7 @@ abstract class BaseChat implements Chat {
     public Mono<AffectedHistory> unpinAllMessages() {
         InputPeer peer = client.asResolvedInputPeer(getId());
 
-        return client.getServiceHolder().getMessageService().unpinAllMessages(peer);
+        return client.getServiceHolder().getChatService().unpinAllMessages(peer);
     }
 
     @Override

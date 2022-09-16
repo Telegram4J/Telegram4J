@@ -24,8 +24,8 @@ public class ChatPhoto implements TelegramObject {
     private final String bigFileReferenceId;
 
     public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.data = Objects.requireNonNull(data, "data");
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
 
         this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data,
                 FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL, messageId, peer).serialize();
@@ -81,7 +81,7 @@ public class ChatPhoto implements TelegramObject {
      * @return The expanded stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getThumb() {
-        return data.strippedThumb().map(TlEntityUtil::expandInlineThumb);
+        return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
     }
 
     /**
@@ -91,7 +91,7 @@ public class ChatPhoto implements TelegramObject {
      * @return The raw stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getStrippedThumb() {
-        return data.strippedThumb();
+        return Optional.ofNullable(data.strippedThumb());
     }
 
     /**

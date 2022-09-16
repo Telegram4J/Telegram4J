@@ -148,7 +148,8 @@ public class User implements PeerEntity {
      * @return The {@link UserStatus} of user, if present.
      */
     public Optional<UserStatus> getStatus() {
-        return Optional.ofNullable(minData.status()).map(d -> EntityFactory.createUserStatus(client, d));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.status()))
+                .map(d -> EntityFactory.createUserStatus(client, d));
     }
 
     /**

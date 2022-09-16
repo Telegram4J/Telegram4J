@@ -345,7 +345,7 @@ public final class Message implements TelegramObject {
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(client.getServiceHolder().getMessageService()::editMessage)
+                    .flatMap(client.getServiceHolder().getChatService()::editMessage)
                     .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
         });
     }
@@ -374,7 +374,7 @@ public final class Message implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion nothing.
      */
     public Mono<Void> pin(PinMessageSpec spec) {
-        return Mono.defer(() -> client.getServiceHolder().getMessageService()
+        return Mono.defer(() -> client.getServiceHolder().getChatService()
                 .updatePinnedMessage(UpdatePinnedMessage.builder()
                         .peer(client.asResolvedInputPeer(resolvedChatId))
                         .id(getId())
@@ -481,7 +481,7 @@ public final class Message implements TelegramObject {
          */
         public static EnumSet<Flag> of(telegram4j.tl.Message data) {
             EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-            if (data instanceof MessageEmpty) {
+            if (data.identifier() == MessageEmpty.ID) {
                 return set;
             }
 

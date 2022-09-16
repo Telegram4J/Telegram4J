@@ -658,8 +658,7 @@ public class FileReferenceId {
             throw new IllegalStateException("Cant create input document from file reference id: " + this);
         }
 
-        return ImmutableBaseInputDocument.of(documentId, accessHash)
-                .withFileReference(fileReference);
+        return ImmutableBaseInputDocument.of(documentId, accessHash, fileReference);
     }
 
     /**
@@ -673,8 +672,7 @@ public class FileReferenceId {
             throw new IllegalStateException("Cant create input photo from file reference id: " + this);
         }
 
-        return ImmutableBaseInputPhoto.of(documentId, accessHash)
-                .withFileReference(fileReference);
+        return ImmutableBaseInputPhoto.of(documentId, accessHash, fileReference);
     }
 
     @Override

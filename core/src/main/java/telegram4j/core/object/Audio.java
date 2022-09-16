@@ -18,7 +18,7 @@ public class Audio extends Document {
     public Audio(MTProtoTelegramClient client, BaseDocumentFields data, String fileName,
                  int messageId, InputPeer peer, DocumentAttributeAudio audioData) {
         super(client, data, fileName, messageId, peer);
-        this.audioData = Objects.requireNonNull(audioData, "audioData");
+        this.audioData = Objects.requireNonNull(audioData);
     }
 
     /**
@@ -63,7 +63,7 @@ public class Audio extends Document {
      * @return The waveform of voice message, if it is and present.
      */
     public Optional<ByteBuf> getWaveform() {
-        return audioData.waveform();
+        return Optional.ofNullable(audioData.waveform());
     }
 
     @Override

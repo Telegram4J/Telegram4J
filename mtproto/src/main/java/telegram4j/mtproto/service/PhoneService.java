@@ -1,7 +1,6 @@
 package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
@@ -11,13 +10,16 @@ import telegram4j.tl.phone.PhoneCall;
 import telegram4j.tl.phone.*;
 import telegram4j.tl.request.phone.*;
 
-import java.util.function.Function;
+import java.util.List;
 
 public class PhoneService extends RpcService {
 
     public PhoneService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
     }
+
+    // phone namespace
+    // ======================
 
     public Mono<String> getCallConfig() {
         return client.sendAwait(GetCallConfig.instance()).map(DataJSON::data);
@@ -28,20 +30,17 @@ public class PhoneService extends RpcService {
     }
 
     public Mono<PhoneCall> acceptCall(InputPhoneCall peer, ByteBuf gb, PhoneCallProtocol protocol) {
-        return client.sendAwait(ImmutableAcceptCall.of(peer, protocol)
-                .withGB(gb));
+        return Mono.defer(() -> client.sendAwait(ImmutableAcceptCall.of(peer, gb, protocol)));
     }
 
     public Mono<PhoneCall> confirmCall(InputPhoneCall peer, ByteBuf ga, long keyFingerPrint, PhoneCallProtocol protocol) {
-        return client.sendAwait(ImmutableConfirmCall.of(peer, keyFingerPrint, protocol)
-                .withGA(ga));
+        return Mono.defer(() -> client.sendAwait(ImmutableConfirmCall.of(peer, ga, keyFingerPrint, protocol)));
     }
 
     public Mono<Boolean> receivedCall(InputPhoneCall peer) {
         return client.sendAwait(ImmutableReceivedCall.of(peer));
     }
 
-    // TODO: check updates type
     public Mono<Updates> discardCall(DiscardCall request) {
         return client.sendAwait(request);
     }
@@ -55,20 +54,13 @@ public class PhoneService extends RpcService {
     }
 
     public Mono<Boolean> sendSignalingData(InputPhoneCall peer, ByteBuf data) {
-        return client.sendAwait(ImmutableSendSignalingData.of(peer)
-                .withData(data));
+        return Mono.defer(() -> client.sendAwait(ImmutableSendSignalingData.of(peer, data)));
     }
 
-    public Mono<Updates> createGroupCall(InputPeer peer, int randomId, String title, int scheduleDate) {
-        return client.sendAwait(CreateGroupCall.builder()
-                .peer(peer)
-                .randomId(randomId)
-                .title(title)
-                .scheduleDate(scheduleDate)
-                .build());
+    public Mono<Updates> createGroupCall(CreateGroupCall request) {
+        return client.sendAwait(request);
     }
 
-    // TODO: unwrap DataJSON param
     public Mono<Updates> joinGroupCall(JoinGroupCall request) {
         return client.sendAwait(request);
     }
@@ -78,10 +70,7 @@ public class PhoneService extends RpcService {
     }
 
     public Mono<Updates> inviteToGroupCall(InputGroupCall peer, Iterable<? extends InputUser> ids) {
-        return client.sendAwait(InviteToGroupCall.builder()
-                .call(peer)
-                .users(ids)
-                .build());
+        return Mono.defer(() -> client.sendAwait(ImmutableInviteToGroupCall.of(peer, ids)));
     }
 
     public Mono<Updates> discardGroupCall(DiscardCall request) {
@@ -96,23 +85,12 @@ public class PhoneService extends RpcService {
         return client.sendAwait(ImmutableGetGroupCall.of(peer, limit));
     }
 
-    public Mono<GroupParticipants> getGroupParticipant(InputGroupCall peer, Iterable<? extends InputPeer> ids,
-                                                       Iterable<Integer> sources, String offset, int limit) {
-        return client.sendAwait(GetGroupParticipants.builder()
-                .call(peer)
-                .ids(ids)
-                .sources(sources)
-                .offset(offset)
-                .limit(limit)
-                .build());
+    public Mono<GroupParticipants> getGroupParticipant(GetGroupParticipants request) {
+        return client.sendAwait(request);
     }
 
-    public Flux<Integer> checkGroupCall(InputGroupCall peer, Iterable<Integer> sources) {
-        return client.sendAwait(CheckGroupCall.builder()
-                .call(peer)
-                .sources(sources)
-                .build())
-                .flatMapIterable(Function.identity());
+    public Mono<List<Integer>> checkGroupCall(InputGroupCall peer, Iterable<Integer> sources) {
+        return client.sendAwait(ImmutableCheckGroupCall.of(peer, sources));
     }
 
     public Mono<Updates> toggleGroupCallRecord(ToggleGroupCallRecord request) {
@@ -153,5 +131,17 @@ public class PhoneService extends RpcService {
 
     public Mono<Updates> leaveGroupCallPresentation(InputGroupCall peer) {
         return client.sendAwait(ImmutableLeaveGroupCallPresentation.of(peer));
+    }
+
+    public Mono<GroupCallStreamChannels> getGroupCallStreamChannels(InputGroupCall peer) {
+        return client.sendAwait(ImmutableGetGroupCallStreamChannels.of(peer));
+    }
+
+    public Mono<GroupCallStreamRtmpUrl> getGroupCallStreamRtmpUrl(InputPeer peer, boolean revoke) {
+        return client.sendAwait(ImmutableGetGroupCallStreamRtmpUrl.of(peer, revoke));
+    }
+
+    public Mono<Boolean> saveCallLog(InputPhoneCall peer, InputFile file) {
+        return client.sendAwait(ImmutableSaveCallLog.of(peer, file));
     }
 }

@@ -64,7 +64,7 @@ public class InlineCallbackQueryEvent extends CallbackEvent {
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
                     .flatMap(editMessage -> client.getServiceHolder()
-                            .getMessageService().editInlineBotMessage(editMessage));
+                            .getChatService().editInlineBotMessage(editMessage));
         });
     }
 

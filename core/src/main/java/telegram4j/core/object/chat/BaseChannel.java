@@ -289,10 +289,9 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
         return client.asInputUser(userId)
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editAdmin(channel, target, telegram4j.tl.ChatAdminRights.instance()
-                                .withFlags(rights.stream()
-                                        .map(ChatAdminRights::getFlag)
-                                        .reduce(0, (l, r) -> l | r)), rank))
+                        .editAdmin(channel, target, telegram4j.tl.ImmutableChatAdminRights.of(rights.stream()
+                                .map(ChatAdminRights::getFlag)
+                                .reduce(0, (l, r) -> l | r)), rank))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
     }
