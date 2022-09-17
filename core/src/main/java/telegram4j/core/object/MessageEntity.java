@@ -202,6 +202,7 @@ public final class MessageEntity implements TelegramObject {
         /**
          * Gets type of raw {@link telegram4j.tl.MessageEntity} data.
          *
+         * @param data The raw data.
          * @return The {@code Type} of raw message entity data.
          */
         public static Type of(telegram4j.tl.MessageEntity data) {

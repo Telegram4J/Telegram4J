@@ -88,6 +88,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * Creates new {@code MTProtoBootstrap} with new option modifier step.
      *
      * @param optionsModifier A new option mapper for composing.
+     * @param <O1> A new type of options.
      * @return This new builder with new option modifier.
      */
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {

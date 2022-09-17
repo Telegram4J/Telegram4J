@@ -16,7 +16,7 @@ import java.util.Optional;
 interface InputMediaDocumentSpecDef extends InputMediaSpec {
 
     /**
-     * @return The serialized {@link FileReferenceId} or url to web file.
+     * @return The serialized {@link telegram4j.mtproto.file.FileReferenceId} or url to web file.
      */
     String document();
 

@@ -16,7 +16,7 @@ import java.util.Optional;
 interface InputMediaPhotoSpecDef extends InputMediaSpec {
 
     /**
-     * @return The serialized {@link FileReferenceId} or url to web file.
+     * @return The serialized {@link telegram4j.mtproto.file.FileReferenceId} or url to web file.
      */
     String photo();
 

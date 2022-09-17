@@ -122,7 +122,7 @@ public interface Channel extends Chat {
      * Gets list of pending api suggestions for channel, if present
      * and if detailed information about channel is available.
      *
-     * @see <a href="https://core.telegram.org/api/config#suggestions>Channel Suggestions</a>
+     * @see <a href="https://core.telegram.org/api/config#suggestions">Channel Suggestions</a>
      * @return The list of pending api suggestions for channel, if present
      * and if detailed information about channel is available.
      */
