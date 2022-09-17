@@ -37,7 +37,7 @@ public final class InitConnectionParams {
      */
     public static InitConnectionParams getDefault() {
         var pckg = InitConnectionParams.class.getPackage();
-        String appVersion = pckg.getImplementationVersion();
+        String appVersion = (appVersion = pckg.getImplementationVersion()) != null ? appVersion : "0.1.0-SNAPSHOT";
         String deviceModel = "Telegram4J";
         String systemVersion = String.join(" ", System.getProperty("os.name"),
                 System.getProperty("os.version"),

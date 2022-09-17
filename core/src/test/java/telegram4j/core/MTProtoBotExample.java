@@ -1,7 +1,9 @@
 package telegram4j.core;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.core.command.Command;
@@ -12,6 +14,7 @@ import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.BotCommandScopeChats;
+import telegram4j.tl.json.TlModule;
 
 import java.util.List;
 import java.util.Locale;
@@ -27,6 +30,9 @@ public class MTProtoBotExample {
     private static final Map<String, Command> commandsMap = commands.stream()
             .collect(Collectors.toMap(c -> c.getInfo().command().toLowerCase(Locale.ROOT), Function.identity()));
 
+    private static final ObjectMapper mapper = new ObjectMapper()
+            .registerModule(new TlModule());
+
     public static void main(String[] args) {
 
         // only for testing
@@ -38,9 +44,6 @@ public class MTProtoBotExample {
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
-                // default params can't be generated for test sources
-                .setInitConnectionParams(new InitConnectionParams("test", "test",
-                        "en", "", "test", "en", null, null))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getServiceHolder().getBotService()
@@ -56,6 +59,12 @@ public class MTProtoBotExample {
                                 return client.getServiceHolder().getBotService()
                                         .setBotCommands(BotCommandScopeChats.instance(), "en", infos);
                             })
+                            .then();
+
+                    Mono<Void> sandbox = client.getMtProtoClient().updates().asFlux()
+                            .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
+                            .publishOn(Schedulers.boundedElastic())
+                            .doOnNext(log::info)
                             .then();
 
                     Mono<Void> listenMessages = client.on(SendMessageEvent.class)
@@ -75,7 +84,7 @@ public class MTProtoBotExample {
                                     .orElseGet(Mono::empty)))
                             .then();
 
-                    return Mono.when(updateCommands, listenMessages);
+                    return Mono.when(updateCommands, listenMessages, sandbox);
                 })
                 .block();
     }
