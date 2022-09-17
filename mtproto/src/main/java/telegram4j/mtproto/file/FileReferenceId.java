@@ -26,7 +26,7 @@ import java.util.Optional;
  */
 public class FileReferenceId {
 
-    static final char PREFIX = 'x';
+    static final String PREFIX = "x74JF1D"; // xT4JFID
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
 
     static final int MESSAGE_ID_MASK = 1;
@@ -247,12 +247,12 @@ public class FileReferenceId {
      * @return The deserialized {@code FileReferenceId} with decoded information.
      */
     public static FileReferenceId deserialize(String str) {
-        if (str.length() < 1 || str.charAt(0) != PREFIX) {
+        if (!str.startsWith(PREFIX)) {
             throw new IllegalArgumentException("Incorrect file reference id format: '" + str + "'");
         }
 
-        ByteBuf data = Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8));
-        data.skipBytes(1); // PREFIX
+        ByteBuf data = Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8))
+                .skipBytes(PREFIX.length());
 
         ByteBuf buf = Base64.decode(data, Base64Dialect.URL_SAFE);
         data.release();
@@ -344,7 +344,7 @@ public class FileReferenceId {
             encoded.writeByte(b);
 
             if (i + 1 < n && b == 0) {
-                int c = 1;
+                byte c = 1;
                 while (c < MAX_RLE_SEQ && i + c < n && data.getByte(i + c) == 0) {
                     c++;
                 }
@@ -468,11 +468,12 @@ public class FileReferenceId {
                 break;
 
             default:
-                throw new IllegalStateException("Unexpected value: " + fileType);
+                throw new IllegalStateException("Unexpected file type: " + fileType);
         }
 
         buf = encodeZeroRle(buf);
         ByteBuf base64 = Base64.encode(buf, Base64Dialect.URL_SAFE);
+        buf.release();
         try {
             return PREFIX + base64.toString(StandardCharsets.UTF_8);
         } finally {
