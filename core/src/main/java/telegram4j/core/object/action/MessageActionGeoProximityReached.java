@@ -12,7 +12,7 @@ public class MessageActionGeoProximityReached extends BaseMessageAction {
 
     public MessageActionGeoProximityReached(MTProtoTelegramClient client, telegram4j.tl.MessageActionGeoProximityReached data) {
         super(client, Type.GEO_PROXIMITY_REACHED);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Id getFromPeerId() {

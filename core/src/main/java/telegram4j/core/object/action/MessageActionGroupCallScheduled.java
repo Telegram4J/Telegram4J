@@ -13,7 +13,7 @@ public class MessageActionGroupCallScheduled extends BaseMessageAction {
 
     public MessageActionGroupCallScheduled(MTProtoTelegramClient client, telegram4j.tl.MessageActionGroupCallScheduled data) {
         super(client, Type.GROUP_CALL_SCHEDULED);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public InputGroupCall getCall() {

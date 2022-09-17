@@ -14,7 +14,7 @@ public class MessageActionChatCreate extends BaseMessageAction {
 
     public MessageActionChatCreate(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatCreate data) {
         super(client, Type.CHAT_CREATE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getTitle() {

@@ -35,8 +35,7 @@ public class ChannelLocation implements TelegramObject {
      * @return The {@link GeoPoint} of the address, if present.
      */
     public Optional<GeoPoint> getGeoPoint() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class))
-                .map(d -> new GeoPoint(client, d));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class)).map(GeoPoint::new);
     }
 
     /**

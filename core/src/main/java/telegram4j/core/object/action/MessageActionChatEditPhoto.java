@@ -29,8 +29,8 @@ public class MessageActionChatEditPhoto extends BaseMessageAction {
     public MessageActionChatEditPhoto(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatEditPhoto data,
                                       InputPeer peer, int messageId) {
         super(client, Type.EDIT_CHAT_PHOTO);
-        this.data = Objects.requireNonNull(data, "data");
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.data = Objects.requireNonNull(data);
+        this.peer = Objects.requireNonNull(peer);
         this.messageId = messageId;
     }
 

@@ -11,8 +11,8 @@ public class BaseMessageMedia implements MessageMedia {
     protected final Type type;
 
     public BaseMessageMedia(MTProtoTelegramClient client, Type type) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.type = Objects.requireNonNull(type, "type");
+        this.client = Objects.requireNonNull(client);
+        this.type = Objects.requireNonNull(type);
     }
 
     @Override

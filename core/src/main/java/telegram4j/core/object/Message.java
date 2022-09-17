@@ -14,7 +14,6 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.BaseMessage;
 import telegram4j.tl.BaseMessageFields;
-import telegram4j.tl.MessageEmpty;
 import telegram4j.tl.MessageService;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
@@ -30,6 +29,7 @@ import java.util.stream.Collectors;
 
 import static reactor.function.TupleUtils.function;
 import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
+import static telegram4j.tl.BaseMessage.*;
 
 /**
  * Representation for default and service messages.
@@ -77,7 +77,7 @@ public final class Message implements TelegramObject {
      * @return The {@link EnumSet} of the message flags.
      */
     public EnumSet<Flag> getFlags() {
-        return Flag.of(getBaseData());
+        return Flag.of0(getBaseData());
     }
 
     /**
@@ -96,7 +96,7 @@ public final class Message implements TelegramObject {
      */
     public Optional<Id> getAuthorId() {
         return Optional.ofNullable(getBaseData().fromId()).map(Id::of)
-                // If message from DC (not outgoing message) fromId might be absent, just use chatId
+                // If message from DM (and not outgoing message) fromId might be absent, just use chatId
                 .or(() -> resolvedChatId.getType() == Id.Type.USER ? Optional.of(resolvedChatId) : Optional.empty());
     }
 
@@ -410,87 +410,79 @@ public final class Message implements TelegramObject {
     }
 
     /** Available flag types of message. */
-    public enum Flag {
+    public enum Flag implements BitFlag {
 
-        // BaseMessage & ServiceMessage flags
+        // it's checked common flags:
+        // https://github.com/telegramdesktop/tdesktop/blob/7a61693034b260084b2ce99463e394526c279df3/Telegram/SourceFiles/codegen/scheme/codegen_scheme.py#L39
 
         /** Is this an outgoing message. */
-        OUT(1),
+        OUT(OUT_POS),
 
         /** Whether we were <a href="https://core.telegram.org/api/mentions">mentioned</a> in this message. */
-        MENTIONED(4),
+        MENTIONED(MENTIONED_POS),
 
         /** Whether there are unread media attachments in this message. */
-        MEDIA_UNREAD(5),
+        MEDIA_UNREAD(MEDIA_UNREAD_POS),
 
         /** Whether this is a silent message (no notification triggered). */
-        SILENT(13),
+        SILENT(SILENT_POS),
 
         /** Whether this is a channel post. */
-        POST(14),
+        POST(POST_POS),
 
         /** Whether this is a <a href="https://core.telegram.org/api/scheduled-messages">scheduled message</a>. */
-        FROM_SCHEDULED(18),
+        FROM_SCHEDULED(FROM_SCHEDULED_POS),
 
         /** This is a legacy message: it has to be refetched with the new layer. */
-        LEGACY(19),
+        LEGACY(LEGACY_POS),
 
         /**
          * Whether this message is <a href="https://telegram.org/blog/protected-content-delete-by-date-and-more">protected</a>
          * and thus cannot be forwarded.
          */
-        NO_FORWARDS(26),
+        NO_FORWARDS(NOFORWARDS_POS),
 
         /** Whether the message should be shown as not modified to the user, even if an edit date is present. */
-        EDIT_HIDE(21),
+        EDIT_HIDE(EDIT_HIDE_POS),
 
         /** Whether this message is <a href="https://core.telegram.org/api/pin">pinned</a>. */
-        PINNED(24);
+        PINNED(PINNED_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Flag(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Flag(byte position) {
+            this.position = position;
+        }
+
+        @Override
+        public byte position() {
+            return position;
         }
 
         /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
+         * Computes {@link EnumSet} from raw message service data.
          *
-         * @return The flag shift position.
+         * @param data The message data.
+         * @return The {@link EnumSet} of the message service flags.
          */
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
+        public static EnumSet<Flag> of(telegram4j.tl.MessageService data) {
+            return of0(data);
         }
 
         /**
          * Computes {@link EnumSet} from raw message data.
          *
-         * @param data The message data.
+         * @param data The message service data.
          * @return The {@link EnumSet} of the message flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.Message data) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-            if (data.identifier() == MessageEmpty.ID) {
-                return set;
-            }
+        public static EnumSet<Flag> of(telegram4j.tl.BaseMessage data) {
+            return of0(data);
+        }
 
+        private static EnumSet<Flag> of0(telegram4j.tl.BaseMessageFields data) {
+            var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            for (Flag value : values()) {
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

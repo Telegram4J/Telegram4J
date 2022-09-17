@@ -1,5 +1,6 @@
 package telegram4j.core.auxiliary;
 
+import reactor.util.function.Tuple2;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -7,15 +8,14 @@ import telegram4j.core.util.Id;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 public class AuxiliarySendAs {
     private final MTProtoTelegramClient client;
-    private final Set<Id> peerIds;
+    private final List<Tuple2<Boolean, Id>> peerIds;
     private final List<User> users;
     private final List<Chat> chats;
 
-    public AuxiliarySendAs(MTProtoTelegramClient client, Set<Id> peerIds, List<User> users, List<Chat> chats) {
+    public AuxiliarySendAs(MTProtoTelegramClient client, List<Tuple2<Boolean, Id>> peerIds, List<User> users, List<Chat> chats) {
         this.client = Objects.requireNonNull(client);
         this.peerIds = Objects.requireNonNull(peerIds);
         this.users = Objects.requireNonNull(users);
@@ -26,7 +26,14 @@ public class AuxiliarySendAs {
         return client;
     }
 
-    public Set<Id> getPeerIds() {
+    /**
+     * Gets list of {@link Tuple2} which contains {@code boolean} which
+     * indicates whether premium is required to use and {@link Id} of peer.
+     *
+     * @return The of {@link Tuple2} with the availability flag and id.
+     */
+    // TODO: type most likely will changed in future
+    public List<Tuple2<Boolean, Id>> getPeerIds() {
         return peerIds;
     }
 

@@ -19,9 +19,9 @@ public class MessageMediaInvoice extends BaseMessageMedia {
     public MessageMediaInvoice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaInvoice data,
                                int messageId, InputPeer peer) {
         super(client, Type.INVOICE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
         this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.peer = Objects.requireNonNull(peer);
     }
 
     public boolean isShippingAddressRequested() {

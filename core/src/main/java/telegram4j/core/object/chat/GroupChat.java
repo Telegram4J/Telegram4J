@@ -9,9 +9,12 @@ import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
+import telegram4j.core.object.Reaction;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.InputChatPhotoSpec;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
@@ -22,6 +25,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static telegram4j.tl.BaseChat.*;
+import static telegram4j.tl.BaseChatFull.CAN_SET_USERNAME_POS;
+import static telegram4j.tl.BaseChatFull.HAS_SCHEDULED_POS;
 
 /** Represents a basic group of 0-200 users (must be upgraded to a supergroup to accommodate more than 200 users). */
 public final class GroupChat extends BaseChat {
@@ -255,12 +262,18 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets list of available unicode emojis, used as reactions, if present.
+     * Gets {@code boolean} which indicates the availability of any emojis in the group
+     * or list of available reactions, if present
+     * and if detailed information about channel is available.
      *
-     * @return The list of available unicode emojis, used as reactions, if present.
+     * @return The {@link Variant2} with {@code boolean} which indicates the availability of any emojis in the group
+     * or list of available reactions, if present
+     * and if detailed information about channel is available.
      */
-    public Optional<List<String>> getAvailableReactions() {
-        return Optional.ofNullable(fullData).map(BaseChatFull::availableReactions);
+    public Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions() {
+        return Optional.ofNullable(fullData)
+                .map(BaseChatFull::availableReactions)
+                .map(EntityFactory::createChatReactions);
     }
 
     /**
@@ -273,7 +286,7 @@ public final class GroupChat extends BaseChat {
     public Mono<Void> deleteChatParticipant(Id userId, boolean revokeHistory) {
         return client.asInputUser(userId)
                 .flatMap(p -> client.getServiceHolder().getChatService()
-                        .deleteChatUser(getId().asLong(), p, revokeHistory));
+                        .deleteChatUser(minData.id(), p, revokeHistory));
     }
 
     /**
@@ -335,65 +348,47 @@ public final class GroupChat extends BaseChat {
     }
 
     /** Types of the group chat flags. */
-    public enum Flag {
+    public enum Flag implements BitFlag {
         // MinChat flags
 
         /** Whether the current user is the creator of the group. */
-        CREATOR(0),
-
-        /** Whether the current user was kicked from the group. */
-        KICKED(1),
+        CREATOR(CREATOR_POS),
 
         /** Whether the current user has left the group. */
-        LEFT(2),
+        LEFT(LEFT_POS),
 
         /** Whether the group was <a href="https://core.telegram.org/api/channel">migrated</a>. */
-        DEACTIVATED(5),
+        DEACTIVATED(DEACTIVATED_POS),
 
         /** Whether a group call is currently active. */
-        CALL_ACTIVE(23),
+        CALL_ACTIVE(CALL_ACTIVE_POS),
 
         /** Whether there's anyone in the group call. */
-        CALL_NOT_EMPTY(24),
+        CALL_NOT_EMPTY(CALL_NOT_EMPTY_POS),
 
         /**
          * Whether this group is <a href="https://telegram.org/blog/protected-content-delete-by-date-and-more">protected</a>,
          * this does not allow forwarding messages from it.
          */
-        NO_FORWARDS(25),
+        NO_FORWARDS(NOFORWARDS_POS),
 
         // FullChat flags
 
         /** Can we change the username of this chat? */
-        CAN_SET_USERNAME(7),
+        CAN_SET_USERNAME(CAN_SET_USERNAME_POS),
 
         /** Whether <a href="https://core.telegram.org/api/scheduled-messages">scheduled messages</a> are available. */
-        HAS_SCHEDULED(8);
+        HAS_SCHEDULED(HAS_SCHEDULED_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Flag(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Flag(byte position) {
+            this.position = position;
         }
 
-        /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-         *
-         * @return The flag shift position.
-         */
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
+        @Override
+        public byte position() {
+            return position;
         }
 
         /**
@@ -404,46 +399,28 @@ public final class GroupChat extends BaseChat {
          * @return The {@link EnumSet} with channel flags.
          */
         public static EnumSet<Flag> of(@Nullable telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
+            var minFlags = of(minData);
             if (fullData != null) {
+                var set = EnumSet.allOf(Flag.class);
                 int flags = fullData.flags();
-                for (Flag value : values()) {
-                    if (value != CAN_SET_USERNAME && value != HAS_SCHEDULED) continue;
-                    if ((flags & value.flag) != 0) {
-                        set.add(value);
-                    }
-                }
+                set.removeIf(value -> value.ordinal() < CAN_SET_USERNAME.ordinal() || (flags & value.mask()) == 0);
+                set.addAll(of(minData));
+                return set;
             }
 
-            set.addAll(of(minData));
-
-            return set;
+            return minFlags;
         }
 
         /**
          * Computes {@link EnumSet} with chat flags from given min data.
          *
          * @param data The min chat data.
-         * @return The {@link EnumSet} with channel flags.
+         * @return The {@link EnumSet} with chat flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.Chat data) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-            if (data instanceof ChatEmpty) {
-                return set;
-            }
-
-            telegram4j.tl.BaseChat chat = (telegram4j.tl.BaseChat) data;
-            int flags = chat.flags();
-            for (Flag value : values()) {
-                // This check is unnecessary, because in the MinUser
-                // these flags are not occupied, but if a new one with one of
-                // these values is added, it will be dangerous...
-                if (value == CAN_SET_USERNAME || value == HAS_SCHEDULED) continue;
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
-
+        public static EnumSet<Flag> of(telegram4j.tl.BaseChat data) {
+            var set = EnumSet.allOf(Flag.class);
+            int flags = data.flags();
+            set.removeIf(value -> value.ordinal() >= CAN_SET_USERNAME.ordinal() || (flags & value.mask()) == 0);
             return set;
         }
     }

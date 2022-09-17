@@ -55,7 +55,7 @@ class BotUpdatesHandlers {
 
         User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
         GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(upd.geo(), BaseGeoPoint.class))
-                .map(d -> new GeoPoint(client, d))
+                .map(GeoPoint::new)
                 .orElse(null);
 
         return Flux.just(new InlineQueryEvent(client, upd.queryId(), user,

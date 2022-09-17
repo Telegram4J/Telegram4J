@@ -15,7 +15,7 @@ public class MessageActionPaymentSentMe extends BaseMessageAction {
 
     public MessageActionPaymentSentMe(MTProtoTelegramClient client, telegram4j.tl.MessageActionPaymentSentMe data) {
         super(client, Type.PAYMENT_SENT);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getCurrency() {

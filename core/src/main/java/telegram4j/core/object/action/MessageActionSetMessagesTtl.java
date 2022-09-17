@@ -12,7 +12,7 @@ public class MessageActionSetMessagesTtl extends BaseMessageAction {
 
     public MessageActionSetMessagesTtl(MTProtoTelegramClient client, telegram4j.tl.MessageActionSetMessagesTTL data) {
         super(client, Type.SET_MESSAGES_TTL);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Duration getCurrentDuration() {

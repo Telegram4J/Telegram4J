@@ -8,6 +8,8 @@ import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 
+import static telegram4j.tl.PeerSettings.*;
+
 public class PeerSettings implements TelegramObject {
 
     private final MTProtoTelegramClient client;
@@ -60,34 +62,34 @@ public class PeerSettings implements TelegramObject {
                 '}';
     }
 
-    public enum Flag {
+    public enum Flag implements BitFlag {
 
         /** Whether we can still report the user for spam. */
-        REPORT_SPAM(0),
+        REPORT_SPAM(REPORT_SPAM_POS),
 
         /** Whether we can add the user as contact. */
-        ADD_CONTACT(1),
+        ADD_CONTACT(ADD_CONTACT_POS),
 
         /** Whether we can block the user. */
-        BLOCK_CONTACT(2),
+        BLOCK_CONTACT(BLOCK_CONTACT_POS),
 
         /** Whether we can share the user's contact. */
-        SHARE_CONTACT(3),
+        SHARE_CONTACT(SHARE_CONTACT_POS),
 
         /** Whether a special exception for contacts is needed. */
-        NEED_CONTACTS_EXCEPTION(4),
+        NEED_CONTACTS_EXCEPTION(NEED_CONTACTS_EXCEPTION_POS),
 
         /** Whether we can report a geogroup is irrelevant for this location. */
-        REPORT_GEO(5),
+        REPORT_GEO(REPORT_GEO_POS),
 
         /**
          * Whether this peer was automatically archived according
          * to <a href="https://core.telegram.org/constructor/globalPrivacySettings">privacy settings</a>.
          */
-        AUTOARCHIVED(7),
+        AUTOARCHIVED(AUTOARCHIVED_POS),
 
         /** Whether we can invite members to a <a href="https://core.telegram.org/api/channel">group or channel</a>. */
-        INVITE_MEMBERS(8),
+        INVITE_MEMBERS(INVITE_MEMBERS_POS),
 
         /**
          * This flag is set if {@link #getRequestChatTitle()} and {@link #getRequestChatTimestamp()}
@@ -96,32 +98,17 @@ public class PeerSettings implements TelegramObject {
          *
          * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
          */
-        REQUEST_CHAT_BROADCAST(10);
+        REQUEST_CHAT_BROADCAST(REQUEST_CHAT_BROADCAST_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Flag(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Flag(byte position) {
+            this.position = position;
         }
 
-        /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-         *
-         * @return The flag shift position.
-         */
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
+        @Override
+        public byte position() {
+            return position;
         }
 
         /**
@@ -131,13 +118,9 @@ public class PeerSettings implements TelegramObject {
          * @return The {@link EnumSet} of the {@link telegram4j.tl.PeerSettings} flags.
          */
         public static EnumSet<Flag> of(telegram4j.tl.PeerSettings data) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
+            var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            for (Flag value : values()) {
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

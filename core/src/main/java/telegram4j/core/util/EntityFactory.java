@@ -8,6 +8,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.*;
@@ -647,6 +648,36 @@ public final class EntityFactory {
                     .map(ImmutableInputBotInlineResultGame.Builder::build);
         } else {
             throw new IllegalStateException();
+        }
+    }
+
+    public static Reaction createReaction(telegram4j.tl.Reaction reaction) {
+        switch (reaction.identifier()) {
+            case ReactionCustomEmoji.ID:
+                ReactionCustomEmoji custom = (ReactionCustomEmoji) reaction;
+                return new Reaction(custom.documentId());
+            case ReactionEmoji.ID:
+                ReactionEmoji emoticon = (ReactionEmoji) reaction;
+                return new Reaction(emoticon.emoticon());
+            // and ReactionEmpty
+            default:
+                throw new IllegalArgumentException("Unknown reaction type: " + reaction);
+        }
+    }
+
+    @Nullable
+    public static Variant2<Boolean, List<Reaction>> createChatReactions(ChatReactions data) {
+        switch (data.identifier()) {
+            case ChatReactionsAll.ID:
+                ChatReactionsAll all = (ChatReactionsAll) data;
+                return Variant2.ofT1(all.allowCustom());
+            case ChatReactionsSome.ID:
+                ChatReactionsSome some = (ChatReactionsSome) data;
+                return Variant2.ofT2(some.reactions().stream()
+                        .map(EntityFactory::createReaction)
+                        .collect(Collectors.toUnmodifiableList()));
+            case ChatReactionsNone.ID: return null;
+            default: throw new IllegalStateException("Unknown ChatReactions type: " + data);
         }
     }
 

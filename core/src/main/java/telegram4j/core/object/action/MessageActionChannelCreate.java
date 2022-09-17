@@ -11,7 +11,7 @@ public class MessageActionChannelCreate extends BaseMessageAction {
 
     public MessageActionChannelCreate(MTProtoTelegramClient client, telegram4j.tl.MessageActionChannelCreate data) {
         super(client, Type.CHANNEL_CREATE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getChannelTitle() {

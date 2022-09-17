@@ -14,7 +14,7 @@ public class MessageActionGroupCall extends BaseMessageAction {
 
     public MessageActionGroupCall(MTProtoTelegramClient client, telegram4j.tl.MessageActionGroupCall data) {
         super(client, Type.GROUP_CALL);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public InputGroupCall getCall() {

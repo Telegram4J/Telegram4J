@@ -14,7 +14,7 @@ public class MessageActionPhoneCall extends BaseMessageAction {
 
     public MessageActionPhoneCall(MTProtoTelegramClient client, telegram4j.tl.MessageActionPhoneCall data) {
         super(client, Type.PHONE_CALL);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public boolean isVideo() {

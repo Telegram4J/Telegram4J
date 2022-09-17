@@ -14,7 +14,7 @@ public class MessageActionSecureValuesSentMe extends BaseMessageAction {
 
     public MessageActionSecureValuesSentMe(MTProtoTelegramClient client, telegram4j.tl.MessageActionSecureValuesSentMe data) {
         super(client, Type.SECURE_VALUES_SENT_ME);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public List<SecureValue> getValues() {

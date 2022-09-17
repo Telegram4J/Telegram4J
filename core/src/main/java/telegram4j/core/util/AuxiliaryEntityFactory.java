@@ -1,5 +1,6 @@
 package telegram4j.core.util;
 
+import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
@@ -108,8 +109,8 @@ public final class AuxiliaryEntityFactory {
 
     public static AuxiliarySendAs createSendAs(MTProtoTelegramClient client, SendAsPeers data) {
         var peerIds = data.peers().stream()
-                .map(Id::of)
-                .collect(Collectors.toUnmodifiableSet());
+                .map(s -> Tuples.of(s.premiumRequired(), Id.of(s.peer())))
+                .collect(Collectors.toUnmodifiableList());
 
         var users = data.users().stream()
                 .map(u -> EntityFactory.createUser(client, u))

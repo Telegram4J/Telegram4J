@@ -12,7 +12,7 @@ public class MessageMediaContact extends BaseMessageMedia {
 
     public MessageMediaContact(MTProtoTelegramClient client, telegram4j.tl.MessageMediaContact data) {
         super(client, Type.CONTACT);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getPhoneNumber() {

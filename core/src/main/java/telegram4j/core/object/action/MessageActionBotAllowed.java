@@ -11,7 +11,7 @@ public class MessageActionBotAllowed extends BaseMessageAction {
 
     public MessageActionBotAllowed(MTProtoTelegramClient client, telegram4j.tl.MessageActionBotAllowed data) {
         super(client, Type.BOT_ALLOWED);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getDomain() {

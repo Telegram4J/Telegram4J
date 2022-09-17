@@ -20,7 +20,7 @@ public final class ReplyKeyboardMarkup extends ReplyMarkup {
 
     @Override
     public Type getType() {
-        return Type.of(data);
+        return Type.KEYBOARD;
     }
 
     /**

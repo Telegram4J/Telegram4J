@@ -20,16 +20,16 @@ public class MessageMediaPhoto extends BaseMessageMedia {
     public MessageMediaPhoto(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPhoto data,
                              int messageId, InputPeer peer) {
         super(client, Type.PHOTO);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
         this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.peer = Objects.requireNonNull(peer);
     }
 
 
     /**
-     * Gets photo of the message, if it hasn't expired.
+     * Gets photo of the message, if it hasn't expired by timer.
      *
-     * @return The {@link Photo} of the message, if it hasn't expired.
+     * @return The {@link Photo} of the message, if it hasn't expired by timer.
      */
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))

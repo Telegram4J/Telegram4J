@@ -11,7 +11,7 @@ public class MessageActionChatEditTitle extends BaseMessageAction {
 
     public MessageActionChatEditTitle(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatEditTitle data) {
         super(client, Type.CHAT_EDIT_TITLE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getCurrentTitle() {

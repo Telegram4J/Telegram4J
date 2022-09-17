@@ -7,6 +7,7 @@ import telegram4j.core.object.*;
 import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
+import telegram4j.core.util.Variant2;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 import telegram4j.tl.InputStickerSet;
@@ -16,6 +17,9 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import static telegram4j.tl.Channel.*;
+import static telegram4j.tl.ChannelFull.*;
 
 /**
  * Interface for Telegram channel (supergroups, broadcast channels and gigagroups).
@@ -154,13 +158,15 @@ public interface Channel extends Chat {
     Optional<List<Id>> getRecentRequesters();
 
     /**
-     * Gets list of available unicode emojis, used as reactions, if present
+     * Gets {@code boolean} which indicates the availability of any emojis in the channel
+     * or list of available reactions, if present
      * and if detailed information about channel is available.
      *
-     * @return The list of available unicode emojis, used as reactions, if present
+     * @return The {@link Variant2} with {@code boolean} which indicates the availability of any emojis in the channel
+     * or list of available reactions, if present
      * and if detailed information about channel is available.
      */
-    Optional<List<String>> getAvailableReactions();
+    Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions();
 
     /**
      * Gets the latest <a href="https://core.telegram.org/api/updates">pts</a> for this channel, if present
@@ -360,118 +366,103 @@ public interface Channel extends Chat {
     Mono<Boolean> editAbout(String newAbout);
 
     /** Available channel flags. */
-    enum Flag {
+    enum Flag implements BitFlag {
         // ChannelMin flags
 
         /** Whether the current user is the creator of this channel. */
-        CREATOR(0),
+        CREATOR(CREATOR_POS),
 
         /** Whether the current user has left this channel. */
-        LEFT(2),
+        LEFT(LEFT_POS),
 
-        /** Is this channel verified by telegram?. */
-        VERIFIED(7),
+        /** Is this channel verified by telegram? */
+        VERIFIED(VERIFIED_POS),
 
-        /** Whether viewing/writing in this channel for a reason (see {@link BroadcastChannel#getRestrictionReason()}) */
-        RESTRICTED(9),
+        /** Whether viewing/writing in this channel for a reason (see {@link Channel#getRestrictionReason()}) */
+        RESTRICTED(RESTRICTED_POS),
 
         /** Whether signatures are enabled (channels). */
-        SIGNATURES(11),
+        SIGNATURES(SIGNATURES_POS),
 
-        MIN(12),
+        MIN(MIN_POS),
 
         /** This channel/supergroup is probably a scam. */
-        SCAM(19),
+        SCAM(CREATOR_POS),
 
         /** Whether this channel has a private join link. */
-        HAS_LINK(20),
+        HAS_LINK(HAS_LINK_POS),
 
-        /** Whether this channel has a geoposition. */
-        HAS_GEO(21),
+        /** Whether this channel has a geo position. */
+        HAS_GEO(HAS_GEO_POS),
 
         /** Whether slow mode is enabled for groups to prevent flood in chat. */
-        SLOWMODE_ENABLED(22),
+        SLOWMODE_ENABLED(SLOWMODE_ENABLED_POS),
 
         /** Whether a group call or livestream is currently active. */
-        CALL_ACTIVE(23),
+        CALL_ACTIVE(CALL_ACTIVE_POS),
 
         /** Whether there's anyone in the group call or livestream. */
-        CALL_NOT_EMPTY(24),
+        CALL_NOT_EMPTY(CALL_NOT_EMPTY_POS),
 
         /**
-         * If set, this <a href="https://core.telegram.org/api/channel">supergroup/channel</a> was reported by many users
+         * If set, this supergroup/channel was reported by many users
          * as a fake or scam: be careful when interacting with it.
          */
-        FAKE(25),
+        FAKE(FAKE_POS),
 
-        /** Whether this <a href="https://core.telegram.org/api/channel">supergroup</a> is a gigagroup. */
-        GIGAGROUP(26),
+        /** Whether this supergroup is a gigagroup. */
+        GIGAGROUP(GIGAGROUP_POS),
 
         /** Whether this channel or group is protected, thus does not allow forwarding messages from it. */
-        NO_FORWARDS(27),
+        NO_FORWARDS(NOFORWARDS_POS),
 
-        JOIN_TO_SEND(28),
+        JOIN_TO_SEND(JOIN_TO_SEND_POS),
 
-        JOIN_REQUEST(29),
+        JOIN_REQUEST(JOIN_REQUEST_POS),
 
         // ChannelFull flags
 
         /** Can we view the participant list? */
-        CAN_VIEW_PARTICIPANTS(3),
+        CAN_VIEW_PARTICIPANTS(CAN_VIEW_PARTICIPANTS_POS),
 
         /** Can we set the channel's username? */
-        CAN_SET_USERNAME(6),
+        CAN_SET_USERNAME(CAN_SET_USERNAME_POS),
 
-        /** Can we <a href="https://core.telegram.org/method/channels.setStickers">associate</a> a stickerpack to the supergroup? */
-        CAN_SET_STICKERS(7),
+        /** Can we associate a stickerpack to the supergroup via {@link Channel#setStickers(InputStickerSet)}? */
+        CAN_SET_STICKERS(CAN_SET_STICKERS_POS),
 
         /** Is the history before we joined hidden to us? */
-        HIDDEN_PREHISTORY(10),
+        HIDDEN_PREHISTORY(HIDDEN_PREHISTORY_POS),
 
         /** Can we set the geolocation of this group (for geogroups)? */
-        CAN_SET_LOCATION(16),
+        CAN_SET_LOCATION(CAN_SET_LOCATION_POS),
 
         /** Whether scheduled messages are available. */
-        HAS_SCHEDULED(19),
+        HAS_SCHEDULED(HAS_SCHEDULED_POS),
 
         /** Can the user view <a href="https://core.telegram.org/api/stats">channel/supergroup statistics</a>. */
-        CAN_VIEW_STATS(20),
+        CAN_VIEW_STATS(CAN_VIEW_STATS_POS),
 
         /**
          * Whether any anonymous admin of this supergroup was blocked:
          * if set, you won't receive messages from anonymous group
          * admins in <a href="https://core.telegram.org/api/discussion">discussion replies via @replies</a>.
          */
-        BLOCKED(22),
+        BLOCKED(BLOCKED_POS),
 
         // ChannelFull flags2
 
-        CAN_DELETE_CHANNEL(0);
+        CAN_DELETE_CHANNEL(CAN_DELETE_CHANNEL_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Flag(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Flag(byte position) {
+            this.position = position;
         }
 
-        /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-         *
-         * @return The flag shift position.
-         */
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
+        @Override
+        public byte position() {
+            return position;
         }
 
         /**
@@ -482,30 +473,23 @@ public interface Channel extends Chat {
          * @return The {@link EnumSet} with channel flags.
          */
         public static EnumSet<Flag> of(@Nullable telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
+            var minFlags = of(minData);
             if (fullData != null) {
-                var values = values();
+                var set = EnumSet.allOf(Flag.class);
 
                 int flags = fullData.flags();
-                for (int i = CAN_VIEW_PARTICIPANTS.ordinal(); i < values.length; i++) {
-                    Flag value = values[i];
-                    if ((flags & value.flag) != 0) {
-                        set.add(value);
-                    }
-                }
-
                 // well done, telegram, good solution
                 int flags2 = fullData.flags2();
-                for (int i = CAN_DELETE_CHANNEL.ordinal(); i < values.length; i++) {
-                    Flag value = values[i];
-                    if ((flags2 & value.flag) != 0) {
-                        set.add(value);
-                    }
-                }
+
+                set.removeIf(value -> value.ordinal() < CAN_VIEW_PARTICIPANTS.ordinal() ||
+                        value.ordinal() >= CAN_DELETE_CHANNEL.ordinal() && (flags2 & value.mask()) == 0 ||
+                        (flags & value.mask()) == 0);
+
+                set.addAll(minFlags);
+                return set;
             }
 
-            set.addAll(of(minData));
-            return set;
+            return minFlags;
         }
 
         /**
@@ -515,15 +499,9 @@ public interface Channel extends Chat {
          * @return The {@link EnumSet} with channel flags.
          */
         public static EnumSet<Flag> of(telegram4j.tl.Channel data) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-            var values = values();
+            var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            for (int i = 0; i < CAN_VIEW_PARTICIPANTS.ordinal(); i++) {
-                Flag value = values[i];
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
+            set.removeIf(value -> value.ordinal() >= CAN_VIEW_PARTICIPANTS.ordinal() || (flags & value.mask()) == 0);
             return set;
         }
     }

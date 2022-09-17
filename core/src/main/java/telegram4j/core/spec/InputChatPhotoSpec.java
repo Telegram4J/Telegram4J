@@ -7,7 +7,7 @@ import telegram4j.tl.*;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class InputChatPhotoSpec {
+public final class InputChatPhotoSpec implements Spec {
     @Nullable
     private final String photo;
     @Nullable

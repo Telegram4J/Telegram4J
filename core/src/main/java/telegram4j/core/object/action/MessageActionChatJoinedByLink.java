@@ -12,7 +12,7 @@ public class MessageActionChatJoinedByLink extends BaseMessageAction {
 
     public MessageActionChatJoinedByLink(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatJoinedByLink data) {
         super(client, Type.CHAT_JOINED_BY_LINK);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Id getInviterId() {

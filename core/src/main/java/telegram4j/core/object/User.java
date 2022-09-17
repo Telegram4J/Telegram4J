@@ -15,10 +15,13 @@ import telegram4j.tl.photos.Photos;
 import telegram4j.tl.photos.PhotosSlice;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.toInputUser;
+import static telegram4j.tl.BaseUser.*;
+import static telegram4j.tl.UserFull.*;
 
 /**
  * Representation for available min/full users.
@@ -58,7 +61,7 @@ public class User implements PeerEntity {
      * @return The {@link EnumSet} with user flags.
      */
     public EnumSet<Flag> getFlags() {
-        return Flag.fromUserFull(fullData, minData);
+        return Flag.of(fullData, minData);
     }
 
     /**
@@ -191,6 +194,21 @@ public class User implements PeerEntity {
         return Optional.ofNullable(minData.langCode());
     }
 
+    public Optional<EmojiStatus> getEmojiStatus() {
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.emojiStatus()))
+                .map(e -> {
+                    switch (e.identifier()) {
+                        case BaseEmojiStatus.ID:
+                            BaseEmojiStatus base = (BaseEmojiStatus) e;
+                            return new EmojiStatus(base.documentId(), null);
+                        case EmojiStatusUntil.ID:
+                            EmojiStatusUntil until = (EmojiStatusUntil) e;
+                            return new EmojiStatus(until.documentId(), Instant.ofEpochSecond(until.until()));
+                        default: throw new IllegalStateException("Unknown EmojiStatus type: " + e);
+                    }
+                });
+    }
+
     // FullUser fields
 
     /**
@@ -246,6 +264,22 @@ public class User implements PeerEntity {
         return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
     }
 
+    public Optional<EnumSet<ChatAdminRights>> getBotGroupAdminRights() {
+        return Optional.ofNullable(fullData)
+                .map(UserFull::botGroupAdminRights)
+                .map(ChatAdminRights::of);
+    }
+
+    public Optional<EnumSet<ChatAdminRights>> getBotBroadcastAdminRights() {
+        return Optional.ofNullable(fullData)
+                .map(UserFull::botBroadcastAdminRights)
+                .map(ChatAdminRights::of);
+    }
+
+    // TODO:
+    // @Nullable
+    // List<PremiumGiftOption> premiumGifts();
+
     // Interaction methods
 
     /**
@@ -290,138 +324,108 @@ public class User implements PeerEntity {
                 '}';
     }
 
-    public enum Flag {
+    public enum Flag implements BitFlag {
 
         // FullUser flags
 
         /** Whether you have blocked this user. */
-        BLOCKED(0),
+        BLOCKED(BLOCKED_POS),
 
         /** Whether this user can make VoIP calls. */
-        PHONE_CALLS_AVAILABLE(4),
+        PHONE_CALLS_AVAILABLE(PHONE_CALLS_AVAILABLE_POS),
 
         /** Whether this user's privacy settings allow you to call him. */
-        PHONE_CALLS_PRIVATE(5),
+        PHONE_CALLS_PRIVATE(PHONE_CALLS_PRIVATE_POS),
 
         /** Whether you can pin messages in the chat with this user, you can do this only for a chat with yourself. */
-        CAN_PIN_MESSAGE(7),
+        CAN_PIN_MESSAGE(CAN_PIN_MESSAGE_POS),
 
         /** Whether <a href="https://core.telegram.org/api/scheduled-messages">scheduled messages</a> are available. */
-        HAS_SCHEDULED(12),
+        HAS_SCHEDULED(HAS_SCHEDULED_POS),
 
         /** Whether the user can receive video calls. */
-        VIDEO_CALLS_AVAILABLE(13),
+        VIDEO_CALLS_AVAILABLE(VIDEO_CALLS_AVAILABLE_POS),
 
         // MinUser flags
 
         /** Whether this user indicates the currently logged-in user. */
-        SELF(10),
+        SELF(SELF_POS),
 
         /** Whether this user is a contact. */
-        CONTACT(11),
+        CONTACT(CONTACT_POS),
 
         /** Whether this user is a mutual contact. */
-        MUTUAL_CONTACTS(12),
+        MUTUAL_CONTACTS(MUTUAL_CONTACT_POS),
 
         /** Whether the account of this user was deleted. */
-        DELETED(13),
+        DELETED(DELETED_POS),
 
         /** Is this user a bot?. */
-        BOT(14),
+        BOT(BOT_POS),
 
         /** Can the bot see all messages in groups? */
-        BOT_CHAT_HISTORY(15),
+        BOT_CHAT_HISTORY(BOT_CHAT_HISTORY_POS),
 
         /** Can the bot be added to groups? */
-        BOT_NO_CHATS(16),
+        BOT_NO_CHATS(BOT_NOCHATS_POS),
 
         /** Whether this user is verified. */
-        VERIFIED(17),
+        VERIFIED(VERIFIED_POS),
 
         /** Access to this user must be restricted. */
-        RESTRICTED(18),
+        RESTRICTED(RESTRICTED_POS),
 
         /** Whether this user is <a href="https://core.telegram.org/api/min">min</a>. */
-        MIN(20),
+        MIN(MIN_POS),
 
         /** Whether the bot can request our geolocation in inline mode. */
-        BOT_INLINE_GEO(21),
+        BOT_INLINE_GEO(BOT_INLINE_GEO_POS),
 
         /** Whether this is an official support user. */
-        SUPPORT(23),
+        SUPPORT(SUPPORT_POS),
 
         /** This may be a scam user. */
-        SCAM(24),
+        SCAM(SCAM_POS),
 
         /** If set, the profile picture for this user should be refetched. */
-        APPLY_MIN_PHOTO(25),
+        APPLY_MIN_PHOTO(APPLY_MIN_PHOTO_POS),
 
         /** If set, this user was reported by many users as a fake or scam user: be careful when interacting with them. */
-        FAKE(26),
+        FAKE(FAKE_POS),
 
-        BOT_ATTACH_MENU(27),
+        BOT_ATTACH_MENU(BOT_ATTACH_MENU_POS),
 
-        PREMIUM(28),
+        PREMIUM(PREMIUM_POS),
 
-        ATTACH_MENU_ENABLED(29);
+        ATTACH_MENU_ENABLED(ATTACH_MENU_ENABLED_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Flag(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Flag(byte position) {
+            this.position = position;
         }
 
-        /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-         *
-         * @return The flag shift position.
-         */
-        public int getValue() {
-            return value;
+        @Override
+        public byte position() {
+            return position;
         }
 
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
-        }
-
-        public static EnumSet<Flag> fromUserFull(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-
+        public static EnumSet<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
+            var minFlags = of(userMin);
             if (userFull != null) {
+                var set = EnumSet.allOf(Flag.class);
                 int flags = userFull.flags();
-                for (Flag value : values()) {
-                    if (value.ordinal() >= VIDEO_CALLS_AVAILABLE.ordinal()) continue;
-                    if ((flags & value.flag) != 0) {
-                        set.add(value);
-                    }
-                }
+                set.removeIf(value -> value.ordinal() >= SELF.ordinal() || (flags & value.mask()) == 0);
+                set.addAll(of(userMin));
+                return set;
             }
-
-            // Add min user flags
-            set.addAll(fromUserMin(userMin));
-
-            return set;
+            return minFlags;
         }
 
-        public static EnumSet<Flag> fromUserMin(telegram4j.tl.BaseUser user) {
-            EnumSet<Flag> set = EnumSet.noneOf(Flag.class);
-
+        public static EnumSet<Flag> of(telegram4j.tl.BaseUser user) {
+            var set = EnumSet.allOf(Flag.class);
             int flags = user.flags();
-            for (Flag value : values()) {
-                // UserFull and UserMin flags has collision in bit positions
-                if (value.ordinal() < SELF.ordinal()) continue;
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
-
+            set.removeIf(value -> value.ordinal() < SELF.ordinal() || (flags & value.mask()) == 0);
             return set;
         }
     }

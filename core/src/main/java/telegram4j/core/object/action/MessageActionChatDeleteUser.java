@@ -12,7 +12,7 @@ public class MessageActionChatDeleteUser extends BaseMessageAction {
 
     public MessageActionChatDeleteUser(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatDeleteUser data) {
         super(client, Type.CHAT_DELETE_USER);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Id getUserId() {

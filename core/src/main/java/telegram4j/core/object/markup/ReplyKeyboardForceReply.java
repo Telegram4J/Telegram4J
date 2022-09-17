@@ -18,7 +18,7 @@ public final class ReplyKeyboardForceReply extends ReplyMarkup {
 
     @Override
     public Type getType() {
-        return Type.of(data);
+        return Type.FORCE;
     }
 
     /**

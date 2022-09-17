@@ -180,12 +180,12 @@ public class AccountService extends RpcService {
         return client.sendAwait(ImmutableVerifyPhone.of(phoneNumber, phoneCodeHash, phoneCode));
     }
 
-    public Mono<SentEmailCode> sendVerifyEmailCode(String email) {
-        return client.sendAwait(ImmutableSendVerifyEmailCode.of(email));
+    public Mono<SentEmailCode> sendVerifyEmailCode(EmailVerifyPurpose purpose, String email) {
+        return client.sendAwait(ImmutableSendVerifyEmailCode.of(purpose, email));
     }
 
-    public Mono<Boolean> verifyEmail(String email, String code) {
-        return client.sendAwait(ImmutableVerifyEmail.of(email, code));
+    public Mono<EmailVerified> verifyEmail(EmailVerifyPurpose purpose, EmailVerification verification) {
+        return client.sendAwait(ImmutableVerifyEmail.of(purpose, verification));
     }
 
     public Mono<Long> initTakeoutSession(InitTakeoutSession request) {

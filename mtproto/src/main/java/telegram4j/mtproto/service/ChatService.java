@@ -111,8 +111,9 @@ public class ChatService extends RpcService {
         return Mono.defer(() -> client.sendAwait(ImmutableSendEncryptedService.of(peer, randomId, data)));
     }
 
-    public Mono<SimpleWebViewResult> requestSimpleWebView(InputUser bot, String url, @Nullable String themeParamsJson) {
-        return client.sendAwait(ImmutableRequestSimpleWebView.of(bot, url)
+    public Mono<SimpleWebViewResult> requestSimpleWebView(InputUser bot, String url, String platform,
+                                                          @Nullable String themeParamsJson) {
+        return client.sendAwait(ImmutableRequestSimpleWebView.of(bot, url, platform)
                 .withThemeParams(themeParamsJson != null ? ImmutableDataJSON.of(themeParamsJson) : null));
     }
 

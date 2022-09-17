@@ -1,25 +1,17 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 import java.util.Optional;
 
 /** Geo point representation. */
-public final class GeoPoint implements TelegramObject {
+public final class GeoPoint {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.BaseGeoPoint data;
 
-    public GeoPoint(MTProtoTelegramClient client, telegram4j.tl.BaseGeoPoint data) {
-        this.client = Objects.requireNonNull(client);
+    public GeoPoint(telegram4j.tl.BaseGeoPoint data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     /**

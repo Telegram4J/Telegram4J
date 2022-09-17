@@ -15,9 +15,9 @@ public class MessageMediaGame extends BaseMessageMedia {
     public MessageMediaGame(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGame data,
                             int messageId, InputPeer peer) {
         super(client, Type.GAME);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
         this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.peer = Objects.requireNonNull(peer);
     }
 
     public Game getGame() {

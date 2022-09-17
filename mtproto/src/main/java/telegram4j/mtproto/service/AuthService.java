@@ -53,8 +53,8 @@ public class AuthService extends RpcService {
         return client.sendAwait(ImmutableSignUp.of(phoneNumber, phoneNumberHash, firstName, lastName));
     }
 
-    public Mono<Authorization> signIn(String phoneNumber, String phoneNumberHash, String phoneCode) {
-        return client.sendAwait(ImmutableSignIn.of(phoneNumber, phoneNumberHash, phoneCode));
+    public Mono<Authorization> signIn(SignIn request) {
+        return client.sendAwait(request);
     }
 
     public Mono<Boolean> resetAuthorizations() {

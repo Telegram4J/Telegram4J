@@ -11,7 +11,7 @@ public class MessageActionGameScore extends BaseMessageAction {
 
     public MessageActionGameScore(MTProtoTelegramClient client, telegram4j.tl.MessageActionGameScore data) {
         super(client, Type.GAME_SCORE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public long getGameId() {

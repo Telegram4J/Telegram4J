@@ -2,8 +2,10 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.EntityFactory;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public class ReactionCount implements TelegramObject {
 
@@ -20,12 +22,12 @@ public class ReactionCount implements TelegramObject {
         return client;
     }
 
-    public boolean isChosen() {
-        return data.chosen();
+    public Optional<Integer> getChosenOrder() {
+        return Optional.ofNullable(data.chosenOrder());
     }
 
-    public String getReaction() {
-        return data.reaction();
+    public Reaction getReaction() {
+        return EntityFactory.createReaction(data.reaction());
     }
 
     public int getCount() {

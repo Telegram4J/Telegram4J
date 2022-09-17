@@ -2,68 +2,56 @@ package telegram4j.core.object;
 
 import java.util.EnumSet;
 
-public enum ChatAdminRights {
+import static telegram4j.tl.ChatAdminRights.*;
+
+/** Enumeration of {@link telegram4j.tl.ChatAdminRights} bit-flags, that can be used in {@link EnumSet} */
+public enum ChatAdminRights implements BitFlag {
 
     /** If set, allows the admin to modify the description of the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
-    CHANGE_INFO(0),
+    CHANGE_INFO(CHANGE_INFO_POS),
 
     /** If set, allows the admin to post messages in the <a href="https://core.telegram.org/api/channel">channel</a>. */
-    POST_MESSAGES(1),
+    POST_MESSAGES(POST_MESSAGES_POS),
 
     /** If set, allows the admin to also edit messages from other admins in the <a href="https://core.telegram.org/api/channel">channel</a>. */
-    EDIT_MESSAGES(2),
+    EDIT_MESSAGES(EDIT_MESSAGES_POS),
 
     /** If set, allows the admin to also delete messages from other admins in the <a href="https://core.telegram.org/api/channel">channel</a>. */
-    DELETE_MESSAGES(3),
+    DELETE_MESSAGES(DELETE_MESSAGES_POS),
 
     /** If set, allows the admin to ban users from the <a href="https://core.telegram.org/api/channel">channel/supergroup</a> */
-    BAN_USERS(4),
+    BAN_USERS(BAN_USERS_POS),
 
     /** If set, allows the admin to invite users in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
-    INVITE_USERS(5),
+    INVITE_USERS(INVITE_USERS_POS),
 
     /** If set, allows the admin to pin messages in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
-    PIN_MESSAGES(7),
+    PIN_MESSAGES(PIN_MESSAGES_POS),
 
     /**
      * If set, allows the admin to add other admins with the same (or more limited)
      * permissions in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>.
      */
-    ADD_ADMINS(9),
+    ADD_ADMINS(ADD_ADMINS_POS),
 
     /** Whether this admin is anonymous. */
-    ANONYMOUS(10),
+    ANONYMOUS(ANONYMOUS_POS),
 
     /** If set, allows the admin to change group call/livestream settings. */
-    MANAGE_CALL(11),
+    MANAGE_CALL(MANAGE_CALL_POS),
 
     /** Set this flag if none of the other flags are set, but you still want the user to be an admin. */
-    OTHER(12);
+    OTHER(OTHER_POS);
 
-    private final int value;
-    private final int flag;
+    private final byte position;
 
-    ChatAdminRights(int value) {
-        this.value = value;
-        this.flag = 1 << value;
+    ChatAdminRights(byte position) {
+        this.position = position;
     }
 
-    /**
-     * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-     *
-     * @return The flag shift position.
-     */
-    public int getValue() {
-        return value;
-    }
-
-    /**
-     * Gets bit-mask for flag.
-     *
-     * @return The bit-mask for flag.
-     */
-    public int getFlag() {
-        return flag;
+    @Override
+    public byte position() {
+        return position;
     }
 
     /**
@@ -73,13 +61,9 @@ public enum ChatAdminRights {
      * @return The {@link EnumSet} of the {@link telegram4j.tl.ChatAdminRights} flags.
      */
     public static EnumSet<ChatAdminRights> of(telegram4j.tl.ChatAdminRights chatAdminRights) {
-        EnumSet<ChatAdminRights> set = EnumSet.noneOf(ChatAdminRights.class);
+        var set = EnumSet.allOf(ChatAdminRights.class);
         int flags = chatAdminRights.flags();
-        for (ChatAdminRights value : values()) {
-            if ((flags & value.flag) != 0) {
-                set.add(value);
-            }
-        }
+        set.removeIf(value -> (flags & value.mask()) == 0);
         return set;
     }
 }

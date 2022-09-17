@@ -11,7 +11,7 @@ public class MessageActionCustom extends BaseMessageAction {
 
     public MessageActionCustom(MTProtoTelegramClient client, telegram4j.tl.MessageActionCustomAction data) {
         super(client, Type.CUSTOM);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public String getMessage() {

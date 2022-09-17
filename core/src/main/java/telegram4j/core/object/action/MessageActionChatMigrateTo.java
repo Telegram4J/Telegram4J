@@ -12,7 +12,7 @@ public class MessageActionChatMigrateTo extends BaseMessageAction {
 
     public MessageActionChatMigrateTo(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatMigrateTo data) {
         super(client, Type.CHAT_MIGRATE_TO);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Id getChannelId() {

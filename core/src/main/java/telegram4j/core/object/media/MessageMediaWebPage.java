@@ -12,7 +12,7 @@ public class MessageMediaWebPage extends BaseMessageMedia {
 
     public MessageMediaWebPage(MTProtoTelegramClient client, telegram4j.tl.MessageMediaWebPage data) {
         super(client, Type.WEB_PAGE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     // TODO

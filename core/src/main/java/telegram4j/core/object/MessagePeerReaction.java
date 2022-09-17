@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 
 import java.util.Objects;
@@ -49,12 +50,12 @@ public class MessagePeerReaction implements TelegramObject {
     }
 
     /**
-     * Gets reaction unicode emoji.
+     * Gets custom or default emoji reaction.
      *
-     * @return The reaction unicode emoji.
+     * @return The custom or default emoji reaction.
      */
-    public String getReaction() {
-        return data.reaction();
+    public Reaction getReaction() {
+        return Objects.requireNonNull(EntityFactory.createReaction(data.reaction()));
     }
 
     @Override

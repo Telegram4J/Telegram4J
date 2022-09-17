@@ -23,7 +23,7 @@ public final class ReplyInlineMarkup extends ReplyMarkup {
 
     @Override
     public Type getType() {
-        return Type.of(data);
+        return Type.INLINE;
     }
 
     /**

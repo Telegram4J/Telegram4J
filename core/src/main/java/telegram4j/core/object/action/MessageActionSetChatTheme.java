@@ -11,7 +11,7 @@ public class MessageActionSetChatTheme extends BaseMessageAction {
 
     public MessageActionSetChatTheme(MTProtoTelegramClient client, telegram4j.tl.MessageActionSetChatTheme data) {
         super(client, Type.SET_CHAT_THEME);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     /**

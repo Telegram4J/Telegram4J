@@ -33,7 +33,6 @@ public class Sticker extends Document {
      */
     public int getWidth() {
         return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).w();
-
     }
 
     /**
@@ -43,7 +42,6 @@ public class Sticker extends Document {
      */
     public int getHeight() {
         return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).h();
-
     }
 
     /**

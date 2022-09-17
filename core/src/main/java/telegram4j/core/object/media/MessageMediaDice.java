@@ -11,7 +11,7 @@ public class MessageMediaDice extends BaseMessageMedia {
 
     public MessageMediaDice(MTProtoTelegramClient client, telegram4j.tl.MessageMediaDice data) {
         super(client, Type.DICE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     /**

@@ -10,8 +10,8 @@ public class BaseMessageAction implements MessageAction {
     protected final Type type;
 
     public BaseMessageAction(MTProtoTelegramClient client, Type type) {
-        this.client = Objects.requireNonNull(client, "client");
-        this.type = Objects.requireNonNull(type, "type");
+        this.client = Objects.requireNonNull(client);
+        this.type = Objects.requireNonNull(type);
     }
 
     @Override

@@ -15,12 +15,11 @@ public class MessageMediaGeoLive extends BaseMessageMedia {
 
     public MessageMediaGeoLive(MTProtoTelegramClient client, telegram4j.tl.MessageMediaGeoLive data) {
         super(client, Type.GEO_LIVE);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public Optional<GeoPoint> getGeo() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class))
-                .map(d -> new GeoPoint(client, d));
+        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class)).map(GeoPoint::new);
     }
 
     public Optional<Integer> getHeading() {

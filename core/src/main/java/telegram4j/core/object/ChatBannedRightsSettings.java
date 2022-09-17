@@ -8,6 +8,8 @@ import java.time.Instant;
 import java.util.EnumSet;
 import java.util.Objects;
 
+import static telegram4j.tl.ChatBannedRights.*;
+
 public class ChatBannedRightsSettings implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final ChatBannedRights data;
@@ -50,84 +52,65 @@ public class ChatBannedRightsSettings implements TelegramObject {
                 '}';
     }
 
-    public enum Right {
+    public enum Right implements BitFlag {
 
         /** If set, does not allow a user to view messages in a <a href="https://core.telegram.org/api/channel">supergroup/channel/chat</a>. */
-        VIEW_MESSAGES(0),
+        VIEW_MESSAGES(VIEW_MESSAGES_POS),
 
         /** If set, does not allow a user to send messages in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_MESSAGES(1),
+        SEND_MESSAGES(SEND_MESSAGES_POS),
 
         /** If set, does not allow a user to send any media in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_MEDIA(2),
+        SEND_MEDIA(SEND_MEDIA_POS),
 
         /** If set, does not allow a user to send stickers in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_STICKERS(3),
+        SEND_STICKERS(SEND_STICKERS_POS),
 
         /** If set, does not allow a user to send gifs in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_GIFS(4),
+        SEND_GIFS(SEND_GIFS_POS),
 
         /** If set, does not allow a user to send games in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_GAMES(5),
+        SEND_GAMES(SEND_GAMES_POS),
 
         /** If set, does not allow a user to use inline bots in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_INLINE(6),
+        SEND_INLINE(SEND_INLINE_POS),
 
         /** If set, does not allow a user to embed links in the messages of a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        EMBED_LINKS(7),
+        EMBED_LINKS(EMBED_LINKS_POS),
 
         /** If set, does not allow a user to send polls in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        SEND_POLLS(8),
+        SEND_POLLS(SEND_POLLS_POS),
 
         /** If set, does not allow any user to change the description of a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        CHANGE_INFO(10),
+        CHANGE_INFO(CHANGE_INFO_POS),
 
         /** If set, does not allow any user to invite users in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        INVITE_USERS(15),
+        INVITE_USERS(INVITE_USERS_POS),
 
         /** If set, does not allow any user to pin messages in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
-        PIN_MESSAGES(17);
+        PIN_MESSAGES(PIN_MESSAGES_POS);
 
-        private final int value;
-        private final int flag;
+        private final byte position;
 
-        Right(int value) {
-            this.value = value;
-            this.flag = 1 << value;
+        Right(byte position) {
+            this.position = position;
+        }
+
+        @Override
+        public byte position() {
+            return position;
         }
 
         /**
-         * Gets flag position, used in the {@link #getFlag()} as {@code 1 << position}.
-         *
-         * @return The flag shift position.
-         */
-        public int getValue() {
-            return value;
-        }
-
-        /**
-         * Gets bit-mask for flag.
-         *
-         * @return The bit-mask for flag.
-         */
-        public int getFlag() {
-            return flag;
-        }
-
-        /**
-         * Computes {@link EnumSet} from raw {@link telegram4j.tl.ChatBannedRights} data.
+         * Computes {@link EnumSet} from raw {@link ChatBannedRights} data.
          *
          * @param data The raw chat banned rights data.
-         * @return The {@link EnumSet} of the {@link telegram4j.tl.ChatBannedRights} flags.
+         * @return The {@link EnumSet} of the {@link ChatBannedRights} flags.
          */
         public static EnumSet<Right> of(ChatBannedRights data) {
-            EnumSet<Right> set = EnumSet.noneOf(Right.class);
+            var set = EnumSet.allOf(Right.class);
             int flags = data.flags();
-            for (Right value : values()) {
-                if ((flags & value.flag) != 0) {
-                    set.add(value);
-                }
-            }
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

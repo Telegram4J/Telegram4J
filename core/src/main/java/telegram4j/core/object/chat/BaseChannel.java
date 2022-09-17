@@ -10,6 +10,7 @@ import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
+import telegram4j.core.object.Reaction;
 import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
@@ -17,6 +18,7 @@ import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.BaseChannelParticipants;
@@ -197,8 +199,10 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<List<String>> getAvailableReactions() {
-        return Optional.ofNullable(fullData).map(ChannelFull::availableReactions);
+    public Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::availableReactions)
+                .map(EntityFactory::createChatReactions);
     }
 
     @Override
@@ -289,8 +293,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
         return client.asInputUser(userId)
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editAdmin(channel, target, telegram4j.tl.ImmutableChatAdminRights.of(rights.stream()
-                                .map(ChatAdminRights::getFlag)
+                        .editAdmin(channel, target, ImmutableChatAdminRights.of(rights.stream()
+                                .map(BitFlag::mask)
                                 .reduce(0, (l, r) -> l | r)), rank))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
@@ -302,12 +306,10 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
         return client.asInputPeer(peerId)
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editBanned(channel, target, ChatBannedRights.builder()
-                                .flags(rights.stream()
-                                        .map(ChatBannedRightsSettings.Right::getFlag)
-                                        .reduce(0, (l, r) -> l | r))
-                                .untilDate(Math.toIntExact(untilTimestamp.getEpochSecond()))
-                                .build()))
+                        .editBanned(channel, target, ImmutableChatBannedRights.of(rights.stream()
+                                        .map(BitFlag::mask)
+                                        .reduce(0, (l, r) -> l | r),
+                                        Math.toIntExact(untilTimestamp.getEpochSecond()))))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
     }
@@ -339,8 +341,6 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Mono<ChatParticipant> getParticipant(Id participantId) {
-        Id id = getId();
-
         return client.asInputPeer(participantId)
                 .flatMap(participantPeer -> client.getServiceHolder()
                         .getChatService().getParticipant(toInputChannel(client.asResolvedInputPeer(getId())), participantPeer))
@@ -368,7 +368,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                         default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
                     }
 
-                    return new ChatParticipant(client, peerEntity, d.participant(), id);
+                    return new ChatParticipant(client, peerEntity, d.participant(), getId());
                 });
     }
 

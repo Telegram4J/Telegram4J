@@ -14,7 +14,7 @@ public class MessageActionChatAddUser extends BaseMessageAction {
 
     public MessageActionChatAddUser(MTProtoTelegramClient client, telegram4j.tl.MessageActionChatAddUser data) {
         super(client, Type.CHAT_ADD_USER);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
     }
 
     public List<Id> getUserIds() {

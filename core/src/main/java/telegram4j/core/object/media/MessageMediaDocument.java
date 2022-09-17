@@ -21,15 +21,15 @@ public class MessageMediaDocument extends BaseMessageMedia {
     public MessageMediaDocument(MTProtoTelegramClient client, telegram4j.tl.MessageMediaDocument data,
                                 int messageId, InputPeer peer) {
         super(client, Type.DOCUMENT);
-        this.data = Objects.requireNonNull(data, "data");
+        this.data = Objects.requireNonNull(data);
         this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer, "peer");
+        this.peer = Objects.requireNonNull(peer);
     }
 
     /**
-     * Gets document of the message, if it hasn't expired.
+     * Gets document of the message, if it hasn't expired by timer.
      *
-     * @return The {@link Document} of the message, if it hasn't expired.
+     * @return The {@link Document} of the message, if it hasn't expired by timer.
      */
     public Optional<Document> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
