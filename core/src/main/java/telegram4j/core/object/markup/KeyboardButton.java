@@ -292,6 +292,7 @@ public final class KeyboardButton implements TelegramObject {
         /**
          * Gets whether specified type supports only in the {@link ReplyMarkup.Type#INLINE inline} keyboards.
          *
+         * @param type The type of button.
          * @return {@code true} if button type is supports in the inline keyboards.
          */
         public static boolean isInlineOnly(Type type) {

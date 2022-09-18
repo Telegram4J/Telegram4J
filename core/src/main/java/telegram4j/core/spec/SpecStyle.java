@@ -14,6 +14,8 @@ import java.lang.annotation.Target;
         typeImmutable = "*",
         visibility = Value.Style.ImplementationVisibility.PUBLIC,
         allMandatoryParameters = true,
+        optionalAcceptNullable = true,
+        allowedClasspathAnnotations = Override.class,
         depluralize = true,
         jdkOnly = true
 )

@@ -269,7 +269,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         ByteBuf messageKeyHashSlice = messageKeyHash.slice(8, 16);
 
                         if (!messageKey.equals(messageKeyHashSlice)) {
-                            return Mono.error(() -> new MTProtoException("Incorrect message key. Received: 0x"
+                            return Mono.error(new MTProtoException("Incorrect message key. Received: 0x"
                                     + ByteBufUtil.hexDump(messageKey) + ", but recomputed: 0x"
                                     + ByteBufUtil.hexDump(messageKeyHashSlice)));
                         }

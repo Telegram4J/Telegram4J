@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.util.ReferenceCountUtil.safeRelease;
 
+/** Holder object used during authorization key generation. */
 public final class AuthorizationContext {
     private volatile ByteBuf nonce;
     private volatile ByteBuf newNonce;

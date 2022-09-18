@@ -1,7 +1,6 @@
 package telegram4j.core.util;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.AuthorizationResources;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
@@ -19,7 +18,7 @@ public final class Id implements Comparable<Id> {
     private final Type type;
     private final long value;
     @Nullable
-    private final Object context;
+    private final Object context; // Long/MinInformation
 
     private Id(Type type, long value, @Nullable Object context) {
         this.type = Objects.requireNonNull(type);
@@ -277,7 +276,7 @@ public final class Id implements Comparable<Id> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, value);
+        return type.hashCode() ^ Long.hashCode(value);
     }
 
     @Override
@@ -299,7 +298,7 @@ public final class Id implements Comparable<Id> {
 
     /**
      * Context for accessing to user/channel which haven't access hash.
-     * Available to use only from {@link AuthorizationResources.Type#USER users accounts}.
+     * <b>Available to use only from users accounts.</b>
      *
      * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
      */

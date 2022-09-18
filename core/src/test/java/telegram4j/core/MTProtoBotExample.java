@@ -62,8 +62,8 @@ public class MTProtoBotExample {
                             .then();
 
                     Mono<Void> sandbox = client.getMtProtoClient().updates().asFlux()
-                            .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
                             .publishOn(Schedulers.boundedElastic())
+                            .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
                             .doOnNext(log::info)
                             .then();
 

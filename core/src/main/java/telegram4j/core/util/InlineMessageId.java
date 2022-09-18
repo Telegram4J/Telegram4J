@@ -6,8 +6,6 @@ import telegram4j.tl.ImmutableInputBotInlineMessageID64;
 import telegram4j.tl.InputBotInlineMessageID;
 import telegram4j.tl.InputBotInlineMessageID64;
 
-import java.util.Objects;
-
 /**
  * One-type representation for {@link InputBotInlineMessageID inline message id}.
  * All incoming {@link BaseInputBotInlineMessageID} would be mapped as {@link InputBotInlineMessageID64} for better compatibility.
@@ -118,7 +116,12 @@ public final class InlineMessageId {
 
     @Override
     public int hashCode() {
-        return Objects.hash(dcId, ownerId, id, accessHash);
+        int h = 5381;
+        h += (h << 5) + dcId;
+        h += (h << 5) + Long.hashCode(ownerId);
+        h += (h << 5) + id;
+        h += (h << 5) + Long.hashCode(accessHash);
+        return h;
     }
 
     @Override

@@ -16,7 +16,6 @@ import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
-import telegram4j.core.AuthorizationResources.Type;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.EventDispatcher;
@@ -290,7 +289,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             Collections.unmodifiableList(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
-                    defaultEntityParserFactory, initHttpClient());
+                    defaultEntityParserFactory, initHttpClient(), initUnavailableChatPolicy());
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
                     .layer(TlInfo.LAYER)
@@ -300,7 +299,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             Id[] selfId = {null};
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
-                    mtProtoResources, updatesManagerFactory, initUnavailableChatPolicy(), selfId,
+                    mtProtoResources, updatesManagerFactory, selfId,
                     serviceHolder, entityRetrieverFactory, onDisconnect.asMono());
 
             Runnable disconnect = () -> {
@@ -343,7 +342,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
                                 Mono<Void> fetchSelfId = Mono.defer(() -> {
                                             // bot user id writes before ':' char
-                                            if (parseBotIdFromToken && authResources.getType() == Type.BOT) {
+                                            if (parseBotIdFromToken && authResources.isBot()) {
                                                 return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
                                                         .map(t -> Long.parseLong(t.split(":", 2)[0]))
                                                         .orElseThrow(), null));
@@ -367,7 +366,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                 .then(Mono.fromRunnable(() -> sink.error(e))))
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
-                                                .filter(e -> authResources.getType() == Type.USER &&
+                                                .filter(e -> !authResources.isBot() &&
                                                         e instanceof RpcException &&
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
@@ -405,7 +404,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .systemVersion(params.getSystemVersion())
                 .systemLangCode(params.getSystemLangCode());
 
-        if (authResources.getType() == Type.BOT) {
+        if (authResources.isBot()) {
             initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getApiId(),
                     authResources.getApiHash(), authResources.getBotAuthToken().orElseThrow()));
         } else {

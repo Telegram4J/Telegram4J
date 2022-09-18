@@ -101,7 +101,7 @@ public final class EntityFactory {
                 Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
                 return new UserStatus(client, UserStatus.Type.ONLINE, expiresTimestamp, null);
             case UserStatusRecently.ID: return new UserStatus(client, UserStatus.Type.RECENTLY);
-            default: throw new IllegalArgumentException("Unknown user status type: " + data);
+            default: throw new IllegalArgumentException("Unknown UserStatus type: " + data);
         }
     }
 
@@ -109,7 +109,7 @@ public final class EntityFactory {
         switch (data.identifier()) {
             case BaseMessage.ID: return new Message(client, (BaseMessage) data, resolvedChatId);
             case MessageService.ID: return new Message(client, (MessageService) data, resolvedChatId);
-            default: throw new IllegalArgumentException("Unknown message type: " + data);
+            default: throw new IllegalArgumentException("Unknown Message type: " + data);
         }
     }
 
@@ -120,12 +120,12 @@ public final class EntityFactory {
             case UserEmpty.ID:
             case ChatEmpty.ID: return null;
             case ChatForbidden.ID:
-                switch (client.getUnavailableChatPolicy()) {
+                switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
                     case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
                     case NULL_MAPPING: return null;
                 }
             case ChannelForbidden.ID:
-                switch (client.getUnavailableChatPolicy()) {
+                switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
                     case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
                     case NULL_MAPPING: return null;
                 }
@@ -175,12 +175,12 @@ public final class EntityFactory {
                             switch (c.identifier()) {
                                 case ChatEmpty.ID: return null;
                                 case ChatForbidden.ID:
-                                    switch (client.getUnavailableChatPolicy()) {
+                                    switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
                                         case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
                                         case NULL_MAPPING: return null;
                                     }
                                 case ChannelForbidden.ID:
-                                    switch (client.getUnavailableChatPolicy()) {
+                                    switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
                                         case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
                                         case NULL_MAPPING: return null;
                                     }
@@ -250,7 +250,7 @@ public final class EntityFactory {
 
                 return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData, exportedChatInvite, chatParticipants);
             default:
-                throw new IllegalArgumentException("Unknown chat type: " + possibleChat);
+                throw new IllegalArgumentException("Unknown Chat type: " + possibleChat);
         }
     }
 
@@ -279,7 +279,7 @@ public final class EntityFactory {
 
                 return new User(client, baseUser);
             default:
-                throw new IllegalArgumentException("Unknown user type: " + possibleUser);
+                throw new IllegalArgumentException("Unknown User type: " + possibleUser);
         }
     }
 

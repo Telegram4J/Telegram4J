@@ -77,7 +77,7 @@ public final class PeerId {
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, id);
+        return Objects.hashCode(username) + Objects.hashCode(id);
     }
 
     @Override

@@ -1,8 +1,9 @@
 package telegram4j.mtproto;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledByteBufAllocator;
+import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlSerialUtil;
 
@@ -179,14 +180,14 @@ public final class PublicRsaKey {
     }
 
     /**
-     * Compute a reversed tail of last 64 be bits from serialized key sha 1 hash,
+     * Compute a reversed tail of last 64 big-endian bits from serialized key sha 1 hash,
      * which uses in DH gen.
      *
-     * @param alloc The byte buf allocator, that's need to create temp buffers.
      * @param key The RSA key.
      * @return The reversed tail in {@literal long} number of key hash.
      */
-    public static long computeTail(ByteBufAllocator alloc, PublicRsaKey key) {
+    public static long computeTail(PublicRsaKey key) {
+        var alloc = UnpooledByteBufAllocator.DEFAULT;
         ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.modulus));
         ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.exponent));
 
@@ -194,10 +195,7 @@ public final class PublicRsaKey {
         ByteBuf sha1 = CryptoUtil.sha1Digest(concat);
         concat.release();
 
-        ByteBuf tail = sha1.slice(sha1.readableBytes() - 8, 8);
-        CryptoUtil.reverse(tail);
-
-        return tail.readLong();
+        return sha1.getLongLE(sha1.readableBytes() - 8);
     }
 
     /**
@@ -230,7 +228,7 @@ public final class PublicRsaKey {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         PublicRsaKey publicKey = (PublicRsaKey) o;

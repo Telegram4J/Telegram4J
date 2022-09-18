@@ -1,6 +1,7 @@
 package telegram4j.core.spec;
 
 import org.immutables.value.Value;
+import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserFactory;
 
@@ -42,7 +43,7 @@ interface SendMessageSpecDef extends Spec {
     Optional<EntityParserFactory> parser();
 
     // Full qualification is need due to immutables doesnt able to import spec
-    Optional<telegram4j.core.spec.markup.ReplyMarkupSpec> replyMarkup();
+    Optional<ReplyMarkupSpec> replyMarkup();
 
     Optional<Instant> scheduleTimestamp();
 

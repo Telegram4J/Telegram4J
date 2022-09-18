@@ -143,7 +143,7 @@ public final class AuxiliaryEntityFactory {
                 chatId = usersMap.get(peerId).getId();
                 break;
             default:
-                throw new IllegalStateException();
+                throw new IllegalArgumentException("Unknown Peer type: " + message.peerId());
         }
 
         return EntityFactory.createMessage(client, message, chatId);

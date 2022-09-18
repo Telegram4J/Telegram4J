@@ -23,9 +23,6 @@ public class MTProtoBotInlineExample {
         // Don't forget to enable inline queries in the @BotFather settings
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
-                // default params can't be generated for test sources
-                .setInitConnectionParams(new InitConnectionParams("test", "test",
-                        "en", "", "test", "en", null, null))
                 .withConnection(client -> {
 
                     Mono<Void> listenInline = client.on(InlineQueryEvent.class)

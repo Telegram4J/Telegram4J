@@ -3,6 +3,7 @@ package telegram4j.core;
 import reactor.netty.http.client.HttpClient;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.EventDispatcher;
+import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.store.StoreLayout;
 
@@ -16,13 +17,16 @@ public final class MTProtoResources {
     @Nullable
     private final EntityParserFactory defaultEntityParser;
     private final HttpClient httpClient;
+    private final UnavailableChatPolicy unavailableChatPolicy;
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
-                     @Nullable EntityParserFactory defaultEntityParser, HttpClient httpClient) {
+                     @Nullable EntityParserFactory defaultEntityParser, HttpClient httpClient,
+                     UnavailableChatPolicy unavailableChatPolicy) {
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         this.defaultEntityParser = defaultEntityParser;
         this.httpClient = Objects.requireNonNull(httpClient);
+        this.unavailableChatPolicy = unavailableChatPolicy;
     }
 
     /**
@@ -60,5 +64,14 @@ public final class MTProtoResources {
      */
     public HttpClient getHttpClient() {
         return httpClient;
+    }
+
+    /**
+     * Gets handle policy for processing unavailable chats/channels.
+     *
+     * @return The handle policy {@link UnavailableChatPolicy}.
+     */
+    public UnavailableChatPolicy getUnavailableChatPolicy() {
+        return unavailableChatPolicy;
     }
 }

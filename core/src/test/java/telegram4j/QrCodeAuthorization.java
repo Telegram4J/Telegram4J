@@ -96,7 +96,7 @@ public class QrCodeAuthorization {
 
             StringBuilder b = new StringBuilder();
             while (stre.hasNext()) {
-                b.append(stre.nextLine()).append("\n");
+                b.append(stre.nextLine()).append('\n');
             }
             return b.toString();
         } catch (Throwable t) {

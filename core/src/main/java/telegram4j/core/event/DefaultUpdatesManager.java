@@ -291,7 +291,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
 
         // It often turns out that getDifference() returns the updates already received.
-        if (client.isBot()) {
+        if (client.getAuthResources().isBot()) {
             date += DEFAULT_CHECKIN.getSeconds();
         }
 
@@ -398,7 +398,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
                     int dpts = Math.max(1, Math.max(upts, cpts));
-                    int limit = client.isBot()
+                    int limit = client.getAuthResources().isBot()
                             ? MAX_BOT_CHANNEL_DIFFERENCE
                             : MAX_CHANNEL_DIFFERENCE;
 
@@ -697,7 +697,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     private Flux<Event> getChannelDifference(InputChannel id, int pts) {
-        int limit = client.isBot()
+        int limit = client.getAuthResources().isBot()
                 ? MAX_BOT_CHANNEL_DIFFERENCE
                 : MAX_CHANNEL_DIFFERENCE;
 

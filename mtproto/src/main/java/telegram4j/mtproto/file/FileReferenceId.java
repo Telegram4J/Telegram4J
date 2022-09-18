@@ -16,9 +16,10 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * File reference wrapper, which can be serialized to base 64 url string
- * via {@link #serialize()} and deserialized {@link #deserialize(String)}.
- * For compatibility with rpc methods can be mapped to {@code InputPhoto}/{@code InputDocument}, {@code InputFileLocation}.
+ * File reference wrapper, which can be serialized to {@code base64url} string
+ * via {@link #serialize()} and deserialized via {@link #deserialize(String)}.
+ * For compatibility with rpc methods can be mapped to {@link InputPhoto}/{@link InputDocument},
+ * {@link InputFileLocation}, {@link InputWebFileLocation}.
  *
  * @apiNote This identifier can't be used across different accounts
  * due to the relativity of message identifiers in private chats
@@ -296,7 +297,7 @@ public class FileReferenceId {
                 documentType = DocumentType.ALL[buf.readByte()];
 
             case PHOTO:
-                dcId = buf.readByte();
+                dcId = buf.readUnsignedByte();
                 documentId = buf.readLongLE();
                 accessHash = buf.readLongLE();
 
@@ -308,7 +309,7 @@ public class FileReferenceId {
                 break;
             case CHAT_PHOTO:
                 sizeType = PhotoSizeType.ALL[buf.readByte()];
-                dcId = buf.readByte();
+                dcId = buf.readUnsignedByte();
                 documentId = buf.readLongLE();
 
                 if (sizeType == PhotoSizeType.UNKNOWN) {
@@ -327,7 +328,7 @@ public class FileReferenceId {
                 break;
             default:
                 buf.release();
-                throw new IllegalStateException("Malformed file reference id.");
+                throw new IllegalArgumentException("Malformed file reference id.");
         }
 
         buf.release();
@@ -691,9 +692,18 @@ public class FileReferenceId {
 
     @Override
     public int hashCode() {
-        return Objects.hash(fileType, sizeType, dcId, documentId,
-                accessHash, thumbSizeType, url, stickerSet, thumbVersion,
-                fileReference);
+        int h = 5381;
+        h += (h << 5) + fileType.hashCode();
+        h += (h << 5) + sizeType.hashCode();
+        h += (h << 5) + dcId;
+        h += (h << 5) + Long.hashCode(documentId);
+        h += (h << 5) + Long.hashCode(accessHash);
+        h += (h << 5) + Character.hashCode(thumbSizeType);
+        h += (h << 5) + url.hashCode();
+        h += (h << 5) + stickerSet.hashCode();
+        h += (h << 5) + thumbVersion;
+        h += (h << 5) + fileReference.hashCode();
+        return h;
     }
 
     @Override

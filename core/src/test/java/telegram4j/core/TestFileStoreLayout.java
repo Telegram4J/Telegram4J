@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+// Skat: This class is not designed in the best way, so do not copy it into your applications.
+// When there is time, I will make the default file store implementation.
 public class TestFileStoreLayout implements StoreLayout {
 
     private static final String DB_FILE = "core/src/test/resources/db-%s.bin";

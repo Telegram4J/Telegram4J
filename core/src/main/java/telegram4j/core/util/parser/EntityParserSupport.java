@@ -128,7 +128,7 @@ public final class EntityParserSupport {
                     case STRIKETHROUGH:
                         sink.next(ImmutableMessageEntityStrike.of(offset, length));
                         break;
-                    case MENTION_NAME:
+                    case MENTION_NAME: {
                         String arg = Objects.requireNonNull(begin.arg(), () ->
                                 "Absent userId value for token begin: " + begin);
                         long userId = Long.parseLong(arg);
@@ -137,8 +137,12 @@ public final class EntityParserSupport {
                                 .map(p -> ImmutableInputMessageEntityMentionName.of(offset, length, p))
                                 .subscribe(sink::next, sink::error);
                         break;
+                    }
                     case CUSTOM_EMOJI:
-                        // TODO
+                        String arg = Objects.requireNonNull(begin.arg(), () ->
+                                "Absent documentId value for token begin: " + begin);
+                        long documentId = Long.parseLong(arg);
+                        sink.next(ImmutableMessageEntityCustomEmoji.of(offset, length, documentId));
                         break;
                     case TEXT_URL:
                         sink.next(ImmutableMessageEntityTextUrl.of(offset, length,

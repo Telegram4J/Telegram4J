@@ -15,13 +15,13 @@ public final class AuthorizationResources {
     private final String botAuthToken;
     @Nullable
     private final Function<MTProtoTelegramClient, Publisher<?>> authHandler;
-    private final Type type;
+    private final boolean bot;
 
     AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.botAuthToken = Objects.requireNonNull(botAuthToken);
-        this.type = Type.BOT;
+        this.bot = true;
 
         this.authHandler = null;
     }
@@ -30,7 +30,7 @@ public final class AuthorizationResources {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.authHandler = Objects.requireNonNull(authHandler);
-        this.type = Type.USER;
+        this.bot = false;
 
         this.botAuthToken = null;
     }
@@ -73,20 +73,12 @@ public final class AuthorizationResources {
     }
 
     /**
-     * Gets the type of authorization.
+     * Gets whether <a href="https://core.telegram.org/bots">bot authorization</a> is used for connection,
+     * otherwise <a href="https://core.telegram.org/api/auth">user authorization</a> must be implemented.
      *
-     * @return The type of authorization.
+     * @return {@code true} if it's bot authorization form.
      */
-    public Type getType() {
-        return type;
-    }
-
-    /** Types of authorization. */
-    public enum Type {
-        /** A <a href="https://core.telegram.org/bots">bot authorization</a> type. */
-        BOT,
-
-        /** A <a href="https://core.telegram.org/api/auth">user authorization</a> type. */
-        USER
+    public boolean isBot() {
+        return bot;
     }
 }

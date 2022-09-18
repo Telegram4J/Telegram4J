@@ -1,5 +1,7 @@
 package telegram4j.mtproto;
 
+import reactor.util.annotation.Nullable;
+
 import java.util.List;
 import java.util.Objects;
 
@@ -84,7 +86,7 @@ public final class DataCenter {
 
     DataCenter(int id, String address, int port) {
         this.id = id;
-        this.address = address;
+        this.address = Objects.requireNonNull(address);
         this.port = port;
     }
 
@@ -128,7 +130,7 @@ public final class DataCenter {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DataCenter that = (DataCenter) o;
