@@ -18,17 +18,15 @@ public class StickerSet implements TelegramObject {
     private final telegram4j.tl.StickerSet data;
 
     @Nullable
-    private final String fileReferenceId;
+    private final FileReferenceId fileReferenceId;
 
     public StickerSet(MTProtoTelegramClient client, telegram4j.tl.StickerSet data) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.fileReferenceId = Optional.ofNullable(data.thumbVersion())
-                .map(version -> FileReferenceId.ofStickerSet(
-                ImmutableInputStickerSetID.of(data.id(), data.accessHash()), version)
-                .serialize())
-                .orElse(null);
+        Integer ver = data.thumbVersion();
+        this.fileReferenceId = ver != null ? FileReferenceId.ofStickerSet(ImmutableInputStickerSetID.of(
+                data.id(), data.accessHash()), ver) : null;
     }
 
     @Override
@@ -36,7 +34,12 @@ public class StickerSet implements TelegramObject {
         return client;
     }
 
-    public Optional<String> getFileReferenceId() {
+    /**
+     * Gets {@link FileReferenceId} for this sticker set, if {@link #getThumbVersion()} is present.
+     *
+     * @return The {@link FileReferenceId} for this sticker set, if {@link #getThumbVersion()} is present.
+     */
+    public Optional<FileReferenceId> getFileReferenceId() {
         return Optional.ofNullable(fileReferenceId);
     }
 

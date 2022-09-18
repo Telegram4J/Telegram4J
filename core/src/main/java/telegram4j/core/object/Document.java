@@ -27,7 +27,7 @@ public class Document implements TelegramObject {
     @Nullable
     private final String fileName;
 
-    private final String fileReferenceId;
+    private final FileReferenceId fileReferenceId;
 
     public Document(MTProtoTelegramClient client, BaseDocumentFields data,
                     @Nullable String fileName, int messageId, InputPeer peer) {
@@ -35,7 +35,7 @@ public class Document implements TelegramObject {
         this.data = Objects.requireNonNull(data);
         this.fileName = fileName;
 
-        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer).serialize();
+        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer);
     }
 
     @Override
@@ -64,11 +64,11 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets serialized file reference id for this document.
+     * Gets {@link FileReferenceId} for this document.
      *
-     * @return The serialized file reference id.
+     * @return The {@link FileReferenceId} for this document.
      */
-    public String getFileReferenceId() {
+    public FileReferenceId getFileReferenceId() {
         return fileReferenceId;
     }
 

@@ -20,17 +20,17 @@ public class ChatPhoto implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final ChatPhotoFields data;
 
-    private final String smallFileReferenceId;
-    private final String bigFileReferenceId;
+    private final FileReferenceId smallFileReferenceId;
+    private final FileReferenceId bigFileReferenceId;
 
     public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
         this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data,
-                FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL, messageId, peer).serialize();
+                FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL, messageId, peer);
         this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data,
-                FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG, messageId, peer).serialize();
+                FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG, messageId, peer);
     }
 
     @Override
@@ -39,11 +39,11 @@ public class ChatPhoto implements TelegramObject {
     }
 
     /**
-     * Gets serialized {@link FileReferenceId} of <b>small</b> chat photo.
+     * Gets {@link FileReferenceId} of <b>small</b> chat photo.
      *
-     * @return The serialized {@link FileReferenceId} of <b>small</b> chat photo.
+     * @return The {@link FileReferenceId} of <b>small</b> chat photo.
      */
-    public String getSmallFileReferenceId() {
+    public FileReferenceId getSmallFileReferenceId() {
         return smallFileReferenceId;
     }
 
@@ -52,7 +52,7 @@ public class ChatPhoto implements TelegramObject {
      *
      * @return The serialized {@link FileReferenceId} of <b>big</b> chat photo.
      */
-    public String getBigFileReferenceId() {
+    public FileReferenceId getBigFileReferenceId() {
         return bigFileReferenceId;
     }
 

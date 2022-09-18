@@ -14,4 +14,10 @@ interface InlineResultArticleSpecDef extends InlineResultSpec {
     String url();
 
     Optional<WebDocumentSpec> thumb();
+
+    @Override
+    String id();
+
+    @Override
+    InlineMessageSpec message();
 }

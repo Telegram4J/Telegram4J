@@ -22,20 +22,20 @@ public class Photo implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final BasePhoto data;
 
-    private final String fileReferenceId;
+    private final FileReferenceId fileReferenceId;
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer).serialize();
+        this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer);
     }
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, messageId, peer).serialize();
+        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, messageId, peer);
     }
 
     @Override
@@ -44,11 +44,11 @@ public class Photo implements TelegramObject {
     }
 
     /**
-     * Gets serialized file reference id for this photo.
+     * Gets {@link FileReferenceId} for this photo.
      *
-     * @return The serialized file reference id.
+     * @return The {@link FileReferenceId} for this photo.
      */
-    public String getFileReferenceId() {
+    public FileReferenceId getFileReferenceId() {
         return fileReferenceId;
     }
 

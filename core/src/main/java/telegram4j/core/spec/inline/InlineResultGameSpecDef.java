@@ -6,4 +6,10 @@ import org.immutables.value.Value;
 interface InlineResultGameSpecDef extends InlineResultSpec {
 
     String shortName();
+
+    @Override
+    String id();
+
+    @Override
+    InlineMessageSpec message();
 }

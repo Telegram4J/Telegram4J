@@ -15,4 +15,10 @@ interface InlineResultPhotoSpecDef extends InlineResultSpec {
     Optional<SizeSpec> photoSize();
 
     Optional<WebDocumentSpec> thumb();
+
+    @Override
+    String id();
+
+    @Override
+    InlineMessageSpec message();
 }

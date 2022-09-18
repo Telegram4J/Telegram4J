@@ -34,4 +34,10 @@ interface InlineResultDocumentSpecDef extends InlineResultSpec {
     Optional<String> mimeType();
 
     Optional<WebDocumentSpec> thumb();
+
+    @Override
+    String id();
+
+    @Override
+    InlineMessageSpec message();
 }

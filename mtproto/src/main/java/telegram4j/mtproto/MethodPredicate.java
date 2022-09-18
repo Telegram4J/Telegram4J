@@ -2,6 +2,7 @@ package telegram4j.mtproto;
 
 import telegram4j.tl.api.TlMethod;
 
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -27,5 +28,22 @@ public interface MethodPredicate extends Predicate<TlMethod<?>> {
      */
     static MethodPredicate all() {
         return m -> true;
+    }
+
+    @Override
+    default MethodPredicate and(Predicate<? super TlMethod<?>> other) {
+        Objects.requireNonNull(other);
+        return t -> test(t) && other.test(t);
+    }
+
+    @Override
+    default Predicate<TlMethod<?>> negate() {
+        return t -> !test(t);
+    }
+
+    @Override
+    default Predicate<TlMethod<?>> or(Predicate<? super TlMethod<?>> other) {
+        Objects.requireNonNull(other);
+        return t -> test(t) || other.test(t);
     }
 }
