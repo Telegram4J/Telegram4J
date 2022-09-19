@@ -166,6 +166,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Request to download file by their reference from Telegram Media DC or
      * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
+     * Method will return {@link Flux#empty()} when web-file id passed on bot accounts.
      *
      * @param loc The location of file.
      * @return A {@link Flux} emitting full or parts of downloading file.
@@ -173,10 +174,23 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     public Flux<FilePart> downloadFile(FileReferenceId loc) {
         return Flux.defer(() -> {
             if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-                if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
-                    return getFile0(loc);
+                if (authResources.isBot()) {
+                    return Flux.empty();
                 }
 
+                if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
+                    return mtProtoResources.getHttpClient().orElseThrow()
+                            .get().uri(loc.getUrl())
+                            .responseSingle((res, buf) -> buf
+                                    .map(TlEncodingUtil::copyAsUnpooled)
+                                    .map(bytes -> {
+                                        String mimeType = res.responseHeaders().getAsString(HttpHeaderNames.CONTENT_TYPE);
+                                        int size = res.responseHeaders().getInt(HttpHeaderNames.CONTENT_LENGTH, -1);
+                                        FileType type = TlEntityUtil.suggestFileType(mimeType);
+                                        return new FilePart(type, -1, bytes, size, mimeType);
+                                    }))
+                            .flux();
+                }
                 return serviceHolder.getUploadService()
                         .getWebFile(loc.asWebLocation().orElseThrow())
                         .map(FilePart::ofWebFile);
@@ -453,20 +467,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     // Internal methods
     // ===========================
-
-    private Flux<FilePart> getFile0(FileReferenceId loc) {
-        return mtProtoResources.getHttpClient()
-                .get().uri(loc.getUrl())
-                .responseSingle((res, buf) -> buf
-                        .map(TlEncodingUtil::copyAsUnpooled)
-                        .map(bytes -> {
-                            String mimeType = res.responseHeaders().getAsString(HttpHeaderNames.CONTENT_TYPE);
-                            int size = res.responseHeaders().getInt(HttpHeaderNames.CONTENT_LENGTH, -1);
-                            FileType type = TlEntityUtil.suggestFileType(mimeType);
-                            return new FilePart(type, -1, bytes, size, mimeType);
-                        }))
-                .flux();
-    }
 
     private Mono<FileReferenceId> findMessageAction(Messages messages, FileReferenceId orig) {
         var list = messages.identifier() == BaseMessages.ID

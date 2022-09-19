@@ -16,16 +16,17 @@ public final class MTProtoResources {
     private final EventDispatcher eventDispatcher;
     @Nullable
     private final EntityParserFactory defaultEntityParser;
+    @Nullable
     private final HttpClient httpClient;
     private final UnavailableChatPolicy unavailableChatPolicy;
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
-                     @Nullable EntityParserFactory defaultEntityParser, HttpClient httpClient,
+                     @Nullable EntityParserFactory defaultEntityParser, @Nullable HttpClient httpClient,
                      UnavailableChatPolicy unavailableChatPolicy) {
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         this.defaultEntityParser = defaultEntityParser;
-        this.httpClient = Objects.requireNonNull(httpClient);
+        this.httpClient = httpClient;
         this.unavailableChatPolicy = unavailableChatPolicy;
     }
 
@@ -58,12 +59,12 @@ public final class MTProtoResources {
     }
 
     /**
-     * Gets http client for downloading non-proxied by telegram web files.
+     * Gets http client for downloading non-proxied by telegram web files, if present.
      *
-     * @return The http client for downloading web files.
+     * @return The http client for downloading web files, if present.
      */
-    public HttpClient getHttpClient() {
-        return httpClient;
+    public Optional<HttpClient> getHttpClient() {
+        return Optional.ofNullable(httpClient);
     }
 
     /**

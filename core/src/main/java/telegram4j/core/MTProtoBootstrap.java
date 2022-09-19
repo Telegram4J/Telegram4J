@@ -70,7 +70,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory = RpcEntityRetriever::new;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, DefaultUpdatesMapper.instance);
-    private UnavailableChatPolicy unavailableChatPolicy;
+    private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private HttpClient httpClient;
 
     private InitConnectionParams initConnectionParams;
@@ -202,6 +202,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
+    /**
+     * Sets handle policy for unavailable chats and channels.
+     * <p>
+     * By default, {@link UnavailableChatPolicy#NULL_MAPPING} will be used.
+     *
+     * @param policy A new policy for unavailable chats and channels.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setUnavailableChatPolicy(UnavailableChatPolicy policy) {
         this.unavailableChatPolicy = Objects.requireNonNull(policy);
         return this;
@@ -235,10 +243,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * <p>
      * If custom http client doesn't set, pooled with ssl and compression will be used.
      *
+     * @throws IllegalStateException if you try to do it on bots.
      * @param httpClient A new {@link HttpClient} for direct file downloading.
      * @return This builder.
      */
     public MTProtoBootstrap<O> setHttpClient(HttpClient httpClient) {
+        if (authResources.isBot()) {
+            throw new IllegalStateException("HttpClient can't be set for bots, as they cannot download web files");
+        }
         this.httpClient = Objects.requireNonNull(httpClient);
         return this;
     }
@@ -289,7 +301,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             Collections.unmodifiableList(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
-                    defaultEntityParserFactory, initHttpClient(), initUnavailableChatPolicy());
+                    defaultEntityParserFactory, initHttpClient(), unavailableChatPolicy);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
                     .layer(TlInfo.LAYER)
@@ -433,10 +445,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 EmissionHandlers.DEFAULT_PARKING);
     }
 
-    private UnavailableChatPolicy initUnavailableChatPolicy() {
-        return unavailableChatPolicy != null ? unavailableChatPolicy : UnavailableChatPolicy.NULL_MAPPING;
-    }
-
     private StoreLayout initStoreLayout() {
         if (storeLayout != null) {
             return storeLayout;
@@ -465,8 +473,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
     }
 
+    @Nullable
     private HttpClient initHttpClient() {
-        if (httpClient != null) {
+        if (httpClient != null || authResources.isBot()) {
             return httpClient;
         }
         return HttpClient.create().compress(true).followRedirect(true).secure();

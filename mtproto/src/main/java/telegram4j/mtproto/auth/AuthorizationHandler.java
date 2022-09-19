@@ -20,6 +20,7 @@ import telegram4j.tl.request.mtproto.ReqDHParams;
 import telegram4j.tl.request.mtproto.SetClientDHParams;
 
 import java.math.BigInteger;
+import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
@@ -110,12 +111,14 @@ public final class AuthorizationHandler {
 
         if (fingerprint == -1) {
             return Mono.fromRunnable(() -> onAuthSink.emitError(
-                    new AuthorizationException("Unknown server fingerprints: " + fingerprints),
+                    new AuthorizationException("Unknown server fingerprints: " + fingerprints.stream()
+                            .map(Long::toHexString)
+                            .collect(Collectors.joining(", ", "[", "]"))),
                     Sinks.EmitFailureHandler.FAIL_FAST));
         }
 
         BigInteger pq = fromByteBuf(resPQ.pq());
-        BigInteger p = BigInteger.valueOf(pqPrimeLeemon(pq.longValueExact()));
+        BigInteger p = BigInteger.valueOf(pqFactorize(pq.longValueExact()));
         BigInteger q = pq.divide(p);
 
         ByteBuf pb = toByteBuf(p);
@@ -123,7 +126,7 @@ public final class AuthorizationHandler {
 
         if (p.longValueExact() > q.longValueExact()) {
             return Mono.fromRunnable(() -> onAuthSink.emitError(
-                    new AuthorizationException("Incorrect prime factorization. p: "
+                    new AuthorizationException("Invalid factorization result. p: "
                     + p + ", q: " + q + ", pq: " + pq),
                     Sinks.EmitFailureHandler.FAIL_FAST));
         }
@@ -183,7 +186,7 @@ public final class AuthorizationHandler {
 
         ByteBuf encryptedAnswer = Unpooled.wrappedBuffer(serverDHParams.encryptedAnswer());
         ByteBuf answer = decrypter.decrypt(encryptedAnswer)
-                .skipBytes(20); // answer hash
+                .skipBytes(20); // TODO: answer hash
 
         ServerDHInnerData serverDHInnerData = TlDeserializer.deserialize(answer);
         answer.release();

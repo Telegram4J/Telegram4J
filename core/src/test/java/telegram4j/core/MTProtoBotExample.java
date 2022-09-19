@@ -12,6 +12,8 @@ import telegram4j.core.command.PingCommand;
 import telegram4j.core.command.ShrugCommand;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.mtproto.MethodPredicate;
+import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.BotCommandScopeChats;
 import telegram4j.tl.json.TlModule;
@@ -44,6 +46,7 @@ public class MTProtoBotExample {
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
+                .addResponseTransformer(ResponseTransformer.emptyOnErrorCodes(MethodPredicate.all(), 400))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getServiceHolder().getBotService()
@@ -51,7 +54,7 @@ public class MTProtoBotExample {
                             .flatMap(list -> {
                                 var infos = commands.stream()
                                         .map(Command::getInfo)
-                                        .collect(Collectors.toList());
+                                        .collect(Collectors.toUnmodifiableList());
 
                                 if (list.equals(infos)) {
                                     return Mono.empty();

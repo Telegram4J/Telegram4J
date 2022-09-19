@@ -1,7 +1,6 @@
 package telegram4j.mtproto;
 
 import reactor.core.publisher.Mono;
-import telegram4j.tl.api.EmptyObject;
 import telegram4j.tl.api.TlMethod;
 
 import java.util.function.Function;
@@ -9,26 +8,6 @@ import java.util.function.Function;
 /** Interface for mapping rpc responses. */
 @FunctionalInterface
 public interface ResponseTransformer {
-
-    /**
-     * Create new {@code ResponseTransformer} which filters out response objects
-     * which extends {@link EmptyObject} type.
-     *
-     * @param methodPredicate The method scope.
-     * @return The new {@code ResponseTransformer} which filters {@link EmptyObject} responses.
-     */
-    static ResponseTransformer ignoreEmpty(MethodPredicate methodPredicate) {
-        return new ResponseTransformer() {
-            @Override
-            public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
-                if (methodPredicate.test(method)) {
-                    return mono -> mono.filter(r -> !(r instanceof EmptyObject));
-                }
-
-                return Function.identity();
-            }
-        };
-    }
 
     /**
      * Create new {@code ResponseTransformer} which returns

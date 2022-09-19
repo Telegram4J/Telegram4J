@@ -46,47 +46,67 @@ public final class CryptoUtil {
         }
     }
 
-    // from https://github.com/zhukov/webogram/blob/6c8b8474194ed8a76c4cf70db303c0c1cd86891f/app/js/lib/bin_utils.js#L597
-    public static long pqPrimeLeemon(long n) {
-        long g = 0;
-        for (int i = 0; i < 3; i++) {
-            int q = (random.nextInt(128) & 15) + 17;
-            long x = random.nextInt(1000000000) + 1;
-            long y = x;
-            int lim = 1 << i + 18;
+    // from https://github.com/tdlib/td/blob/64c718c0a1b02a28a6f628d98cd5fbde1d17c3fa/tdutils/td/utils/crypto.cpp
+    private static long pqGcd(long a, long b) {
+        if (a == 0) return b;
 
-            for (int j = 1; j < lim; j++) {
-                long a = x, b = x, c = q;
-                while (b != 0) {
-                    if ((b & 1) != 0) {
-                        c += a;
-                        if (c >= n) {
-                            c -= n;
-                        }
-                    }
-                    a += a;
-                    if (a >= n) {
-                        a -= n;
-                    }
+        while ((a & 1) == 0) {
+            a >>= 1;
+        }
+
+        // if ((b & 1) == 0)
+        //     throw new IllegalArgumentException("a: " + a + ", b: " + b);
+
+        while (true) {
+            if (a > b) {
+                a = a - b >> 1;
+                while ((a & 1) == 0) {
+                    a >>= 1;
+                }
+            } else if (b > a) {
+                b = b - a >> 1;
+                while ((b & 1) == 0) {
                     b >>= 1;
                 }
-                x = c;
-                long z = x < y ? y - x : x - y;
-                long b1 = n;
-                while (z != 0 && b1 != 0) {
-                    while ((b1 & 1) == 0) {
-                        b1 >>= 1;
-                    }
-                    while ((z & 1) == 0) {
-                        z >>= 1;
-                    }
-                    if (z > b1) {
-                        z -= b1;
-                    } else {
-                        b1 -= z;
-                    }
+            } else {
+                return a;
+            }
+        }
+    }
+
+    // returns (c + a * b) % pq
+    private static long pqAddMul(long c, long a, long b, long pq) {
+        while (b != 0) {
+            if ((b & 1) != 0) {
+                c += a;
+                if (c >= pq) {
+                    c -= pq;
                 }
-                g = b1 == 0 ? z : b1;
+            }
+            a += a;
+            if (a >= pq) {
+                a -= pq;
+            }
+            b >>= 1;
+        }
+        return c;
+    }
+
+    public static long pqFactorize(long pq) {
+        if (pq <= 2) return 1;
+        if ((pq & 1) == 0) return 2;
+
+        long g = 0;
+        for (int i = 0, iter = 0; i < 3 || iter < 1000; i++) {
+            long q = (17 + random.nextInt(32)) % (pq - 1);
+            long x = Math.abs(random.nextLong()) % (pq - 1) + 1;
+            long y = x;
+            int lim = 1 << Math.min(5, i) + 18;
+            for (int j = 1; j < lim; j++) {
+                iter++;
+                x = pqAddMul(q, x, x, pq);
+                long z = x < y ? pq + x - y : x - y;
+                g = pqGcd(z, pq);
                 if (g != 1) {
                     break;
                 }
@@ -94,12 +114,11 @@ public final class CryptoUtil {
                     y = x;
                 }
             }
-            if (g > 1) {
+            if (g > 1 && g < pq) {
                 break;
             }
         }
-
-        return Math.min(n / g, g);
+        return g != 0 ? Math.min(pq / g, g) : g;
     }
 
     private static MessageDigest createDigest(String alg) {
@@ -162,16 +181,6 @@ public final class CryptoUtil {
         byte[] paddingb = new byte[padding];
         random.nextBytes(paddingb);
         return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(paddingb));
-    }
-
-    public static void reverse(ByteBuf data) {
-        int n = data.readableBytes();
-        for (int i = 0, mid = n >> 1, j = n - 1; i < mid; i++, j--) {
-            byte ib = data.getByte(i);
-            byte jb = data.getByte(j);
-            data.setByte(i, jb);
-            data.setByte(j, ib);
-        }
     }
 
     public static AES256IGECipher createAesCipher(ByteBuf messageKey, ByteBuf authKey, boolean server) {

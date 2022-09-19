@@ -88,19 +88,19 @@ public final class EntityFactory {
     private EntityFactory() {
     }
 
-    public static UserStatus createUserStatus(MTProtoTelegramClient client, telegram4j.tl.UserStatus data) {
+    public static UserStatus createUserStatus(telegram4j.tl.UserStatus data) {
         switch (data.identifier()) {
-            case UserStatusLastMonth.ID: return new UserStatus(client, UserStatus.Type.LAST_MONTH);
-            case UserStatusLastWeek.ID: return new UserStatus(client, UserStatus.Type.LAST_WEEK);
+            case UserStatusLastMonth.ID: return new UserStatus(UserStatus.Type.LAST_MONTH);
+            case UserStatusLastWeek.ID: return new UserStatus(UserStatus.Type.LAST_WEEK);
             case UserStatusOffline.ID:
                 UserStatusOffline userStatusOffline = (UserStatusOffline) data;
                 Instant wasOnlineTimestamp = Instant.ofEpochSecond(userStatusOffline.wasOnline());
-                return new UserStatus(client, UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
+                return new UserStatus(UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
             case UserStatusOnline.ID:
                 UserStatusOnline userStatusOnline = (UserStatusOnline) data;
                 Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
-                return new UserStatus(client, UserStatus.Type.ONLINE, expiresTimestamp, null);
-            case UserStatusRecently.ID: return new UserStatus(client, UserStatus.Type.RECENTLY);
+                return new UserStatus(UserStatus.Type.ONLINE, expiresTimestamp, null);
+            case UserStatusRecently.ID: return new UserStatus(UserStatus.Type.RECENTLY);
             default: throw new IllegalArgumentException("Unknown UserStatus type: " + data);
         }
     }
@@ -561,8 +561,8 @@ public final class EntityFactory {
                 InputDocument document = fileRefId.asInputDocument();
 
                 if (r.type().map(t -> fileRefId.getDocumentType() != t).orElse(false)) {
-                    return Mono.error(new IllegalArgumentException("Document type mismatch. File ref id: "
-                            + fileRefId.getDocumentType() + ", type: " + documentType));
+                    throw new IllegalArgumentException("Document type mismatch. File ref id: "
+                            + fileRefId.getDocumentType() + ", type: " + documentType);
                 }
 
                 var builder = InputBotInlineResultDocument.builder()
@@ -575,30 +575,36 @@ public final class EntityFactory {
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableInputBotInlineResultDocument.Builder::build);
             } catch (IllegalArgumentException e) { // may be just an url
-                String url = r.file();
-                String mimeType = r.mimeType().orElseThrow(() -> new IllegalArgumentException(
-                        "Mime type must be included with urls."));
-
-                if (!mimeType.equalsIgnoreCase("application/pdf") &&
-                        !mimeType.equalsIgnoreCase("application/zip")) {
-                    return Mono.error(new IllegalStateException("Not allowed mime type for web file: " + mimeType));
-                }
 
                 var builder = BaseInputBotInlineResult.builder()
                         .type(type)
                         .title(r.title())
                         .description(r.description().orElse(null))
                         .id(r.id())
-                        .url(url);
+                        .url(r.file());
 
                 var contentBuilder = InputWebDocument.builder()
-                        .url(url)
-                        .size(0)
-                        .mimeType(mimeType);
+                        .url(r.file())
+                        .size(0);
+
+                String mimeType = r.mimeType().orElseThrow(() -> new IllegalArgumentException(
+                        "Mime type must be included with urls."));
+
+                if (documentType == DocumentType.GENERAL &&
+                        !mimeType.equalsIgnoreCase("application/pdf") &&
+                        !mimeType.equalsIgnoreCase("application/zip")) {
+                    throw new IllegalStateException("Not allowed mime type for web file: " + mimeType);
+                }
+
+                contentBuilder.mimeType(mimeType);
 
                 switch (documentType) {
                     case VIDEO:
                     case GIF: {
+                        if (r.thumb().isEmpty()) {
+                            throw new IllegalStateException("Thumbnail must be set for gif files.");
+                        }
+
                         int duration = r.duration()
                                 .map(Duration::getSeconds)
                                 .map(Math::toIntExact)
@@ -628,7 +634,7 @@ public final class EntityFactory {
                         break;
                 }
 
-                Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
+                Optional.ofNullable(getFilenameFromUrl(r.file())).ifPresent(s -> contentBuilder.addAttribute(
                         ImmutableDocumentAttributeFilename.of(s)));
 
                 builder.content(contentBuilder.build());

@@ -1,30 +1,25 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
 /** Simplified version of the {@link telegram4j.tl.UserStatus user status}. */
-public class UserStatus implements TelegramObject {
+public class UserStatus {
 
-    private final MTProtoTelegramClient client;
     private final Type type;
     @Nullable
     private final Instant expiresTimestamp;
     @Nullable
     private final Instant wasOnlineTimestamp;
 
-    public UserStatus(MTProtoTelegramClient client, Type type) {
-        this(client, type, null, null);
+    public UserStatus(Type type) {
+        this(type, null, null);
     }
 
-    public UserStatus(MTProtoTelegramClient client, Type type,
-                      @Nullable Instant expiresTimestamp,
-                      @Nullable Instant wasOnlineTimestamp) {
-        this.client = Objects.requireNonNull(client);
+    public UserStatus(Type type, @Nullable Instant expiresTimestamp, @Nullable Instant wasOnlineTimestamp) {
         this.type = Objects.requireNonNull(type);
         this.expiresTimestamp = expiresTimestamp;
         this.wasOnlineTimestamp = wasOnlineTimestamp;
@@ -55,11 +50,6 @@ public class UserStatus implements TelegramObject {
      */
     public Optional<Instant> getWasOnlineTimestamp() {
         return Optional.ofNullable(wasOnlineTimestamp);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

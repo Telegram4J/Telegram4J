@@ -152,7 +152,7 @@ public class User implements PeerEntity {
      */
     public Optional<UserStatus> getStatus() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.status()))
-                .map(d -> EntityFactory.createUserStatus(client, d));
+                .map(EntityFactory::createUserStatus);
     }
 
     /**
