@@ -22,7 +22,7 @@ public class MessageMediaPoll extends BaseMessageMedia {
      * @return The {@link Poll} object.
      */
     public Poll getPoll() {
-        return new Poll(client, data.poll());
+        return new Poll(data.poll());
     }
 
     /**

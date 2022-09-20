@@ -199,16 +199,12 @@ public final class EntityFactory {
                 var exportedChatInvite = Optional.of(chatFull.fullChat())
                         .map(telegram4j.tl.ChatFull::exportedInvite)
                         .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                        .map(d -> {
-                            var admin = chatFull.users().stream()
-                                    // This list is *usually* small, so there is no point in computing map
-                                    .filter(u -> u.id() == d.adminId())
-                                    .findFirst()
-                                    .map(u -> createUser(client, u))
-                                    .orElseThrow();
-
-                            return new ExportedChatInvite(client, d, admin);
-                        })
+                        .map(d -> new ExportedChatInvite(client, d, chatFull.users().stream()
+                                // This list is *usually* small, so there is no point in computing map
+                                .filter(u -> u.id() == d.adminId())
+                                .findFirst()
+                                .map(u -> createUser(client, u))
+                                .orElseThrow()))
                         .orElse(null);
 
                 if (chatFull.fullChat().identifier() == ChannelFull.ID) {
@@ -395,20 +391,14 @@ public final class EntityFactory {
         }
     }
 
-    public static PhotoSize createPhotoSize(MTProtoTelegramClient client, telegram4j.tl.PhotoSize data) {
+    public static PhotoSize createPhotoSize(telegram4j.tl.PhotoSize data) {
         switch (data.identifier()) {
-            case telegram4j.tl.BasePhotoSize.ID:
-                return new DefaultPhotoSize(client, (telegram4j.tl.BasePhotoSize) data);
-            case telegram4j.tl.PhotoCachedSize.ID:
-                return new PhotoCachedSize(client, (telegram4j.tl.PhotoCachedSize) data);
-            case telegram4j.tl.PhotoPathSize.ID:
-                return new PhotoPathSize(client, (telegram4j.tl.PhotoPathSize) data);
-            case telegram4j.tl.PhotoSizeProgressive.ID:
-                return new PhotoSizeProgressive(client, (telegram4j.tl.PhotoSizeProgressive) data);
-            case telegram4j.tl.PhotoStrippedSize.ID:
-                return new PhotoStrippedSize(client, (telegram4j.tl.PhotoStrippedSize) data);
-            default:
-                throw new IllegalArgumentException("Unknown photo size type: " + data);
+            case telegram4j.tl.BasePhotoSize.ID: return new DefaultPhotoSize((telegram4j.tl.BasePhotoSize) data);
+            case telegram4j.tl.PhotoCachedSize.ID: return new PhotoCachedSize((telegram4j.tl.PhotoCachedSize) data);
+            case telegram4j.tl.PhotoPathSize.ID: return new PhotoPathSize((telegram4j.tl.PhotoPathSize) data);
+            case telegram4j.tl.PhotoSizeProgressive.ID: return new PhotoSizeProgressive((telegram4j.tl.PhotoSizeProgressive) data);
+            case telegram4j.tl.PhotoStrippedSize.ID: return new PhotoStrippedSize((telegram4j.tl.PhotoStrippedSize) data);
+            default: throw new IllegalArgumentException("Unknown photo size type: " + data);
         }
     }
 

@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.ChatBannedRights;
 
 import java.time.Instant;
@@ -10,18 +9,11 @@ import java.util.Objects;
 
 import static telegram4j.tl.ChatBannedRights.*;
 
-public class ChatBannedRightsSettings implements TelegramObject {
-    private final MTProtoTelegramClient client;
+public class ChatBannedRightsSettings {
     private final ChatBannedRights data;
 
-    public ChatBannedRightsSettings(MTProtoTelegramClient client, ChatBannedRights data) {
-        this.client = Objects.requireNonNull(client);
+    public ChatBannedRightsSettings(ChatBannedRights data) {;
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     public EnumSet<Right> getRights() {

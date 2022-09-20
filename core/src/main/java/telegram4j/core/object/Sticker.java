@@ -77,8 +77,7 @@ public class Sticker extends Document {
      * @return The mask coordinates, if {@link #isMask()} is {@code true}.
      */
     public Optional<MaskCoordinates> getMaskCoordinates() {
-        return Optional.ofNullable(stickerData.maskCoords())
-                .map(d -> new MaskCoordinates(getClient(), d));
+        return Optional.ofNullable(stickerData.maskCoords()).map(MaskCoordinates::new);
     }
 
     @Override

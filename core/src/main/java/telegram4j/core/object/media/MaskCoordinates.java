@@ -1,24 +1,14 @@
 package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.TelegramObject;
 
 import java.util.Objects;
 
-public class MaskCoordinates implements TelegramObject {
-
-    private final MTProtoTelegramClient client;
+public class MaskCoordinates {
     private final telegram4j.tl.MaskCoords data;
 
-    public MaskCoordinates(MTProtoTelegramClient client, telegram4j.tl.MaskCoords data) {
-        this.client = Objects.requireNonNull(client);
+    public MaskCoordinates(telegram4j.tl.MaskCoords data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     public Type getType() {

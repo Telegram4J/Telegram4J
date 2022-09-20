@@ -1,23 +1,15 @@
 package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
 public class DefaultPhotoSize implements PhotoSize {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.BasePhotoSize data;
 
-    public DefaultPhotoSize(MTProtoTelegramClient client, telegram4j.tl.BasePhotoSize data) {
-        this.client = Objects.requireNonNull(client);
+    public DefaultPhotoSize(telegram4j.tl.BasePhotoSize data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

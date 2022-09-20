@@ -11,7 +11,6 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
-import telegram4j.core.object.RestrictionReason;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.InputChatPhotoSpec;
@@ -112,10 +111,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData.restrictionReason())
-                .map(list -> list.stream()
-                        .map(d -> new RestrictionReason(client, d))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(minData.restrictionReason());
     }
 
     @Override
@@ -138,7 +134,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::notifySettings)
-                .map(d -> new PeerNotifySettings(client, d));
+                .map(PeerNotifySettings::new);
     }
 
     @Override
@@ -156,12 +152,12 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Optional<ChatBannedRightsSettings> getBannedRights() {
-        return Optional.ofNullable(minData.bannedRights()).map(d -> new ChatBannedRightsSettings(client, d));
+        return Optional.ofNullable(minData.bannedRights()).map(ChatBannedRightsSettings::new);
     }
 
     @Override
     public Optional<ChatBannedRightsSettings> getDefaultBannedRights() {
-        return Optional.ofNullable(minData.defaultBannedRights()).map(d -> new ChatBannedRightsSettings(client, d));
+        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatBannedRightsSettings::new);
     }
 
     @Override

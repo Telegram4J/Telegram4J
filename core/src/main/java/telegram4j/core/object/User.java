@@ -17,7 +17,6 @@ import telegram4j.tl.photos.PhotosSlice;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.TlEntityUtil.toInputUser;
 import static telegram4j.tl.BaseUser.*;
@@ -170,10 +169,7 @@ public class User implements PeerEntity {
      * @return The list of reasons for why access to this user must be restricted, if present.
      */
     public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData.restrictionReason())
-                .map(list -> list.stream()
-                        .map(d -> new RestrictionReason(client, d))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(minData.restrictionReason());
     }
 
     /**
@@ -223,13 +219,13 @@ public class User implements PeerEntity {
     public Optional<PeerSettings> getSettings() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::settings)
-                .map(d -> new PeerSettings(client, d));
+                .map(PeerSettings::new);
     }
 
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::notifySettings)
-                .map(d -> new PeerNotifySettings(client, d));
+                .map(PeerNotifySettings::new);
     }
 
     public Optional<BotInfo> getBotInfo() {

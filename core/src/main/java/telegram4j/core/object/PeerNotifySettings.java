@@ -1,24 +1,16 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-public class PeerNotifySettings implements TelegramObject {
-    private final MTProtoTelegramClient client;
+public class PeerNotifySettings {
     private final telegram4j.tl.PeerNotifySettings data;
 
-    public PeerNotifySettings(MTProtoTelegramClient client, telegram4j.tl.PeerNotifySettings data) {
-        this.client = Objects.requireNonNull(client);
+    public PeerNotifySettings(telegram4j.tl.PeerNotifySettings data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     public Optional<Boolean> isShowPreviews() {

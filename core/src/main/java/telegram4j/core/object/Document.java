@@ -149,7 +149,7 @@ public class Document implements TelegramObject {
         }
         return Optional.ofNullable(((BaseDocument) data).thumbs())
                 .map(list -> list.stream()
-                        .map(d -> EntityFactory.createPhotoSize(client, d))
+                        .map(EntityFactory::createPhotoSize)
                         .collect(Collectors.toList()));
     }
 

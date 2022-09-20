@@ -7,12 +7,12 @@ import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
+import telegram4j.tl.BotCommand;
 import telegram4j.tl.InputPeerEmpty;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Chat bot information.
@@ -72,10 +72,7 @@ public class BotInfo implements TelegramObject {
      * @return The {@link List} of the bot commands, if present.
      */
     public Optional<List<BotCommand>> getCommands() {
-        return Optional.ofNullable(data.commands())
-                .map(l -> l.stream()
-                        .map(d -> new BotCommand(client, d))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(data.commands());
     }
 
     @Override

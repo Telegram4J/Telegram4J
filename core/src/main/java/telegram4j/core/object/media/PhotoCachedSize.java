@@ -2,23 +2,15 @@ package telegram4j.core.object.media;
 
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
 public class PhotoCachedSize implements PhotoSize {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.PhotoCachedSize data;
 
-    public PhotoCachedSize(MTProtoTelegramClient client, telegram4j.tl.PhotoCachedSize data) {
-        this.client = Objects.requireNonNull(client);
+    public PhotoCachedSize(telegram4j.tl.PhotoCachedSize data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

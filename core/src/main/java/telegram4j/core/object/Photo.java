@@ -104,7 +104,7 @@ public class Photo implements TelegramObject {
      */
     public List<PhotoSize> getSizes() {
         return data.sizes().stream()
-                .map(d -> EntityFactory.createPhotoSize(client, d))
+                .map(EntityFactory::createPhotoSize)
                 .collect(Collectors.toList());
     }
 

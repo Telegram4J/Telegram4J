@@ -15,6 +15,7 @@ import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.BaseMessage;
 import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.MessageService;
+import telegram4j.tl.RestrictionReason;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
 import telegram4j.tl.request.messages.UpdatePinnedMessage;
@@ -279,11 +280,7 @@ public final class Message implements TelegramObject {
      * @return The {@link List} of the {@link RestrictionReason}, if present.
      */
     public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(baseData)
-                .map(BaseMessage::restrictionReason)
-                .map(list -> list.stream()
-                        .map(d -> new RestrictionReason(client, d))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(baseData).map(BaseMessage::restrictionReason);
     }
 
     /**

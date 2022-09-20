@@ -2,23 +2,15 @@ package telegram4j.core.object.media;
 
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.Objects;
 
 public class PhotoPathSize implements PhotoSize {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.PhotoPathSize data;
 
-    public PhotoPathSize(MTProtoTelegramClient client, telegram4j.tl.PhotoPathSize data) {
-        this.client = Objects.requireNonNull(client);
+    public PhotoPathSize(telegram4j.tl.PhotoPathSize data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

@@ -42,11 +42,7 @@ class ChannelUpdateHandlers {
         User actor = Objects.requireNonNull(context.getUsers().get(upd.actorId()));
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                .map(d -> {
-                    User admin = Objects.requireNonNull(context.getUsers().get(d.adminId()));
-
-                    return new ExportedChatInvite(context.getClient(), d, admin);
-                })
+                .map(d -> new ExportedChatInvite(context.getClient(), d, context.getUsers().get(d.adminId())))
                 .orElse(null);
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())

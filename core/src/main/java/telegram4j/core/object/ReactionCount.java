@@ -1,25 +1,17 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.util.EntityFactory;
 
 import java.util.Objects;
 import java.util.Optional;
 
-public class ReactionCount implements TelegramObject {
+public class ReactionCount {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.ReactionCount data;
 
-    public ReactionCount(MTProtoTelegramClient client, telegram4j.tl.ReactionCount data) {
-        this.client = Objects.requireNonNull(client);
+    public ReactionCount(telegram4j.tl.ReactionCount data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     public Optional<Integer> getChosenOrder() {

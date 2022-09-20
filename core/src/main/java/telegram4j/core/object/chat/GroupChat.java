@@ -108,7 +108,7 @@ public final class GroupChat extends BaseChat {
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::notifySettings)
-                .map(d -> new PeerNotifySettings(client, d));
+                .map(PeerNotifySettings::new);
     }
 
     @Override
@@ -173,7 +173,7 @@ public final class GroupChat extends BaseChat {
      * @return The {@link EnumSet} of disallowed rights for users in this chat, if present.
      */
     public Optional<ChatBannedRightsSettings> getDefaultBannedRights() {
-        return Optional.ofNullable(minData.defaultBannedRights()).map(data -> new ChatBannedRightsSettings(client, data));
+        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatBannedRightsSettings::new);
     }
 
     /**

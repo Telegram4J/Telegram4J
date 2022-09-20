@@ -1,30 +1,21 @@
 package telegram4j.core.object.poll;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.TelegramObject;
+import telegram4j.tl.PollAnswer;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** <a href="https://core.telegram.org/api/poll">Poll</a> object, which represents active or closed poll. */
-public class Poll implements TelegramObject {
+public class Poll {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.Poll data;
 
-    public Poll(MTProtoTelegramClient client, telegram4j.tl.Poll data) {
-        this.client = Objects.requireNonNull(client);
+    public Poll(telegram4j.tl.Poll data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     /**
@@ -87,9 +78,7 @@ public class Poll implements TelegramObject {
      * @return The list of answers.
      */
     public List<PollAnswer> getAnswers() {
-        return data.answers().stream()
-                .map(d -> new PollAnswer(client, d))
-                .collect(Collectors.toList());
+        return data.answers();
     }
 
     /**

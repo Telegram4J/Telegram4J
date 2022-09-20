@@ -5,6 +5,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.util.Id;
+import telegram4j.tl.PollAnswerVoters;
 
 import java.util.List;
 import java.util.Objects;
@@ -42,10 +43,7 @@ public class PollResults implements TelegramObject {
      * @return List of poll answer results, if present.
      */
     public Optional<List<PollAnswerVoters>> getResults() {
-        return Optional.ofNullable(data.results())
-                .map(l -> l.stream()
-                        .map(d -> new PollAnswerVoters(client, d))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(data.results());
     }
 
     /**

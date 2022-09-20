@@ -1,24 +1,16 @@
 package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.util.List;
 import java.util.Objects;
 
 public class PhotoSizeProgressive implements PhotoSize {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.PhotoSizeProgressive data;
 
-    public PhotoSizeProgressive(MTProtoTelegramClient client, telegram4j.tl.PhotoSizeProgressive data) {
-        this.client = Objects.requireNonNull(client);
+    public PhotoSizeProgressive(telegram4j.tl.PhotoSizeProgressive data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

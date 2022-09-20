@@ -11,6 +11,7 @@ import telegram4j.core.util.Variant2;
 import telegram4j.tl.ChannelParticipantsFilter;
 import telegram4j.tl.InputGroupCall;
 import telegram4j.tl.InputStickerSet;
+import telegram4j.tl.RestrictionReason;
 
 import java.time.Instant;
 import java.util.EnumSet;

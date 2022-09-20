@@ -2,24 +2,16 @@ package telegram4j.core.object.media;
 
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.util.TlEntityUtil;
 
 import java.util.Objects;
 
 public class PhotoStrippedSize implements PhotoSize {
 
-    private final MTProtoTelegramClient client;
     private final telegram4j.tl.PhotoStrippedSize data;
 
-    public PhotoStrippedSize(MTProtoTelegramClient client, telegram4j.tl.PhotoStrippedSize data) {
-        this.client = Objects.requireNonNull(client);
+    public PhotoStrippedSize(telegram4j.tl.PhotoStrippedSize data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     @Override

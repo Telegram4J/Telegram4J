@@ -112,11 +112,7 @@ class ChatUpdateHandlers {
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                .map(d -> {
-                    User admin = Objects.requireNonNull(context.getUsers().get(d.adminId()));
-
-                    return new ExportedChatInvite(context.getClient(), d, admin);
-                })
+                .map(d -> new ExportedChatInvite(context.getClient(), d, context.getUsers().get(d.adminId())))
                 .orElse(null);
         GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(upd.chatId()));
         User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));

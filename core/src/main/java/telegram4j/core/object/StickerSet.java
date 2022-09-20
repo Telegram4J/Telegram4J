@@ -90,7 +90,7 @@ public class StickerSet implements TelegramObject {
     public Optional<List<PhotoSize>> getThumbs() {
         return Optional.ofNullable(data.thumbs())
                 .map(l -> l.stream()
-                        .map(d -> EntityFactory.createPhotoSize(client, d))
+                        .map(EntityFactory::createPhotoSize)
                         .collect(Collectors.toList()));
     }
 

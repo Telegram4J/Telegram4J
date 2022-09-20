@@ -31,8 +31,8 @@ public class VideoSize implements TelegramObject {
      * Gets single-char type of applied transformations to video.
      * Can be one of these chars:
      * <ul>
-     *   <li>{@code u}: if it's a profile photo.</li>
-     *   <li>{@code v}: if it's a trimmed and downscaled video previews.</li>
+     *   <li>{@code 'u'}: if it's a profile photo.</li>
+     *   <li>{@code 'v'}: if it's a trimmed and downscaled video previews.</li>
      * </ul>
      *
      * @return The single-char type of applied transformations.

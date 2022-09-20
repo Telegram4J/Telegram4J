@@ -43,7 +43,7 @@ public class MessageReactions implements TelegramObject {
      */
     public List<ReactionCount> getResults() {
         return data.results().stream()
-                .map(d -> new ReactionCount(client, d))
+                .map(ReactionCount::new)
                 .collect(Collectors.toList());
     }
 

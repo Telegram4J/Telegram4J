@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -10,19 +9,11 @@ import java.util.Optional;
 
 import static telegram4j.tl.PeerSettings.*;
 
-public class PeerSettings implements TelegramObject {
-
-    private final MTProtoTelegramClient client;
+public class PeerSettings {
     private final telegram4j.tl.PeerSettings data;
 
-    public PeerSettings(MTProtoTelegramClient client, telegram4j.tl.PeerSettings data) {
-        this.client = Objects.requireNonNull(client);
+    public PeerSettings(telegram4j.tl.PeerSettings data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     public EnumSet<Flag> getFlags() {
