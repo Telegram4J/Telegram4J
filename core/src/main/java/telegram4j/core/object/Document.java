@@ -35,7 +35,9 @@ public class Document implements TelegramObject {
         this.data = Objects.requireNonNull(data);
         this.fileName = fileName;
 
-        this.fileReferenceId = FileReferenceId.ofDocument(data, messageId, peer);
+        this.fileReferenceId = data.identifier() == BaseDocument.ID
+                ? FileReferenceId.ofDocument((BaseDocument) data, '\0', messageId, peer)
+                : FileReferenceId.ofDocument((WebDocument) data, messageId, peer);
     }
 
     @Override
@@ -139,9 +141,9 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets {@link List} of {@link PhotoSize thumbnails} for this document, if present.
+     * Gets <i>mutable</i> {@link List} of {@link PhotoSize thumbnails} for this document, if present.
      *
-     * @return The {@link List} of {@link PhotoSize thumbnails} for this document, if present.
+     * @return The <i>mutable</i> {@link List} of {@link PhotoSize thumbnails} for this document, if present.
      */
     public Optional<List<PhotoSize>> getThumbs() {
         if (data.identifier() != BaseDocument.ID) {
@@ -154,9 +156,9 @@ public class Document implements TelegramObject {
     }
 
     /**
-     * Gets {@link List} of {@link VideoSize video thumbnails} for this document, if present.
+     * Gets <i>mutable</i> {@link List} of {@link VideoSize video thumbnails} for this document, if present.
      *
-     * @return The {@link List} of {@link VideoSize video thumbnails} for this document, if present.
+     * @return The <i>mutable</i> {@link List} of {@link VideoSize video thumbnails} for this document, if present.
      */
     public Optional<List<VideoSize>> getVideoThumbs() {
         if (data.identifier() != BaseDocument.ID) {
@@ -206,7 +208,7 @@ public class Document implements TelegramObject {
         return "Document{" +
                 "data=" + data +
                 ", fileName='" + fileName + '\'' +
-                ", fileReferenceId='" + fileReferenceId + '\'' +
+                ", fileReferenceId=" + fileReferenceId +
                 '}';
     }
 }

@@ -39,7 +39,7 @@ public class MessageReactions implements TelegramObject {
     /**
      * Gets list of count of reactions.
      *
-     * @return The {@link List} of count of reactions.
+     * @return The mutable {@link List} of count of reactions.
      */
     public List<ReactionCount> getResults() {
         return data.results().stream()
@@ -50,7 +50,7 @@ public class MessageReactions implements TelegramObject {
     /**
      * Gets list of recent peers and their reactions.
      *
-     * @return The {@link List} of recent peers and their reactions.
+     * @return The mutable {@link List} of recent peers and their reactions.
      */
     public Optional<List<MessagePeerReaction>> getRecentReactions() {
         return Optional.ofNullable(data.recentReactions())

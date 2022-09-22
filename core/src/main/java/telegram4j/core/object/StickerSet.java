@@ -25,8 +25,8 @@ public class StickerSet implements TelegramObject {
         this.data = Objects.requireNonNull(data);
 
         Integer ver = data.thumbVersion();
-        this.fileReferenceId = ver != null ? FileReferenceId.ofStickerSet(ImmutableInputStickerSetID.of(
-                data.id(), data.accessHash()), ver) : null;
+        this.fileReferenceId = ver != null ? FileReferenceId.ofStickerSet(
+                ImmutableInputStickerSetID.of(data.id(), data.accessHash()), ver) : null;
     }
 
     @Override
@@ -43,28 +43,42 @@ public class StickerSet implements TelegramObject {
         return Optional.ofNullable(fileReferenceId);
     }
 
+    /**
+     * Gets type of sticker set.
+     *
+     * @return The {@link Type} of sticker set.
+     */
+    public Type getType() {
+        return data.emojis() ? Type.CUSTOM_EMOJI :
+                data.masks() ? Type.MASK : Type.REGULAR;
+    }
+
+    /**
+     * Gets type of stickers contained in this sticker pack.
+     *
+     * @return The {@link Sticker.Type} of stickers.
+     */
+    public Sticker.Type getStickerType() {
+        return data.animated() ? Sticker.Type.ANIMATED :
+                data.videos() ? Sticker.Type.VIDEO : Sticker.Type.STATIC;
+    }
+
+    /**
+     * Gets whether sticker set is archived.
+     *
+     * @return {@code true} if sticker set is archived.
+     */
     public boolean isArchived() {
         return data.archived();
     }
 
+    /**
+     * Gets whether sticker set is created by Telegram.
+     *
+     * @return {@code true} if sticker set is created by Telegram.
+     */
     public boolean isOfficial() {
         return data.official();
-    }
-
-    public boolean isMasks() {
-        return data.masks();
-    }
-
-    public boolean isAnimated() {
-        return data.animated();
-    }
-
-    public boolean isVideos() {
-        return data.videos();
-    }
-
-    public boolean isEmojis() {
-        return data.emojis();
     }
 
     public Optional<Instant> getInstallTimestamp() {
@@ -133,5 +147,17 @@ public class StickerSet implements TelegramObject {
                 "data=" + data +
                 ", fileReferenceId='" + fileReferenceId + '\'' +
                 '}';
+    }
+
+    /** Types of sticker sets. */
+    public enum Type {
+        /** Regular sticker set that can contains any type of {@link Sticker.Type stickers}. */
+        REGULAR,
+
+        /** Mask set with {@link StickerSet#getStickerType() element type} {@link Sticker.Type#STATIC}. */
+        MASK,
+
+        /** Custom emoji set that can contains any type of {@link Sticker.Type emojis}. */
+        CUSTOM_EMOJI
     }
 }

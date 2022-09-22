@@ -27,10 +27,10 @@ public final class ReplyInlineMarkup extends ReplyMarkup {
     }
 
     /**
-     * Gets nested lists with {@link KeyboardButton}
+     * Gets nested mutable lists with {@link KeyboardButton}
      * which contains only {@link KeyboardButton.Type#isInlineOnly(KeyboardButton.Type) inline} buttons.
      *
-     * @return The nested with {@link KeyboardButton inline buttons}.
+     * @return The nested mutable lists with {@link KeyboardButton inline buttons}.
      */
     public List<List<KeyboardButton>> getRows() {
         return data.rows().stream()

@@ -295,16 +295,6 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onUserUpdate(User payload) {
-        return delegate.onUserUpdate(payload);
-    }
-
-    @Override
-    public Mono<Void> onChatUpdate(Chat payload) {
-        return delegate.onChatUpdate(payload);
-    }
-
-    @Override
     public Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
         return delegate.onChatUpdate(payload);
     }

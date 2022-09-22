@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A tuple which holds only one non-null value of specified types.
@@ -47,6 +48,35 @@ public class Variant2<T1, T2> {
     public static <T1, T2> Variant2<T1, T2> ofT2(T2 t2) {
         Objects.requireNonNull(t2);
         return new Variant2<>(null, t2);
+    }
+
+    /**
+     * Create a {@code Variant2} with one of the non-null values.
+     *
+     * @throws IllegalArgumentException if no {@code null} values
+     * @param t1 The first value in the tuple, may be null
+     * @param t2 The second value in the tuple, may be null
+     * @param <T1> The type of the first value
+     * @param <T2> The type of the second value
+     * @return The new {@code Variant2}.
+     */
+    public static <T1, T2> Variant2<T1, T2> of(@Nullable T1 t1, @Nullable T2 t2) {
+        if (t1 == null && t2 == null || t1 != null && t2 != null) {
+            throw new IllegalArgumentException("Unexpected variants, t1: " + t1 + ", t2: " + t2);
+        }
+        return new Variant2<>(t1, t2);
+    }
+
+    /**
+     * Map the available value into a different value and type.
+     *
+     * @param mapT1 The mapping {@link Function} for the {@code t1} parameter
+     * @param mapT2 The mapping {@link Function} for the {@code t2} parameter
+     * @param <R> The return type of mapping functions
+     * @return The mapping result.
+     */
+    public <R> R map(Function<? super T1, ? extends R> mapT1, Function<? super T2, ? extends R> mapT2) {
+        return t1 != null ? mapT1.apply(t1) : mapT2.apply(t2);
     }
 
     /**

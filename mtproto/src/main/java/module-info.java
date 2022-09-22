@@ -1,12 +1,13 @@
 module telegram4j.mtproto {
-    requires io.netty.buffer;
     requires reactor.core;
+    requires reactor.extra;
     requires reactor.netty.core;
-    requires com.github.benmanes.caffeine;
+    requires org.reactivestreams;
+    requires io.netty.buffer;
     requires io.netty.codec;
     requires io.netty.common;
-    requires org.reactivestreams;
     requires io.netty.transport;
+    requires com.github.benmanes.caffeine;
     requires com.fasterxml.jackson.databind;
 
     requires transitive telegram4j.tl;

@@ -2,6 +2,7 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.media.GeoPoint;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChannelLocation;
 import telegram4j.tl.BaseGeoPoint;

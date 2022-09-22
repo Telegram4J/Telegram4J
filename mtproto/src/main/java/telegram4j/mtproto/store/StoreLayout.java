@@ -218,11 +218,7 @@ public interface StoreLayout {
 
     Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users);
 
-    Mono<Void> onUserUpdate(User payload);
-
     Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
-
-    Mono<Void> onChatUpdate(Chat payload);
 
     Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
 

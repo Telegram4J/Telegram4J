@@ -21,7 +21,7 @@ public abstract class ReplyMarkup implements TelegramObject {
     public abstract Type getType();
 
     @Override
-    public MTProtoTelegramClient getClient() {
+    public final MTProtoTelegramClient getClient() {
         return client;
     }
 
@@ -29,16 +29,6 @@ public abstract class ReplyMarkup implements TelegramObject {
         INLINE,
         FORCE,
         HIDE,
-        KEYBOARD;
-
-        public static Type of(telegram4j.tl.ReplyMarkup data) {
-            switch (data.identifier()) {
-                case telegram4j.tl.ReplyInlineMarkup.ID: return INLINE;
-                case telegram4j.tl.ReplyKeyboardForceReply.ID: return FORCE;
-                case telegram4j.tl.ReplyKeyboardHide.ID: return HIDE;
-                case telegram4j.tl.ReplyKeyboardMarkup.ID: return KEYBOARD;
-                default: throw new IllegalArgumentException("Unknown reply markup type: " + data);
-            }
-        }
+        KEYBOARD
     }
 }

@@ -50,9 +50,9 @@ public class MessagePeerReaction implements TelegramObject {
     }
 
     /**
-     * Gets custom or default emoji reaction.
+     * Gets custom or unicode emoji reaction.
      *
-     * @return The custom or default emoji reaction.
+     * @return The custom or unicode emoji reaction.
      */
     public Reaction getReaction() {
         return EntityFactory.createReaction(data.reaction());

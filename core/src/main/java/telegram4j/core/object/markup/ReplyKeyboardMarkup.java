@@ -52,9 +52,9 @@ public final class ReplyKeyboardMarkup extends ReplyMarkup {
     }
 
     /**
-     * Gets nested lists with reply {@link KeyboardButton buttons}.
+     * Gets nested mutable lists with reply {@link KeyboardButton buttons}.
      *
-     * @return The nested with {@link KeyboardButton reply buttons}.
+     * @return The nested mutable lists with {@link KeyboardButton reply buttons}.
      */
     public List<List<KeyboardButton>> getRows() {
         return data.rows().stream()

@@ -59,12 +59,13 @@ public class MessageReplies implements TelegramObject {
     /**
      * Gets list of the last few comment posters ids, if present.
      *
-     * @return The {@link List} of the last few comment posters ids, if present.
+     * @return The mutable {@link List} of the last few comment posters ids, if present.
      */
     public Optional<List<Id>> getRecentRepliers() {
-        return Optional.ofNullable(data.recentRepliers()).map(list -> list.stream()
-                .map(Id::of)
-                .collect(Collectors.toList()));
+        return Optional.ofNullable(data.recentRepliers())
+                .map(list -> list.stream()
+                        .map(Id::of)
+                        .collect(Collectors.toList()));
     }
 
     /**

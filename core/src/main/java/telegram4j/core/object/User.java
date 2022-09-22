@@ -272,7 +272,7 @@ public class User implements PeerEntity {
                 .map(ChatAdminRights::of);
     }
 
-    // TODO:
+    // TODO: implement
     // @Nullable
     // List<PremiumGiftOption> premiumGifts();
 

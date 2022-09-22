@@ -1,4 +1,4 @@
-package telegram4j.core.object.poll;
+package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;

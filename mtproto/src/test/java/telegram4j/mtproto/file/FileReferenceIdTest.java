@@ -30,7 +30,7 @@ class FileReferenceIdTest {
                 .size(-1)
                 .build(), 2, InputPeerSelf.instance());
         var expChatPhoto = ofChatPhoto(ImmutableBaseUserProfilePhoto.of(0, 1337, 2),
-                PhotoSizeType.CHAT_PHOTO_BIG, -1, InputPeerSelf.instance());
+                true, -1, InputPeerSelf.instance());
         var expMinPhoto = ofChatPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
@@ -43,7 +43,7 @@ class FileReferenceIdTest {
                         .size(-1)
                         .build()))
                 .dcId(2)
-                .build(), 1337, ImmutableInputPeerUser.of(1234, -4321));
+                .build(), 'i', 1337, ImmutableInputPeerUser.of(1234, -4321));
         var expDocument = ofDocument(BaseDocument.builder()
                 .id(1337)
                 .accessHash(-1111)
@@ -60,7 +60,7 @@ class FileReferenceIdTest {
                 .mimeType("")
                 .size(-1)
                 .attributes(List.of())
-                .build(), 1, InputPeerSelf.instance());
+                .build(), '\0', 1, InputPeerSelf.instance());
         var expPhoto = ofPhoto(BasePhoto.builder()
                 .id(1337)
                 .accessHash(-1111)
@@ -73,7 +73,7 @@ class FileReferenceIdTest {
                         .size(-1)
                         .build()))
                 .dcId(2)
-                .build(), 1, InputPeerSelf.instance());
+                .build(), '\0', 1, InputPeerSelf.instance());
         var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2);
 
         var actWebDocumentNoProxy = serialize(expWebDocumentNoProxy);

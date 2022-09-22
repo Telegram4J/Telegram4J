@@ -8,33 +8,12 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.MessageAction;
+import telegram4j.core.object.MessageMedia;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.*;
-import telegram4j.core.object.action.MessageAction;
-import telegram4j.core.object.action.MessageActionBotAllowed;
-import telegram4j.core.object.action.MessageActionChannelCreate;
-import telegram4j.core.object.action.MessageActionChannelMigrateFrom;
-import telegram4j.core.object.action.MessageActionChatAddUser;
-import telegram4j.core.object.action.MessageActionChatCreate;
-import telegram4j.core.object.action.MessageActionChatDeleteUser;
-import telegram4j.core.object.action.MessageActionChatEditPhoto;
-import telegram4j.core.object.action.MessageActionChatEditTitle;
-import telegram4j.core.object.action.MessageActionChatJoinedByLink;
-import telegram4j.core.object.action.MessageActionChatMigrateTo;
-import telegram4j.core.object.action.MessageActionGameScore;
-import telegram4j.core.object.action.MessageActionGeoProximityReached;
-import telegram4j.core.object.action.MessageActionGroupCall;
-import telegram4j.core.object.action.MessageActionGroupCallScheduled;
-import telegram4j.core.object.action.MessageActionInviteToGroupCall;
-import telegram4j.core.object.action.MessageActionPaymentSent;
-import telegram4j.core.object.action.MessageActionPaymentSentMe;
-import telegram4j.core.object.action.MessageActionPhoneCall;
-import telegram4j.core.object.action.MessageActionSecureValuesSent;
-import telegram4j.core.object.action.MessageActionSecureValuesSentMe;
-import telegram4j.core.object.action.MessageActionSetChatTheme;
-import telegram4j.core.object.action.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.*;
@@ -43,18 +22,6 @@ import telegram4j.core.object.markup.ReplyKeyboardForceReply;
 import telegram4j.core.object.markup.ReplyKeyboardHide;
 import telegram4j.core.object.markup.ReplyKeyboardMarkup;
 import telegram4j.core.object.markup.ReplyMarkup;
-import telegram4j.core.object.media.MessageMedia;
-import telegram4j.core.object.media.MessageMediaContact;
-import telegram4j.core.object.media.MessageMediaDice;
-import telegram4j.core.object.media.MessageMediaDocument;
-import telegram4j.core.object.media.MessageMediaGame;
-import telegram4j.core.object.media.MessageMediaGeo;
-import telegram4j.core.object.media.MessageMediaGeoLive;
-import telegram4j.core.object.media.MessageMediaInvoice;
-import telegram4j.core.object.media.MessageMediaPhoto;
-import telegram4j.core.object.media.MessageMediaPoll;
-import telegram4j.core.object.media.MessageMediaVenue;
-import telegram4j.core.object.media.MessageMediaWebPage;
 import telegram4j.core.object.media.PhotoCachedSize;
 import telegram4j.core.object.media.PhotoPathSize;
 import telegram4j.core.object.media.PhotoSize;
@@ -101,6 +68,7 @@ public final class EntityFactory {
                 Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
                 return new UserStatus(UserStatus.Type.ONLINE, expiresTimestamp, null);
             case UserStatusRecently.ID: return new UserStatus(UserStatus.Type.RECENTLY);
+            // and UserStatusEmpty
             default: throw new IllegalArgumentException("Unknown UserStatus type: " + data);
         }
     }
@@ -145,14 +113,12 @@ public final class EntityFactory {
                 }
 
                 User mappedFullUser = new User(client, userFull.fullUser(), minData);
-
                 return new PrivateChat(client, mappedFullUser, selfUser);
             }
             case BaseUser.ID:
                 BaseUser baseUser = (BaseUser) possibleChat;
 
                 User mappedMinUser = new User(client, baseUser);
-
                 return new PrivateChat(client, mappedMinUser, selfUser);
             case BaseChat.ID:
                 BaseChat baseChat = (BaseChat) possibleChat;
@@ -187,7 +153,7 @@ public final class EntityFactory {
                                 case BaseChat.ID:
                                 case Channel.ID:
                                     return c;
-                                default: throw new IllegalArgumentException("Unknown chat type: " + c);
+                                default: throw new IllegalArgumentException("Unknown Chat type: " + c);
                             }
                         })
                         .orElse(null);
@@ -241,7 +207,7 @@ public final class EntityFactory {
                                 .orElse(null);
                         break;
                     }
-                    default: throw new IllegalStateException("Unknown chat participants type: " + chat.participants());
+                    default: throw new IllegalStateException("Unknown ChatParticipants type: " + chat.participants());
                 }
 
                 return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData, exportedChatInvite, chatParticipants);
@@ -283,64 +249,64 @@ public final class EntityFactory {
                                                     InputPeer peer, int messageId) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageActionBotAllowed.ID:
-                return new MessageActionBotAllowed(client, (telegram4j.tl.MessageActionBotAllowed) data);
+                return new MessageAction.BotAllowed(client, (telegram4j.tl.MessageActionBotAllowed) data);
             case telegram4j.tl.MessageActionChannelCreate.ID:
-                return new MessageActionChannelCreate(client, (telegram4j.tl.MessageActionChannelCreate) data);
+                return new MessageAction.ChannelCreate(client, (telegram4j.tl.MessageActionChannelCreate) data);
             case telegram4j.tl.MessageActionChannelMigrateFrom.ID:
-                return new MessageActionChannelMigrateFrom(client, (telegram4j.tl.MessageActionChannelMigrateFrom) data);
+                return new MessageAction.ChannelMigrateFrom(client, (telegram4j.tl.MessageActionChannelMigrateFrom) data);
             case telegram4j.tl.MessageActionChatAddUser.ID:
-                return new MessageActionChatAddUser(client, (telegram4j.tl.MessageActionChatAddUser) data);
+                return new MessageAction.ChatAddUser(client, (telegram4j.tl.MessageActionChatAddUser) data);
             case telegram4j.tl.MessageActionChatCreate.ID:
-                return new MessageActionChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
+                return new MessageAction.ChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
             case telegram4j.tl.MessageActionChatDeleteUser.ID:
-                return new MessageActionChatDeleteUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
-            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageActionChatEditPhoto(client);
+                return new MessageAction.ChatDeleteUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
+            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageAction.ChatEditPhoto(client);
             case telegram4j.tl.MessageActionChatEditPhoto.ID:
-                return new MessageActionChatEditPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data, peer, messageId);
+                return new MessageAction.ChatEditPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data, peer, messageId);
             case telegram4j.tl.MessageActionChatEditTitle.ID:
-                return new MessageActionChatEditTitle(client, (telegram4j.tl.MessageActionChatEditTitle) data);
+                return new MessageAction.ChatEditTitle(client, (telegram4j.tl.MessageActionChatEditTitle) data);
             case telegram4j.tl.MessageActionChatJoinedByLink.ID:
-                return new MessageActionChatJoinedByLink(client, (telegram4j.tl.MessageActionChatJoinedByLink) data);
+                return new MessageAction.ChatJoinedByLink(client, (telegram4j.tl.MessageActionChatJoinedByLink) data);
             case telegram4j.tl.MessageActionChatJoinedByRequest.ID:
-                return new BaseMessageAction(client, MessageAction.Type.CHAT_JOINED_BY_REQUEST);
+                return new MessageAction(client, MessageAction.Type.CHAT_JOINED_BY_REQUEST);
             case telegram4j.tl.MessageActionChatMigrateTo.ID:
-                return new MessageActionChatMigrateTo(client, (telegram4j.tl.MessageActionChatMigrateTo) data);
+                return new MessageAction.ChatMigrateTo(client, (telegram4j.tl.MessageActionChatMigrateTo) data);
             case telegram4j.tl.MessageActionContactSignUp.ID:
-                return new BaseMessageAction(client, MessageAction.Type.CONTACT_SIGN_UP);
+                return new MessageAction(client, MessageAction.Type.CONTACT_SIGN_UP);
             case telegram4j.tl.MessageActionCustomAction.ID:
-                return new MessageActionCustom(client, (telegram4j.tl.MessageActionCustomAction) data);
+                return new MessageAction.Custom(client, (telegram4j.tl.MessageActionCustomAction) data);
             case telegram4j.tl.MessageActionGameScore.ID:
-                return new MessageActionGameScore(client, (telegram4j.tl.MessageActionGameScore) data);
+                return new MessageAction.GameScore(client, (telegram4j.tl.MessageActionGameScore) data);
             case telegram4j.tl.MessageActionGeoProximityReached.ID:
-                return new MessageActionGeoProximityReached(client, (telegram4j.tl.MessageActionGeoProximityReached) data);
+                return new MessageAction.GeoProximityReached(client, (telegram4j.tl.MessageActionGeoProximityReached) data);
             case telegram4j.tl.MessageActionGroupCall.ID:
-                return new MessageActionGroupCall(client, (telegram4j.tl.MessageActionGroupCall) data);
+                return new MessageAction.GroupCall(client, (telegram4j.tl.MessageActionGroupCall) data);
             case telegram4j.tl.MessageActionGroupCallScheduled.ID:
-                return new MessageActionGroupCallScheduled(client, (telegram4j.tl.MessageActionGroupCallScheduled) data);
+                return new MessageAction.GroupCallScheduled(client, (telegram4j.tl.MessageActionGroupCallScheduled) data);
             case telegram4j.tl.MessageActionHistoryClear.ID:
-                return new BaseMessageAction(client, MessageAction.Type.HISTORY_CLEAR);
+                return new MessageAction(client, MessageAction.Type.HISTORY_CLEAR);
             case telegram4j.tl.MessageActionInviteToGroupCall.ID:
-                return new MessageActionInviteToGroupCall(client, (telegram4j.tl.MessageActionInviteToGroupCall) data);
+                return new MessageAction.InviteToGroupCall(client, (telegram4j.tl.MessageActionInviteToGroupCall) data);
             case telegram4j.tl.MessageActionPaymentSent.ID:
-                return new MessageActionPaymentSent(client, (telegram4j.tl.MessageActionPaymentSent) data);
+                return new MessageAction.PaymentSent(client, (telegram4j.tl.MessageActionPaymentSent) data);
             case telegram4j.tl.MessageActionPaymentSentMe.ID:
-                return new MessageActionPaymentSentMe(client, (telegram4j.tl.MessageActionPaymentSentMe) data);
+                return new MessageAction.PaymentSentMe(client, (telegram4j.tl.MessageActionPaymentSentMe) data);
             case telegram4j.tl.MessageActionPhoneCall.ID:
-                return new MessageActionPhoneCall(client, (telegram4j.tl.MessageActionPhoneCall) data);
+                return new MessageAction.PhoneCall(client, (telegram4j.tl.MessageActionPhoneCall) data);
             case telegram4j.tl.MessageActionPinMessage.ID:
-                return new BaseMessageAction(client, MessageAction.Type.PIN_MESSAGE);
+                return new MessageAction(client, MessageAction.Type.PIN_MESSAGE);
             case telegram4j.tl.MessageActionScreenshotTaken.ID:
-                return new BaseMessageAction(client, MessageAction.Type.SCREENSHOT_TAKEN);
+                return new MessageAction(client, MessageAction.Type.SCREENSHOT_TAKEN);
             case telegram4j.tl.MessageActionSecureValuesSent.ID:
-                return new MessageActionSecureValuesSent(client, (telegram4j.tl.MessageActionSecureValuesSent) data);
+                return new MessageAction.SecureValuesSent(client, (telegram4j.tl.MessageActionSecureValuesSent) data);
             case telegram4j.tl.MessageActionSecureValuesSentMe.ID:
-                return new MessageActionSecureValuesSentMe(client, (telegram4j.tl.MessageActionSecureValuesSentMe) data);
+                return new MessageAction.SecureValuesSentMe(client, (telegram4j.tl.MessageActionSecureValuesSentMe) data);
             case telegram4j.tl.MessageActionSetChatTheme.ID:
-                return new MessageActionSetChatTheme(client, (telegram4j.tl.MessageActionSetChatTheme) data);
+                return new MessageAction.SetChatTheme(client, (telegram4j.tl.MessageActionSetChatTheme) data);
             case telegram4j.tl.MessageActionSetMessagesTTL.ID:
-                return new MessageActionSetMessagesTtl(client, (telegram4j.tl.MessageActionSetMessagesTTL) data);
+                return new MessageAction.SetMessagesTtl(client, (telegram4j.tl.MessageActionSetMessagesTTL) data);
             default:
-                throw new IllegalArgumentException("Unknown message action type: " + data);
+                throw new IllegalArgumentException("Unknown MessageAction type: " + data);
         }
     }
 
@@ -348,29 +314,29 @@ public final class EntityFactory {
                                                   int messageId, InputPeer peer) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageMediaPhoto.ID:
-                return new MessageMediaPhoto(client, (telegram4j.tl.MessageMediaPhoto) data, messageId, peer);
+                return new MessageMedia.Photo(client, (telegram4j.tl.MessageMediaPhoto) data, messageId, peer);
             case telegram4j.tl.MessageMediaGeo.ID:
-                return new MessageMediaGeo(client, (telegram4j.tl.MessageMediaGeo) data);
+                return new MessageMedia.Geo(client, (telegram4j.tl.MessageMediaGeo) data);
             case telegram4j.tl.MessageMediaContact.ID:
-                return new MessageMediaContact(client, (telegram4j.tl.MessageMediaContact) data);
+                return new MessageMedia.Contact(client, (telegram4j.tl.MessageMediaContact) data);
             case telegram4j.tl.MessageMediaUnsupported.ID:
-                return new BaseMessageMedia(client, MessageMedia.Type.UNSUPPORTED);
+                return new MessageMedia(client, MessageMedia.Type.UNSUPPORTED);
             case telegram4j.tl.MessageMediaDocument.ID:
-                return new MessageMediaDocument(client, (telegram4j.tl.MessageMediaDocument) data, messageId, peer);
+                return new MessageMedia.Document(client, (telegram4j.tl.MessageMediaDocument) data, messageId, peer);
             case telegram4j.tl.MessageMediaWebPage.ID:
-                return new MessageMediaWebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
+                return new MessageMedia.WebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
             case telegram4j.tl.MessageMediaVenue.ID:
-                return new MessageMediaVenue(client, (telegram4j.tl.MessageMediaVenue) data);
+                return new MessageMedia.Venue(client, (telegram4j.tl.MessageMediaVenue) data);
             case telegram4j.tl.MessageMediaGame.ID:
-                return new MessageMediaGame(client, (telegram4j.tl.MessageMediaGame) data, messageId, peer);
+                return new MessageMedia.Game(client, (telegram4j.tl.MessageMediaGame) data, messageId, peer);
             case telegram4j.tl.MessageMediaInvoice.ID:
-                return new MessageMediaInvoice(client, (telegram4j.tl.MessageMediaInvoice) data, messageId, peer);
+                return new MessageMedia.Invoice(client, (telegram4j.tl.MessageMediaInvoice) data, messageId, peer);
             case telegram4j.tl.MessageMediaGeoLive.ID:
-                return new MessageMediaGeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
+                return new MessageMedia.GeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
             case telegram4j.tl.MessageMediaPoll.ID:
-                return new MessageMediaPoll(client, (telegram4j.tl.MessageMediaPoll) data);
+                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data);
             case telegram4j.tl.MessageMediaDice.ID:
-                return new MessageMediaDice(client, (telegram4j.tl.MessageMediaDice) data);
+                return new MessageMedia.Dice(client, (telegram4j.tl.MessageMediaDice) data);
             default:
                 throw new IllegalArgumentException("Unknown message action type: " + data);
         }
@@ -410,13 +376,12 @@ public final class EntityFactory {
         telegram4j.tl.DocumentAttributeAudio audioData = null;
         telegram4j.tl.DocumentAttributeSticker stickerData = null;
         telegram4j.tl.DocumentAttributeImageSize sizeData = null;
-        // TODO: test
-        telegram4j.tl.DocumentAttributeCustomEmoji customEmojiData = null;
+        telegram4j.tl.DocumentAttributeCustomEmoji emojiData = null;
         String fileName = null;
         for (var a : data.attributes()) {
             switch (a.identifier()) {
                 case telegram4j.tl.DocumentAttributeCustomEmoji.ID:
-                    customEmojiData = (DocumentAttributeCustomEmoji) a;
+                    emojiData = (DocumentAttributeCustomEmoji) a;
                     break;
                 case telegram4j.tl.DocumentAttributeHasStickers.ID:
                     hasStickers = true;
@@ -440,13 +405,18 @@ public final class EntityFactory {
                     videoData = (telegram4j.tl.DocumentAttributeVideo) a;
                     break;
                 default:
-                    throw new IllegalArgumentException("Unknown document attribute type: " + a);
+                    throw new IllegalArgumentException("Unknown DocumentAttribute type: " + a);
             }
         }
 
         if (stickerData != null) {
             return new Sticker(client, data, fileName,
-                    messageId, peer, stickerData, sizeData, videoData);
+                    messageId, peer, stickerData, Variant2.of(sizeData, videoData));
+        }
+
+        if (emojiData != null) {
+            return new CustomEmoji(client, data, fileName,
+                    messageId, peer, emojiData, Variant2.of(sizeData, videoData));
         }
 
         if (audioData != null) {
@@ -541,16 +511,13 @@ public final class EntityFactory {
             InlineResultDocumentSpec r = (InlineResultDocumentSpec) spec;
 
             DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
-            if (documentType == DocumentType.UNKNOWN) {
-                return Mono.error(new IllegalArgumentException("Unexpected document type."));
-            }
 
             String type = documentType == DocumentType.GENERAL ? "file" : documentType.name().toLowerCase(Locale.ROOT);
             try {
                 FileReferenceId fileRefId = FileReferenceId.deserialize(r.file());
                 InputDocument document = fileRefId.asInputDocument();
 
-                if (r.type().map(t -> fileRefId.getDocumentType() != t).orElse(false)) {
+                if (r.type().map(t -> fileRefId.getDocumentType().orElseThrow() != t).orElse(false)) {
                     throw new IllegalArgumentException("Document type mismatch. File ref id: "
                             + fileRefId.getDocumentType() + ", type: " + documentType);
                 }

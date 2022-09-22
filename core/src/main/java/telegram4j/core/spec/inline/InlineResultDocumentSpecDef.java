@@ -11,7 +11,7 @@ interface InlineResultDocumentSpecDef extends InlineResultSpec {
 
     /**
      * @return The type of web file, if absent {@link telegram4j.mtproto.file.FileReferenceId.DocumentType#GENERAL}
-     * would be used. Must be not {@link telegram4j.mtproto.file.FileReferenceId.DocumentType#UNKNOWN}.
+     * would be used.
      */
     Optional<DocumentType> type();
 

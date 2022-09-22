@@ -17,15 +17,6 @@ import java.util.Optional;
 
 /** A {@link GroupChat chat}/{@link Channel channel} participant implementation. */
 public final class ChatParticipant implements TelegramObject {
-    /*
-     * This is a too complex type from polymorphism side, and
-     * it's mapping looks quite specific (ugly!).
-     * It may be worth removing the switches and replacing them
-     * with fields, but this type has collections, and more specifically
-     * an EnumSet, which is not immutable, but it can't
-     * be normally wrapped to immutable set...
-     */
-
     private final MTProtoTelegramClient client;
     @Nullable
     private final PeerEntity peer;
@@ -94,7 +85,7 @@ public final class ChatParticipant implements TelegramObject {
             case ChatParticipantAdmin.ID: return Id.ofUser(((ChatParticipantAdmin) data).userId(), null);
             case ChannelParticipantBanned.ID: return Id.of(((ChannelParticipantBanned) data).peer());
             case ChannelParticipantLeft.ID: return Id.of(((ChannelParticipantLeft) data).peer());
-            default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
         }
     }
 
@@ -114,7 +105,7 @@ public final class ChatParticipant implements TelegramObject {
             case ChannelParticipantLeft.ID:
             case ChannelParticipantCreator.ID:
             case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
         }
     }
 
@@ -135,7 +126,7 @@ public final class ChatParticipant implements TelegramObject {
             case ChannelParticipantLeft.ID:
             case ChannelParticipantCreator.ID:
             case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
         }
     }
 
@@ -186,7 +177,7 @@ public final class ChatParticipant implements TelegramObject {
             case ChannelParticipantBanned.ID:
             case ChannelParticipantLeft.ID:
             case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
         }
     }
 
@@ -206,7 +197,7 @@ public final class ChatParticipant implements TelegramObject {
             case ChannelParticipantBanned.ID:
             case ChannelParticipantLeft.ID:
             case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
         }
     }
 
@@ -312,7 +303,7 @@ public final class ChatParticipant implements TelegramObject {
                 case ChatParticipantAdmin.ID: return Status.ADMIN;
                 case ChannelParticipantBanned.ID: return Status.BANNED;
                 case ChannelParticipantLeft.ID: return Status.LEFT;
-                default: throw new IllegalStateException("Unexpected chat participant type: " + data);
+                default: throw new IllegalStateException("Unexpected ChatParticipant/ChannelParticipant type: " + data);
             }
         }
     }

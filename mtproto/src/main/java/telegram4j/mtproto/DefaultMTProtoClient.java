@@ -279,7 +279,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         decrypted.readLongLE();
                         long sessionId = decrypted.readLongLE();
                         if (this.sessionId != sessionId) {
-                            return Mono.error(() -> new IllegalStateException("Incorrect session identifier. Current: 0x"
+                            return Mono.error(new IllegalStateException("Incorrect session identifier. Current: 0x"
                                     + Long.toHexString(this.sessionId) + ", received: 0x"
                                     + Long.toHexString(sessionId)));
                         }
@@ -295,6 +295,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         ByteBuf payload = decrypted.readSlice(length);
                         try {
                             TlObject obj = TlDeserializer.deserialize(payload);
+                            // check for end of input?
                             return handleServiceMessage(obj, messageId);
                         } catch (Throwable t) {
                             return Mono.error(Exceptions.propagate(t));
@@ -315,21 +316,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, payloadFlux)
                     .map(req -> {
-                        var pending = requests.entrySet().stream()
-                                .filter(e -> (e.getValue().state & PENDING) != 1)
-                                .map(Map.Entry::getKey)
-                                .collect(Collectors.toList());
-
+                        List<Long> pending;
                         // server returns -404 transport error when this packet placed in container
                         boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID;
                         int cnt = 1;
                         ByteBuf stateRequest = null;
-                        if (canContainerize && !pending.isEmpty()) {
+                        if (canContainerize && !(pending = collectPendingMessageIds()).isEmpty()) {
                             cnt++;
 
-                            var stpending = new PendingRequest(MsgsStateReq.builder()
-                                    .addAllMsgIds(pending)
-                                    .build());
+                            var stpending = new PendingRequest(ImmutableMsgsStateReq.of(pending));
 
                             long messageId = getMessageId();
                             int seqNo = updateSeqNo(false);
@@ -350,11 +345,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         if (canContainerize && !acknowledgments.isEmpty()) {
                             cnt++;
 
-                            ByteBuf data = TlSerializer.serialize(alloc, MsgsAck.builder()
-                                    .msgIds(acknowledgments)
-                                    .build());
-
+                            var acksReq = ImmutableMsgsAck.of(acknowledgments);
                             acknowledgments.clear();
+                            ByteBuf data = TlSerializer.serialize(alloc, acksReq);
 
                             long messageId = getMessageId();
                             int seqNo = updateSeqNo(false);
@@ -558,6 +551,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
                 }))
         .then(Mono.defer(() -> closeHook.asMono()));
+    }
+
+    private List<Long> collectPendingMessageIds() {
+        return requests.entrySet().stream()
+                .filter(e -> (e.getValue().state & PENDING) != 1)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableList());
     }
 
     @Override
@@ -1027,7 +1027,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .collect(Collectors.joining(", ")));
         }
 
-        var acks = MsgsAck.builder().msgIds(acknowledgments).build();
+        var acks = ImmutableMsgsAck.of(acknowledgments);
         acknowledgments.clear();
 
         return sendAwait(acks);

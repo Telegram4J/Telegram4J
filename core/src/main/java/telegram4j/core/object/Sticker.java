@@ -3,27 +3,38 @@ package telegram4j.core.object;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.MaskCoordinates;
+import telegram4j.core.util.Variant2;
 import telegram4j.tl.*;
 
+import java.time.Duration;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Inferred from {@link BaseDocumentFields#attributes()} type for all types of sticker documents. */
+/**
+ * Inferred from {@link BaseDocumentFields#attributes()} type for all types of sticker documents.
+ * The {@link #getFileName() file name} will always be available.
+ */
 public class Sticker extends Document {
 
     private final DocumentAttributeSticker stickerData;
-    @Nullable
-    private final DocumentAttributeImageSize sizeData;
-    @Nullable
-    private final DocumentAttributeVideo videoData;
+    private final Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData;
 
     public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName, int messageId,
-                   InputPeer peer, DocumentAttributeSticker stickerData, @Nullable DocumentAttributeImageSize sizeData,
-                   @Nullable DocumentAttributeVideo videoData) {
+                   InputPeer peer, DocumentAttributeSticker stickerData,
+                   Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData) {
         super(client, data, fileName, messageId, peer);
         this.stickerData = Objects.requireNonNull(stickerData);
-        this.sizeData = sizeData;
-        this.videoData = videoData;
+        this.optData = Objects.requireNonNull(optData);
+    }
+
+    /**
+     * Gets type of emoji.
+     *
+     * @return The {@link Sticker.Type} of emoji.
+     */
+    public Sticker.Type getType() {
+        return Sticker.Type.fromMimeType(getMimeType());
     }
 
     /**
@@ -32,7 +43,7 @@ public class Sticker extends Document {
      * @return The width of sticker.
      */
     public int getWidth() {
-        return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).w();
+        return optData.map(DocumentAttributeImageSize::w, DocumentAttributeVideo::w);
     }
 
     /**
@@ -41,7 +52,16 @@ public class Sticker extends Document {
      * @return The height of sticker.
      */
     public int getHeight() {
-        return sizeData != null ? sizeData.w() : Objects.requireNonNull(videoData).h();
+        return optData.map(DocumentAttributeImageSize::h, DocumentAttributeVideo::h);
+    }
+
+    /**
+     * Gets duration of video sticker, if {@link #getType()} is {@link Sticker.Type#VIDEO}.
+     *
+     * @return The duration of video sticker, if {@link #getType()} is {@link Sticker.Type#VIDEO}
+     */
+    public Optional<Duration> getDuration() {
+        return optData.getT2().map(d -> Duration.ofSeconds(d.duration()));
     }
 
     /**
@@ -84,8 +104,29 @@ public class Sticker extends Document {
     public String toString() {
         return "Sticker{" +
                 "stickerData=" + stickerData +
-                ", sizeData=" + sizeData +
-                ", videoData=" + videoData +
+                ", optData=" + optData +
                 "} " + super.toString();
+    }
+
+    /** Types of sticker set elements. */
+    public enum Type {
+        /** Represents static image sticker and emoji. */
+        STATIC,
+
+        /** Represents vector-animated sticker and emoji. */
+        ANIMATED,
+
+        /** Represents video sticker and emoji. */
+        VIDEO;
+
+        public static Type fromMimeType(String mimeType) {
+            switch (mimeType.toLowerCase(Locale.US)) {
+                case "image/png":
+                case "image/webp": return STATIC;
+                case "video/webm": return VIDEO;
+                case "application/x-tgsticker": return ANIMATED;
+                default: throw new IllegalStateException("Unexpected mime type: '" + mimeType + '\'');
+            }
+        }
     }
 }

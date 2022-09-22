@@ -3,11 +3,8 @@ package telegram4j.core;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.spec.AnswerInlineCallbackQuerySpec;
-import telegram4j.core.spec.inline.InlineMessageMediaAutoSpec;
-import telegram4j.core.spec.inline.InlineResultDocumentSpec;
-import telegram4j.core.spec.inline.SizeSpec;
-import telegram4j.core.spec.inline.WebDocumentSpec;
-import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.core.spec.inline.InlineMessageTextSpec;
+import telegram4j.core.spec.inline.InlineResultArticleSpec;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
 import java.time.Duration;
@@ -29,21 +26,15 @@ public class MTProtoBotInlineExample {
                 .withConnection(client -> {
 
                     Mono<Void> listenInline = client.on(InlineQueryEvent.class)
-                            .filter(e -> e.getQuery().equals("getf"))
+                            .filter(e -> e.getQuery().isEmpty())
                             .flatMap(e -> e.answer(AnswerInlineCallbackQuerySpec.builder()
                                     .cacheTime(CACHE_TIME)
-                                    .addResult(InlineResultDocumentSpec.builder()
+                                    .addResult(InlineResultArticleSpec.builder()
                                             .id("1")
-                                            .size(SizeSpec.of(498, 385))
-                                            .type(FileReferenceId.DocumentType.VIDEO)
-                                            .mimeType("video/mp4")
-                                            .duration(Duration.ofMillis(800))
-                                            .title("OWO!!!!")
-                                            .thumb(WebDocumentSpec.of("https://github.com/Anuken/Mindustry/blob/master/core/assets-raw/sprites/blocks/campaign/interplanetary-accelerator.png?raw=true")
-                                                    .withMimeType("image/jpeg"))
-                                            .file("https://images-ext-1.discordapp.net/external/uyLYWYm7IVqYUFIgqcXoGm5JBHzGEel9UZQIY1d2b_k/https/c.tenor.com/VqUFZ4uNMCoAAAAM/niko-dance-one-shot-dancing.gif")
-                                            .message(InlineMessageMediaAutoSpec.builder()
-                                                    .message("nya~")
+                                            .title("Telegram wikipedia page.")
+                                            .url("https://en.wikipedia.org/wiki/Telegram_(software)")
+                                            .message(InlineMessageTextSpec.builder()
+                                                    .message("Telegram wikipedia page.")
                                                     .build())
                                             .build())
                                     .build()))

@@ -36,7 +36,6 @@ import telegram4j.tl.request.messages.UpdateDialogFilter;
 import telegram4j.tl.request.messages.*;
 
 import java.util.List;
-import java.util.function.Function;
 
 import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
@@ -272,6 +271,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableImportChatInvite.of(hash));
     }
 
+    @BotCompatible
     public Mono<telegram4j.tl.messages.StickerSet> getStickerSet(InputStickerSet stickerSet, int hash) {
         return client.sendAwait(ImmutableGetStickerSet.of(stickerSet, hash));
     }
@@ -374,30 +374,22 @@ public class ChatService extends RpcService {
     }
 
     public Mono<RecentStickers> getRecentStickers(boolean attached, long hash) {
-        return client.sendAwait(GetRecentStickers.builder()
-                .attached(attached)
-                .hash(hash)
-                .build());
+        return client.sendAwait(ImmutableGetRecentStickers.of(attached ?
+                        ImmutableGetRecentStickers.ATTACHED_MASK : 0, hash));
     }
 
-    public Mono<Boolean> saveRecentSticker(boolean attached, String documentFileReferenceId, boolean unsave) {
-        return Mono.defer(() -> client.sendAwait(SaveRecentSticker.builder()
-                .attached(attached)
-                .id(FileReferenceId.deserialize(documentFileReferenceId).asInputDocument())
-                .unsave(unsave)
-                .build()));
+    public Mono<Boolean> saveRecentSticker(boolean attached, InputDocument document, boolean unsave) {
+        return client.sendAwait(ImmutableSaveRecentSticker.of(attached
+                ? ImmutableSaveRecentSticker.ATTACHED_MASK : 0, document, unsave));
     }
 
     public Mono<Boolean> clearRecentStickers(boolean attached) {
-        return client.sendAwait(ClearRecentStickers.builder().attached(attached).build());
+        return client.sendAwait(ImmutableClearRecentStickers.of(attached
+                ? ImmutableClearRecentStickers.ATTACHED_MASK : 0));
     }
 
-    public Mono<ArchivedStickers> getArchivedStickers(boolean marks, long offsetId, int limit) {
-        return client.sendAwait(GetArchivedStickers.builder()
-                .masks(marks)
-                .offsetId(offsetId)
-                .limit(limit)
-                .build());
+    public Mono<ArchivedStickers> getArchivedStickers(GetArchivedStickers request) {
+        return client.sendAwait(request);
     }
 
     public Mono<AllStickers> getMaskStickers(long hash) {
@@ -490,9 +482,8 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableGetFavedStickers.of(hash));
     }
 
-    public Mono<Boolean> faveSticker(String documentFileReferenceId, boolean unfave) {
-        return Mono.defer(() -> client.sendAwait(ImmutableFaveSticker.of(
-                FileReferenceId.deserialize(documentFileReferenceId).asInputDocument(), unfave)));
+    public Mono<Boolean> faveSticker(InputDocument document, boolean unfave) {
+        return client.sendAwait(ImmutableFaveSticker.of(document, unfave));
     }
 
     public Mono<Messages> getUnreadMentions(InputPeer peer, int offsetId, int addOffset, int limit, int maxId, int minId) {
@@ -540,19 +531,15 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
         return client.sendAwait(request)
-                .flatMap(u -> {
-                    client.updates().emitNext(u, DEFAULT_PARKING);
-
-                    return Mono.empty();
-                });
+                .flatMap(u -> Mono.fromRunnable(() -> client.updates().emitNext(u, DEFAULT_PARKING)));
     }
 
-    public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<ByteBuf> options) {
-        return client.sendAwait(SendVote.builder()
+    public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<? extends ByteBuf> options) {
+        return Mono.defer(() -> client.sendAwait(ImmutableSendVote.builder()
                 .peer(peer)
                 .msgId(msgId)
                 .options(options)
-                .build());
+                .build()));
     }
 
     public Mono<Updates> getPollResults(InputPeer peer, int msgId) {
@@ -581,10 +568,7 @@ public class ChatService extends RpcService {
     }
 
     public Mono<List<SearchCounter>> getSearchCounters(InputPeer peer, Iterable<? extends MessagesFilter> filters) {
-        return client.sendAwait(GetSearchCounters.builder()
-                .peer(peer)
-                .filters(filters)
-                .build());
+        return Mono.defer(() -> client.sendAwait(ImmutableGetSearchCounters.of(peer, filters)));
     }
 
     public Mono<UrlAuthResult> requestUrlAuth(@Nullable InputPeer peer, @Nullable Integer msgId,
@@ -645,14 +629,12 @@ public class ChatService extends RpcService {
         return client.sendAwait(request);
     }
 
-    public Flux<DialogFilter> getDialogFilters() {
-        return client.sendAwait(GetDialogFilters.instance())
-                .flatMapIterable(Function.identity());
+    public Mono<List<DialogFilter>> getDialogFilters() {
+        return client.sendAwait(GetDialogFilters.instance());
     }
 
-    public Flux<DialogFilterSuggested> getSuggestedDialogFilters() {
-        return client.sendAwait(GetSuggestedDialogFilters.instance())
-                .flatMapIterable(Function.identity());
+    public Mono<List<DialogFilterSuggested>> getSuggestedDialogFilters() {
+        return client.sendAwait(GetSuggestedDialogFilters.instance());
     }
 
     public Mono<Boolean> updateDialogFilter(int id, @Nullable DialogFilter filter) {
@@ -694,9 +676,8 @@ public class ChatService extends RpcService {
     }
 
     public Mono<AffectedFoundMessages> deletePhoneCallHistory(boolean revoked) {
-        return client.sendAwait(DeletePhoneCallHistory.builder()
-                .revoke(revoked)
-                .build());
+        return client.sendAwait(ImmutableDeletePhoneCallHistory.of(revoked
+                ? ImmutableDeletePhoneCallHistory.REVOKE_MASK : 0));
     }
 
     public Mono<HistoryImportParsed> checkHistoryImport(String importHead) {
@@ -757,9 +738,8 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableSetChatTheme.of(peer, emoticon));
     }
 
-    public Flux<Long> getMessageReadParticipants(InputPeer peer, int msgId) {
-        return client.sendAwait(ImmutableGetMessageReadParticipants.of(peer, msgId))
-                .flatMapIterable(Function.identity());
+    public Mono<List<Long>> getMessageReadParticipants(InputPeer peer, int msgId) {
+        return client.sendAwait(ImmutableGetMessageReadParticipants.of(peer, msgId));
     }
 
     public Mono<Boolean> setInlineBotResults(SetInlineBotResults request) {
@@ -1125,7 +1105,7 @@ public class ChatService extends RpcService {
     }
 
     // Short-send related updates object should be transformed to the updateShort or baseUpdates.
-    // https://core.telegram.org/api/updates-sequence
+    // https://core.telegram.org/api/updates#updates-sequence
 
     private Mono<Tuple2<BaseMessageFields, Updates>> transformMessageUpdate(BaseSendMessageRequest request, Updates updates) {
         return toPeer(request.peer())
@@ -1243,8 +1223,7 @@ public class ChatService extends RpcService {
 
                             return Tuples.of(message, casted);
                         }
-                        default:
-                            throw new IllegalArgumentException("Unknown updates type: " + updates);
+                        default: throw new IllegalArgumentException("Unknown Updates type: " + updates);
                     }
                 }));
     }

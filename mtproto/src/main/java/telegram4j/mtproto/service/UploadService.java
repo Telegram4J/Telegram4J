@@ -176,7 +176,6 @@ public class UploadService extends RpcService {
         return Mono.defer(() -> client.sendAwait(ImmutableSaveBigFilePart.of(fileId, filePart, fileTotalParts, bytes)));
     }
 
-    // TODO: bot compatible?
     public Flux<WebFile> getWebFile(InputWebFileLocation location) {
         return Flux.defer(() -> {
             AtomicInteger offset = new AtomicInteger();

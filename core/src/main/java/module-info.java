@@ -25,11 +25,9 @@ module telegram4j.core {
     exports telegram4j.core.event.domain.inline;
     exports telegram4j.core.event.domain.message;
     exports telegram4j.core.object;
-    exports telegram4j.core.object.action;
     exports telegram4j.core.object.chat;
     exports telegram4j.core.object.markup;
     exports telegram4j.core.object.media;
-    exports telegram4j.core.object.poll;
     exports telegram4j.core.retriever;
     exports telegram4j.core.spec;
     exports telegram4j.core.spec.inline;

@@ -180,7 +180,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
                 if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
                     return mtProtoResources.getHttpClient().orElseThrow()
-                            .get().uri(loc.getUrl())
+                            .get().uri(loc.getUrl().orElseThrow())
                             .responseSingle((res, buf) -> buf
                                     .map(TlEncodingUtil::copyAsUnpooled)
                                     .map(bytes -> {
@@ -246,11 +246,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
                 .flatMap(f -> {
                     switch (f.getFileType()) {
-                        case CHAT_PHOTO:
-                            switch (f.getPeer().identifier()) {
+                        case CHAT_PHOTO: {
+                            InputPeer peer = f.getPeer().orElseThrow();
+                            switch (peer.identifier()) {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:
-                                    InputChannel channel = TlEntityUtil.toInputChannel(f.getPeer());
+                                    InputChannel channel = TlEntityUtil.toInputChannel(peer);
                                     return serviceHolder.getChatService()
                                             .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(ChannelMessages.class)
@@ -264,21 +265,23 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                 case InputPeerUser.ID:
                                 case InputPeerUserFromMessage.ID:
                                     return serviceHolder.getUserService()
-                                            .getUserPhotos(TlEntityUtil.toInputUser(f.getPeer()),
+                                            .getUserPhotos(TlEntityUtil.toInputUser(peer),
                                                     0, -f.getDocumentId(), 1)
                                             .map(p -> p.photos().get(0))
                                             .ofType(BasePhoto.class)
-                                            .map(p -> FileReferenceId.ofChatPhoto(p, -1, f.getPeer()));
+                                            .map(p -> FileReferenceId.ofChatPhoto(p, '\0', -1, peer));
                                 default:
-                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + f.getPeer()));
+                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
                             }
+                        }
                         case WEB_DOCUMENT:
                         case DOCUMENT:
                         case PHOTO: // message id must be present
-                            switch (f.getPeer().identifier()) {
+                            InputPeer peer = f.getPeer().orElseThrow();
+                            switch (peer.identifier()) {
                                 case InputPeerChannel.ID:
                                 case InputPeerChannelFromMessage.ID:
-                                    InputChannel channel = TlEntityUtil.toInputChannel(f.getPeer());
+                                    InputChannel channel = TlEntityUtil.toInputChannel(peer);
                                     return serviceHolder.getChatService()
                                             .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
                                             .ofType(ChannelMessages.class)
@@ -292,13 +295,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                             .ofType(BaseMessages.class)
                                             .flatMap(b -> findMessageMedia(b, f));
                                 default:
-                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + f.getPeer()));
+                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
                             }
                             // No need refresh
-                        case STICKER_SET_THUMB:
-                            return Mono.just(f);
-                        default:
-                            return Mono.error(new IllegalStateException());
+                        case STICKER_SET_THUMB: return Mono.just(f);
+                        default: return Mono.error(new IllegalStateException());
                     }
                 });
     }
@@ -480,14 +481,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .findFirst()
                 .orElseThrow();
 
-        switch (service.action().identifier()) {
-            case MessageActionChatEditPhoto.ID:
-                MessageActionChatEditPhoto a = (MessageActionChatEditPhoto) service.action();
-                return Mono.justOrEmpty(TlEntityUtil.unmapEmpty(a.photo(), BasePhoto.class))
-                        .map(p -> FileReferenceId.ofChatPhoto(p, orig.getMessageId(), orig.getPeer()));
-            default:
-                return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + service.action()));
+        if (service.action().identifier() == MessageActionChatEditPhoto.ID) {
+            MessageActionChatEditPhoto a = (MessageActionChatEditPhoto) service.action();
+            return Mono.justOrEmpty(TlEntityUtil.unmapEmpty(a.photo(), BasePhoto.class))
+                    .map(p -> FileReferenceId.ofChatPhoto(p, '\0', orig.getMessageId(), orig.getPeer().orElseThrow()));
         }
+        return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + service.action()));
     }
 
     private Mono<FileReferenceId> findMessageMedia(Messages messages, FileReferenceId orig) {
@@ -510,18 +509,16 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             case MessageMediaDocument.ID:
                 return Mono.justOrEmpty(((MessageMediaDocument) media).document())
                         .ofType(BaseDocument.class)
-                        .map(d -> FileReferenceId.ofDocument(d,
-                                orig.getMessageId(), orig.getPeer()));
+                        .map(d -> FileReferenceId.ofDocument(d, '\0',
+                                orig.getMessageId(), orig.getPeer().orElseThrow()));
             case MessageMediaPhoto.ID:
                 return Mono.justOrEmpty(((MessageMediaPhoto) media).photo())
                         .ofType(BasePhoto.class)
-                        .map(d -> FileReferenceId.ofPhoto(d,
-                                orig.getMessageId(), orig.getPeer()));
+                        .map(d -> FileReferenceId.ofPhoto(d, '\0',
+                                orig.getMessageId(), orig.getPeer().orElseThrow()));
             case MessageMediaInvoice.ID:
                 return Mono.justOrEmpty(((MessageMediaInvoice) media).photo())
-                        .cast(BaseDocumentFields.class)
-                        .map(d -> FileReferenceId.ofDocument(d,
-                                orig.getMessageId(), orig.getPeer()));
+                        .map(d -> FileReferenceId.ofDocument(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
             default:
                 return Mono.error(new IllegalStateException("Unexpected MessageMedia type: " + media));
         }

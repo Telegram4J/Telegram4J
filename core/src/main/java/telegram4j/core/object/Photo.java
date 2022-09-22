@@ -28,14 +28,14 @@ public class Photo implements TelegramObject {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.fileReferenceId = FileReferenceId.ofPhoto(data, messageId, chatPeer);
+        this.fileReferenceId = FileReferenceId.ofPhoto(data, '\0', messageId, chatPeer);
     }
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, messageId, peer);
+        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, '\0', messageId, peer);
     }
 
     @Override
@@ -146,7 +146,7 @@ public class Photo implements TelegramObject {
     public String toString() {
         return "Photo{" +
                 "data=" + data +
-                ", fileReferenceId='" + fileReferenceId + '\'' +
+                ", fileReferenceId=" + fileReferenceId +
                 '}';
     }
 }

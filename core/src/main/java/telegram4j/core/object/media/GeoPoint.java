@@ -1,4 +1,4 @@
-package telegram4j.core.object;
+package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 

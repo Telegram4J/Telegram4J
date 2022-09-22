@@ -27,10 +27,8 @@ public class ChatPhoto implements TelegramObject {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data,
-                FileReferenceId.PhotoSizeType.CHAT_PHOTO_SMALL, messageId, peer);
-        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data,
-                FileReferenceId.PhotoSizeType.CHAT_PHOTO_BIG, messageId, peer);
+        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, messageId, peer);
+        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, messageId, peer);
     }
 
     @Override
@@ -70,15 +68,14 @@ public class ChatPhoto implements TelegramObject {
      *
      * @return The id of chat photo.
      */
-    public long getPhotoId() {
+    public long getId() {
         return data.photoId();
     }
 
     /**
-     * Gets expanded stripped thumbnail for photo, if present.
-     * The returned buffer is modifiable unpooled array-based and does not require to be {@link ByteBuf#release() released}
+     * Gets new {@link ByteBuf} with expanded stripped thumbnail for photo, if present.
      *
-     * @return The expanded stripped thumbnail for photo, if present.
+     * @return The new {@link ByteBuf} with expanded stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getThumb() {
         return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
@@ -86,7 +83,6 @@ public class ChatPhoto implements TelegramObject {
 
     /**
      * Gets raw stripped thumbnail for photo, if present.
-     * The returned buffer is unmodifiable and does not require to be {@link ByteBuf#release() released}
      *
      * @return The raw stripped thumbnail for photo, if present.
      */
@@ -120,8 +116,8 @@ public class ChatPhoto implements TelegramObject {
     public String toString() {
         return "ChatPhoto{" +
                 "data=" + data +
-                ", smallFileReferenceId='" + smallFileReferenceId + '\'' +
-                ", bigFileReferenceId='" + bigFileReferenceId + '\'' +
+                ", smallFileReferenceId=" + smallFileReferenceId +
+                ", bigFileReferenceId=" + bigFileReferenceId +
                 '}';
     }
 }
