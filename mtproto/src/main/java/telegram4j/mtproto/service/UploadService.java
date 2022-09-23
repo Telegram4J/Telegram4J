@@ -1,12 +1,16 @@
 package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.CompositeByteBuf;
+import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
+import reactor.netty.ByteBufFlux;
 import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.DataCenter;
@@ -21,23 +25,38 @@ import telegram4j.tl.upload.WebFile;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
 public class UploadService extends RpcService {
-
-    private static final int PART_SIZE = 512 * 1024;
+    public static final int MIN_PART_SIZE = 1024;
+    public static final int MAX_PART_SIZE = 512 * 1024;
+    // it is necessary that the server does not consider our frequent packets to be a flood
+    private static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
     private static final int TEN_MB = 10 * 1024 * 1024;
-    private static final int LIMIT_MB = 2000 * 1024 * 1024;
     private static final int PARALLELISM = 3;
-    private static final int PRECISE_LIMIT = 1024 * 1024; // 1mb
+    private static final int PRECISE_LIMIT = 1024 * 1024;
 
     public UploadService(MTProtoClient client, StoreLayout storeLayout) {
         super(client, storeLayout);
+    }
+
+    public static int suggestPartSize(int size, int partSize) {
+        if (partSize == -1) {
+            return MAX_PART_SIZE; // TODO
+        } else if (partSize > MAX_PART_SIZE) {
+            throw new IllegalArgumentException(size + " > " + MAX_PART_SIZE);
+        } else if (partSize < MIN_PART_SIZE) {
+            throw new IllegalArgumentException(size + " < " + MIN_PART_SIZE);
+        } else {
+            return partSize;
+        }
     }
 
     // additional methods
@@ -48,18 +67,19 @@ public class UploadService extends RpcService {
     // upload.getCdnFileHashes#91dc3f31 file_token:bytes offset:long = Vector<FileHash>;
 
     @BotCompatible
-    public Mono<InputFile> saveFile(ByteBuf data, String name) {
+    public Mono<InputFile> saveFile(ByteBufFlux data, int size, int partSize, String name) {
         return Mono.defer(() -> {
-            if (data.readableBytes() > LIMIT_MB) {
-                return Mono.error(new IllegalArgumentException("File size is under limit. Size: "
-                        + data.readableBytes() + ", limit: " + LIMIT_MB));
-            }
-
-            boolean big = data.readableBytes() > TEN_MB;
+            // TODO: perhaps necessary checks:
+            //  - check size
+            //  - verify final counter.value with computed parts count
+            //  - check part size
             long fileId = CryptoUtil.random.nextLong();
-            int parts = (int) Math.ceil((float) data.readableBytes() / PART_SIZE);
 
-            if (big) {
+            IntHolder counter = new IntHolder();
+            CompositeByteBuf agr = ByteBufAllocator.DEFAULT.compositeBuffer();
+            if (size > TEN_MB) {
+                int parts = (int) Math.ceil((float) size / partSize);
+
                 Sinks.Many<SaveBigFilePart> queue = Sinks.many().multicast()
                         .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
 
@@ -84,8 +104,6 @@ public class UploadService extends RpcService {
                             MTProtoClient client = clients.get(it.getAndUpdate(i -> i + 1 == PARALLELISM ? 0 : i + 1));
 
                             client.sendAwait(req)
-                                    .filter(b -> b)
-                                    .switchIfEmpty(Mono.error(new IllegalStateException("Failed to upload part #" + req.filePart())))
                                     .flatMap(b -> {
                                         if (suc.incrementAndGet() == req.fileTotalParts()) {
                                             queue.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
@@ -99,19 +117,15 @@ public class UploadService extends RpcService {
                         })
                         .then();
 
-                Mono<Void> reader = Flux.range(0, parts)
-                        .doOnNext(filePart -> {
-                            ByteBuf part = data.readSlice(Math.min(PART_SIZE, data.readableBytes()));
-
-                            SaveBigFilePart req = SaveBigFilePart.builder()
-                                    .fileId(fileId)
-                                    .filePart(filePart)
-                                    .bytes(part)
-                                    .fileTotalParts(parts)
-                                    .build();
-
-                            queue.emitNext(req, DEFAULT_PARKING);
+                Mono<Void> reader = data.flatMap(bufferUntil(agr, partSize))
+                        .map(part -> {
+                            try {
+                                return ImmutableSaveBigFilePart.of(fileId, counter.value++, parts, part);
+                            } finally {
+                                ReferenceCountUtil.safeRelease(part);
+                            }
                         })
+                        .doOnNext(buf -> queue.emitNext(buf, DEFAULT_PARKING))
                         .then();
 
                 return Mono.when(initialize, reader, sender)
@@ -125,19 +139,43 @@ public class UploadService extends RpcService {
                 throw Exceptions.propagate(e);
             }
 
-            return Flux.range(0, parts)
-                    .flatMap(filePart -> {
-                        ByteBuf partBytes = data.readSlice(Math.min(PART_SIZE, data.readableBytes()));
-
-                        synchronized (md5) {
-                            md5.update(partBytes.nioBuffer());
-                        }
-
-                        return client.sendAwait(ImmutableSaveFilePart.of(fileId, filePart, partBytes));
-                    })
-                    .then(Mono.fromSupplier(() -> ImmutableBaseInputFile.of(fileId,
-                            parts, name, ByteBufUtil.hexDump(md5.digest()))));
+            return data.flatMap(bufferUntil(agr, partSize))
+            .flatMap(part -> Mono.fromCallable(() -> {
+                md5.update(part.nioBuffer());
+                try {
+                    return ImmutableSaveFilePart.of(fileId, counter.value++, part);
+                } finally {
+                    ReferenceCountUtil.safeRelease(part);
+                }
+            })
+            .delayElement(UPLOAD_INTERVAL))
+            .flatMap(client::sendAwait)
+            .then(Mono.fromSupplier(() -> ImmutableBaseInputFile.of(fileId,
+                    counter.value, name, ByteBufUtil.hexDump(md5.digest()))));
         });
+    }
+
+    static Function<ByteBuf, Flux<ByteBuf>> bufferUntil(CompositeByteBuf agr, int partSize) {
+        return buf -> Flux.create(sink -> {
+            if (buf.readableBytes() == partSize) {
+                sink.next(buf);
+                return;
+            }
+
+            agr.addFlattenedComponents(true, buf);
+            while (agr.isReadable(partSize)) {
+                sink.next(agr.readSlice(partSize));
+            }
+
+            if (agr.isReadable()) { // the last part
+                sink.next(agr);
+                sink.complete();
+            }
+        });
+    }
+
+    static class IntHolder {
+        private int value;
     }
 
     // upload namespace

@@ -5,6 +5,8 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.netty.ByteBufFlux;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
@@ -20,6 +22,7 @@ import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.FilePart;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
@@ -29,6 +32,8 @@ import telegram4j.tl.messages.ChannelMessages;
 import telegram4j.tl.messages.Messages;
 import telegram4j.tl.storage.FileType;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -141,14 +146,45 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     /**
      * Request to upload file to Telegram Media DC.
-     * Method doesn't release incoming {@link ByteBuf}.
+     * The uploaded file will have the same name as local one and will upload with {@link UploadService#MAX_PART_SIZE max part size}.
      *
-     * @param data The {@link ByteBuf} with file data.
-     * @param filename The name for file.
-     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and CRC32 if applicable.
+     * @see #uploadFile(Path, String, int)
+     * @param path The path to local file.
+     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and MD5 hash if applicable.
      */
-    public Mono<InputFile> uploadFile(ByteBuf data, String filename) {
-        return serviceHolder.getUploadService().saveFile(data, filename);
+    public Mono<InputFile> uploadFile(Path path) {
+        return uploadFile(path, path.getFileName().toString(), -1);
+    }
+
+    /**
+     * Request to upload file to Telegram Media DC.
+     *
+     * @param path The path to local file.
+     * @param filename The name of remote file.
+     * @param partSize The part size for uploading, must be divisible by
+     * {@link UploadService#MIN_PART_SIZE} and {@link UploadService#MAX_PART_SIZE} must be evenly divisible by part_size
+     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and MD5 hash if applicable.
+     */
+    public Mono<InputFile> uploadFile(Path path, String filename, int partSize) {
+        return Mono.fromCallable(() -> Files.size(path))
+                .publishOn(Schedulers.boundedElastic())
+                .map(Math::toIntExact)
+                .flatMap(size -> uploadFile(ByteBufFlux.fromPath(path, partSize), filename, size, partSize));
+    }
+
+    /**
+     * Request to upload file to Telegram Media DC.
+     *
+     * @param data The flux of {@link ByteBuf} to upload.
+     * @param filename The name of remote file.
+     * @param size The exact size of file.
+     * @param partSize The part size for uploading, must be divisible by
+     * {@link UploadService#MIN_PART_SIZE} and {@link UploadService#MAX_PART_SIZE} must be evenly divisible by part_size
+     * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and MD5 hash if applicable.
+     */
+    public Mono<InputFile> uploadFile(ByteBufFlux data, String filename, int size, int partSize) {
+        int ps = UploadService.suggestPartSize(size, partSize);
+        return serviceHolder.getUploadService().saveFile(data, size, ps, filename);
     }
 
     /**
