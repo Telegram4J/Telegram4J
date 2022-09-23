@@ -361,7 +361,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                     .map(u -> Objects.requireNonNull(EntityFactory.createUser(client, u)))
                                     .orElseThrow();
                             break;
-                        default: throw new IllegalArgumentException("Unknown peer type: " + peerId);
+                        default: throw new IllegalArgumentException("Unknown Peer type: " + peerId);
                     }
 
                     return new ChatParticipant(client, peerEntity, d.participant(), getId());
@@ -400,7 +400,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                         peerEntity = usersMap.get(rawPeerId);
                                         break;
                                     default:
-                                        throw new IllegalArgumentException("Unknown peer type: " + peerId);
+                                        throw new IllegalArgumentException("Unknown Peer type: " + peerId);
                                 }
 
                                 return new ChatParticipant(client, peerEntity, c, id);

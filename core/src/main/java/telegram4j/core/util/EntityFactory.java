@@ -410,8 +410,8 @@ public final class EntityFactory {
         }
 
         if (stickerData != null) {
-            return new Sticker(client, data, fileName,
-                    messageId, peer, stickerData, Variant2.of(sizeData, videoData));
+            return new Sticker(client, data, fileName, messageId, peer,
+                    stickerData, Variant2.of(sizeData, videoData));
         }
 
         if (emojiData != null) {

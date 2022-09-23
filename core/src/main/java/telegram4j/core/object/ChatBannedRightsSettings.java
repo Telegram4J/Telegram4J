@@ -44,42 +44,43 @@ public class ChatBannedRightsSettings {
                 '}';
     }
 
+    /** An enumeration of permissions that describes disallowed actions. */
     public enum Right implements BitFlag {
 
-        /** If set, does not allow a user to view messages in a <a href="https://core.telegram.org/api/channel">supergroup/channel/chat</a>. */
+        /** Disallows to view messages in a channel/chat. */
         VIEW_MESSAGES(VIEW_MESSAGES_POS),
 
-        /** If set, does not allow a user to send messages in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send messages in a channel/chat. */
         SEND_MESSAGES(SEND_MESSAGES_POS),
 
-        /** If set, does not allow a user to send any media in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send any media in a channel/chat. */
         SEND_MEDIA(SEND_MEDIA_POS),
 
-        /** If set, does not allow a user to send stickers in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send stickers in a channel/chat. */
         SEND_STICKERS(SEND_STICKERS_POS),
 
-        /** If set, does not allow a user to send gifs in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send gifs in a channel/chat. */
         SEND_GIFS(SEND_GIFS_POS),
 
-        /** If set, does not allow a user to send games in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send games in a channel/chat. */
         SEND_GAMES(SEND_GAMES_POS),
 
-        /** If set, does not allow a user to use inline bots in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to use inline bots in a channel/chat. */
         SEND_INLINE(SEND_INLINE_POS),
 
-        /** If set, does not allow a user to embed links in the messages of a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to embed links in the messages of a channel/chat. */
         EMBED_LINKS(EMBED_LINKS_POS),
 
-        /** If set, does not allow a user to send polls in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to send polls in a channel/chat. */
         SEND_POLLS(SEND_POLLS_POS),
 
-        /** If set, does not allow any user to change the description of a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to change the description in a channel/chat. */
         CHANGE_INFO(CHANGE_INFO_POS),
 
-        /** If set, does not allow any user to invite users in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to invite users in a channel/chat. */
         INVITE_USERS(INVITE_USERS_POS),
 
-        /** If set, does not allow any user to pin messages in a <a href="https://core.telegram.org/api/channel">supergroup/chat</a>. */
+        /** Disallows to pin messages in a channel/chat. */
         PIN_MESSAGES(PIN_MESSAGES_POS);
 
         private final byte position;
@@ -97,7 +98,7 @@ public class ChatBannedRightsSettings {
          * Computes {@link EnumSet} from raw {@link ChatBannedRights} data.
          *
          * @param data The raw chat banned rights data.
-         * @return The {@link EnumSet} of the {@link ChatBannedRights} flags.
+         * @return The {@link EnumSet} of the mapped {@link ChatBannedRights} flags.
          */
         public static EnumSet<Right> of(ChatBannedRights data) {
             var set = EnumSet.allOf(Right.class);

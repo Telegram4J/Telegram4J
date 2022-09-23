@@ -230,8 +230,7 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Optional<ChatBannedRightsSettings> getBannedRights() {
         return data.identifier() == ChannelParticipantBanned.ID
-                ? Optional.of(((ChannelParticipantBanned) data).bannedRights())
-                .map(ChatBannedRightsSettings::new)
+                ? Optional.of(new ChatBannedRightsSettings(((ChannelParticipantBanned) data).bannedRights()))
                 : Optional.empty();
     }
 

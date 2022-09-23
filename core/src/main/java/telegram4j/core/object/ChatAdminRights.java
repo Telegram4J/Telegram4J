@@ -7,37 +7,34 @@ import static telegram4j.tl.ChatAdminRights.*;
 /** Enumeration of {@link telegram4j.tl.ChatAdminRights} bit-flags, that can be used in {@link EnumSet} */
 public enum ChatAdminRights implements BitFlag {
 
-    /** If set, allows the admin to modify the description of the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
+    /** Allows to modify the description of the channel/supergroup. */
     CHANGE_INFO(CHANGE_INFO_POS),
 
-    /** If set, allows the admin to post messages in the <a href="https://core.telegram.org/api/channel">channel</a>. */
+    /** Allows to post messages in the channel. */
     POST_MESSAGES(POST_MESSAGES_POS),
 
-    /** If set, allows the admin to also edit messages from other admins in the <a href="https://core.telegram.org/api/channel">channel</a>. */
+    /** Allows to also edit messages from other admins in the channel. */
     EDIT_MESSAGES(EDIT_MESSAGES_POS),
 
-    /** If set, allows the admin to also delete messages from other admins in the <a href="https://core.telegram.org/api/channel">channel</a>. */
+    /** Allows to also delete messages from other admins in the channel. */
     DELETE_MESSAGES(DELETE_MESSAGES_POS),
 
-    /** If set, allows the admin to ban users from the <a href="https://core.telegram.org/api/channel">channel/supergroup</a> */
+    /** Allows to ban users from the channel/supergroup */
     BAN_USERS(BAN_USERS_POS),
 
-    /** If set, allows the admin to invite users in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
+    /** Allows to invite users in the channel/supergroup. */
     INVITE_USERS(INVITE_USERS_POS),
 
-    /** If set, allows the admin to pin messages in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>. */
+    /** Allows to pin messages in the channel/supergroup. */
     PIN_MESSAGES(PIN_MESSAGES_POS),
 
-    /**
-     * If set, allows the admin to add other admins with the same (or more limited)
-     * permissions in the <a href="https://core.telegram.org/api/channel">channel/supergroup</a>.
-     */
+    /** Allows to add other admins with the same (or more limited) permissions in the channel/supergroup. */
     ADD_ADMINS(ADD_ADMINS_POS),
 
-    /** Whether this admin is anonymous. */
+    /** Allows the admin to remain anonymous. */
     ANONYMOUS(ANONYMOUS_POS),
 
-    /** If set, allows the admin to change group call/livestream settings. */
+    /** Allows to change group call/livestream settings. */
     MANAGE_CALL(MANAGE_CALL_POS),
 
     /** Set this flag if none of the other flags are set, but you still want the user to be an admin. */

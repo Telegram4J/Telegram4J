@@ -34,21 +34,12 @@ public class Video extends Document {
     }
 
     /**
-     * Gets whether video document is gif.
+     * Gets type of video document.
      *
-     * @return Whether video document is gif.
+     * @return The type of video.
      */
-    public boolean isGif() {
-        return gif;
-    }
-
-    /**
-     * Gets whether video document is round video.
-     *
-     * @return Whether video document is round video.
-     */
-    public boolean isRoundMessage() {
-        return videoData.roundMessage();
+    public Type getType() {
+        return gif ? Type.GIF : videoData.roundMessage() ? Type.ROUND : Type.REGULAR;
     }
 
     /**
@@ -70,18 +61,18 @@ public class Video extends Document {
     }
 
     /**
-     * Gets video document width.
+     * Gets width of video document.
      *
-     * @return The video document width.
+     * @return The width of video document.
      */
     public int getWidth() {
         return videoData.w();
     }
 
     /**
-     * Gets video document height.
+     * Gets height of video document height.
      *
-     * @return The video document height.
+     * @return The height of video document height.
      */
     public int getHeight() {
         return videoData.h();
@@ -90,9 +81,20 @@ public class Video extends Document {
     @Override
     public String toString() {
         return "Video{" +
-                "videoData=" + videoData +
-                ", hasStickers=" + hasStickers +
-                ", gif=" + gif +
-                "} " + super.toString();
+                "data=" + data +
+                ", fileReferenceId=" + fileReferenceId +
+                '}';
+    }
+
+    /** Types of video documents. */
+    public enum Type {
+        /** Represents regular video files. */
+        REGULAR,
+
+        /** Represents video-rounds files. */
+        ROUND,
+
+        /** Represents gif files. */
+        GIF
     }
 }

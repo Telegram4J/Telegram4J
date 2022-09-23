@@ -69,7 +69,8 @@ public class Audio extends Document {
     @Override
     public String toString() {
         return "Audio{" +
-                "audioData=" + audioData +
-                "} " + super.toString();
+                "data=" + data +
+                ", fileReferenceId=" + fileReferenceId +
+                '}';
     }
 }

@@ -25,7 +25,6 @@ public class BotInfo implements TelegramObject {
     public BotInfo(MTProtoTelegramClient client, telegram4j.tl.BotInfo data) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
-
     }
 
     @Override

@@ -73,13 +73,10 @@ public class PeerSettings {
         /** Whether we can report a geogroup is irrelevant for this location. */
         REPORT_GEO(REPORT_GEO_POS),
 
-        /**
-         * Whether this peer was automatically archived according
-         * to <a href="https://core.telegram.org/constructor/globalPrivacySettings">privacy settings</a>.
-         */
+        /** Whether this peer was automatically archived according to privacy settings. */
         AUTOARCHIVED(AUTOARCHIVED_POS),
 
-        /** Whether we can invite members to a <a href="https://core.telegram.org/api/channel">group or channel</a>. */
+        /** Whether we can invite members to a group or channel. */
         INVITE_MEMBERS(INVITE_MEMBERS_POS),
 
         /**

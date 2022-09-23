@@ -103,9 +103,9 @@ public class Sticker extends Document {
     @Override
     public String toString() {
         return "Sticker{" +
-                "stickerData=" + stickerData +
-                ", optData=" + optData +
-                "} " + super.toString();
+                "data=" + data +
+                ", fileReferenceId=" + fileReferenceId +
+                '}';
     }
 
     /** Types of sticker set elements. */

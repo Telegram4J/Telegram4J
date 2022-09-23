@@ -22,12 +22,12 @@ import java.util.stream.Collectors;
  */
 public class Document implements TelegramObject {
 
-    private final MTProtoTelegramClient client;
-    private final BaseDocumentFields data;
+    protected final MTProtoTelegramClient client;
+    protected final BaseDocumentFields data;
     @Nullable
-    private final String fileName;
+    protected final String fileName;
 
-    private final FileReferenceId fileReferenceId;
+    protected final FileReferenceId fileReferenceId;
 
     public Document(MTProtoTelegramClient client, BaseDocumentFields data,
                     @Nullable String fileName, int messageId, InputPeer peer) {
@@ -191,7 +191,7 @@ public class Document implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
+    public final boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Document document = (Document) o;
@@ -199,7 +199,7 @@ public class Document implements TelegramObject {
     }
 
     @Override
-    public int hashCode() {
+    public final int hashCode() {
         return data.hashCode();
     }
 
@@ -207,7 +207,6 @@ public class Document implements TelegramObject {
     public String toString() {
         return "Document{" +
                 "data=" + data +
-                ", fileName='" + fileName + '\'' +
                 ", fileReferenceId=" + fileReferenceId +
                 '}';
     }

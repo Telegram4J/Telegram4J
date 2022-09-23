@@ -81,22 +81,47 @@ public class StickerSet implements TelegramObject {
         return data.official();
     }
 
+    /**
+     * Gets a timestamp when this sticker set was installed by the current user.
+     *
+     * @return The {@link Instant} when this sticker set was installed by the current user.
+     */
     public Optional<Instant> getInstallTimestamp() {
         return Optional.ofNullable(data.installedDate()).map(Instant::ofEpochSecond);
     }
 
+    /**
+     * Gets id of sticker set.
+     *
+     * @return The id of sticker set.
+     */
     public long getId() {
         return data.id();
     }
 
+    /**
+     * Gets access hash for sticker set.
+     *
+     * @return The access hash for sticker set.
+     */
     public long getAccessHash() {
         return data.accessHash();
     }
 
+    /**
+     * Gets name of sticker set.
+     *
+     * @return The name of sticker set.
+     */
     public String getTitle() {
         return data.title();
     }
 
+    /**
+     * Gets short name of sticker set.
+     *
+     * @return The short name of sticker set.
+     */
     public String getShortName() {
         return data.shortName();
     }

@@ -87,9 +87,9 @@ public class CustomEmoji extends Document {
 
     @Override
     public String toString() {
-        return "Sticker{" +
-                "emojiData=" + emojiData +
-                ", optData=" + optData +
-                "} " + super.toString();
+        return "CustomEmoji{" +
+                "data=" + data +
+                ", fileReferenceId=" + fileReferenceId +
+                '}';
     }
 }
