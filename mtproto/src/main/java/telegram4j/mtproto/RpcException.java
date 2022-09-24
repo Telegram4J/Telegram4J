@@ -8,6 +8,7 @@ import java.util.stream.IntStream;
 
 /** Subtype of {@link MTProtoException} which receives on RPC response. */
 public class RpcException extends MTProtoException {
+    private static final long serialVersionUID = 909166276209425603L;
 
     private final RpcError error;
 

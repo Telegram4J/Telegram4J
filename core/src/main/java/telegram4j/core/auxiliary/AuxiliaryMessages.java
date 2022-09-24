@@ -4,6 +4,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.PrivateChat;
 
 import java.util.List;
 
@@ -27,16 +28,17 @@ public class AuxiliaryMessages {
     }
 
     /**
-     * Gets list of found {@link Message}s.
+     * Gets immutable list of found {@link Message}s.
      *
-     * @return The {@link List} of found {@link Message}s.
+     * @return The immutable {@link List} of found {@link Message}s.
      */
     public List<Message> getMessages() {
         return messages;
     }
 
     /**
-     * Gets list of {@link Chat}s mentioned in messages.
+     * Gets immutable list of {@link Chat}s mentioned in messages.
+     * This list doesn't contain {@link PrivateChat} objects.
      *
      * @return The {@link List} of {@link Chat} mentioned in messages.
      */
@@ -45,9 +47,9 @@ public class AuxiliaryMessages {
     }
 
     /**
-     * Gets list of {@link User}s mentioned in messages.
+     * Gets immutable list of {@link User}s mentioned in messages.
      *
-     * @return The {@link List} of {@link User} mentioned in messages.
+     * @return The immutable {@link List} of {@link User} mentioned in messages.
      */
     public List<User> getUsers() {
         return users;

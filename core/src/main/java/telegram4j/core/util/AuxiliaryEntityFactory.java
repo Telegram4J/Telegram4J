@@ -39,9 +39,8 @@ public final class AuxiliaryEntityFactory {
                         .map(d -> EntityFactory.createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-                User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .map(d -> EntityFactory.createChat(client, d, null))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var messages = data0.messages().stream()
@@ -62,9 +61,8 @@ public final class AuxiliaryEntityFactory {
                         .map(d -> EntityFactory.createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-                User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .map(d -> EntityFactory.createChat(client, d, null))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
                 var messages = data0.messages().stream()
@@ -86,12 +84,10 @@ public final class AuxiliaryEntityFactory {
                         .map(d -> EntityFactory.createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-                User selfUser = usersMap.get(client.getSelfId().asLong());
                 var chatsMap = data0.chats().stream()
-                        .map(d -> EntityFactory.createChat(client, d, selfUser))
+                        .map(d -> EntityFactory.createChat(client, d, null))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-
                 var messages = data0.messages().stream()
                         .map(m -> TlEntityUtil.unmapEmpty(m, BaseMessageFields.class))
                         .filter(Objects::nonNull)
@@ -117,13 +113,8 @@ public final class AuxiliaryEntityFactory {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());
 
-        var selfUser = users.stream()
-                .filter(u -> u.getId().equals(client.getSelfId()))
-                .findFirst()
-                .orElse(null);
-
         var chats = data.chats().stream()
-                .map(c -> EntityFactory.createChat(client, c, selfUser))
+                .map(c -> EntityFactory.createChat(client, c, null))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableList());
 

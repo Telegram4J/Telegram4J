@@ -169,12 +169,12 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets text of message, if it's not service message.
+     * Gets text of message, otherwise will return empty string.
      *
-     * @return The raw text of message, if present.
+     * @return The raw text of message, or empty string.
      */
-    public Optional<String> getContent() {
-        return Optional.ofNullable(baseData).map(BaseMessage::message);
+    public String getContent() {
+        return baseData != null ? baseData.message() : "";
     }
 
     /**

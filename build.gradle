@@ -9,8 +9,8 @@ ext {
     reactor_bom_version = '2020.0.22'
     jackson_version = '2.13.4'
     caffeine_version = '3.1.1'
-    javax_annotation = '1.3.2'
     immutables_version = '2.9.2'
+    jsr305_version = '3.0.2'
 
     tl_parser_version = '0.1.2-SNAPSHOT'
 
@@ -21,7 +21,7 @@ ext {
     isSnapshot = version.toString().endsWith("-SNAPSHOT")
 }
 
-allprojects {
+subprojects {
     apply plugin: 'java-library'
     apply plugin: 'maven-publish'
     apply plugin: 'com.github.ben-manes.versions'
@@ -31,7 +31,7 @@ allprojects {
     }
 
     group = 'com.telegram4j'
-    description = 'Java MTProto library for the Telegram API'
+    archivesBaseName = "telegram4j-$project.name"
 
     targetCompatibility = JavaVersion.VERSION_11
     sourceCompatibility = JavaVersion.VERSION_11
@@ -46,14 +46,8 @@ allprojects {
 
     dependencies {
         api platform("io.projectreactor:reactor-bom:$reactor_bom_version")
-        api "io.projectreactor.netty:reactor-netty"
-        api "io.projectreactor.addons:reactor-extra"
 
-        api "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
-        api "com.github.ben-manes.caffeine:caffeine:$caffeine_version"
-        api "com.telegram4j:tl-parser:$tl_parser_version"
-
-        compileOnly "javax.annotation:javax.annotation-api:$javax_annotation"
+        compileOnly "com.google.code.findbugs:jsr305:$jsr305_version"
 
         testImplementation "ch.qos.logback:logback-classic:$logback_version"
         testImplementation "org.junit.jupiter:junit-jupiter-engine:$junit_version"
@@ -65,7 +59,6 @@ allprojects {
 
     tasks.withType(JavaCompile) {
         options.encoding = "UTF-8"
-        options.incremental = true
     }
 
     tasks.withType(Javadoc) {
@@ -91,10 +84,6 @@ allprojects {
 
         modularity.inferModulePath = true
     }
-}
-
-subprojects {
-    archivesBaseName = "telegram4j-$project.name"
 
     jar {
         manifest {
@@ -119,8 +108,11 @@ subprojects {
                 }
 
                 pom {
-                    name = 'Telegram4J'
-                    description = 'A java MTProto library for the Telegram API'
+                    afterEvaluate {
+                        name = pomName
+                        description = project.description
+                    }
+
                     url = 'https://github.com/Telegram4J/Telegram4J'
                     inceptionYear = '2021'
 

@@ -3,13 +3,9 @@ package telegram4j.mtproto.transport;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import reactor.util.Logger;
-import reactor.util.Loggers;
 
 /** A MTProto transport which aligns data up to 4-byte. */
 public class IntermediateTransport implements Transport {
-    private static final Logger log = Loggers.getLogger(IntermediateTransport.class);
-
     public static final int ID = 0xeeeeeeee;
 
     private int size = -1;
@@ -63,8 +59,6 @@ public class IntermediateTransport implements Transport {
         int payloadLength = payload.readableBytes();
         if (length != payloadLength) { // is a part of stream
             if (size == -1) { // header of a stream
-                // log.debug("[header] {} / {}", payloadLength, length);
-
                 if (payloadLength >= length) {
                     ByteBuf buf = payload.readRetainedSlice(length);
                     size = -1;
@@ -78,7 +72,6 @@ public class IntermediateTransport implements Transport {
 
             payloadLength += 4; // return 4 bytes from length
 
-            // log.debug("[stream] {} / {}", payloadLength, size);
             if (payloadLength >= size) { // completed
                 ByteBuf buf = payload.readRetainedSlice(size);
                 size = -1;
@@ -88,12 +81,6 @@ public class IntermediateTransport implements Transport {
                 return null;
             }
         }
-
-        // if (size != -1) {
-        //     log.debug("[stream] {}", payloadLength);
-        // } else {
-        //     log.debug("[packet] r: {}", payloadLength);
-        // }
 
         // packet is not slice
         size = -1;

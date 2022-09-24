@@ -47,7 +47,7 @@ public class ExampleReplyBot {
         MTProtoTelegramClient client = MTProtoTelegramClient.create(apiId, apiHash, botAuthToken).connect().block();
         
         client.on(SendMessageEvent.class)
-                .filter(e -> e.getMessage().getContent().map("!ping"::equals).orElse(false))
+                .filter(e -> e.getMessage().getContent().equals("!ping"))
                 .flatMap(e -> Mono.justOrEmpty(e.getChat())
                         .flatMap(c -> c.sendMessage(SendMessageSpec.of("pong!")
                                 .withReplyToMessageId(e.getMessage().getId()))))

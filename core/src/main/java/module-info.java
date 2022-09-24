@@ -12,7 +12,6 @@ module telegram4j.core {
     requires transitive telegram4j.mtproto;
 
     requires static telegram4j.tl.encoding;
-    requires static java.annotation;
     requires static org.immutables.value;
     requires static com.google.errorprone.annotations;
 
