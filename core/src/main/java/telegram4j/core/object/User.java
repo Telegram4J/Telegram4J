@@ -105,7 +105,8 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets username of this user in format <b>@username</b>, if present can be used in the {@link EntityRetriever#resolvePeer(PeerId)}.
+     * Gets username of this user in format <b>@username</b>,
+     * if present can be used in the {@link EntityRetriever#resolvePeer(PeerId)}.
      *
      * @return The username of this user, if present.
      */
@@ -406,7 +407,7 @@ public class User implements PeerEntity {
             return position;
         }
 
-        public static EnumSet<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
+        private static EnumSet<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
             var minFlags = of(userMin);
             if (userFull != null) {
                 var set = EnumSet.allOf(Flag.class);
@@ -418,7 +419,7 @@ public class User implements PeerEntity {
             return minFlags;
         }
 
-        public static EnumSet<Flag> of(telegram4j.tl.BaseUser user) {
+        private static EnumSet<Flag> of(telegram4j.tl.BaseUser user) {
             var set = EnumSet.allOf(Flag.class);
             int flags = user.flags();
             set.removeIf(value -> value.ordinal() < SELF.ordinal() || (flags & value.mask()) == 0);

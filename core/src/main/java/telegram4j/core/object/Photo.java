@@ -1,145 +1,65 @@
 package telegram4j.core.object;
 
-import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.media.PhotoSize;
-import telegram4j.core.object.media.VideoSize;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.BasePhoto;
+import telegram4j.tl.DocumentAttributeImageSize;
 import telegram4j.tl.InputPeer;
 
-import java.time.Instant;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /** Representation for message and profile photos in normal quality. */
-public class Photo implements TelegramObject {
+public class Photo extends Document {
+    @Nullable
+    private final DocumentAttributeImageSize sizeData;
 
-    private final MTProtoTelegramClient client;
-    private final BasePhoto data;
-
-    private final FileReferenceId fileReferenceId;
+    public Photo(MTProtoTelegramClient client, BaseDocumentFields data,
+                 @Nullable String fileName, int messageId, InputPeer peer,
+                 DocumentAttributeImageSize sizeData) {
+        super(client, data, fileName, messageId, peer);
+        this.sizeData = Objects.requireNonNull(sizeData);
+    }
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
-        this.client = Objects.requireNonNull(client);
-        this.data = Objects.requireNonNull(data);
+        super(client, data, FileReferenceId.ofPhoto(data, messageId, chatPeer), null);
 
-        this.fileReferenceId = FileReferenceId.ofPhoto(data, '\0', messageId, chatPeer);
+        sizeData = null;
     }
 
     public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
-        this.client = Objects.requireNonNull(client);
-        this.data = Objects.requireNonNull(data);
+        super(client, data, FileReferenceId.ofChatPhoto(data, messageId, peer), null);
 
-        this.fileReferenceId = FileReferenceId.ofChatPhoto(data, '\0', messageId, peer);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
+        sizeData = null;
     }
 
     /**
-     * Gets {@link FileReferenceId} for this photo.
+     * Gets original width of video document, if photo uploaded as document.
      *
-     * @return The {@link FileReferenceId} for this photo.
+     * @return The original width of video document, if photo uploaded as document
      */
-    public FileReferenceId getFileReferenceId() {
-        return fileReferenceId;
+    public Optional<Integer> getWidth() {
+        return Optional.ofNullable(sizeData).map(DocumentAttributeImageSize::w);
     }
 
     /**
-     * Gets whether photo has mask stickers attached to it.
+     * Gets original height of video document height, if photo uploaded as document
      *
-     * @return {@code true} if photo has mask stickers attached to it.
+     * @return The original height of video document height, if photo uploaded as document
+     */
+    public Optional<Integer> getHeight() {
+        return Optional.ofNullable(sizeData).map(DocumentAttributeImageSize::h);
+    }
+
+    /**
+     * Gets whether photo has mask stickers attached to it, otherwise {@code false}.
+     *
+     * @return {@code true} if photo has mask stickers attached to it, otherwise {@code false}.
      */
     public boolean hasStickers() {
-        return data.hasStickers();
-    }
-
-    /**
-     * Gets id of the photo.
-     *
-     * @return The id of the photo.
-     */
-    public long getId() {
-        return data.id();
-    }
-
-    /**
-     * Gets access hash of the photo.
-     *
-     * @return The access hash of the photo.
-     */
-    public long getAccessHash() {
-        return data.accessHash();
-    }
-
-    /**
-     * Gets <i>immutable</i> {@link ByteBuf} of the file reference.
-     *
-     * @return The <i>immutable</i> {@link ByteBuf} of the file reference.
-     */
-    public ByteBuf getFileReference() {
-        return data.fileReference();
-    }
-
-    /**
-     * Gets timestamp of the photo upload.
-     *
-     * @return The {@link Instant} of the photo upload.
-     */
-    public Instant getTimestamp() {
-        return Instant.ofEpochSecond(data.date());
-    }
-
-    /**
-     * Gets {@link List} of {@link PhotoSize thumbnails} for this photo.
-     *
-     * @return The {@link List} of {@link PhotoSize thumbnails} for this photo.
-     */
-    public List<PhotoSize> getSizes() {
-        return data.sizes().stream()
-                .map(EntityFactory::createPhotoSize)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Gets {@link List} of {@link VideoSize video thumbnails} for this photo if it's animated, if present.
-     *
-     * @return The {@link List} of {@link VideoSize video thumbnails} for this photo, if present.
-     */
-    public Optional<List<VideoSize>> getVideoSizes() {
-        return Optional.ofNullable(data.videoSizes())
-                .map(l -> l.stream()
-                        .map(d -> new VideoSize(client, d))
-                        .collect(Collectors.toList()));
-    }
-
-    /**
-     * Gets id of the DC, where photo was stored.
-     *
-     * @return The id of the DC, where photo was stored.
-     */
-    public int getDcId() {
-        return data.dcId();
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Photo photo = (Photo) o;
-        return data.equals(photo.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
+        return data.identifier() == BasePhoto.ID && ((BasePhoto) data).hasStickers();
     }
 
     @Override

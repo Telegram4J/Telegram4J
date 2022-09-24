@@ -81,6 +81,13 @@ public class FileReferenceId {
         this.peer = peer;
     }
 
+    private static char asChar(String type) {
+        if (type.length() != 1) {
+            throw new IllegalArgumentException("unknown format of the photo size type: '" + type + "'");
+        }
+        return type.charAt(0);
+    }
+
     /**
      * Creates new {@code FileReferenceId} object from given web document and source context.
      *
@@ -110,7 +117,26 @@ public class FileReferenceId {
 
     /**
      * Creates new {@code FileReferenceId} object from given document and source context,
-     * with <b>first</b> thumbnail, if applicable.
+     * with <b>first</b> video or static thumbnail.
+     *
+     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
+     * @param document The document info.
+     * @param messageId The source message id.
+     * @param peer The message source peer.
+     * @return The new {@code FileReferenceId} from given document and source context.
+     */
+    public static FileReferenceId ofDocument(BaseDocument document, int messageId, InputPeer peer) {
+        char thumbSizeType = Optional.ofNullable(document.videoThumbs())
+                .map(d -> asChar(d.get(0).type()))
+                .or(() -> Optional.ofNullable(document.thumbs())
+                        .map(d -> asChar(d.get(0).type())))
+                .orElseThrow();
+
+        return ofDocument(document, thumbSizeType, messageId, peer);
+    }
+
+    /**
+     * Creates new {@code FileReferenceId} object from given document and source context.
      *
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param document The document info.
@@ -136,7 +162,24 @@ public class FileReferenceId {
 
     /**
      * Creates new {@code FileReferenceId} object from given <b>normal</b> photo and source context,
-     * with <b>first</b> thumbnail.
+     * with <b>first</b> video or static thumbnail.
+     *
+     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
+     * @param chatPhoto The chat photo info.
+     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
+     * @param peer The chat/channel peer where photo was sent.
+     * @return The new {@code FileReferenceId} from given <b>normal</b> photo and source context.
+     */
+    public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, int messageId, InputPeer peer) {
+        char thumbSizeType = Optional.ofNullable(chatPhoto.videoSizes())
+                .map(d -> asChar(d.get(0).type()))
+                .orElseGet(() -> asChar(chatPhoto.sizes().get(0).type()));
+
+        return ofChatPhoto(chatPhoto, thumbSizeType, messageId, peer);
+    }
+
+    /**
+     * Creates new {@code FileReferenceId} object from given <b>normal</b> photo and source context.
      *
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
      * @param chatPhoto The chat photo info.
@@ -179,7 +222,24 @@ public class FileReferenceId {
 
     /**
      * Creates new {@code FileReferenceId} object from given <b>message</b> photo and source context,
-     * with <b>first</b> thumbnail.
+     * with <b>first</b> video or static thumbnail.
+     *
+     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
+     * @param photo The photo object.
+     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
+     * @param peer The message source peer.
+     * @return The new {@code FileReferenceId} from given photo and source context.
+     */
+    public static FileReferenceId ofPhoto(BasePhoto photo, int messageId, InputPeer peer) {
+        char thumbSizeType = Optional.ofNullable(photo.videoSizes())
+                .map(d -> asChar(d.get(0).type()))
+                .orElseGet(() -> asChar(photo.sizes().get(0).type()));
+
+        return ofPhoto(photo, thumbSizeType, messageId, peer);
+    }
+
+    /**
+     * Creates new {@code FileReferenceId} object from given <b>message</b> photo and source context.
      *
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param photo The photo object.
@@ -218,6 +278,7 @@ public class FileReferenceId {
         if (version < 0) {
             throw new IllegalArgumentException("Invalid sticker set thumbnail version.");
         }
+
         return new FileReferenceId(Type.STICKER_SET_THUMB, null,
                 SIZE_TYPE_ABSENT, -1, -1, -1,
                 null, '\0', null, stickerSet,

@@ -10,6 +10,7 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.MessageAction;
 import telegram4j.core.object.MessageMedia;
+import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.object.UserStatus;
@@ -426,6 +427,11 @@ public final class EntityFactory {
         if (videoData != null) {
             return new Video(client, data, fileName, messageId, peer,
                     videoData, hasStickers, animated);
+        }
+
+        if (sizeData != null) {
+            return new Photo(client, data, fileName,
+                    messageId, peer, sizeData);
         }
 
         return new Document(client, data, fileName, messageId, peer);

@@ -305,7 +305,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                                     0, -f.getDocumentId(), 1)
                                             .map(p -> p.photos().get(0))
                                             .ofType(BasePhoto.class)
-                                            .map(p -> FileReferenceId.ofChatPhoto(p, '\0', -1, peer));
+                                            .map(p -> FileReferenceId.ofChatPhoto(p, -1, peer));
                                 default:
                                     return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
                             }
@@ -520,7 +520,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         if (service.action().identifier() == MessageActionChatEditPhoto.ID) {
             MessageActionChatEditPhoto a = (MessageActionChatEditPhoto) service.action();
             return Mono.justOrEmpty(TlEntityUtil.unmapEmpty(a.photo(), BasePhoto.class))
-                    .map(p -> FileReferenceId.ofChatPhoto(p, '\0', orig.getMessageId(), orig.getPeer().orElseThrow()));
+                    .map(p -> FileReferenceId.ofChatPhoto(p, orig.getMessageId(), orig.getPeer().orElseThrow()));
         }
         return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + service.action()));
     }
@@ -545,13 +545,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             case MessageMediaDocument.ID:
                 return Mono.justOrEmpty(((MessageMediaDocument) media).document())
                         .ofType(BaseDocument.class)
-                        .map(d -> FileReferenceId.ofDocument(d, '\0',
-                                orig.getMessageId(), orig.getPeer().orElseThrow()));
+                        .map(d -> FileReferenceId.ofDocument(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
             case MessageMediaPhoto.ID:
                 return Mono.justOrEmpty(((MessageMediaPhoto) media).photo())
                         .ofType(BasePhoto.class)
-                        .map(d -> FileReferenceId.ofPhoto(d, '\0',
-                                orig.getMessageId(), orig.getPeer().orElseThrow()));
+                        .map(d -> FileReferenceId.ofPhoto(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
             case MessageMediaInvoice.ID:
                 return Mono.justOrEmpty(((MessageMediaInvoice) media).photo())
                         .map(d -> FileReferenceId.ofDocument(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
