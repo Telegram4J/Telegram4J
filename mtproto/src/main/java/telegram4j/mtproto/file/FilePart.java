@@ -21,7 +21,7 @@ public final class FilePart {
     private final String mimeType;
 
     /**
-     * Constructs {@code FilePart} from raw parameters, e.g. when downloading no-proxied file.
+     * Constructs {@code FilePart} from raw parameters.
      *
      * @param type The telegram's file type for file. For parsing it from mime-type you can use {@link TlEntityUtil#suggestFileType(String)}.
      * @param mtime The latest modification timestamp, if present, otherwise {@code -1}.

@@ -11,7 +11,7 @@ import telegram4j.tl.InputPeer;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Representation for message and profile photos in normal quality. */
+/** Representation for message and profile photos. */
 public class Photo extends Document {
     @Nullable
     private final DocumentAttributeImageSize sizeData;
@@ -54,9 +54,9 @@ public class Photo extends Document {
     }
 
     /**
-     * Gets whether photo has mask stickers attached to it, otherwise {@code false}.
+     * Gets whether photo has mask stickers attached to it.
      *
-     * @return {@code true} if photo has mask stickers attached to it, otherwise {@code false}.
+     * @return {@code true} if photo has mask stickers attached to it.
      */
     public boolean hasStickers() {
         return data.identifier() == BasePhoto.ID && ((BasePhoto) data).hasStickers();

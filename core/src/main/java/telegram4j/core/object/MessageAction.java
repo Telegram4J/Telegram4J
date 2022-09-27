@@ -1030,5 +1030,4 @@ public class MessageAction implements TelegramObject {
                     '}';
         }
     }
-
 }

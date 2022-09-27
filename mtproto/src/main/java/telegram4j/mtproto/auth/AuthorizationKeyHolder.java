@@ -25,7 +25,7 @@ public class AuthorizationKeyHolder {
      * @param id The id of auth key in the {@link ByteBuf}.
      */
     public AuthorizationKeyHolder(DataCenter dc, ByteBuf value, ByteBuf id) {
-        this.dc = dc;
+        this.dc = Objects.requireNonNull(dc);
         this.value = value.asReadOnly();
         this.id = id.asReadOnly();
     }
@@ -38,7 +38,7 @@ public class AuthorizationKeyHolder {
      * @param value The auth key in the {@link ByteBuf}.
      */
     public AuthorizationKeyHolder(DataCenter dc, ByteBuf value) {
-        this.dc = dc;
+        this.dc = Objects.requireNonNull(dc);
         this.value = value.asReadOnly();
         ByteBuf authKeyHash = sha1Digest(value);
         this.id = authKeyHash.slice(authKeyHash.readableBytes() - 8, 8).asReadOnly();

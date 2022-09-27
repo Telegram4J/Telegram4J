@@ -54,64 +54,37 @@ public class MessageMedia implements TelegramObject {
 
     public enum Type {
 
-        /**
-         * Attached photo.
-         */
-        PHOTO,
-
-        /**
-         * Attached map.
-         */
+        /** Attached map. */
         GEO,
 
-        /**
-         * Attached contact.
-         */
+        /** Attached contact. */
         CONTACT,
 
-        /**
-         * Current version of the client does not support this media type.
-         */
+        /** Current version of the client does not support this media type. */
         UNSUPPORTED,
 
-        /**
-         * Document (video, audio, voice, sticker, any media type except photo).
-         */
+        /** Any type of files. */
         DOCUMENT,
 
-        /**
-         * Preview of webpage.
-         */
+        /** Preview of webpage. */
         WEB_PAGE,
 
-        /**
-         * Message venue.
-         */
+        /** Message venue. */
         VENUE,
 
-        /**
-         * Telegram game.
-         */
+        /** Telegram game. */
         GAME,
 
-        /**
-         * Payment invoice.
-         */
+        /** Payment invoice. */
         INVOICE,
 
-        /**
-         * Indicates a live geolocation.
-         */
+        /** Indicates a live geolocation. */
         GEO_LIVE,
 
-        /**
-         * Message poll.
-         */
+        /** Message poll. */
         POLL,
 
-        /**
-         * Message dice.
-         */
+        /** Message dice. */
         DICE
     }
 
@@ -151,16 +124,19 @@ public class MessageMedia implements TelegramObject {
 
     public static class Document extends MessageMedia {
 
-        private final MessageMediaDocument data;
+        private final telegram4j.tl.MessageMedia data; // MessageMediaDocument/MessageMediaPhoto
         private final int messageId;
         private final InputPeer peer;
 
-        public Document(MTProtoTelegramClient client, MessageMediaDocument data,
-                        int messageId, InputPeer peer) {
+        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data, int messageId, InputPeer peer) {
             super(client, Type.DOCUMENT);
             this.data = Objects.requireNonNull(data);
             this.messageId = messageId;
             this.peer = Objects.requireNonNull(peer);
+        }
+
+        public boolean isNoPremium() {
+            return data.identifier() == MessageMediaDocument.ID && ((MessageMediaDocument) data).nopremium();
         }
 
         /**
@@ -169,8 +145,15 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link telegram4j.core.object.Document} of the message, if it hasn't expired by timer.
          */
         public Optional<telegram4j.core.object.Document> getDocument() {
-            return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                    .map(d -> EntityFactory.createDocument(client, d, messageId, peer));
+            switch (data.identifier()) {
+                case MessageMediaDocument.ID:
+                    return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaDocument) data).document(), BaseDocument.class))
+                            .map(d -> EntityFactory.createDocument(client, d, messageId, peer));
+                case MessageMediaPhoto.ID:
+                    return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaPhoto) data).photo(), BasePhoto.class))
+                            .map(d -> new telegram4j.core.object.Photo(client, d, peer, messageId));
+                default: throw new IllegalStateException();
+            }
         }
 
         /**
@@ -179,7 +162,13 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link Duration} of the document self-destruction, if present.
          */
         public Optional<Duration> getAutoDeleteDuration() {
-            return Optional.ofNullable(data.ttlSeconds()).map(Duration::ofSeconds);
+            switch (data.identifier()) {
+                case MessageMediaDocument.ID:
+                    return Optional.ofNullable(((MessageMediaDocument) data).ttlSeconds()).map(Duration::ofSeconds);
+                case MessageMediaPhoto.ID:
+                    return Optional.ofNullable(((MessageMediaPhoto) data).ttlSeconds()).map(Duration::ofSeconds);
+                default: throw new IllegalStateException();
+            }
         }
 
         @Override
@@ -198,59 +187,6 @@ public class MessageMedia implements TelegramObject {
         @Override
         public String toString() {
             return "MessageMediaDocument{" +
-                    "data=" + data +
-                    '}';
-        }
-    }
-
-    public static class Photo extends MessageMedia {
-
-        private final MessageMediaPhoto data;
-        private final int messageId;
-        private final InputPeer peer;
-
-        public Photo(MTProtoTelegramClient client, MessageMediaPhoto data, int messageId, InputPeer peer) {
-            super(client, Type.PHOTO);
-            this.data = Objects.requireNonNull(data);
-            this.messageId = messageId;
-            this.peer = Objects.requireNonNull(peer);
-        }
-
-        /**
-         * Gets photo of the message, if it hasn't expired by timer.
-         *
-         * @return The {@link telegram4j.core.object.Photo} of the message, if it hasn't expired by timer.
-         */
-        public Optional<telegram4j.core.object.Photo> getPhoto() {
-            return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class))
-                    .map(d -> new telegram4j.core.object.Photo(client, d, peer, messageId));
-        }
-
-        /**
-         * Gets {@link Duration} of the photo self-destruction, if present.
-         *
-         * @return The {@link Duration} of the photo self-destruction, if present.
-         */
-        public Optional<Duration> getAutoDeleteDuration() {
-            return Optional.ofNullable(data.ttlSeconds()).map(Duration::ofSeconds);
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Photo that = (Photo) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
-        public String toString() {
-            return "MessageMediaPhoto{" +
                     "data=" + data +
                     '}';
         }

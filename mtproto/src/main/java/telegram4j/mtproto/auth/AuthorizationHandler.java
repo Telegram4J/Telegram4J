@@ -20,6 +20,7 @@ import telegram4j.tl.request.mtproto.ReqDHParams;
 import telegram4j.tl.request.mtproto.SetClientDHParams;
 
 import java.math.BigInteger;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
@@ -40,10 +41,10 @@ public final class AuthorizationHandler {
     public AuthorizationHandler(MTProtoClient client, AuthorizationContext context,
                                 Sinks.One<AuthorizationKeyHolder> onAuthSink,
                                 ByteBufAllocator alloc) {
-        this.client = client;
-        this.context = context;
-        this.onAuthSink = onAuthSink;
-        this.alloc = alloc;
+        this.client = Objects.requireNonNull(client);
+        this.context = Objects.requireNonNull(context);
+        this.onAuthSink = Objects.requireNonNull(onAuthSink);
+        this.alloc = Objects.requireNonNull(alloc);
     }
 
     public Mono<Void> start() {
@@ -54,43 +55,37 @@ public final class AuthorizationHandler {
             ByteBuf nonce = Unpooled.wrappedBuffer(nonceb);
             context.setNonce(nonce);
 
-            return client.sendAuth(ImmutableReqPqMulti.builder()
-                    .nonce(nonce)
-                    .build());
+            return client.sendAuth(ImmutableReqPqMulti.of(nonce));
         });
     }
 
     public Mono<Void> handle(MTProtoObject obj) {
-        if (obj instanceof ResPQ) {
-            ResPQ resPQ = (ResPQ) obj;
+        switch (obj.identifier()) {
+            case ResPQ.ID:
+                ResPQ resPQ = (ResPQ) obj;
 
-            return handleResPQ(resPQ);
+                return handleResPQ(resPQ);
+            case ServerDHParams.ID:
+                ServerDHParams serverDHParams = (ServerDHParams) obj;
+
+                return handleServerDHParams(serverDHParams);
+            case DhGenOk.ID:
+                DhGenOk dhGenOk = (DhGenOk) obj;
+
+                return handleDhGenOk(dhGenOk);
+            case DhGenRetry.ID:
+                DhGenRetry dhGenRetry = (DhGenRetry) obj;
+
+                return handleDhGenRetry(dhGenRetry);
+            case DhGenFail.ID:
+                DhGenFail dhGenFail = (DhGenFail) obj;
+
+                return handleDhGenFail(dhGenFail);
+            default:
+                return Mono.fromRunnable(() -> onAuthSink.emitError(
+                        new AuthorizationException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())),
+                        Sinks.EmitFailureHandler.FAIL_FAST));
         }
-
-        if (obj instanceof ServerDHParams) {
-            ServerDHParams serverDHParams = (ServerDHParams) obj;
-
-            return handleServerDHParams(serverDHParams);
-        }
-
-        if (obj instanceof DhGenOk) {
-            DhGenOk dhGenOk = (DhGenOk) obj;
-            return handleDhGenOk(dhGenOk);
-        }
-
-        if (obj instanceof DhGenRetry) {
-            DhGenRetry dhGenRetry = (DhGenRetry) obj;
-            return handleDhGenRetry(dhGenRetry);
-        }
-
-        if (obj instanceof DhGenFail) {
-            DhGenFail dhGenFail = (DhGenFail) obj;
-            return handleDhGenFail(dhGenFail);
-        }
-
-        return Mono.fromRunnable(() -> onAuthSink.emitError(
-                new AuthorizationException("Incorrect MTProto object: 0x" + Integer.toHexString(obj.identifier())),
-                Sinks.EmitFailureHandler.FAIL_FAST));
     }
 
     private Mono<Void> handleResPQ(ResPQ resPQ) {

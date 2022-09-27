@@ -5,7 +5,6 @@ import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.*;
 import telegram4j.tl.photos.Photo;
@@ -130,7 +129,7 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<ResolvedPeer> resolveUsername(String username) {
-        return Mono.defer(() -> client.sendAwait(ImmutableResolveUsername.of(TlEntityUtil.stripUsername(username))))
+        return client.sendAwait(ImmutableResolveUsername.of(username))
                 .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
     }
 

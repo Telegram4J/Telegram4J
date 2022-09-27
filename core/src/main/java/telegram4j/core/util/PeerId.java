@@ -38,13 +38,12 @@ public final class PeerId {
     /**
      * Constructs a {@code PeerId} from given peer entity's username.
      *
-     * @throws IllegalArgumentException If username doesn't start from {@literal @} char.
      * @param username The username of a peer entity.
      * @return The new {@code PeerId} from given username.
      */
     public static PeerId of(String username) {
-        if (!username.startsWith("@")) {
-            throw new IllegalArgumentException("Malformed peer id: '" + username + '\'');
+        if (username.startsWith("@")) {
+            username = username.substring(1);
         }
         return new PeerId(username);
     }

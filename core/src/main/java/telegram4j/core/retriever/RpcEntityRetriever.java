@@ -12,8 +12,9 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.InputMessage;
+import telegram4j.tl.PeerChannel;
+import telegram4j.tl.PeerUser;
 import telegram4j.tl.messages.MessagesNotModified;
 
 import java.util.Objects;
@@ -48,11 +49,16 @@ public class RpcEntityRetriever implements EntityRetriever {
                 });
 
         return Mono.justOrEmpty(peerId.asUsername())
-                .map(TlEntityUtil::stripUsername)
                 .flatMap(username -> storeLayout.resolvePeer(username)
                         .switchIfEmpty(serviceHolder.getUserService()
                                 .resolveUsername(username)))
-                .mapNotNull(p -> EntityFactory.createPeerEntity(client, p))
+                .mapNotNull(p -> {
+                    switch (p.peer().identifier()) {
+                        case PeerChannel.ID: return EntityFactory.createChat(client, p.chats().get(0), null);
+                        case PeerUser.ID: return EntityFactory.createUser(client, p.users().get(0));
+                        default: throw new IllegalArgumentException("Unknown Peer type: " + p.peer());
+                    }
+                })
                 .switchIfEmpty(resolveById);
     }
 

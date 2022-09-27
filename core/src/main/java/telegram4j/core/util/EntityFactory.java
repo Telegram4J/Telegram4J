@@ -38,7 +38,6 @@ import telegram4j.tl.BaseChat;
 import telegram4j.tl.Channel;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
-import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
@@ -314,16 +313,15 @@ public final class EntityFactory {
     public static MessageMedia createMessageMedia(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data,
                                                   int messageId, InputPeer peer) {
         switch (data.identifier()) {
-            case telegram4j.tl.MessageMediaPhoto.ID:
-                return new MessageMedia.Photo(client, (telegram4j.tl.MessageMediaPhoto) data, messageId, peer);
             case telegram4j.tl.MessageMediaGeo.ID:
                 return new MessageMedia.Geo(client, (telegram4j.tl.MessageMediaGeo) data);
             case telegram4j.tl.MessageMediaContact.ID:
                 return new MessageMedia.Contact(client, (telegram4j.tl.MessageMediaContact) data);
             case telegram4j.tl.MessageMediaUnsupported.ID:
                 return new MessageMedia(client, MessageMedia.Type.UNSUPPORTED);
+            case telegram4j.tl.MessageMediaPhoto.ID:
             case telegram4j.tl.MessageMediaDocument.ID:
-                return new MessageMedia.Document(client, (telegram4j.tl.MessageMediaDocument) data, messageId, peer);
+                return new MessageMedia.Document(client, data, messageId, peer);
             case telegram4j.tl.MessageMediaWebPage.ID:
                 return new MessageMedia.WebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
             case telegram4j.tl.MessageMediaVenue.ID:
@@ -339,7 +337,7 @@ public final class EntityFactory {
             case telegram4j.tl.MessageMediaDice.ID:
                 return new MessageMedia.Dice(client, (telegram4j.tl.MessageMediaDice) data);
             default:
-                throw new IllegalArgumentException("Unknown message action type: " + data);
+                throw new IllegalArgumentException("Unknown MessageMedia type: " + data);
         }
     }
 
@@ -435,15 +433,6 @@ public final class EntityFactory {
         }
 
         return new Document(client, data, fileName, messageId, peer);
-    }
-
-    @Nullable
-    public static PeerEntity createPeerEntity(MTProtoTelegramClient client, ResolvedPeer p) {
-        switch (p.peer().identifier()) {
-            case PeerChannel.ID: return createChat(client, p.chats().get(0), null);
-            case PeerUser.ID: return createUser(client, p.users().get(0));
-            default: throw new IllegalArgumentException("Unknown peer type: " + p.peer());
-        }
     }
 
     public static Mono<InputBotInlineResult> createInlineResult(MTProtoTelegramClient client, InlineResultSpec spec) {
