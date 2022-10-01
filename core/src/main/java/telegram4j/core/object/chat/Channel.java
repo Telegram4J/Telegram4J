@@ -3,15 +3,16 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import telegram4j.core.object.BotInfo;
+import telegram4j.core.object.ChatAdminRights;
+import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.Reaction;
+import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
-import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.Variant2;
-import telegram4j.tl.ChannelParticipantsFilter;
-import telegram4j.tl.InputGroupCall;
-import telegram4j.tl.InputStickerSet;
-import telegram4j.tl.RestrictionReason;
+import telegram4j.tl.*;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -320,10 +321,18 @@ public interface Channel extends Chat {
     /**
      * Requests to edit current channel photo.
      *
-     * @param spec A spec of new photo for channel, {@code null} value indicates removing.
+     * @param photo A new photo for channel, {@code null} value indicates removing.
      * @return A {@link Mono} emitting on successful completion nothing.
      */
-    Mono<Void> editPhoto(@Nullable InputChatPhotoSpec spec);
+    Mono<Void> editPhoto(@Nullable BaseInputPhoto photo);
+
+    /**
+     * Requests to edit current channel photo.
+     *
+     * @param spec A new uploaded photo for channel, {@code null} value indicates removing.
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    Mono<Void> editPhoto(@Nullable InputChatUploadedPhoto spec);
 
     /**
      * Requests to leave channel by <i>current</i> user.

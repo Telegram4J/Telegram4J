@@ -90,7 +90,7 @@ public class UploadService extends RpcService {
                 DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.stream()
                         .filter(dc -> dc.getId() == client.getDatacenter().getId())
                         .findFirst()
-                        .orElseThrow();
+                        .orElseThrow(); // TODO: dc by default
 
                 Mono<Void> initialize = Flux.range(0, PARALLELISM)
                         .map(i -> client.createMediaClient(mediaDc))

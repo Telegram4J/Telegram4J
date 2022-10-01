@@ -50,14 +50,11 @@ public class BotInfo implements TelegramObject {
         return Optional.ofNullable(data.description());
     }
 
-    public Optional<Photo> getDescriptionPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.descriptionPhoto(), BasePhoto.class))
-                .map(e -> new Photo(client, e, InputPeerEmpty.instance(), -1));
-    }
-
     public Optional<Document> getDescriptionDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.descriptionDocument(), BaseDocument.class))
-                .map(d -> EntityFactory.createDocument(client, d, -1, InputPeerEmpty.instance()));
+                .map(d -> EntityFactory.createDocument(client, d, -1, InputPeerEmpty.instance()))
+                .or(() -> Optional.ofNullable(TlEntityUtil.unmapEmpty(data.descriptionPhoto(), BasePhoto.class))
+                        .map(e -> new Photo(client, e, InputPeerEmpty.instance(), -1)));
     }
 
     // TODO:

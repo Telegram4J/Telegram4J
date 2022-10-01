@@ -42,7 +42,7 @@ public class MaskCoordinates {
 
     @Override
     public String toString() {
-        return "MaskCoords{" +
+        return "MaskCoordinates{" +
                 "data=" + data +
                 '}';
     }

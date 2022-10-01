@@ -12,24 +12,25 @@ public interface KeyboardButtonSpec extends Spec {
         switch (object.getType()) {
             // Inline buttons
             case URL_AUTH:
-                return InlineButtonSpecDef.urlAuth(object.getText(), object.isRequestWriteAccess().orElse(false),
+                return InlineButtonSpec.urlAuth(object.getText(), object.isRequestWriteAccess().orElse(false),
                         object.getForwardText().orElse(null),
                         object.getUrl().orElseThrow(), object.getBotId().orElseThrow());
-            case BUY: return InlineButtonSpecDef.buy(object.getText());
+            case BUY: return InlineButtonSpec.buy(object.getText());
             case CALLBACK:
-                return InlineButtonSpecDef.callback(object.getText(), object.isRequiresPassword().orElse(false),
+                return InlineButtonSpec.callback(object.getText(), object.isRequiresPassword().orElse(false),
                         object.getData().orElseThrow());
-            case GAME: return InlineButtonSpecDef.game(object.getText());
+            case GAME: return InlineButtonSpec.game(object.getText());
             case SWITCH_INLINE:
-                return InlineButtonSpecDef.switchInline(object.getText(),
+                return InlineButtonSpec.switchInline(object.getText(),
                         object.isSamePeer().orElse(false), object.getQuery().orElseThrow());
-            case URL: return InlineButtonSpecDef.url(object.getText(), object.getUrl().orElseThrow());
-            case USER_PROFILE: return InlineButtonSpecDef.userProfile(object.getText(), object.getUserId().orElseThrow());
+            case URL: return InlineButtonSpec.url(object.getText(), object.getUrl().orElseThrow());
+            case USER_PROFILE: return InlineButtonSpec.userProfile(object.getText(), object.getUserId().orElseThrow());
             // Reply buttons
             case REQUEST_GEO_LOCATION:
             case REQUEST_PHONE:
-            case DEFAULT: return ReplyButtonSpec.of(object.getType(), object.getText());
-            case REQUEST_POLL: return ReplyButtonSpecDef.requestPoll(object.getText(), object.isQuiz().orElse(false));
+            case DEFAULT:
+                return new ReplyButtonSpec(object.getType(), object.getText());
+            case REQUEST_POLL: return ReplyButtonSpec.requestPoll(object.getText(), object.isQuiz().orElse(false));
             default: throw new IllegalStateException();
         }
     }
@@ -42,7 +43,7 @@ public interface KeyboardButtonSpec extends Spec {
         return Mono.defer(() -> {
             switch (type()) {
                 case URL_AUTH: {
-                    InlineButtonSpecDef s = (InlineButtonSpecDef) this;
+                    InlineButtonSpec s = (InlineButtonSpec) this;
                     return client.asInputUser(s.userId().orElseThrow())
                             .map(id -> ImmutableInputKeyboardButtonUrlAuth.builder()
                                     .text(text())
@@ -55,22 +56,22 @@ public interface KeyboardButtonSpec extends Spec {
                 case DEFAULT: return Mono.just(ImmutableBaseKeyboardButton.of(text()));
                 case BUY: return Mono.just(ImmutableKeyboardButtonBuy.of(text()));
                 case URL: {
-                    InlineButtonSpecDef s = (InlineButtonSpecDef) this;
+                    InlineButtonSpec s = (InlineButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonUrl.of(text(), s.url().orElseThrow()));
                 }
                 case USER_PROFILE: {
-                    InlineButtonSpecDef s = (InlineButtonSpecDef) this;
+                    InlineButtonSpec s = (InlineButtonSpec) this;
                     return client.asInputUser(s.userId().orElseThrow())
                             .map(id -> ImmutableInputKeyboardButtonUserProfile.of(text(), id));
                 }
                 case SWITCH_INLINE: {
-                    InlineButtonSpecDef s = (InlineButtonSpecDef) this;
+                    InlineButtonSpec s = (InlineButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonSwitchInline.of(
                             s.samePeer().orElse(false) ? ImmutableKeyboardButtonSwitchInline.SAME_PEER_MASK : 0,
                             text(), s.query().orElseThrow()));
                 }
                 case REQUEST_POLL: {
-                    ReplyButtonSpecDef s = (ReplyButtonSpecDef) this;
+                    ReplyButtonSpec s = (ReplyButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonRequestPoll.of(text())
                             .withQuiz(s.quiz().orElse(null)));
                 }
@@ -78,12 +79,13 @@ public interface KeyboardButtonSpec extends Spec {
                 case REQUEST_GEO_LOCATION: return Mono.just(ImmutableKeyboardButtonRequestGeoLocation.of(text()));
                 case GAME: return Mono.from(Mono.just(ImmutableKeyboardButtonGame.of(text())));
                 case CALLBACK: {
-                    InlineButtonSpecDef s = (InlineButtonSpecDef) this;
+                    InlineButtonSpec s = (InlineButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonCallback.of(
                             s.requiresPassword().orElse(false) ? ImmutableKeyboardButtonCallback.REQUIRES_PASSWORD_MASK : 0,
                             text(), s.data().orElseThrow()));
                 }
-                default: return Mono.error(new IllegalStateException());
+                // TODO: implement web view
+                default: return Mono.error(new IllegalStateException("Unexpected button type: " + type()));
             }
         });
     }

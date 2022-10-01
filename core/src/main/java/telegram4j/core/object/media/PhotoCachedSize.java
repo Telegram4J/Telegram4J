@@ -18,7 +18,7 @@ public class PhotoCachedSize implements PhotoSize {
         return data.type().charAt(0);
     }
 
-    public int getWight() {
+    public int getWidth() {
         return data.w();
     }
 

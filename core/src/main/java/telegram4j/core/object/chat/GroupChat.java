@@ -11,7 +11,6 @@ import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.*;
-import telegram4j.core.spec.InputChatPhotoSpec;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;
@@ -315,12 +314,25 @@ public final class GroupChat extends BaseChat {
     /**
      * Requests to edit current chat photo.
      *
-     * @param spec A spec of new photo for chat, {@code null} value indicates removing.
+     * @param photo A new photo for chat, {@code null} value indicates removing.
      * @return A {@link Mono} emitting on successful completion nothing.
      */
-    public Mono<Void> editPhoto(@Nullable InputChatPhotoSpec spec) {
-        return Mono.justOrEmpty(spec)
-                .map(InputChatPhotoSpec::asData)
+    public Mono<Void> editPhoto(@Nullable BaseInputPhoto photo) {
+        return Mono.justOrEmpty(photo)
+                .<InputChatPhoto>map(ImmutableBaseInputChatPhoto::of)
+                .defaultIfEmpty(InputChatPhotoEmpty.instance())
+                .flatMap(c -> client.getServiceHolder().getChatService()
+                        .editChatPhoto(minData.id(), c));
+    }
+
+    /**
+     * Requests to edit current chat photo.
+     *
+     * @param spec A new uploaded photo for chat, {@code null} value indicates removing.
+     * @return A {@link Mono} emitting on successful completion nothing.
+     */
+    public Mono<Void> editPhoto(@Nullable InputChatUploadedPhoto spec) {
+        return Mono.<InputChatPhoto>justOrEmpty(spec)
                 .defaultIfEmpty(InputChatPhotoEmpty.instance())
                 .flatMap(c -> client.getServiceHolder().getChatService()
                         .editChatPhoto(minData.id(), c));

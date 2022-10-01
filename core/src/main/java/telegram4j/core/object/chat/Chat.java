@@ -5,7 +5,6 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.*;
 import telegram4j.core.spec.ForwardMessagesSpec;
-import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
@@ -97,7 +96,7 @@ public interface Chat extends PeerEntity {
     // Interaction methods
 
     /**
-     * Requests to create new message by specified edit specification in this chat.
+     * Requests to create new message or media by specified edit specification in this chat.
      *
      * @param spec an immutable object that specifies how to create the message.
      * @return A {@link Mono} emitting on successful completion created message.
@@ -112,14 +111,6 @@ public interface Chat extends PeerEntity {
      * @return A {@link Flux} emitting created messages.
      */
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
-
-    /**
-     * Requests to create new message with media file by specified media specification in this chat.
-     *
-     * @param spec an immutable object that specifies how to create the message with media file.
-     * @return A {@link Mono} emitting on successful completion created message.
-     */
-    Mono<Message> sendMedia(SendMediaSpec spec);
 
     /**
      * Retrieves {@link AuxiliarySendAs} container with available peers,

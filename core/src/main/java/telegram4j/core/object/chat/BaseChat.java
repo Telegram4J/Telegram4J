@@ -8,7 +8,6 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.Message;
 import telegram4j.core.spec.ForwardMessagesSpec;
-import telegram4j.core.spec.SendMediaSpec;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.AuxiliaryEntityFactory;
 import telegram4j.core.util.EntityFactory;
@@ -72,25 +71,39 @@ abstract class BaseChat implements Chat {
                     .flatMap(client::resolvePeer)
                     .flatMap(p -> client.asInputPeer(p.getId()));
 
-            return parser.map(function((txt, ent) -> SendMessage.builder()
-                    .randomId(CryptoUtil.random.nextLong())
-                    .peer(client.asResolvedInputPeer(getId()))
-                    .silent(spec.silent())
-                    .noWebpage(spec.noWebpage())
-                    .background(spec.background())
-                    .clearDraft(spec.clearDraft())
-                    .noforwards(spec.noForwards())
-                    .replyToMsgId(spec.replyToMessageId().orElse(null))
-                    .message(txt)
-                    .entities(ent)
-                    .scheduleDate(spec.scheduleTimestamp()
-                            .map(Instant::getEpochSecond)
-                            .map(Math::toIntExact)
-                            .orElse(null))))
-                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                            .then(sendAs.doOnNext(builder::sendAs))
-                            .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(client.getServiceHolder().getChatService()::sendMessage)
+            return Mono.justOrEmpty(spec.media())
+                    .flatMap(d -> d.asData(client))
+                    .flatMap(media -> parser.map(function((txt, ent) -> SendMedia.builder()
+                                    .media(media)
+                                    .randomId(CryptoUtil.random.nextLong())
+                                    .peer(client.asResolvedInputPeer(getId()))
+                                    .flags(spec.flags().getValue())
+                                    .replyToMsgId(spec.replyToMessageId().orElse(null))
+                                    .message(txt)
+                                    .entities(ent)
+                                    .scheduleDate(spec.scheduleTimestamp()
+                                            .map(Instant::getEpochSecond)
+                                            .map(Math::toIntExact)
+                                            .orElse(null))))
+                            .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                    .then(sendAs.doOnNext(builder::sendAs))
+                                    .then(Mono.fromSupplier(builder::build)))
+                            .flatMap(client.getServiceHolder().getChatService()::sendMedia))
+                    .switchIfEmpty(parser.map(function((txt, ent) -> SendMessage.builder()
+                                    .randomId(CryptoUtil.random.nextLong())
+                                    .peer(client.asResolvedInputPeer(getId()))
+                                    .flags(spec.flags().getValue())
+                                    .replyToMsgId(spec.replyToMessageId().orElse(null))
+                                    .message(txt)
+                                    .entities(ent)
+                                    .scheduleDate(spec.scheduleTimestamp()
+                                            .map(Instant::getEpochSecond)
+                                            .map(Math::toIntExact)
+                                            .orElse(null))))
+                            .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                    .then(sendAs.doOnNext(builder::sendAs))
+                                    .then(Mono.fromSupplier(builder::build)))
+                            .flatMap(client.getServiceHolder().getChatService()::sendMessage))
                     .map(e -> EntityFactory.createMessage(client, e, getId()));
         });
     }
@@ -109,14 +122,8 @@ abstract class BaseChat implements Chat {
                                 .randomId(CryptoUtil.random.longs(spec.ids().size())
                                         .boxed()
                                         .collect(Collectors.toList()))
-                                .silent(spec.silent())
-                                .background(spec.background())
-                                .withMyScore(spec.myScore())
-                                .dropAuthor(spec.dropAuthor())
-                                .dropMediaCaptions(spec.dropMediaCaptions())
-                                .noforwards(spec.noForwards())
+                                .flags(spec.flags().getValue())
                                 .fromPeer(client.asResolvedInputPeer(getId()))
-                                .silent(spec.silent())
                                 .toPeer(toPeerResend)
                                 .sendAs(unmapEmpty(sendAs))
                                 .scheduleDate(spec.scheduleTimestamp()
@@ -127,33 +134,6 @@ abstract class BaseChat implements Chat {
                         .flatMap(e -> client.asInputPeer(Id.of(e.peerId()))
                                 .map(p -> EntityFactory.createMessage(client, e,
                                         Id.of(p, client.getSelfId()))));
-    }
-
-    @Override
-    public Mono<Message> sendMedia(SendMediaSpec spec) {
-        return Mono.justOrEmpty(spec.sendAs())
-                .flatMap(client::resolvePeer)
-                .flatMap(p -> client.asInputPeer(p.getId()))
-                .defaultIfEmpty(InputPeerEmpty.instance())
-                .zipWith(Mono.defer(() -> spec.media().asData(client)))
-                .flatMap(function((sendAs, media) -> client.getServiceHolder().getChatService()
-                        .sendMedia(SendMedia.builder()
-                                .media(media)
-                                .randomId(CryptoUtil.random.nextLong())
-                                .silent(spec.silent())
-                                .background(spec.background())
-                                .clearDraft(spec.clearDraft())
-                                .noforwards(spec.noForwards())
-                                .peer(client.asResolvedInputPeer(getId()))
-                                .silent(spec.silent())
-                                .message(spec.message())
-                                .sendAs(unmapEmpty(sendAs))
-                                .scheduleDate(spec.scheduleTimestamp()
-                                        .map(Instant::getEpochSecond)
-                                        .map(Math::toIntExact)
-                                        .orElse(null))
-                                .build())
-                        .map(e -> EntityFactory.createMessage(client, e, getId()))));
     }
 
     @Override

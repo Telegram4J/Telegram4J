@@ -145,6 +145,11 @@ public class StickerSet implements TelegramObject {
         return Optional.ofNullable(data.thumbDocumentId());
     }
 
+    /**
+     * Gets count of stickers or emojis in the sticker set.
+     *
+     * @return The count of stickers or emojis.
+     */
     public int getCount() {
         return data.count();
     }

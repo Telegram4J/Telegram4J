@@ -38,7 +38,8 @@ public class UserNameFields {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         UserNameFields that = (UserNameFields) o;
-        return Objects.equals(userName, that.userName) && Objects.equals(firstName, that.firstName) && Objects.equals(lastName, that.lastName);
+        return Objects.equals(userName, that.userName) && Objects.equals(firstName, that.firstName) &&
+                Objects.equals(lastName, that.lastName);
     }
 
     @Override

@@ -6,7 +6,7 @@ import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.spec.EditMessageSpec;
-import telegram4j.core.spec.PinMessageSpec;
+import telegram4j.core.spec.PinMessageFlags;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
@@ -20,10 +20,7 @@ import telegram4j.tl.request.messages.UpdatePinnedMessage;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static reactor.function.TupleUtils.function;
@@ -365,17 +362,17 @@ public final class Message implements TelegramObject {
     /**
      * Requests to pin/unpin this message by specified parameters.
      *
-     * @param spec The pin/unpin parameters.
+     * @param flags The request flags.
      * @return A {@link Mono} emitting on successful completion nothing.
      */
-    public Mono<Void> pin(PinMessageSpec spec) {
+    public Mono<Void> pin(Set<PinMessageFlags> flags) {
         return Mono.defer(() -> client.getServiceHolder().getChatService()
                 .updatePinnedMessage(UpdatePinnedMessage.builder()
                         .peer(client.asResolvedInputPeer(resolvedChatId))
                         .id(getId())
-                        .unpin(spec.unpin())
-                        .silent(spec.silent())
-                        .pmOneside(spec.pmOneSide())
+                        .flags(flags.stream()
+                                .map(PinMessageFlags::mask)
+                                .reduce(0, (l, r) -> l | r))
                         .build()));
     }
 
