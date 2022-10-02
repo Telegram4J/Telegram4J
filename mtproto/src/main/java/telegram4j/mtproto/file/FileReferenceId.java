@@ -854,6 +854,9 @@ public class FileReferenceId {
         /** Default type for all other documents. */
         GENERAL,
 
+        /** Represents photo sent as document. */
+        PHOTO,
+
         /** Represents document with {@link DocumentAttributeVideo} attribute. */
         VIDEO,
 
@@ -879,6 +882,7 @@ public class FileReferenceId {
 
         public static DocumentType fromAttributes(List<DocumentAttribute> attributes) {
             DocumentType type = GENERAL;
+            boolean haveSizeAttr = false;
             for (DocumentAttribute attribute : attributes) {
                 switch (attribute.identifier()) {
                     case DocumentAttributeAnimated.ID: return GIF;
@@ -891,9 +895,12 @@ public class FileReferenceId {
                     case DocumentAttributeVideo.ID:
                         type = VIDEO;
                         break;
+                    case DocumentAttributeImageSize.ID:
+                        haveSizeAttr = true;
+                        break;
                 }
             }
-            return type;
+            return haveSizeAttr ? PHOTO : type;
         }
     }
 

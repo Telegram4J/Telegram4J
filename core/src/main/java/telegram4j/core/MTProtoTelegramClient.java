@@ -275,69 +275,82 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      *
      * @apiNote File ref ids with type {@link FileReferenceId.Type#STICKER_SET_THUMB} don't require refreshing.
      *
+     * @param fileReferenceId The {@link FileReferenceId}.
+     * @return A {@link Mono} that emitting on successful completion refreshed {@link FileReferenceId}.
+     */
+    public Mono<FileReferenceId> refresh(FileReferenceId fileReferenceId) {
+        return Mono.defer(() -> {
+            switch (fileReferenceId.getFileType()) {
+                case CHAT_PHOTO: {
+                    InputPeer peer = fileReferenceId.getPeer().orElseThrow();
+                    switch (peer.identifier()) {
+                        case InputPeerChannel.ID:
+                        case InputPeerChannelFromMessage.ID:
+                            InputChannel channel = TlEntityUtil.toInputChannel(peer);
+                            return serviceHolder.getChatService()
+                                    .getMessages(channel, List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
+                                    .ofType(ChannelMessages.class)
+                                    .flatMap(b -> findMessageAction(b, fileReferenceId));
+                        case InputPeerChat.ID:
+                            return serviceHolder.getChatService()
+                                    .getMessages(List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
+                                    .ofType(BaseMessages.class)
+                                    .flatMap(b -> findMessageAction(b, fileReferenceId));
+                        case InputPeerSelf.ID:
+                        case InputPeerUser.ID:
+                        case InputPeerUserFromMessage.ID:
+                            return serviceHolder.getUserService()
+                                    .getUserPhotos(TlEntityUtil.toInputUser(peer),
+                                            0, -fileReferenceId.getDocumentId(), 1)
+                                    .map(p -> p.photos().get(0))
+                                    .ofType(BasePhoto.class)
+                                    .map(p -> FileReferenceId.ofChatPhoto(p, -1, peer));
+                        default:
+                            return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
+                    }
+                }
+                case WEB_DOCUMENT:
+                case DOCUMENT:
+                case PHOTO: // message id must be present
+                    InputPeer peer = fileReferenceId.getPeer().orElseThrow();
+                    switch (peer.identifier()) {
+                        case InputPeerChannel.ID:
+                        case InputPeerChannelFromMessage.ID:
+                            InputChannel channel = TlEntityUtil.toInputChannel(peer);
+                            return serviceHolder.getChatService()
+                                    .getMessages(channel, List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
+                                    .ofType(ChannelMessages.class)
+                                    .flatMap(b -> findMessageMedia(b, fileReferenceId));
+                        case InputPeerSelf.ID:
+                        case InputPeerUser.ID:
+                        case InputPeerUserFromMessage.ID:
+                        case InputPeerChat.ID:
+                            return serviceHolder.getChatService()
+                                    .getMessages(List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
+                                    .ofType(BaseMessages.class)
+                                    .flatMap(b -> findMessageMedia(b, fileReferenceId));
+                        default:
+                            return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
+                    }
+                    // No need refresh
+                case STICKER_SET_THUMB: return Mono.just(fileReferenceId);
+                default: return Mono.error(new IllegalStateException());
+            }
+        });
+    }
+
+    /**
+     * Refresh {@link FileReferenceId} file reference and access hash from specified context.
+     * Low-quality chat photos (Files with type {@link FileReferenceId.Type#CHAT_PHOTO}) photos will be refreshed as normal photos.
+     *
+     * @apiNote File ref ids with type {@link FileReferenceId.Type#STICKER_SET_THUMB} don't require refreshing.
+     *
      * @param fileReferenceId The serialized {@link FileReferenceId}.
      * @return A {@link Mono} that emitting on successful completion refreshed {@link FileReferenceId}.
      */
     public Mono<FileReferenceId> refresh(String fileReferenceId) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .flatMap(f -> {
-                    switch (f.getFileType()) {
-                        case CHAT_PHOTO: {
-                            InputPeer peer = f.getPeer().orElseThrow();
-                            switch (peer.identifier()) {
-                                case InputPeerChannel.ID:
-                                case InputPeerChannelFromMessage.ID:
-                                    InputChannel channel = TlEntityUtil.toInputChannel(peer);
-                                    return serviceHolder.getChatService()
-                                            .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
-                                            .ofType(ChannelMessages.class)
-                                            .flatMap(b -> findMessageAction(b, f));
-                                case InputPeerChat.ID:
-                                    return serviceHolder.getChatService()
-                                            .getMessages(List.of(ImmutableInputMessageID.of(f.getMessageId())))
-                                            .ofType(BaseMessages.class)
-                                            .flatMap(b -> findMessageAction(b, f));
-                                case InputPeerSelf.ID:
-                                case InputPeerUser.ID:
-                                case InputPeerUserFromMessage.ID:
-                                    return serviceHolder.getUserService()
-                                            .getUserPhotos(TlEntityUtil.toInputUser(peer),
-                                                    0, -f.getDocumentId(), 1)
-                                            .map(p -> p.photos().get(0))
-                                            .ofType(BasePhoto.class)
-                                            .map(p -> FileReferenceId.ofChatPhoto(p, -1, peer));
-                                default:
-                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
-                            }
-                        }
-                        case WEB_DOCUMENT:
-                        case DOCUMENT:
-                        case PHOTO: // message id must be present
-                            InputPeer peer = f.getPeer().orElseThrow();
-                            switch (peer.identifier()) {
-                                case InputPeerChannel.ID:
-                                case InputPeerChannelFromMessage.ID:
-                                    InputChannel channel = TlEntityUtil.toInputChannel(peer);
-                                    return serviceHolder.getChatService()
-                                            .getMessages(channel, List.of(ImmutableInputMessageID.of(f.getMessageId())))
-                                            .ofType(ChannelMessages.class)
-                                            .flatMap(b -> findMessageMedia(b, f));
-                                case InputPeerSelf.ID:
-                                case InputPeerUser.ID:
-                                case InputPeerUserFromMessage.ID:
-                                case InputPeerChat.ID:
-                                    return serviceHolder.getChatService()
-                                            .getMessages(List.of(ImmutableInputMessageID.of(f.getMessageId())))
-                                            .ofType(BaseMessages.class)
-                                            .flatMap(b -> findMessageMedia(b, f));
-                                default:
-                                    return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
-                            }
-                            // No need refresh
-                        case STICKER_SET_THUMB: return Mono.just(f);
-                        default: return Mono.error(new IllegalStateException());
-                    }
-                });
+                .flatMap(this::refresh);
     }
 
     /**

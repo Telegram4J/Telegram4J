@@ -463,63 +463,39 @@ public final class EntityFactory {
 
             return sendMessage.map(builder::sendMessage)
                     .map(ImmutableBaseInputBotInlineResult.Builder::build);
-        } else if (spec instanceof InlineResultPhotoSpec) {
-            InlineResultPhotoSpec r = (InlineResultPhotoSpec) spec;
-
-            try {
-                InputPhoto photo = FileReferenceId.deserialize(r.photo()).asInputPhoto();
-
-                var builder = InputBotInlineResultPhoto.builder()
-                        .type("photo")
-                        .photo(photo)
-                        .id(r.id());
-
-                return sendMessage.map(builder::sendMessage)
-                        .map(ImmutableInputBotInlineResultPhoto.Builder::build);
-            } catch (IllegalArgumentException e) { // may be just an url
-                String url = r.photo();
-                WebDocumentSpec thumb = r.thumb().orElseGet(() -> WebDocumentSpec.of(url));
-
-                var builder = BaseInputBotInlineResult.builder()
-                        .type("photo")
-                        .id(r.id())
-                        .url(url);
-
-                var contentBuilder = InputWebDocument.builder()
-                        .url(url)
-                        .size(0)
-                        .mimeType("image/jpeg");
-
-                Optional.ofNullable(getFilenameFromUrl(url)).ifPresent(s -> contentBuilder.addAttribute(
-                        ImmutableDocumentAttributeFilename.of(s)));
-
-                r.photoSize().ifPresent(s -> contentBuilder.addAttribute(
-                        ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
-
-                builder.content(contentBuilder.build());
-                builder.thumb(createThumbnail(thumb));
-
-                return sendMessage.map(builder::sendMessage)
-                        .map(ImmutableBaseInputBotInlineResult.Builder::build);
-            }
         } else if (spec instanceof InlineResultDocumentSpec) {
             InlineResultDocumentSpec r = (InlineResultDocumentSpec) spec;
 
             DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
-
             String type = documentType == DocumentType.GENERAL ? "file" : documentType.name().toLowerCase(Locale.ROOT);
+
             try {
                 FileReferenceId fileRefId = FileReferenceId.deserialize(r.file());
-                InputDocument document = fileRefId.asInputDocument();
 
-                if (r.type().map(t -> fileRefId.getDocumentType().orElseThrow() != t).orElse(false)) {
+                var fileRefIdType = fileRefId.getDocumentType()
+                        .or(() -> fileRefId.getFileType() == FileReferenceId.Type.PHOTO
+                                ? Optional.of(DocumentType.PHOTO) : Optional.empty()) // possible jpeg photo
+                        .orElseThrow();
+                if (r.type().map(t -> fileRefIdType != t).orElse(false)) {
                     throw new IllegalArgumentException("Document type mismatch. File ref id: "
-                            + fileRefId.getDocumentType() + ", type: " + documentType);
+                            + fileRefIdType + ", type: " + documentType);
                 }
 
+                if (fileRefIdType == DocumentType.PHOTO) {
+                    InputPhoto photo = fileRefId.asInputPhoto();
+                    var builder = InputBotInlineResultPhoto.builder()
+                            .type("photo")
+                            .photo(photo)
+                            .id(r.id());
+
+                    return sendMessage.map(builder::sendMessage)
+                            .map(ImmutableInputBotInlineResultPhoto.Builder::build);
+                }
+
+                InputDocument document = fileRefId.asInputDocument();
                 var builder = InputBotInlineResultDocument.builder()
                         .type(type)
-                        .title(r.title())
+                        .title(r.title().orElse(null))
                         .description(r.description().orElse(null))
                         .document(document)
                         .id(r.id());
@@ -527,10 +503,9 @@ public final class EntityFactory {
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableInputBotInlineResultDocument.Builder::build);
             } catch (IllegalArgumentException e) { // may be just an url
-
                 var builder = BaseInputBotInlineResult.builder()
                         .type(type)
-                        .title(r.title())
+                        .title(r.title().orElse(null))
                         .description(r.description().orElse(null))
                         .id(r.id())
                         .url(r.file());
@@ -539,8 +514,9 @@ public final class EntityFactory {
                         .url(r.file())
                         .size(0);
 
-                String mimeType = r.mimeType().orElseThrow(() -> new IllegalArgumentException(
-                        "Mime type must be included with urls."));
+                String mimeType = r.mimeType()
+                        .or(() -> documentType == DocumentType.PHOTO ? Optional.of("image/jpeg") : Optional.empty())
+                        .orElseThrow(() -> new IllegalArgumentException("Mime type must be included with urls."));
 
                 if (documentType == DocumentType.GENERAL &&
                         !mimeType.equalsIgnoreCase("application/pdf") &&
@@ -551,12 +527,14 @@ public final class EntityFactory {
                 contentBuilder.mimeType(mimeType);
 
                 switch (documentType) {
+                    case PHOTO: {
+                        SizeSpec size = r.size().orElseThrow(() -> new IllegalStateException("Size for photos must be set."));
+
+                        contentBuilder.addAttribute(ImmutableDocumentAttributeImageSize.of(size.width(), size.height()));
+                        break;
+                    }
                     case VIDEO:
                     case GIF: {
-                        if (r.thumb().isEmpty()) {
-                            throw new IllegalStateException("Thumbnail must be set for gif files.");
-                        }
-
                         int duration = r.duration()
                                 .map(Duration::getSeconds)
                                 .map(Math::toIntExact)
@@ -589,8 +567,14 @@ public final class EntityFactory {
                 Optional.ofNullable(getFilenameFromUrl(r.file())).ifPresent(s -> contentBuilder.addAttribute(
                         ImmutableDocumentAttributeFilename.of(s)));
 
-                builder.content(contentBuilder.build());
-                r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
+                var content = contentBuilder.build();
+                builder.content(content);
+
+                r.thumb().map(EntityFactory::createThumbnail).ifPresentOrElse(builder::thumb, () -> {
+                    if (documentType == DocumentType.GIF || documentType == DocumentType.VIDEO ||
+                            documentType == DocumentType.PHOTO)
+                        builder.thumb(content);
+                });
 
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableBaseInputBotInlineResult.Builder::build);

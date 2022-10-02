@@ -1,10 +1,16 @@
 package telegram4j.core;
 
+import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+import reactor.util.Logger;
+import reactor.util.Loggers;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
+import telegram4j.core.event.domain.message.SendMessageEvent;
+import telegram4j.core.object.MessageMedia;
 import telegram4j.core.spec.AnswerInlineCallbackQuerySpec;
-import telegram4j.core.spec.inline.InlineMessageTextSpec;
-import telegram4j.core.spec.inline.InlineResultArticleSpec;
+import telegram4j.core.spec.inline.*;
+import telegram4j.core.util.parser.EntityParserFactory;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
 import java.time.Duration;
@@ -12,7 +18,12 @@ import java.util.function.Function;
 
 public class MTProtoBotInlineExample {
 
+    private static final Logger log = Loggers.getLogger(MTProtoBotInlineExample.class);
+
     private static final Duration CACHE_TIME = Duration.ofSeconds(30);
+    private static final Duration PHOTO_CACHE_TIME = Duration.ofSeconds(5);
+
+    private static volatile String lastPhotoId;
 
     public static void main(String[] args) {
 
@@ -26,22 +37,83 @@ public class MTProtoBotInlineExample {
                 .withConnection(client -> {
 
                     Mono<Void> listenInline = client.on(InlineQueryEvent.class)
-                            .filter(e -> e.getQuery().isEmpty())
-                            .flatMap(e -> e.answer(AnswerInlineCallbackQuerySpec.builder()
-                                    .cacheTime(CACHE_TIME)
-                                    .addResult(InlineResultArticleSpec.builder()
-                                            .id("1")
-                                            .title("Telegram wikipedia page.")
-                                            .url("https://en.wikipedia.org/wiki/Telegram_(software)")
-                                            .message(InlineMessageTextSpec.builder()
-                                                    .message("Telegram wikipedia page.")
-                                                    .build())
-                                            .build())
-                                    .build()))
+                            .flatMap(MTProtoBotInlineExample::handleInlineQuery)
                             .then();
 
-                    return Mono.when(listenInline);
+                    Mono<Void> listenIncomingFri = client.on(SendMessageEvent.class)
+                            .flatMap(s -> Mono.justOrEmpty(s.getMessage().getMedia()))
+                            .ofType(MessageMedia.Document.class)
+                            .flatMap(d -> Mono.justOrEmpty(d.getDocument()))
+                            .map(d -> d.getFileReferenceId().serialize())
+                            .doOnNext(s -> lastPhotoId = s)
+                            .doOnNext(log::debug)
+                            .then();
+
+                    return Mono.when(listenInline, listenIncomingFri);
                 })
                 .block();
+    }
+
+    private static Publisher<?> handleInlineQuery(InlineQueryEvent e) {
+        switch (e.getQuery().toLowerCase()) {
+            case "article":
+                return e.answer(AnswerInlineCallbackQuerySpec.builder()
+                        .cacheTime(CACHE_TIME)
+                        .addResult(InlineResultArticleSpec.builder()
+                                .id("1")
+                                .title("Telegram wikipedia page.")
+                                .url("https://en.wikipedia.org/wiki/Telegram_(software)")
+                                .message(InlineMessageTextSpec.builder()
+                                        .message("[Telegram wikipedia page.](https://en.wikipedia.org/wiki/Telegram_\\(software\\))")
+                                        .parser(EntityParserFactory.MARKDOWN_V2)
+                                        .build())
+                                .build())
+                        .build());
+            case "gif":
+                return e.answer(AnswerInlineCallbackQuerySpec.builder()
+                        .cacheTime(CACHE_TIME)
+                        .addResult(InlineResultDocumentSpec.builder()
+                                .id("2")
+                                .type(FileReferenceId.DocumentType.GIF)
+                                .title("Niko caramelldansen!")
+                                .file("https://media.tenor.com/VqUFZ4uNMCoAAAAC/niko-dance-one-shot-dancing.gif")
+                                .size(SizeSpec.of(498, 373))
+                                .mimeType("image/gif")
+                                .duration(Duration.ofMillis(800))
+                                .message(InlineMessageMediaAutoSpec.builder()
+                                        .message("<i>Cute gif animation, isn't it?</i>")
+                                        .parser(EntityParserFactory.HTML)
+                                        .build())
+                                .build())
+                        .build());
+            case "photo":
+                return e.answer(AnswerInlineCallbackQuerySpec.builder()
+                        .cacheTime(CACHE_TIME)
+                        .addResult(InlineResultDocumentSpec.builder()
+                                .id("3")
+                                .type(FileReferenceId.DocumentType.PHOTO)
+                                .size(SizeSpec.of(256, 256))
+                                .file("https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon256%402x.png")
+                                .message(InlineMessageMediaAutoSpec.of("Icon of TDesktop"))
+                                .build())
+                        .build());
+            case "lastphoto":
+                String photoId = lastPhotoId;
+                if (photoId == null) {
+                    return Mono.empty();
+                }
+                return e.answer(AnswerInlineCallbackQuerySpec.builder()
+                        .cacheTime(PHOTO_CACHE_TIME)
+                        .addResult(InlineResultDocumentSpec.builder()
+                                .id("4")
+                                .file(photoId)
+                                .message(InlineMessageMediaAutoSpec.builder()
+                                        .message("_Hmm... It's a last photo which I saw_")
+                                        .parser(EntityParserFactory.MARKDOWN_V2)
+                                        .build())
+                                .build())
+                        .build());
+            default: return Mono.empty();
+        }
     }
 }

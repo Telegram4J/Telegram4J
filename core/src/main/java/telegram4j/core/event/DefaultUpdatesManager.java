@@ -232,7 +232,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 return preApply.concatWith(mapUpdate);
             }
             default:
-                return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates));
+                return Flux.error(new IllegalArgumentException("Unknown Updates type: " + updates));
         }
     }
 
@@ -252,16 +252,20 @@ public class DefaultUpdatesManager implements UpdatesManager {
         return Mono.defer(() -> {
             if (log.isDebugEnabled()) {
                 StringJoiner j = new StringJoiner(", ");
-                if (this.pts != state.pts()) {
+                int pts = this.pts;
+                if (pts != state.pts()) {
                     j.add("pts: " + pts + "->" + state.pts());
                 }
-                if (this.qts != state.qts()) {
+                int qts = this.qts;
+                if (qts != state.qts()) {
                     j.add("qts: " + qts + "->" + state.qts());
                 }
-                if (this.seq != state.seq()) {
+                int seq = this.seq;
+                if (seq != state.seq()) {
                     j.add("seq: " + seq + "->" + state.seq());
                 }
-                if (this.date != state.date()) {
+                int date = this.date;
+                if (date != state.date()) {
                     j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(state.date()));
                 }
 

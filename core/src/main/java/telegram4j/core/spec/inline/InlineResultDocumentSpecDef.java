@@ -15,7 +15,7 @@ interface InlineResultDocumentSpecDef extends InlineResultSpec {
      */
     Optional<DocumentType> type();
 
-    String title();
+    Optional<String> title();
 
     Optional<String> description();
 

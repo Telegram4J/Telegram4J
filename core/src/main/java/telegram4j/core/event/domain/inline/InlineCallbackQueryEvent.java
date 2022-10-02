@@ -6,7 +6,7 @@ import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
-import telegram4j.core.spec.EditInlineMessageSpec;
+import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.util.InlineMessageId;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.request.messages.EditInlineBotMessage;
@@ -38,11 +38,12 @@ public class InlineCallbackQueryEvent extends CallbackEvent {
 
     /**
      * Request to edit inline message with given specification.
+     * An attribute {@link EditMessageSpec#scheduleTimestamp()} will be ignored.
      *
      * @param spec The specification for editing inline message.
      * @return A {@link Mono} which emitting on completion boolean which displays completion state.
      */
-    public Mono<Boolean> edit(EditInlineMessageSpec spec) {
+    public Mono<Boolean> edit(EditMessageSpec spec) {
         return Mono.defer(() -> {
             var parsed = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())

@@ -416,7 +416,7 @@ public final class GroupChat extends BaseChat {
                 var set = EnumSet.allOf(Flag.class);
                 int flags = fullData.flags();
                 set.removeIf(value -> value.ordinal() < CAN_SET_USERNAME.ordinal() || (flags & value.mask()) == 0);
-                set.addAll(of(minData));
+                set.addAll(minFlags);
                 return set;
             }
 

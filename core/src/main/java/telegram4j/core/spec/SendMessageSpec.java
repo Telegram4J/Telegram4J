@@ -339,7 +339,7 @@ public final class SendMessageSpec {
     }
 
     public enum Flag implements BitFlag {
-        NO_WEBPAGE(SendMessage.NO_WEBPAGE_POS),
+        NO_WEBPAGE(SendMessage.NO_WEBPAGE_POS), // ignored with present 'media' attribute
         SILENT(SendMessage.SILENT_POS),
         BACKGROUND(SendMessage.BACKGROUND_POS),
         CLEAR_DRAFT(SendMessage.CLEAR_DRAFT_POS),
