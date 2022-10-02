@@ -1,5 +1,7 @@
 package telegram4j.core.object;
 
+import telegram4j.core.util.BitFlag;
+
 import java.util.EnumSet;
 
 import static telegram4j.tl.ChatAdminRights.*;

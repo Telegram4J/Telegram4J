@@ -1,6 +1,6 @@
 package telegram4j.core.spec;
 
-import telegram4j.core.object.BitFlag;
+import telegram4j.core.util.BitFlag;
 
 import static telegram4j.tl.request.messages.UpdatePinnedMessage.*;
 

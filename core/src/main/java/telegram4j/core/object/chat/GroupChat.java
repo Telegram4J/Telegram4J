@@ -11,6 +11,7 @@ import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.*;
+import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;

@@ -633,7 +633,7 @@ public final class EntityFactory {
                 .size(0)
                 .url(spec.url());
 
-        spec.imageSize().ifPresent(s -> thumbBuilder.addAttribute(
+        spec.size().ifPresent(s -> thumbBuilder.addAttribute(
                 ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
 
         Optional.ofNullable(getFilenameFromUrl(spec.url())).ifPresent(s -> thumbBuilder.addAttribute(

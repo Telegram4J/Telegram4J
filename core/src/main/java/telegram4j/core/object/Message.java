@@ -7,6 +7,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.spec.PinMessageFlags;
+import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
@@ -200,14 +201,15 @@ public final class Message implements TelegramObject {
     /**
      * Gets markup entities for {@link #getContent() text}, if message is not service and data present.
      *
-     * @return The {@link List} of markup entities for {@link #getContent() text}, if present.
+     * @return The {@link List} of markup entities for {@link #getContent() text}, if present otherwise empty list.
      */
-    public Optional<List<MessageEntity>> getEntities() {
+    public List<MessageEntity> getEntities() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::entities)
                 .map(list -> list.stream()
                         .map(e -> new MessageEntity(client, e, baseData.message()))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()))
+                .orElse(List.of());
     }
 
     /**
@@ -269,13 +271,15 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets {@link List} of {@link RestrictionReason} for why access to this message must be restricted,
+     * Gets immutable list of {@link RestrictionReason} for why access to this message must be restricted,
      * if message is not service and list present.
      *
-     * @return The {@link List} of the {@link RestrictionReason}, if present.
+     * @return The immutable list of the {@link RestrictionReason}, if present otherwise empty list.
      */
-    public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(baseData).map(BaseMessage::restrictionReason);
+    public List<RestrictionReason> getRestrictionReason() {
+        return Optional.ofNullable(baseData)
+                .map(BaseMessage::restrictionReason)
+                .orElse(List.of());
     }
 
     /**

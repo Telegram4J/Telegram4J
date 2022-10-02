@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.util.BitFlag;
 
 import java.time.Instant;
 import java.util.EnumSet;

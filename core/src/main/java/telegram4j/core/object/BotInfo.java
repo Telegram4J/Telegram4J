@@ -65,10 +65,11 @@ public class BotInfo implements TelegramObject {
     /**
      * Gets list of the bot commands, if present.
      *
-     * @return The {@link List} of the bot commands, if present.
+     * @return The immutable list of the bot commands, if present otherwise empty list.
      */
-    public Optional<List<BotCommand>> getCommands() {
-        return Optional.ofNullable(data.commands());
+    public List<BotCommand> getCommands() {
+        var commands = data.commands();
+        return commands != null ? commands : List.of();
     }
 
     @Override

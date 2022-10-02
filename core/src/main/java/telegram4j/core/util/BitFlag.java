@@ -1,4 +1,4 @@
-package telegram4j.core.object;
+package telegram4j.core.util;
 
 /** Interface that flags enumerations must implement. */
 public interface BitFlag {

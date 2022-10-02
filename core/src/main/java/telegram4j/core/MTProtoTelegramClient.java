@@ -15,6 +15,7 @@ import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetriever;
+import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.MTProtoClient;
@@ -264,6 +265,46 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return asInputChannel(channelId)
                 .flatMap(p -> serviceHolder.getChatService()
                         .deleteMessages(p, ids));
+    }
+
+    /**
+     * Request to get all commands by specified scope and language.
+     *
+     * @param spec The specification which represents a command scope.
+     * @param langCode The ISO 639-1 language code for commands
+     * @return A {@link Mono} emitting on successful completion immutable list of bot commands.
+     */
+    public Mono<List<BotCommand>> getCommands(BotCommandScopeSpec spec, String langCode) {
+        return spec.asData(this)
+                .flatMap(scope -> serviceHolder.getBotService()
+                        .getBotCommands(scope, langCode));
+    }
+
+    /**
+     * Request to delete all commands by specified scope and language.
+     *
+     * @param spec The specification which represents a command scope.
+     * @param langCode The ISO 639-1 language code for commands
+     * @return A {@link Mono} emitting on successful completion boolean result state.
+     */
+    public Mono<Boolean> resetCommands(BotCommandScopeSpec spec, String langCode) {
+        return spec.asData(this)
+                .flatMap(scope -> serviceHolder.getBotService()
+                        .resetBotCommands(scope, langCode));
+    }
+
+    /**
+     * Request to rewrite all commands by specified scope and language.
+     *
+     * @param spec The specification which represents a command scope.
+     * @param langCode The ISO 639-1 language code for commands
+     * @param commands An iterable of bot commands to update.
+     * @return A {@link Mono} emitting on successful completion boolean result state.
+     */
+    public Mono<Boolean> setCommands(BotCommandScopeSpec spec, String langCode, Iterable<? extends BotCommand> commands) {
+        return spec.asData(this)
+                .flatMap(scope -> serviceHolder.getBotService()
+                        .setBotCommands(scope, langCode, commands));
     }
 
     // Utility methods

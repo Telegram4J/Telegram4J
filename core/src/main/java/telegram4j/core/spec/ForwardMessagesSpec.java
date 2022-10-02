@@ -1,7 +1,7 @@
 package telegram4j.core.spec;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.object.BitFlag;
+import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.api.TlEncodingUtil;

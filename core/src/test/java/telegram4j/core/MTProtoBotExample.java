@@ -12,10 +12,10 @@ import telegram4j.core.command.PingCommand;
 import telegram4j.core.command.ShrugCommand;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.StoreLayoutImpl;
-import telegram4j.tl.BotCommandScopeChats;
 import telegram4j.tl.json.TlModule;
 
 import java.util.List;
@@ -49,8 +49,7 @@ public class MTProtoBotExample {
                 .addResponseTransformer(ResponseTransformer.emptyOnErrorCodes(MethodPredicate.all(), 400))
                 .withConnection(client -> {
 
-                    Mono<Void> updateCommands = client.getServiceHolder().getBotService()
-                            .getBotCommands(BotCommandScopeChats.instance(), "en")
+                    Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.CHATS), "en")
                             .flatMap(list -> {
                                 var infos = commands.stream()
                                         .map(Command::getInfo)
@@ -59,8 +58,7 @@ public class MTProtoBotExample {
                                 if (list.equals(infos)) {
                                     return Mono.empty();
                                 }
-                                return client.getServiceHolder().getBotService()
-                                        .setBotCommands(BotCommandScopeChats.instance(), "en", infos);
+                                return client.setCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.CHATS), "en", infos);
                             })
                             .then();
 
@@ -71,7 +69,7 @@ public class MTProtoBotExample {
                             .then();
 
                     Mono<Void> listenMessages = client.on(SendMessageEvent.class)
-                            .flatMap(e -> Mono.from(e.getMessage().getEntities()
+                            .flatMap(e -> Mono.just(e.getMessage().getEntities())
                                     .filter(list -> !list.isEmpty() && list.get(0).getType() == MessageEntity.Type.BOT_COMMAND)
                                     .map(list -> list.get(0))
                                     .map(ent -> {
@@ -83,8 +81,7 @@ public class MTProtoBotExample {
                                         return Mono.fromSupplier(() -> commandsMap.get(command))
                                                 .flatMap(c -> Mono.from(c.execute(e)))
                                                 .then();
-                                    })
-                                    .orElseGet(Mono::empty)))
+                                    }))
                             .then();
 
                     return Mono.when(updateCommands, listenMessages, sandbox);

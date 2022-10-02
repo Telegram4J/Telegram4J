@@ -1,7 +1,5 @@
 package telegram4j.core.util;
 
-import telegram4j.core.object.BitFlag;
-
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;

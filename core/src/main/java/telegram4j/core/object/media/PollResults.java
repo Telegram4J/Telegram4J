@@ -40,10 +40,11 @@ public class PollResults implements TelegramObject {
     /**
      * Gets list of poll answer results, if present.
      *
-     * @return List of poll answer results, if present.
+     * @return List of poll answer results, if present otherwise empty list.
      */
-    public Optional<List<PollAnswerVoters>> getResults() {
-        return Optional.ofNullable(data.results());
+    public List<PollAnswerVoters> getResults() {
+        var result = data.results();
+        return result != null ? result : List.of();
     }
 
     /**
@@ -58,13 +59,14 @@ public class PollResults implements TelegramObject {
     /**
      * Gets list of the last users that recently voted in the poll, if present.
      *
-     * @return List of the last users that recently voted in the poll, if present.
+     * @return List of the last users that recently voted in the poll, if present empty list.
      */
-    public Optional<List<Id>> getRecentVoters() {
+    public List<Id> getRecentVoters() {
         return Optional.ofNullable(data.recentVoters())
                 .map(l -> l.stream()
                         .map(i -> Id.ofUser(i, null))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()))
+                .orElse(List.of());
     }
 
     /**
@@ -79,13 +81,14 @@ public class PollResults implements TelegramObject {
     /**
      * Gets list of message entities of the explanation quiz solution, if poll is quiz.
      *
-     * @return The list of message entities of the explanation quiz solution, if poll is quiz.
+     * @return The list of message entities of the explanation quiz solution, if poll is quiz otherwise empty list.
      */
-    public Optional<List<MessageEntity>> getSolutionEntities() {
+    public List<MessageEntity> getSolutionEntities() {
         return Optional.ofNullable(data.solutionEntities())
                 .map(l -> l.stream()
                         .map(d -> new MessageEntity(client, d, Objects.requireNonNull(data.solution())))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toList()))
+                .orElse(List.of());
     }
 
     @Override

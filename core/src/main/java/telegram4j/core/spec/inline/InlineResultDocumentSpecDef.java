@@ -6,7 +6,7 @@ import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import java.time.Duration;
 import java.util.Optional;
 
-@Value.Immutable
+@Value.Immutable // TODO: support audio files
 interface InlineResultDocumentSpecDef extends InlineResultSpec {
 
     /**
