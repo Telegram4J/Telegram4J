@@ -68,15 +68,15 @@ public final class EntityParserSupport {
 
         // sort list and collect pairs from the nearest tokens
         tokens.sort(Comparator.comparing(EntityToken::type)
-                .thenComparingInt(EntityToken::offset));
+                .thenComparingInt(EntityToken::position));
 
         return Flux.<MessageEntity>create(sink -> {
             for (var it = tokens.iterator(); it.hasNext(); ) {
                 EntityToken begin = it.next();
                 EntityToken end = it.next();
 
-                int offset = begin.offset();
-                int length = end.offset() - offset;
+                int offset = begin.position();
+                int length = end.position() - offset;
 
                 switch (begin.type()) {
                     case MENTION:

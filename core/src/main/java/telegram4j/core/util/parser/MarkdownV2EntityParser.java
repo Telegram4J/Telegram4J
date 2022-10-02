@@ -99,12 +99,14 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                     int endPos = -1;
                     int endText = -1;
                     int beginUrl = -1;
+                    StringBuilder url = new StringBuilder();
                     for (int i = cursor + 1; i < str.length(); i++) {
-                        if (i - 1 >= 0 && str.charAt(i - 1) == '\\') {
+                        char n = str.charAt(i);
+                        if (n == '\\' && i + 1 < str.length()) {
+                            i++;
                             continue;
                         }
 
-                        char n = str.charAt(i);
                         if (n == ')') {
                             endPos = i;
                             break;
@@ -112,19 +114,21 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                             beginUrl = i;
                         } else if (n == ']') {
                             endText = i;
+                        } else if (beginUrl != -1) {
+                            url.append(str.charAt(i));
                         }
                     }
 
                     if (endText != -1 && beginUrl != -1 && endPos != -1) {
-                        arg = str.substring(beginUrl + 1, endPos).trim();
                         urlEnd = endPos + 1;
 
-                        Matcher mentionName = USER_LINK_ID_PATTERN.matcher(arg);
+                        Matcher mentionName = USER_LINK_ID_PATTERN.matcher(url);
                         if (mentionName.matches()) {
                             type = MessageEntity.Type.MENTION_NAME;
                             arg = mentionName.group(1);
                         } else {
                             type = MessageEntity.Type.TEXT_URL;
+                            arg = url.toString();
                         }
                     }
 

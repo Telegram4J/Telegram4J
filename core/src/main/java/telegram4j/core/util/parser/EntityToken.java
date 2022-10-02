@@ -28,11 +28,11 @@ public interface EntityToken {
     MessageEntity.Type type();
 
     /**
-     * Gets an offset position of token according cleared text length.
+     * Gets position of token according cleared text length.
      *
-     * @return An offset position in the cleared text.
+     * @return The position in the cleared text.
      */
-    int offset();
+    int position();
 
     /**
      * Gets the string representation of token value, if present.

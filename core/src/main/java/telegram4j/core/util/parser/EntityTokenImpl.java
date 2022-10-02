@@ -21,7 +21,7 @@ class EntityTokenImpl implements EntityToken {
     }
 
     @Override
-    public int offset() {
+    public int position() {
         return offset;
     }
 
