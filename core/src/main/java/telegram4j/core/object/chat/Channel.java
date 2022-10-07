@@ -3,12 +3,15 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import telegram4j.core.internal.RetrievalUtil;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
@@ -40,7 +43,7 @@ public interface Channel extends Chat {
 
     /**
      * Gets username of channel, if present. This username can be used to retrieve channel
-     * via {@link telegram4j.core.retriever.EntityRetriever#resolvePeer(PeerId)}
+     * via {@link EntityRetriever#resolvePeer(PeerId)}
      * or used in {@link PeerId peer id}.
      *
      * @return The username of channel, if present.
@@ -142,8 +145,7 @@ public interface Channel extends Chat {
     Optional<Integer> getRequestsPending();
 
     /**
-     * Gets id of peer for sending messages, if present
-     * and if detailed information about channel is available.
+     * Gets id of peer for sending messages, if present.
      *
      * @return The id of peer for sending messages, if present
      * and if detailed information about channel is available.
@@ -151,8 +153,7 @@ public interface Channel extends Chat {
     Optional<Id> getDefaultSendAs();
 
     /**
-     * Gets list of user ids, who requested to join recently, if present
-     * and if detailed information about channel is available.
+     * Gets list of user ids, who requested to join recently, if present.
      *
      * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
      * @return The list of user ids, who requested to join recently, if present
@@ -162,8 +163,7 @@ public interface Channel extends Chat {
 
     /**
      * Gets {@code boolean} which indicates the availability of any emojis in the channel
-     * or list of available reactions, if present
-     * and if detailed information about channel is available.
+     * or list of available reactions, if present.
      *
      * @return The {@link Variant2} with {@code boolean} which indicates the availability of any emojis in the channel
      * or list of available reactions, if present
@@ -172,8 +172,7 @@ public interface Channel extends Chat {
     Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions();
 
     /**
-     * Gets the latest <a href="https://core.telegram.org/api/updates">pts</a> for this channel, if present
-     * and if detailed information about channel is available.
+     * Gets the latest <a href="https://core.telegram.org/api/updates">pts</a> for this channel, if present.
      *
      * @return The latest pts for this channel, if present
      * and if detailed information about channel is available.
@@ -181,8 +180,7 @@ public interface Channel extends Chat {
     Optional<Integer> getPts();
 
     /**
-     * Gets maximal message id of read incoming messages, if present
-     * and if detailed information about channel is available.
+     * Gets maximal message id of read incoming messages, if present.
      *
      * @return The maximal id of read incoming messages, if present
      * and if detailed information about channel is available.
@@ -190,8 +188,7 @@ public interface Channel extends Chat {
     Optional<Integer> getReadInboxMaxId();
 
     /**
-     * Gets maximal message id of read outgoing messages, if present
-     * and if detailed information about channel is available.
+     * Gets maximal message id of read outgoing messages, if present.
      *
      * @return The maximal id of read outgoing messages, if present
      * and if detailed information about channel is available.
@@ -199,8 +196,7 @@ public interface Channel extends Chat {
     Optional<Integer> getReadOutboxMaxId();
 
     /**
-     * Gets count of unread messages for <i>current</i> user, if present
-     * and if detailed information about channel is available.
+     * Gets count of unread messages for <i>current</i> user, if present.
      *
      * @return The count of unread messages for <i>current</i> user, if present
      * and if detailed information about channel is available.
@@ -217,8 +213,7 @@ public interface Channel extends Chat {
     Optional<Integer> getAdminsCount();
 
     /**
-     * Gets count of current kicked participants, if present
-     * and if detailed information about channel is available.
+     * Gets count of current kicked participants, if present.
      *
      * @return The count of current kicked participates, if present
      * and if detailed information about channel is available.
@@ -244,14 +239,30 @@ public interface Channel extends Chat {
     Optional<Integer> getOnlineCount();
 
     /**
-     * Gets id of linked (discussion) channel, if present
-     * and if detailed information about channel is available.
+     * Gets id of linked (discussion or posting) channel, if present.
      *
      * @see <a href="https://core.telegram.org/api/discussion">Discussion Groups</a>
      * @return The id of linked channel, if present
      * and if detailed information about channel is available.
      */
-    Optional<Id> getLinkedChatId();
+    Optional<Id> getLinkedChannelId();
+
+    /**
+     * Requests to retrieve linked channel.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link Channel channel}.
+     */
+    default Mono<Channel> getLinkedChannel() {
+        return getLinkedChannel(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve linked channel using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link Channel channel}.
+     */
+    Mono<Channel> getLinkedChannel(EntityRetrievalStrategy strategy);
 
     /**
      * Gets current group call/livestream in the channel, if present

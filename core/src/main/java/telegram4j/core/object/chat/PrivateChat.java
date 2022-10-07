@@ -1,11 +1,14 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 
 import java.time.Duration;
@@ -75,6 +78,11 @@ public final class PrivateChat extends BaseChat {
     @Override
     public Optional<Integer> getPinnedMessageId() {
         return user.getPinnedMessageId();
+    }
+
+    @Override
+    public Mono<AuxiliaryMessages> getPinnedMessage(EntityRetrievalStrategy strategy) {
+        return user.getPinnedMessage(strategy);
     }
 
     @Override

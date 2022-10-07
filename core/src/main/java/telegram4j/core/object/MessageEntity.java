@@ -1,7 +1,10 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.*;
@@ -101,6 +104,26 @@ public final class MessageEntity implements TelegramObject {
         return data.identifier() == MessageEntityMentionName.ID
                 ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
                 : Optional.empty();
+    }
+
+    /**
+     * Requests to retrieve mentioned user.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User mentioned user}.
+     */
+    public Mono<User> getUser() {
+        return getUser(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve mentioned user using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply
+     * @return An {@link Mono} emitting on successful completion the {@link User mentioned user}.
+     */
+    public Mono<User> getUser(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getUserId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
     /**

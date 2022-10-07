@@ -1,10 +1,19 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
+import telegram4j.tl.ImmutableInputMessageID;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -46,6 +55,27 @@ public class MessageForwardHeader implements TelegramObject {
     }
 
     /**
+     * Requests to retrieve peer from which message was forwarded.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link PeerEntity peer}.
+     */
+    public Mono<PeerEntity> getFrom() {
+        return getFrom(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve peer from which message was forwarded using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link PeerEntity peer}.
+     */
+    public Mono<PeerEntity> getFrom(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getFromId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .resolvePeer(PeerId.of(id)));
+    }
+
+    /**
      * Gets name of the peer that originally sent the message, if present.
      *
      * @return The name of the peer that originally sent the message, if present.
@@ -73,6 +103,31 @@ public class MessageForwardHeader implements TelegramObject {
     }
 
     /**
+     * Requests to retrieve original channel message.
+     *
+     * @return An {@link Mono} emitting on successful completion the
+     * {@link AuxiliaryMessages} message container, otherwise empty signals.
+     */
+    public Mono<AuxiliaryMessages> getOriginalMessage() {
+        return getOriginalMessage(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve original channel message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the
+     * {@link AuxiliaryMessages} message container, otherwise empty signals.
+     */
+    public Mono<AuxiliaryMessages> getOriginalMessage(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(data.channelPost())
+                .map(id -> List.of(ImmutableInputMessageID.of(id)))
+                .zipWith(Mono.justOrEmpty(getFromId()))
+                .flatMap(TupleUtils.function((messageId, channelId) -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(channelId, messageId)));
+    }
+
+    /**
      * Gets name of channel message's author, if present.
      *
      * @return The name of channel message's author, if present.
@@ -97,6 +152,38 @@ public class MessageForwardHeader implements TelegramObject {
      */
     public Optional<Integer> getSavedFromMessageId() {
         return Optional.ofNullable(data.savedFromMsgId());
+    }
+
+    /**
+     * Requests to retrieve saved to self user message.
+     *
+     * @return An {@link Mono} emitting on successful completion the
+     * {@link AuxiliaryMessages} message container, otherwise empty signals.
+     */
+    public Mono<AuxiliaryMessages> getSavedFrom() {
+        return getSavedFrom(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve saved to self user message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the
+     * {@link AuxiliaryMessages} message container, otherwise empty signals.
+     */
+    public Mono<AuxiliaryMessages> getSavedFrom(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(data.savedFromMsgId())
+                .map(id -> List.of(ImmutableInputMessageID.of(id)))
+                .flatMap(messageId -> {
+                    EntityRetriever retriever = client.withRetrievalStrategy(strategy);
+                    Id peerId = getSavedFromPeerId().orElseThrow();
+                    switch (peerId.getType()) {
+                        case USER:
+                        case CHAT: return retriever.getMessagesById(messageId);
+                        case CHANNEL: return retriever.getMessagesById(peerId, messageId);
+                        default: return Mono.error(new IllegalStateException());
+                    }
+                });
     }
 
     // TODO: docs

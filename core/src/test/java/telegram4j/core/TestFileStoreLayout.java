@@ -12,7 +12,6 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
-import telegram4j.mtproto.store.UserNameFields;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
@@ -21,7 +20,6 @@ import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -105,7 +103,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
             Path fileName = Path.of(String.format(DB_FILE, key.getDc().getId()));
             try {
-                Files.write(fileName, ByteBufUtil.hexDump(buf).getBytes(StandardCharsets.UTF_8));
+                Files.writeString(fileName, ByteBufUtil.hexDump(buf));
             } finally {
                 buf.release();
             }
@@ -205,41 +203,6 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload) {
         return delegate.onUpdatePinnedMessages(payload);
-    }
-
-    @Override
-    public Mono<Void> onChannelUserTyping(UpdateChannelUserTyping payload) {
-        return delegate.onChannelUserTyping(payload);
-    }
-
-    @Override
-    public Mono<Void> onChatUserTyping(UpdateChatUserTyping payload) {
-        return delegate.onChatUserTyping(payload);
-    }
-
-    @Override
-    public Mono<Void> onUserTyping(UpdateUserTyping payload) {
-        return delegate.onUserTyping(payload);
-    }
-
-    @Override
-    public Mono<UserNameFields> onUserNameUpdate(UpdateUserName payload) {
-        return delegate.onUserNameUpdate(payload);
-    }
-
-    @Override
-    public Mono<String> onUserPhoneUpdate(UpdateUserPhone payload) {
-        return delegate.onUserPhoneUpdate(payload);
-    }
-
-    @Override
-    public Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto payload) {
-        return delegate.onUserPhotoUpdate(payload);
-    }
-
-    @Override
-    public Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus payload) {
-        return delegate.onUserStatusUpdate(payload);
     }
 
     @Override

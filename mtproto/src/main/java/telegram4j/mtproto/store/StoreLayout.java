@@ -176,22 +176,6 @@ public interface StoreLayout {
 
     Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload);
 
-    // user updates
-
-    Mono<Void> onChannelUserTyping(UpdateChannelUserTyping payload);
-
-    Mono<Void> onChatUserTyping(UpdateChatUserTyping payload);
-
-    Mono<Void> onUserTyping(UpdateUserTyping payload);
-
-    Mono<UserNameFields> onUserNameUpdate(UpdateUserName payload);
-
-    Mono<String> onUserPhoneUpdate(UpdateUserPhone payload);
-
-    Mono<UserProfilePhoto> onUserPhotoUpdate(UpdateUserPhoto payload);
-
-    Mono<UserStatus> onUserStatusUpdate(UpdateUserStatus payload);
-
     // bot updates
 
     Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload);

@@ -12,7 +12,10 @@ import telegram4j.core.command.PingCommand;
 import telegram4j.core.command.ShrugCommand;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.retriever.PreferredEntityRetriever.Setting;
 import telegram4j.core.spec.BotCommandScopeSpec;
+import telegram4j.core.spec.BotCommandScopeSpec.Type;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.StoreLayoutImpl;
@@ -45,11 +48,13 @@ public class MTProtoBotExample {
         String botAuthToken = System.getenv("T4J_TOKEN");
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
+                .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
+                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
                 .addResponseTransformer(ResponseTransformer.emptyOnErrorCodes(MethodPredicate.all(), 400))
                 .withConnection(client -> {
 
-                    Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.CHATS), "en")
+                    Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(Type.CHATS), "en")
                             .flatMap(list -> {
                                 var infos = commands.stream()
                                         .map(Command::getInfo)
@@ -58,7 +63,7 @@ public class MTProtoBotExample {
                                 if (list.equals(infos)) {
                                     return Mono.empty();
                                 }
-                                return client.setCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.CHATS), "en", infos);
+                                return client.setCommands(BotCommandScopeSpec.of(Type.CHATS), "en", infos);
                             })
                             .then();
 

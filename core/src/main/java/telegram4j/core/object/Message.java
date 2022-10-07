@@ -4,12 +4,16 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.markup.ReplyMarkup;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.spec.PinMessageFlags;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.BaseMessage;
 import telegram4j.tl.BaseMessageFields;
@@ -98,12 +102,52 @@ public final class Message implements TelegramObject {
     }
 
     /**
+     * Requests to retrieve author of this message.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<PeerEntity> getAuthor() {
+        return getAuthor(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve author of this message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<PeerEntity> getAuthor(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getAuthorId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .resolvePeer(PeerId.of(id)));
+    }
+
+    /**
      * Gets id of the chat, where message was sent.
      *
      * @return The {@link Id} of the chat, where message was sent.
      */
     public Id getChatId() {
         return resolvedChatId;
+    }
+
+    /**
+     * Requests to retrieve chat where message was sent using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat(EntityRetrievalStrategy strategy) {
+        return client.withRetrievalStrategy(strategy).getChatById(resolvedChatId);
+    }
+
+    /**
+     * Requests to retrieve chat where message was sent.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat() {
+        return client.getChatById(resolvedChatId);
     }
 
     /**
@@ -164,6 +208,26 @@ public final class Message implements TelegramObject {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::viaBotId)
                 .map(l -> Id.ofUser(l, null));
+    }
+
+    /**
+     * Requests to retrieve inline bot that generated this message.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User bot}.
+     */
+    public Mono<User> getViaBot() {
+        return getViaBot(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve inline bot that generated this message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User bot}.
+     */
+    public Mono<User> getViaBot(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getViaBotId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
     /**

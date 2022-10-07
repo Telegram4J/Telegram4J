@@ -10,6 +10,7 @@ public class ShrugCommand implements Command {
     @Override
     public Publisher<?> execute(SendMessageEvent event) {
         return Mono.justOrEmpty(event.getChat())
+                .switchIfEmpty(event.getMessage().getChat())
                 .flatMap(c -> c.sendMessage(SendMessageSpec.builder()
                         .message("¯\\_(ツ)_/¯")
                         .replyToMessageId(event.getMessage().getId())

@@ -10,23 +10,22 @@ import telegram4j.core.util.AuxiliaryEntityFactory;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
-import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.InputMessage;
 import telegram4j.tl.PeerChannel;
 import telegram4j.tl.PeerUser;
-import telegram4j.tl.messages.MessagesNotModified;
 
 import java.util.Objects;
 
-/** Implementation of {@code EntityRetriever} which uses Telegram RPC API. */
-public class RpcEntityRetriever implements EntityRetriever {
+/** Implementation of {@code EntityRetriever} which uses {@link StoreLayout storage}. */
+public class StoreEntityRetriever implements EntityRetriever {
 
     private final MTProtoTelegramClient client;
-    private final ServiceHolder serviceHolder;
+    private final StoreLayout storeLayout;
 
-    public RpcEntityRetriever(MTProtoTelegramClient client) {
+    public StoreEntityRetriever(MTProtoTelegramClient client) {
         this.client = Objects.requireNonNull(client);
-        this.serviceHolder = client.getServiceHolder();
+        this.storeLayout = client.getMtProtoResources().getStoreLayout();
     }
 
     @Override
@@ -42,8 +41,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                 });
 
         return Mono.justOrEmpty(peerId.asUsername())
-                .flatMap(username -> serviceHolder.getUserService()
-                        .resolveUsername(username))
+                .flatMap(storeLayout::resolvePeer)
                 .mapNotNull(p -> {
                     switch (p.peer().identifier()) {
                         case PeerChannel.ID: return EntityFactory.createChat(client, p.chats().get(0), null);
@@ -55,14 +53,18 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
+    public Mono<User> getUserById(Id userId) {
+        return getUserMinById(userId);
+    }
+
+    @Override
     public Mono<User> getUserMinById(Id userId) {
         if (userId.getType() != Id.Type.USER) {
             return Mono.error(new IllegalArgumentException("Incorrect id type, expected: "
                     + Id.Type.USER + ", but given: " + userId.getType()));
         }
 
-        return client.asInputUser(userId)
-                .flatMap(serviceHolder.getUserService()::getUser)
+        return storeLayout.getUserMinById(userId.asLong())
                 .mapNotNull(u -> EntityFactory.createUser(client, u));
     }
 
@@ -73,45 +75,44 @@ public class RpcEntityRetriever implements EntityRetriever {
                     + Id.Type.USER + ", but given: " + userId.getType()));
         }
 
-        return client.asInputUser(userId)
-                .flatMap(serviceHolder.getUserService()::getFullUser)
+        return storeLayout.getUserFullById(userId.asLong())
                 .mapNotNull(u -> EntityFactory.createUser(client, u));
+    }
+
+    @Override
+    public Mono<Chat> getChatById(Id chatId) {
+        return getChatMinById(chatId);
     }
 
     @Override
     public Mono<Chat> getChatMinById(Id chatId) {
         return Mono.defer(() -> {
-            switch (chatId.getType()) {
-                case CHAT: return serviceHolder.getChatService().getChat(chatId.asLong());
-                case CHANNEL: return client.asInputChannel(chatId)
-                        .flatMap(serviceHolder.getChatService()::getChannel);
-                case USER: return client.asInputUser(chatId)
-                        .flatMap(serviceHolder.getUserService()::getUser);
-                default: return Mono.error(new IllegalStateException());
-            }
-        })
-        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                    switch (chatId.getType()) {
+                        case CHAT: return storeLayout.getChatMinById(chatId.asLong());
+                        case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong());
+                        case USER: return storeLayout.getUserMinById(chatId.asLong());
+                        default: return Mono.error(new IllegalStateException());
+                    }
+                })
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
         return Mono.defer(() -> {
-            switch (chatId.getType()) {
-                case CHAT: return serviceHolder.getChatService().getFullChat(chatId.asLong());
-                case CHANNEL: return client.asInputChannel(chatId)
-                        .flatMap(serviceHolder.getChatService()::getFullChannel);
-                case USER: return client.asInputUser(chatId)
-                        .flatMap(serviceHolder.getUserService()::getFullUser);
-                default: return Mono.error(new IllegalStateException());
-            }
-        })
-        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                    switch (chatId.getType()) {
+                        case CHAT: return storeLayout.getChatFullById(chatId.asLong());
+                        case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong());
+                        case USER: return storeLayout.getUserFullById(chatId.asLong());
+                        default: return Mono.error(new IllegalStateException());
+                    }
+                })
+                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
     }
 
     @Override
     public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return serviceHolder.getChatService().getMessages(messageIds)
-                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+        return storeLayout.getMessages(messageIds)
                 .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 
@@ -122,9 +123,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     + Id.Type.CHANNEL + ", but given: " + channelId.getType()));
         }
 
-        return client.asInputChannel(channelId)
-                .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds))
-                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+        return storeLayout.getMessages(channelId.asLong(), messageIds)
                 .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 }

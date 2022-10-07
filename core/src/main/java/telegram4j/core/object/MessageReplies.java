@@ -1,12 +1,16 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.object.chat.SupergroupChat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -59,13 +63,14 @@ public class MessageReplies implements TelegramObject {
     /**
      * Gets list of the last few comment posters ids, if present.
      *
-     * @return The mutable {@link List} of the last few comment posters ids, if present.
+     * @return The mutable {@link Set} of the last few comment posters ids, if present.
      */
-    public Optional<List<Id>> getRecentRepliers() {
+    public Set<Id> getRecentRepliers() {
         return Optional.ofNullable(data.recentRepliers())
                 .map(list -> list.stream()
                         .map(Id::of)
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toSet()))
+                .orElse(Set.of());
     }
 
     /**
@@ -74,8 +79,29 @@ public class MessageReplies implements TelegramObject {
      * @see <a href="https://core.telegram.org/api/discussion">Discussion Supergroups</a>
      * @return The id of discussion supergroup, if present.
      */
-    public Optional<Id> getChannelId() {
+    public Optional<Id> getDiscussionChannelId() {
         return Optional.ofNullable(data.channelId()).map(c -> Id.ofChannel(c, null));
+    }
+
+    /**
+     * Requests to retrieve discussion channel.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link SupergroupChat discussion channel}.
+     */
+    public Mono<SupergroupChat> getDiscussionChannel() {
+        return getDiscussionChannel(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve discussion channel using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link SupergroupChat discussion channel}.
+     */
+    public Mono<SupergroupChat> getDiscussionChannel(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getDiscussionChannelId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getChatById(id))
+                .cast(SupergroupChat.class);
     }
 
     /**

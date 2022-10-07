@@ -1,9 +1,13 @@
 package telegram4j.core.object.markup;
 
 import io.netty.buffer.ByteBuf;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.RetrievalUtil;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.User;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.markup.KeyboardButtonSpec;
 import telegram4j.core.util.Id;
 import telegram4j.tl.*;
@@ -156,9 +160,9 @@ public final class KeyboardButton implements TelegramObject {
     }
 
     /**
-     * Gets id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     * Gets id of bot which will be used for user authorization, if {@link #getType() type} is {@link Type#URL_AUTH}.
      *
-     * @return The id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     * @return The id of bot which will be used for user authorization, if {@link #getType() type} is {@link Type#URL_AUTH}.
      */
     public Optional<Id> getBotId() {
         if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
@@ -166,6 +170,26 @@ public final class KeyboardButton implements TelegramObject {
             return Optional.of(Id.of(inputUser, client.getSelfId()));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Requests to retrieve bot which will be used for user authorization.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getBot() {
+        return getBot(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve bot which will be used for user authorization using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getBot(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getBotId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
     /**
@@ -181,6 +205,26 @@ public final class KeyboardButton implements TelegramObject {
                     ((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
             default: return Optional.empty();
         }
+    }
+
+    /**
+     * Requests to retrieve user their profile will be opened on press.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getUser() {
+        return getUser(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve user their profile will be opened on press using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getUser(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getUserId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
     @Override

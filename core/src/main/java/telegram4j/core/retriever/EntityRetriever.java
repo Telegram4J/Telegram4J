@@ -25,6 +25,17 @@ public interface EntityRetriever {
     Mono<PeerEntity> resolvePeer(PeerId peerId);
 
     /**
+     * Retrieve user with retriever strategy by the specified id.
+     *
+     * @param userId The id of user.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link User} with minimal information.
+     */
+    default Mono<User> getUserById(Id userId) {
+        return getUserMinById(userId);
+    }
+
+    /**
      * Retrieve user with minimal information by the specified id.
      *
      * @param userId The id of user.
@@ -41,6 +52,17 @@ public interface EntityRetriever {
      * the {@link User} with detailed information.
      */
     Mono<User> getUserFullById(Id userId);
+
+    /**
+     * Retrieve chat with retriever strategy by the specified id.
+     *
+     * @param chatId The id of chat.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link Chat} with minimal information.
+     */
+    default Mono<Chat> getChatById(Id chatId) {
+        return getChatMinById(chatId);
+    }
 
     /**
      * Retrieve chat with minimal information by the specified id.

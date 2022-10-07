@@ -2,8 +2,11 @@ package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
+import telegram4j.core.internal.RetrievalUtil;
 import telegram4j.core.object.*;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMessageSpec;
 import telegram4j.core.util.Id;
@@ -62,6 +65,23 @@ public interface Chat extends PeerEntity {
      * @return The {@link Id} of pinned message, if present and available.
      */
     Optional<Integer> getPinnedMessageId();
+
+    /**
+     * Requests to retrieve pinned message.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryMessages pinned message}.
+     */
+    default Mono<AuxiliaryMessages> getPinnedMessage() {
+        return getPinnedMessage(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve pinned message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryMessages pinned message}.
+     */
+    Mono<AuxiliaryMessages> getPinnedMessage(EntityRetrievalStrategy strategy);
 
     /**
      * Gets notify settings of chat, if present

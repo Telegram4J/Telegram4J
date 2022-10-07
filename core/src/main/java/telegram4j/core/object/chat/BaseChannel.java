@@ -4,6 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
@@ -13,6 +14,7 @@ import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.*;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -78,6 +80,14 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Override
     public Optional<Integer> getPinnedMessageId() {
         return Optional.ofNullable(fullData).map(ChannelFull::pinnedMsgId);
+    }
+
+    @Override
+    public Mono<AuxiliaryMessages> getPinnedMessage(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(fullData)
+                .mapNotNull(ChannelFull::pinnedMsgId)
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override
@@ -238,10 +248,17 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<Id> getLinkedChatId() {
+    public Optional<Id> getLinkedChannelId() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::linkedChatId)
-                .map(Id::ofChat);
+                .map(id -> Id.ofChannel(id, null));
+    }
+
+    @Override
+    public Mono<Channel> getLinkedChannel(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getLinkedChannelId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getChatById(id))
+                .cast(Channel.class);
     }
 
     @Override

@@ -22,8 +22,7 @@ import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;
 import telegram4j.core.event.domain.Event;
-import telegram4j.core.retriever.EntityRetriever;
-import telegram4j.core.retriever.RpcEntityRetriever;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
@@ -67,7 +66,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
-    private Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory = RpcEntityRetriever::new;
+    private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, DefaultUpdatesMapper.instance);
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
@@ -197,8 +196,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setEntityRetrieverFactory(Function<MTProtoTelegramClient, EntityRetriever> entityRetrieverFactory) {
-        this.entityRetrieverFactory = Objects.requireNonNull(entityRetrieverFactory);
+    public MTProtoBootstrap<O> setEntityRetrieverStrategy(EntityRetrievalStrategy strategy) {
+        this.entityRetrievalStrategy = Objects.requireNonNull(strategy);
         return this;
     }
 
@@ -312,7 +311,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, mtProtoClient,
                     mtProtoResources, updatesManagerFactory, selfId,
-                    serviceHolder, entityRetrieverFactory, onDisconnect.asMono());
+                    serviceHolder, entityRetrievalStrategy, onDisconnect.asMono());
 
             Runnable disconnect = () -> {
                 eventDispatcher.shutdown();

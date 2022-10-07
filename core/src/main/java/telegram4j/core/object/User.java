@@ -1,9 +1,13 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.RetrievalUtil;
 import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.*;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -234,6 +238,17 @@ public class User implements PeerEntity {
 
     public Optional<Integer> getPinnedMessageId() {
         return Optional.ofNullable(fullData).map(UserFull::pinnedMsgId);
+    }
+
+    public Mono<AuxiliaryMessages> getPinnedMessage() {
+        return getPinnedMessage(RetrievalUtil.IDENTITY);
+    }
+
+    public Mono<AuxiliaryMessages> getPinnedMessage(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(fullData)
+                .mapNotNull(UserFull::pinnedMsgId)
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
     }
 
     public Optional<Integer> getCommonChatsCount() {

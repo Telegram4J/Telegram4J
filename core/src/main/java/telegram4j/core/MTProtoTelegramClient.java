@@ -14,6 +14,7 @@ import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.util.Id;
@@ -54,7 +55,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                           MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
                           Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
                           Id[] selfIdHolder, ServiceHolder serviceHolder,
-                          Function<MTProtoTelegramClient, EntityRetriever> entityRetriever,
+                          EntityRetrievalStrategy entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
         this.mtProtoClient = mtProtoClient;
@@ -518,12 +519,27 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         }
     }
 
+    /**
+     * Applies the given retrieval strategy to retrieve objects using this {@link MTProtoTelegramClient}.
+     *
+     * @param strategy The retrieval strategy to apply.
+     * @return A new {@code EntityRetriever} from strategy.
+     */
+    public EntityRetriever withRetrievalStrategy(EntityRetrievalStrategy strategy) {
+        return strategy.apply(this);
+    }
+
     // EntityRetriever methods
     // ===========================
 
     @Override
     public Mono<PeerEntity> resolvePeer(PeerId peerId) {
         return entityRetriever.resolvePeer(peerId);
+    }
+
+    @Override
+    public Mono<User> getUserById(Id userId) {
+        return entityRetriever.getUserById(userId);
     }
 
     @Override
@@ -534,6 +550,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     @Override
     public Mono<User> getUserFullById(Id userId) {
         return entityRetriever.getUserFullById(userId);
+    }
+
+    @Override
+    public Mono<Chat> getChatById(Id chatId) {
+        return entityRetriever.getChatById(chatId);
     }
 
     @Override

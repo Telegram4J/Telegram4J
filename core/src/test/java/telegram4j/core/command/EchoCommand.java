@@ -10,6 +10,7 @@ public class EchoCommand implements Command {
     @Override
     public Publisher<?> execute(SendMessageEvent event) {
         return Mono.justOrEmpty(event.getChat())
+                .switchIfEmpty(event.getMessage().getChat())
                 .flatMap(c -> {
                     String text = event.getMessage().getContent();
                     int spc = text.indexOf(' ');

@@ -92,7 +92,7 @@ public class MTProtoBotInlineExample {
                         .addResult(InlineResultDocumentSpec.builder()
                                 .id("3")
                                 .type(FileReferenceId.DocumentType.PHOTO)
-                                .size(SizeSpec.of(256, 256))
+                                .size(SizeSpec.of(256))
                                 .file("https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon256%402x.png")
                                 .message(InlineMessageMediaAutoSpec.of("Icon of TDesktop"))
                                 .build())

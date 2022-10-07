@@ -1,7 +1,10 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -39,6 +42,26 @@ public class BotInfo implements TelegramObject {
      */
     public Optional<Id> getBotId() {
         return Optional.ofNullable(data.userId()).map(i -> Id.ofUser(i, null));
+    }
+
+    /**
+     * Requests to retrieve bot described by this info.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getBot() {
+        return getBot(RetrievalUtil.IDENTITY);
+    }
+
+    /**
+     * Requests to retrieve bot described by this info using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     */
+    public Mono<User> getBot(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getBotId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
     /**
