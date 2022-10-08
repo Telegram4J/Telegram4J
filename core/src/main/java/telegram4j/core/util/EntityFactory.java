@@ -408,14 +408,9 @@ public final class EntityFactory {
             }
         }
 
-        if (stickerData != null) {
+        if (stickerData != null || emojiData != null) {
             return new Sticker(client, data, fileName, messageId, peer,
-                    stickerData, Variant2.of(sizeData, videoData));
-        }
-
-        if (emojiData != null) {
-            return new CustomEmoji(client, data, fileName,
-                    messageId, peer, emojiData, Variant2.of(sizeData, videoData));
+                    Variant2.of(stickerData, emojiData), Variant2.of(sizeData, videoData));
         }
 
         if (audioData != null) {

@@ -210,9 +210,9 @@ public class User implements PeerEntity {
     // FullUser fields
 
     /**
-     * Gets user's bio/about text.
+     * Gets user's bio/about text, if present.
      *
-     * @return The user's bio text.
+     * @return The user's bio text, if present.
      */
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(UserFull::about);
@@ -230,20 +230,41 @@ public class User implements PeerEntity {
                 .map(PeerNotifySettings::new);
     }
 
+    /**
+     * Gets detailed info about bot, if present.
+     *
+     * @return The detailed info about bot, if present.
+     */
     public Optional<BotInfo> getBotInfo() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botInfo)
                 .map(d -> new BotInfo(client, d));
     }
 
+    /**
+     * Gets id of pinned message in this user dialog, if present.
+     *
+     * @return The id of pinned message in this user dialog, if present.
+     */
     public Optional<Integer> getPinnedMessageId() {
         return Optional.ofNullable(fullData).map(UserFull::pinnedMsgId);
     }
 
+    /**
+     * Requests to retrieve pinned message in this dialog.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
     public Mono<AuxiliaryMessages> getPinnedMessage() {
         return getPinnedMessage(RetrievalUtil.IDENTITY);
     }
 
+    /**
+     * Requests to retrieve pinned message in this user dialog using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
     public Mono<AuxiliaryMessages> getPinnedMessage(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(UserFull::pinnedMsgId)
@@ -251,6 +272,11 @@ public class User implements PeerEntity {
                         .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
     }
 
+    /**
+     * Gets count of common with current user chats, if full data is present.
+     *
+     * @return The count of common with current user chats, if full data is present.
+     */
     public Optional<Integer> getCommonChatsCount() {
         return Optional.ofNullable(fullData).map(UserFull::commonChatsCount);
     }
@@ -259,6 +285,11 @@ public class User implements PeerEntity {
         return Optional.ofNullable(fullData).map(UserFull::folderId);
     }
 
+    /**
+     * Gets {@link Duration} of the message Time-To-Live in this user dialog, if present.
+     *
+     * @return The {@link Duration} of the message Time-To-Live in this user dialog, if present.
+     */
     public Optional<Duration> getMessageAutoDeleteDuration() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::ttlPeriod)

@@ -18,10 +18,10 @@ class UniformMessageEntityTest {
 
         eq("", List.of());
         eq("send `/help@botbot` to get help!", List.of(ImmutableMessageEntityBotCommand.of(6, 12)));
-        eq("example@domain.com says #sus :flushed:", List.of(
+        eq("example@domain.com send #hashtag", List.of(
                 ImmutableMessageEntityEmail.of(0, 18),
-                ImmutableMessageEntityHashtag.of(24, 4)));
-        eq("#sus", List.of(ImmutableMessageEntityHashtag.of(0, 4)));
+                ImmutableMessageEntityHashtag.of(24, 8)));
+        eq("#hashtag", List.of(ImmutableMessageEntityHashtag.of(0, 8)));
     }
 
     static void eq(String text, List<MessageEntity> expected) {

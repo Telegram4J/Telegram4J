@@ -24,7 +24,7 @@ abstract class BaseEntityParser implements EntityParser {
     @Override
     public String striped() {
         if (cursor < str.length()) {
-            throw new IllegalStateException("Parsing has not yet completed.");
+            throw new IllegalStateException("Parsing has not completed yet.");
         }
 
         return striped.toString();

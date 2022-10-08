@@ -2,6 +2,7 @@ package telegram4j.mtproto;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -50,10 +51,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.InetSocketAddress;
 import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
@@ -112,9 +110,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, PendingRequest> requests = new ConcurrentHashMap<>();
-    private final Cache<Integer, Long> quickAckTokens = Caffeine.newBuilder()
-            .expireAfterWrite(2, TimeUnit.MINUTES)
-            .build();
+    private final Cache<Integer, Long> quickAckTokens;
 
     DefaultMTProtoClient(Type type, DataCenter dataCenter, MTProtoOptions options) {
         this.type = type;
@@ -133,6 +129,19 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .latestOrDefault(State.RECONNECT);
         this.ackEmitter = new ResettableInterval(Schedulers.parallel());
         this.pingEmitter = new ResettableInterval(Schedulers.parallel());
+        var cacheBuilder = Caffeine.newBuilder()
+                .expireAfterWrite(2, TimeUnit.MINUTES);
+        // And yes, it will be triggered if the message was acked via MsgsAck.
+        if (rpcLog.isDebugEnabled()) {
+            cacheBuilder.<Integer, Long>evictionListener((key, value, cause) -> {
+                if (cause == RemovalCause.EXPIRED) {
+                    Objects.requireNonNull(value);
+                    rpcLog.debug("[C:0x{}] Evicted unhandled quick acknowledge for 0x{}", this.id, Long.toHexString(value));
+                }
+            });
+        }
+
+        this.quickAckTokens = cacheBuilder.build();
     }
 
     public DefaultMTProtoClient(MTProtoOptions options) {
@@ -202,7 +211,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             if (!TransportException.isError(val) && transport.supportQuickAck()) { // quick acknowledge
                                 Long msgId = quickAckTokens.getIfPresent(val);
                                 if (msgId == null) {
-                                    log.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
+                                    rpcLog.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
                                     return Mono.empty();
                                 }
 
@@ -731,8 +740,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
         long millis = System.currentTimeMillis();
         long seconds = millis / 1000;
         long mod = millis % 1000;
-        long messageId = seconds + timeOffset << 32 | mod << 22 | random.nextInt(0xFFFF) << 2;
-
+        // [ 32 bits to approximate server time in seconds | 12 bits to fractional part of time | 20 bits of random number (divisible by 4) ]
+        long messageId = seconds + timeOffset << 32 | mod << 20 | random.nextInt(0x1fffff) << 2;
         long l = lastMessageId;
         if (l >= messageId) {
             messageId = l + 4;
@@ -998,9 +1007,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             return Mono.empty();
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug("Unhandled payload: {}", obj);
-        }
+        log.warn("[C:0x{}] Unhandled payload: {}", id, obj);
         return Mono.empty();
     }
 

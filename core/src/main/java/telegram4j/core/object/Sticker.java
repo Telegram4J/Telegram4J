@@ -12,20 +12,30 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Inferred from {@link BaseDocumentFields#attributes()} type for all types of sticker documents.
+ * Representation of all types of stickers and custom emojis.
  * The {@link #getFileName() file name} will always be available.
  */
 public class Sticker extends Document {
 
-    private final DocumentAttributeSticker stickerData;
+    private final Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData;
     private final Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData;
 
     public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName, int messageId,
-                   InputPeer peer, DocumentAttributeSticker stickerData,
+                   InputPeer peer, Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData,
                    Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData) {
         super(client, data, fileName, messageId, peer);
         this.stickerData = Objects.requireNonNull(stickerData);
         this.optData = Objects.requireNonNull(optData);
+    }
+
+    /**
+     * Gets type of set which contains this sticker.
+     *
+     * @return The type of sticker set.
+     */
+    public StickerSet.Type getSetType() {
+        return stickerData.map(d -> d.mask() ? StickerSet.Type.MASK
+                : StickerSet.Type.REGULAR, d -> StickerSet.Type.CUSTOM_EMOJI);
     }
 
     /**
@@ -35,6 +45,10 @@ public class Sticker extends Document {
      */
     public Sticker.Type getType() {
         return Sticker.Type.fromMimeType(getMimeType());
+    }
+
+    public boolean isFree() {
+        return stickerData.map(d -> false, DocumentAttributeCustomEmoji::free);
     }
 
     /**
@@ -65,21 +79,12 @@ public class Sticker extends Document {
     }
 
     /**
-     * Gets whether this is a mask sticker
-     *
-     * @return {@code true} if this is a mask sticker.
-     */
-    public boolean isMask() {
-        return stickerData.mask();
-    }
-
-    /**
      * Gets alternative unicode emoji representation for sticker.
      *
      * @return The alternative unicode emoji representation.
      */
     public String getAlternative() {
-        return stickerData.alt();
+        return stickerData.map(DocumentAttributeSticker::alt, DocumentAttributeCustomEmoji::alt);
     }
 
     /**
@@ -88,16 +93,18 @@ public class Sticker extends Document {
      * @return The {@link InputStickerSet} id of sticker set.
      */
     public InputStickerSet getStickerSet() {
-        return stickerData.stickerset();
+        return stickerData.map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset);
     }
 
     /**
-     * Gets mask coordinates, if {@link #isMask()} is {@code true}.
+     * Gets mask coordinates, if {@link #getSetType()} is {@link StickerSet.Type#MASK}.
      *
-     * @return The mask coordinates, if {@link #isMask()} is {@code true}.
+     * @return The mask coordinates, if {@link #getSetType()} is {@link StickerSet.Type#MASK}.
      */
     public Optional<MaskCoordinates> getMaskCoordinates() {
-        return Optional.ofNullable(stickerData.maskCoords()).map(MaskCoordinates::new);
+        return stickerData.getT1()
+                .map(DocumentAttributeSticker::maskCoords)
+                .map(MaskCoordinates::new);
     }
 
     @Override

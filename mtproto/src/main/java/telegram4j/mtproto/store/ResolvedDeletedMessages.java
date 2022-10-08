@@ -1,6 +1,5 @@
 package telegram4j.mtproto.store;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.InputPeer;
 
@@ -24,19 +23,6 @@ public class ResolvedDeletedMessages {
 
     public List<BaseMessageFields> getMessages() {
         return messages;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ResolvedDeletedMessages that = (ResolvedDeletedMessages) o;
-        return peer.equals(that.peer) && messages.equals(that.messages);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(peer, messages);
     }
 
     @Override
