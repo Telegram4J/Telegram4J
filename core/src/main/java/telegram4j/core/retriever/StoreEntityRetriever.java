@@ -1,6 +1,7 @@
 package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
@@ -42,11 +43,13 @@ public class StoreEntityRetriever implements EntityRetriever {
 
         return Mono.justOrEmpty(peerId.asUsername())
                 .flatMap(storeLayout::resolvePeer)
-                .mapNotNull(p -> {
+                .flatMap(p -> {
                     switch (p.peer().identifier()) {
-                        case PeerChannel.ID: return EntityFactory.createChat(client, p.chats().get(0), null);
-                        case PeerUser.ID: return EntityFactory.createUser(client, p.users().get(0));
-                        default: throw new IllegalArgumentException("Unknown Peer type: " + p.peer());
+                        case PeerChannel.ID: return getUserFullById(client.getSelfId())
+                                .switchIfEmpty(Mono.error(IllegalStateException::new))
+                                .mapNotNull(selfUser -> EntityFactory.createChat(client, p.chats().get(0), selfUser));
+                        case PeerUser.ID: return Mono.justOrEmpty(EntityFactory.createUser(client, p.users().get(0)));
+                        default: return Mono.error(new IllegalStateException("Unknown Peer type: " + p.peer()));
                     }
                 })
                 .switchIfEmpty(resolveById);
@@ -88,26 +91,34 @@ public class StoreEntityRetriever implements EntityRetriever {
     public Mono<Chat> getChatMinById(Id chatId) {
         return Mono.defer(() -> {
                     switch (chatId.getType()) {
-                        case CHAT: return storeLayout.getChatMinById(chatId.asLong());
-                        case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong());
-                        case USER: return storeLayout.getUserMinById(chatId.asLong());
+                        case CHAT: return storeLayout.getChatMinById(chatId.asLong())
+                                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                        case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
+                                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                        case USER: return storeLayout.getUserMinById(chatId.asLong())
+                                .zipWith(getUserFullById(client.getSelfId())
+                                        .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());
                     }
-                })
-                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                });
     }
 
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
         return Mono.defer(() -> {
                     switch (chatId.getType()) {
-                        case CHAT: return storeLayout.getChatFullById(chatId.asLong());
-                        case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong());
-                        case USER: return storeLayout.getUserFullById(chatId.asLong());
+                        case CHAT: return storeLayout.getChatFullById(chatId.asLong())
+                                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                        case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong())
+                                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                        case USER: return storeLayout.getUserFullById(chatId.asLong())
+                                .zipWith(getUserFullById(client.getSelfId())
+                                        .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());
                     }
-                })
-                .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                });
     }
 
     @Override

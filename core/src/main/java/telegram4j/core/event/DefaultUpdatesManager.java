@@ -32,6 +32,7 @@ import telegram4j.tl.updates.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -122,7 +123,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
-                        data.chats(), data.users(), true));
+                        data.chats(), data.users()));
             }
             case UpdatesCombined.ID: {
                 UpdatesCombined data = (UpdatesCombined) updates;
@@ -145,7 +146,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
-                        data.chats(), data.users(), true));
+                        data.chats(), data.users()));
             }
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
@@ -294,11 +295,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
             return Flux.empty();
         }
 
-        // It often turns out that getDifference() returns the updates already received.
-        if (client.getAuthResources().isBot()) {
-            date += DEFAULT_CHECKIN.getSeconds();
-        }
-
         if (log.isDebugEnabled()) {
             log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
         }
@@ -326,7 +322,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                             return applyState(difference0.state())
                                     .thenMany(handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
-                                            difference0.chats(), difference0.users(), false));
+                                            difference0.chats(), difference0.users()));
                         }
                         case DifferenceSlice.ID: {
                             DifferenceSlice difference0 = (DifferenceSlice) difference;
@@ -334,7 +330,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             applyStateLocal(difference0.intermediateState());
 
                             return handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
-                                    difference0.chats(), difference0.users(), false)
+                                    difference0.chats(), difference0.users())
                                     .concatWith(getDifference());
                         }
                         default:
@@ -344,8 +340,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     private Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
-                                       List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
-                                       boolean applyCheck) {
+                                       List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users) {
         var usersMap = users.stream()
                 .map(u -> EntityFactory.createUser(client, u))
                 .filter(Objects::nonNull)
@@ -387,7 +382,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .switchIfEmpty(client.getMtProtoResources().getStoreLayout()
                                 .resolveChannel(u.channelId())
                                 .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
-                                .then(Mono.empty()))
+                                .then(Mono.empty())) // no channel pts; can't request channel updates
                         .map(ChatFull::fullChat)
                         .cast(ChannelFull.class)
                         .map(ChannelFull::pts)
@@ -426,7 +421,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         Flux<Event> concatedUpdates = Flux.fromIterable(otherUpdates)
                 .map(u -> UpdateContext.create(client, chatsMap, usersMap, u))
-                .flatMap(ctx -> applyCheck ? applyUpdate(ctx) : updatesMapper.handle(ctx))
+                .flatMap(this::applyUpdate)
                 .concatWith(messageCreateEvents)
                 .concatWith(applyChannelDifference);
 
@@ -597,18 +592,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 case UpdateEditChannelMessage.ID: {
                     UpdateEditChannelMessage u = (UpdateEditChannelMessage) ptsUpdate;
 
-                    Peer p = ((BaseMessageFields) u.message()).peerId();
-                    if (p.identifier() == PeerChannel.ID) {
-                        channelId = getRawPeerId(p);
-                    }
+                    PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
+                    channelId = getRawPeerId(p);
                     break;
                 }
                 case UpdateNewChannelMessage.ID: {
                     UpdateNewChannelMessage u = (UpdateNewChannelMessage) ptsUpdate;
-                    Peer p = ((BaseMessageFields) u.message()).peerId();
-                    if (p.identifier() == PeerChannel.ID) {
-                        channelId = getRawPeerId(p);
-                    }
+                    PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
+                    channelId = getRawPeerId(p);
                     break;
                 }
                 case UpdatePinnedChannelMessages.ID: {
@@ -652,16 +643,21 @@ public class DefaultUpdatesManager implements UpdatesManager {
             long id = channelId;
 
             // If -1, just apply update
+            AtomicBoolean justApplied = new AtomicBoolean();
             return client.getMtProtoResources()
                     .getStoreLayout().getChannelFullById(id)
                     .switchIfEmpty(client.getMtProtoResources()
                             .getStoreLayout().resolveChannel(id)
-                            .flatMap(c -> client.getServiceHolder()
-                                    .getChatService().getFullChannel(c)))
+                            .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
+                            .doOnNext(c -> justApplied.set(true)))
                     .map(ChatFull::fullChat)
                     .cast(ChannelFull.class)
                     .map(ChannelFull::pts)
                     .flatMapMany(pts -> {
+                        if (justApplied.get()) {
+                            return mapUpdate;
+                        }
+
                         if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                             log.debug("Updates gap found for channel {}. Received pts: {}-{}, local pts: {}",
                                     id, ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
@@ -675,8 +671,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             return Flux.empty();
                         }
                         return mapUpdate;
-                    })
-                    .switchIfEmpty(mapUpdate);
+                    });
         }
 
         if (ctx.getUpdate() instanceof QtsUpdate) {

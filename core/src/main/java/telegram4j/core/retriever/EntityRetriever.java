@@ -5,6 +5,7 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.InputMessage;
@@ -56,6 +57,8 @@ public interface EntityRetriever {
     /**
      * Retrieve chat with retriever strategy by the specified id.
      *
+     * @implSpec {@link PrivateChat} must contain full information about self user.
+     *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
      * the {@link Chat} with minimal information.
@@ -67,6 +70,8 @@ public interface EntityRetriever {
     /**
      * Retrieve chat with minimal information by the specified id.
      *
+     * @implSpec {@link PrivateChat} must contain full information about self user.
+     *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
      * the {@link Chat} with minimal information.
@@ -75,6 +80,8 @@ public interface EntityRetriever {
 
     /**
      * Retrieve chat with detailed information by the specified id.
+     *
+     * @implSpec {@link PrivateChat} must contain full information about self user.
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion

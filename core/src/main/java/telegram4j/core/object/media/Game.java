@@ -91,9 +91,9 @@ public class Game implements TelegramObject {
     }
 
     /**
-     * Gets attached document, if present.
+     * Gets attached video document, if present.
      *
-     * @return The attached document, if present.
+     * @return The attached video document, if present.
      */
     public Optional<Video> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))

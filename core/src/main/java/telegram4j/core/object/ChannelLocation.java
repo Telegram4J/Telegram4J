@@ -8,7 +8,6 @@ import telegram4j.tl.BaseChannelLocation;
 import telegram4j.tl.BaseGeoPoint;
 
 import java.util.Objects;
-import java.util.Optional;
 
 /**
  * Geolocation representation for supergroups
@@ -31,12 +30,14 @@ public class ChannelLocation implements TelegramObject {
     }
 
     /**
-     * Gets geo-point of the address, if present.
+     * Gets geo-point of the address.
      *
-     * @return The {@link GeoPoint} of the address, if present.
+     * @return The {@link GeoPoint} of the address.
      */
-    public Optional<GeoPoint> getGeoPoint() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class)).map(GeoPoint::new);
+    public GeoPoint getGeoPoint() {
+        BaseGeoPoint geoPoint = TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class);
+        Objects.requireNonNull(geoPoint);
+        return new GeoPoint(geoPoint);
     }
 
     /**

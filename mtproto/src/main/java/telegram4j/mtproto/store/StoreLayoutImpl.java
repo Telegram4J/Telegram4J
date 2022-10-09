@@ -199,6 +199,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 .filter(userInfo -> userInfo.full != null)
                 .map(userInfo -> telegram4j.tl.messages.ChatFull.builder()
                         .chats(List.of(userInfo.min))
+                        .users(List.of())
                         .fullChat(Objects.requireNonNull(userInfo.full))
                         .build());
     }
@@ -215,6 +216,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 .map(userInfo -> telegram4j.tl.users.UserFull.builder()
                         .addUser(userInfo.min)
                         .fullUser(Objects.requireNonNull(userInfo.full))
+                        .chats(List.of())
                         .build());
     }
 
@@ -234,6 +236,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
             messages.put(key, cast);
 
+            savePeer(cast.peerId(), cast);
             Peer p = cast.fromId();
             if (p != null) {
                 savePeer(p, cast);
@@ -247,6 +250,7 @@ public class StoreLayoutImpl implements StoreLayout {
             BaseMessageFields cast = (BaseMessageFields) message;
             MessageId key = MessageId.create(cast);
 
+            savePeer(cast.peerId(), cast);
             Peer p = cast.fromId();
             if (p != null) {
                 savePeer(p, cast);
@@ -428,6 +432,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 .orElse(null);
 
         if (chat1 == null || !isAccessible(chat1)) {
+            System.out.println("!!!!!!!");
             return;
         }
 
@@ -599,6 +604,7 @@ public class StoreLayoutImpl implements StoreLayout {
                         break;
                     }
 
+                    System.out.println("\"WHUY\" = " + "WHUY");
                     return;
                 }
 
