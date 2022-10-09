@@ -432,7 +432,6 @@ public class StoreLayoutImpl implements StoreLayout {
                 .orElse(null);
 
         if (chat1 == null || !isAccessible(chat1)) {
-            System.out.println("!!!!!!!");
             return;
         }
 
@@ -496,9 +495,17 @@ public class StoreLayoutImpl implements StoreLayout {
 
         Chat cpy = copy(chat);
         if (chat.identifier() == BaseChat.ID) {
-            chats.compute(cpy.id(), (k, v) -> v == null ? new PartialFields<>((BaseChat) cpy) : v.withMin((BaseChat) cpy));
+            BaseChat c = (BaseChat) cpy;
+            savePeer(ImmutablePeerChat.of(c.id()), null);
+            chats.compute(cpy.id(), (k, v) -> v == null ? new PartialFields<>(c) : v.withMin(c));
         } else { // Channel
-            channels.compute(cpy.id(), (k, v) -> v == null ? new PartialFields<>((Channel) cpy) : v.withMin((Channel) cpy));
+            Channel c =  (Channel) cpy;
+            Long acch = c.accessHash();
+            if (acch != null) {
+                peers.put(ImmutablePeerChannel.of(c.id()), ImmutableInputPeerChannel.of(c.id(), acch));
+            }
+
+            channels.compute(cpy.id(), (k, v) -> v == null ? new PartialFields<>(c) : v.withMin(c));
             saveUsernamePeer(cpy);
         }
     }
@@ -604,7 +611,6 @@ public class StoreLayoutImpl implements StoreLayout {
                         break;
                     }
 
-                    System.out.println("\"WHUY\" = " + "WHUY");
                     return;
                 }
 
