@@ -236,11 +236,6 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> updateSelfId(long userId) {
-        return delegate.updateSelfId(userId);
-    }
-
-    @Override
     public Mono<Void> updateState(State state) {
         return Mono.defer(() -> {
             if (!state.equals(this.state)) {

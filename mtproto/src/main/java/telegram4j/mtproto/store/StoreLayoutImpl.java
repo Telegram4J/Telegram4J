@@ -183,6 +183,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromSupplier(() -> chats.get(chatId))
                 .filter(userInfo -> userInfo.full != null)
                 .map(userInfo -> telegram4j.tl.messages.ChatFull.builder()
+                        .users(List.of())
                         .chats(List.of(userInfo.min))
                         .fullChat(Objects.requireNonNull(userInfo.full))
                         .build());
@@ -214,7 +215,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromSupplier(() -> users.get(userId))
                 .filter(userInfo -> userInfo.full != null)
                 .map(userInfo -> telegram4j.tl.users.UserFull.builder()
-                        .addUser(userInfo.min)
+                        .users(List.of(userInfo.min))
                         .fullUser(Objects.requireNonNull(userInfo.full))
                         .chats(List.of())
                         .build());
@@ -376,11 +377,6 @@ public class StoreLayoutImpl implements StoreLayout {
                 channels.remove(payload.channelId());
             }
         });
-    }
-
-    @Override
-    public Mono<Void> updateSelfId(long userId) {
-        return Mono.fromRunnable(() -> selfId = userId);
     }
 
     @Override

@@ -192,8 +192,6 @@ public interface StoreLayout {
 
     // not an update-related methods
 
-    Mono<Void> updateSelfId(long userId);
-
     Mono<Void> updateState(State state);
 
     Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
