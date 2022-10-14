@@ -14,11 +14,11 @@ import telegram4j.core.event.dispatcher.UpdateContext;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.*;
@@ -44,7 +44,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     private static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
 
     private static final int MAX_CHANNEL_DIFFERENCE = 100;
-    private static final int MAX_BOT_CHANNEL_DIFFERENCE = 100000;
+    private static final int MAX_BOT_CHANNEL_DIFFERENCE = 10000;
     private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(2);
 
     private final MTProtoTelegramClient client;
@@ -164,10 +164,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 this.pts = data.pts();
 
                 var message = BaseMessage.builder()
-                        .out(data.out())
-                        .mentioned(data.mentioned())
-                        .mediaUnread(data.mediaUnread())
-                        .silent(data.silent())
+                        .flags(data.flags())
                         .id(data.id())
                         .date(data.date())
                         .fromId(ImmutablePeerUser.of(data.fromId()))
@@ -203,10 +200,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 this.pts = data.pts();
 
                 var message = BaseMessage.builder()
-                        .out(data.out())
-                        .mentioned(data.mentioned())
-                        .mediaUnread(data.mediaUnread())
-                        .silent(data.silent())
+                        .flags(data.flags())
                         .id(data.id())
                         .date(data.date())
                         .fwdFrom(data.fwdFrom())
@@ -344,24 +338,25 @@ public class DefaultUpdatesManager implements UpdatesManager {
         var usersMap = users.stream()
                 .map(u -> EntityFactory.createUser(client, u))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
-        var selfUser = usersMap.get(client.getSelfId().asLong());
+        var selfUser = usersMap.get(client.getSelfId());
 
         var chatsMap = chats.stream()
                 .map(u -> EntityFactory.createChat(client, u, null))
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
         Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(newMessages)
                 .ofType(BaseMessageFields.class)
                 .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                         .getStoreLayout().existMessage(message)))
                 .flatMap(data -> {
-                    var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
+                    Id peerId = Id.of(data.peerId());
+                    var chat = getChatEntity(peerId, chatsMap, usersMap, selfUser);
 
                     var author = Optional.ofNullable(data.fromId())
-                            .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
+                            .flatMap(p -> getPeerEntity(Id.of(p), chatsMap, usersMap))
                             .or(() -> Optional.ofNullable(chat)
                                     .filter(c -> c.getType() == Chat.Type.PRIVATE)
                                     .map(c -> ((PrivateChat) c).getUser()))
@@ -369,7 +364,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     return Mono.justOrEmpty(chat)
                             .map(Chat::getId)
-                            .switchIfEmpty(client.asInputPeer(Id.of(data.peerId()))
+                            .switchIfEmpty(client.asInputPeer(peerId)
                                     .map(p -> Id.of(p, client.getSelfId())))
                             .map(i -> EntityFactory.createMessage(client, data, i))
                             .map(m -> new SendMessageEvent(client, m, chat, author));
@@ -389,7 +384,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .map(i -> Tuples.of(u, i)))
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
                 .flatMap(TupleUtils.function((u, cpts) -> {
-                    var id = Optional.ofNullable(chatsMap.get(u.channelId()))
+                    var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId(), null)))
                             .map(ch -> (Channel) ch)
                             .map(ch -> ImmutableBaseInputChannel.of(ch.id(),
                                     Objects.requireNonNull(ch.accessHash())))
@@ -492,24 +487,24 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                        .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
-                var selfUser = usersMap.get(client.getSelfId().asLong());
+                var selfUser = usersMap.get(client.getSelfId());
 
                 var chatsMap = diff0.chats().stream()
                         .map(u -> EntityFactory.createChat(client, u, null))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                        .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
                         .ofType(BaseMessageFields.class)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
-                            var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
+                            var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
+                                    .flatMap(p -> getPeerEntity(Id.of(p), chatsMap, usersMap))
                                     .orElse(null);
 
                             var msg = EntityFactory.createMessage(client, data, channelId);
@@ -538,24 +533,24 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                        .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
-                var selfUser = usersMap.get(client.getSelfId().asLong());
+                var selfUser = usersMap.get(client.getSelfId());
 
                 var chatsMap = diff0.chats().stream()
                         .map(u -> EntityFactory.createChat(client, u, null))
                         .filter(Objects::nonNull)
-                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                        .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
                         .ofType(BaseMessageFields.class)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
-                            var chat = getChatEntity(data.peerId(), chatsMap, usersMap, selfUser);
+                            var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
 
                             var author = Optional.ofNullable(data.fromId())
-                                    .flatMap(p -> getPeerEntity(p, chatsMap, usersMap))
+                                    .flatMap(p -> getPeerEntity(Id.of(p), chatsMap, usersMap))
                                     .orElse(null);
 
                             var msg = EntityFactory.createMessage(client, data, channelId);
@@ -639,7 +634,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 return preApply.concatWith(mapUpdate);
             }
 
-            // channel pts
             long id = channelId;
 
             // If -1, just apply update
@@ -719,26 +713,25 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     @Nullable
-    private Chat getChatEntity(Peer peer, Map<Long, Chat> chatsMap,
-                               Map<Long, User> usersMap, @Nullable User selfUser) {
-        long rawId = getRawPeerId(peer);
-        switch (peer.identifier()) {
-            case PeerUser.ID:
-                User data = usersMap.get(rawId);
+    private Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap,
+                               Map<Id, User> usersMap, @Nullable User selfUser) {
+        switch (peer.getType()) {
+            case CHAT:
+            case CHANNEL:
+                return chatsMap.get(peer);
+            case USER:
+                User data = usersMap.get(peer);
                 return data != null ? new PrivateChat(client, data, selfUser) : null;
-            case PeerChat.ID:
-            case PeerChannel.ID: return chatsMap.get(rawId);
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
+            default: throw new IllegalStateException();
         }
     }
 
-    private Optional<PeerEntity> getPeerEntity(Peer peer, Map<Long, Chat> chatsMap, Map<Long, User> usersMap) {
-        long rawId = getRawPeerId(peer);
-        switch (peer.identifier()) {
-            case PeerUser.ID: return Optional.ofNullable(usersMap.get(rawId));
-            case PeerChat.ID:
-            case PeerChannel.ID: return Optional.ofNullable(chatsMap.get(rawId));
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
+    private Optional<PeerEntity> getPeerEntity(Id peer, Map<Id, Chat> chatsMap, Map<Id, User> usersMap) {
+        switch (peer.getType()) {
+            case USER: return Optional.ofNullable(usersMap.get(peer));
+            case CHANNEL:
+            case CHAT: return Optional.ofNullable(chatsMap.get(peer));
+            default: throw new IllegalStateException();
         }
     }
 }

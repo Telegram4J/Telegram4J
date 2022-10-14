@@ -8,6 +8,7 @@ import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.GeoPoint;
+import telegram4j.core.util.Id;
 import telegram4j.core.util.InlineMessageId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseGeoPoint;
@@ -28,7 +29,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateInlineBotCallbackQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
         InlineMessageId msgId = InlineMessageId.from(upd.msgId());
 
         return Flux.just(new InlineCallbackQueryEvent(client, upd.queryId(),
@@ -40,8 +41,8 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateBotCallbackQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
-        Chat chat = context.getChatEntity(upd.peer()).orElseThrow();
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        Chat chat = context.getChatEntity(Id.of(upd.peer())).orElseThrow();
 
         return Flux.just(new CallbackQueryEvent(client, upd.queryId(),
                 user, chat, upd.msgId(),
@@ -53,7 +54,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateBotInlineQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(upd.userId()));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
         GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(upd.geo(), BaseGeoPoint.class))
                 .map(GeoPoint::new)
                 .orElse(null);

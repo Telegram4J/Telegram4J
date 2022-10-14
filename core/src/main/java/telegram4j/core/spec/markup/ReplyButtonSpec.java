@@ -1,6 +1,7 @@
 package telegram4j.core.spec.markup;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.markup.KeyboardButton;
 
 import java.util.Objects;
@@ -39,6 +40,7 @@ public final class ReplyButtonSpec implements KeyboardButtonSpec {
     }
 
     public ReplyButtonSpec withQuiz(@Nullable Boolean value) {
+        Preconditions.requireState(type == KeyboardButton.Type.REQUEST_POLL);
         if (Objects.equals(quiz, value)) return this;
         return new ReplyButtonSpec(type, text, value);
     }

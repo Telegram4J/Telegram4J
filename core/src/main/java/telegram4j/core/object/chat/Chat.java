@@ -4,7 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.ForwardMessagesSpec;
@@ -72,7 +72,7 @@ public interface Chat extends PeerEntity {
      * @return A {@link Mono} emitting on successful completion {@link AuxiliaryMessages pinned message}.
      */
     default Mono<AuxiliaryMessages> getPinnedMessage() {
-        return getPinnedMessage(RetrievalUtil.IDENTITY);
+        return getPinnedMessage(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**

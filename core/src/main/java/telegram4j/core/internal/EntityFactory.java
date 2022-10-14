@@ -1,4 +1,4 @@
-package telegram4j.core.util;
+package telegram4j.core.internal;
 
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
@@ -18,11 +18,6 @@ import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.*;
-import telegram4j.core.object.markup.ReplyInlineMarkup;
-import telegram4j.core.object.markup.ReplyKeyboardForceReply;
-import telegram4j.core.object.markup.ReplyKeyboardHide;
-import telegram4j.core.object.markup.ReplyKeyboardMarkup;
-import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.object.media.PhotoCachedSize;
 import telegram4j.core.object.media.PhotoPathSize;
 import telegram4j.core.object.media.PhotoSize;
@@ -30,6 +25,8 @@ import telegram4j.core.object.media.PhotoSizeProgressive;
 import telegram4j.core.object.media.PhotoStrippedSize;
 import telegram4j.core.object.media.*;
 import telegram4j.core.spec.inline.*;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.Variant2;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
@@ -202,8 +199,7 @@ public final class EntityFactory {
                     case ChatParticipantsForbidden.ID: {
                         ChatParticipantsForbidden d = (ChatParticipantsForbidden) chat.participants();
                         chatParticipants = Optional.ofNullable(d.selfParticipant())
-                                .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
-                                .map(List::of)
+                                .map(c -> List.of(new ChatParticipant(client, usersMap.get(c.userId()), c, chatId)))
                                 .orElse(null);
                         break;
                     }
@@ -341,21 +337,6 @@ public final class EntityFactory {
         }
     }
 
-    public static ReplyMarkup createReplyMarkup(MTProtoTelegramClient client, telegram4j.tl.ReplyMarkup data) {
-        switch (data.identifier()) {
-            case telegram4j.tl.ReplyInlineMarkup.ID:
-                return new ReplyInlineMarkup(client, (telegram4j.tl.ReplyInlineMarkup) data);
-            case telegram4j.tl.ReplyKeyboardHide.ID:
-                return new ReplyKeyboardHide(client, (telegram4j.tl.ReplyKeyboardHide) data);
-            case telegram4j.tl.ReplyKeyboardMarkup.ID:
-                return new ReplyKeyboardMarkup(client, (telegram4j.tl.ReplyKeyboardMarkup) data);
-            case telegram4j.tl.ReplyKeyboardForceReply.ID:
-                return new ReplyKeyboardForceReply(client, (telegram4j.tl.ReplyKeyboardForceReply) data);
-            default:
-                throw new IllegalArgumentException("Unknown reply markup type: " + data);
-        }
-    }
-
     public static PhotoSize createPhotoSize(telegram4j.tl.PhotoSize data) {
         switch (data.identifier()) {
             case telegram4j.tl.BasePhotoSize.ID: return new DefaultPhotoSize((telegram4j.tl.BasePhotoSize) data);
@@ -444,15 +425,12 @@ public final class EntityFactory {
 
             r.description().ifPresent(builder::description);
 
-            var contentBuilder = InputWebDocument.builder()
+            builder.content(InputWebDocument.builder()
                     .url(r.url())
                     .size(0)
-                    .mimeType("text/html");
-
-            Optional.ofNullable(getFilenameFromUrl(r.url())).ifPresent(s -> contentBuilder.addAttribute(
-                    ImmutableDocumentAttributeFilename.of(s)));
-
-            builder.content(contentBuilder.build());
+                    .attributes(List.of())
+                    .mimeType("text/html")
+                    .build());
 
             r.thumb().map(EntityFactory::createThumbnail).ifPresent(builder::thumb);
 
@@ -498,17 +476,6 @@ public final class EntityFactory {
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableInputBotInlineResultDocument.Builder::build);
             } catch (IllegalArgumentException e) { // may be just an url
-                var builder = BaseInputBotInlineResult.builder()
-                        .type(type)
-                        .title(r.title().orElse(null))
-                        .description(r.description().orElse(null))
-                        .id(r.id())
-                        .url(r.file());
-
-                var contentBuilder = InputWebDocument.builder()
-                        .url(r.file())
-                        .size(0);
-
                 String mimeType = r.mimeType()
                         .or(() -> documentType == DocumentType.PHOTO ? Optional.of("image/jpeg") : Optional.empty())
                         .orElseThrow(() -> new IllegalArgumentException("Mime type must be included with urls."));
@@ -519,13 +486,23 @@ public final class EntityFactory {
                     throw new IllegalStateException("Not allowed mime type for web file: " + mimeType);
                 }
 
-                contentBuilder.mimeType(mimeType);
+                var builder = BaseInputBotInlineResult.builder()
+                        .type(type)
+                        .title(r.title().orElse(null))
+                        .description(r.description().orElse(null))
+                        .id(r.id())
+                        .url(r.file());
+
+                var contentBuilder = InputWebDocument.builder()
+                        .url(r.file())
+                        .size(0)
+                        .attributes(List.of())
+                        .mimeType(mimeType);
 
                 switch (documentType) {
                     case PHOTO: {
-                        SizeSpec size = r.size().orElseThrow(() -> new IllegalStateException("Size for photos must be set."));
-
-                        contentBuilder.addAttribute(ImmutableDocumentAttributeImageSize.of(size.width(), size.height()));
+                        contentBuilder.addAttribute(r.size().map(WebDocumentFields.Size::asData)
+                                .orElseThrow(() -> new IllegalStateException("Size for photos must be set.")));
                         break;
                     }
                     case VIDEO:
@@ -535,8 +512,7 @@ public final class EntityFactory {
                                 .map(Math::toIntExact)
                                 .orElseThrow(() -> new IllegalStateException("Duration for video/gif documents must be set."));
 
-                        SizeSpec size = r.size()
-                                .orElseThrow(() -> new IllegalStateException("Size for video/gif documents must be set."));
+                        var size = r.size().orElseThrow(() -> new IllegalStateException("Size for video/gif documents must be set."));
 
                         contentBuilder.addAttribute(DocumentAttributeVideo.builder()
                                 .h(size.height())
@@ -555,12 +531,13 @@ public final class EntityFactory {
                         contentBuilder.addAttribute(DocumentAttributeAudio.builder()
                                 .voice(documentType == DocumentType.VOICE)
                                 .duration(duration)
+                                .title(r.title().orElse(null))
+                                .performer(r.performer().orElse(null))
                                 .build());
                         break;
                 }
 
-                Optional.ofNullable(getFilenameFromUrl(r.file())).ifPresent(s -> contentBuilder.addAttribute(
-                        ImmutableDocumentAttributeFilename.of(s)));
+                r.filename().ifPresent(s -> contentBuilder.addAttribute(ImmutableDocumentAttributeFilename.of(s)));
 
                 var content = contentBuilder.build();
                 builder.content(content);
@@ -628,85 +605,63 @@ public final class EntityFactory {
                 .size(0)
                 .url(spec.url());
 
-        spec.size().ifPresent(s -> thumbBuilder.addAttribute(
-                ImmutableDocumentAttributeImageSize.of(s.width(), s.height())));
-
-        Optional.ofNullable(getFilenameFromUrl(spec.url())).ifPresent(s -> thumbBuilder.addAttribute(
-                ImmutableDocumentAttributeFilename.of(s)));
+        spec.size().map(WebDocumentFields.Size::asData).ifPresent(thumbBuilder::addAttribute);
+        spec.filename().ifPresent(s -> thumbBuilder.addAttribute(ImmutableDocumentAttributeFilename.of(s)));
 
         return thumbBuilder.build();
     }
 
-    private static Mono<InputBotInlineMessage> createInlineMessage(MTProtoTelegramClient client, InlineMessageSpec message) {
-        var replyMarkup = Mono.justOrEmpty(message.replyMarkup())
+    private static Mono<InputBotInlineMessage> createInlineMessage(MTProtoTelegramClient client, InlineMessageSpec m) {
+        var replyMarkup = Mono.justOrEmpty(m.replyMarkup())
                 .flatMap(s -> s.asData(client));
 
-        if (message instanceof InlineMessageTextSpec) {
-            InlineMessageTextSpec m = (InlineMessageTextSpec) message;
+        switch (m.type()) {
+            case MEDIA_AUTO: {
+                String c = m.message().orElseThrow().trim();
+                var parser = m.parser()
+                        .or(() -> client.getMtProtoResources().getDefaultEntityParser())
+                        .map(t -> EntityParserSupport.parse(client, t.apply(c)))
+                        .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
 
-            String c = m.message().trim();
-            var parser = m.parser()
-                    .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                    .map(t -> EntityParserSupport.parse(client, t.apply(c)))
-                    .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
+                return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageMediaAuto.builder()
+                                .message(txt)
+                                .entities(ent)))
+                        .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                .then(Mono.fromSupplier(builder::build)));
+            }
+            case TEXT:
+                String c = m.message().orElseThrow().trim();
+                var parser = m.parser()
+                        .or(() -> client.getMtProtoResources().getDefaultEntityParser())
+                        .map(t -> EntityParserSupport.parse(client, t.apply(c)))
+                        .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
 
-            return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageText.builder()
-                            .message(txt)
-                            .entities(ent)
-                            .noWebpage(m.noWebpage())))
-                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                            .then(Mono.fromSupplier(builder::build)));
-        } else if (message instanceof InlineMessageMediaGameSpec) {
-            return Mono.just(ImmutableInputBotInlineMessageGame.of())
-                    .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
-                            .defaultIfEmpty(r));
-
-        } else if (message instanceof InlineMessageMediaAutoSpec) {
-            InlineMessageMediaAutoSpec m = (InlineMessageMediaAutoSpec) message;
-
-            String c = m.message().trim();
-            var parser = m.parser()
-                    .or(() -> client.getMtProtoResources().getDefaultEntityParser())
-                    .map(t -> EntityParserSupport.parse(client, t.apply(c)))
-                    .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
-
-            return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageMediaAuto.builder()
-                            .message(txt)
-                            .entities(ent)))
-                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                            .then(Mono.fromSupplier(builder::build)));
-        } else if (message instanceof InlineMessageMediaVenueSpec) {
-            InlineMessageMediaVenueSpec m = (InlineMessageMediaVenueSpec) message;
-
-            return Mono.just(InputBotInlineMessageMediaVenue.builder()
-                            .geoPoint(BaseInputGeoPoint.builder()
-                                    .lat(m.media().latitude())
-                                    .longitude(m.media().longitude())
-                                    .accuracyRadius(m.media().accuracyRadius().orElse(null))
-                                    .build())
-                            .title(m.media().title())
-                            .provider(m.media().provider())
-                            .venueType(m.media().venueType())
-                            .venueId(m.media().venueId())
-                            .address(m.media().address()))
-                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                            .then(Mono.fromSupplier(builder::build)));
-        } else {
-            throw new IllegalStateException();
+                return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageText.builder()
+                                .message(txt)
+                                .entities(ent)
+                                .noWebpage(m.noWebpage())))
+                        .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                .then(Mono.fromSupplier(builder::build)));
+            case GAME:
+                return Mono.just(ImmutableInputBotInlineMessageGame.of())
+                        .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
+                                .defaultIfEmpty(r));
+            case VENUE:
+                var venue = m.venue().orElseThrow();
+                return Mono.just(InputBotInlineMessageMediaVenue.builder()
+                                .geoPoint(BaseInputGeoPoint.builder()
+                                        .lat(venue.latitude())
+                                        .longitude(venue.longitude())
+                                        .accuracyRadius(venue.accuracyRadius().orElse(null))
+                                        .build())
+                                .title(venue.title())
+                                .provider(venue.provider())
+                                .venueType(venue.venueType())
+                                .venueId(venue.venueId())
+                                .address(venue.address()))
+                        .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                .then(Mono.fromSupplier(builder::build)));
+            default: throw new IllegalStateException();
         }
-    }
-
-    @Nullable
-    private static String getFilenameFromUrl(String url) {
-        int begin = url.lastIndexOf('/') + 1;
-        url = url.substring(begin);
-
-        int end = Math.min(url.indexOf('?'), url.indexOf('#'));
-        if (end == -1) {
-            end = url.length();
-        }
-
-        String res = url.substring(0, end);
-        return res.isEmpty() ? null : res;
     }
 }

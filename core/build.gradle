@@ -2,10 +2,6 @@ dependencies {
     api project(":mtproto")
 
     api "io.projectreactor.netty:reactor-netty-http"
-
-    compileOnly "com.telegram4j:tl-parser-encoding:$tl_parser_version"
-    compileOnly "org.immutables:value:$immutables_version"
-    annotationProcessor "org.immutables:value:$immutables_version"
 }
 
 sourcesJar {

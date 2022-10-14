@@ -101,13 +101,6 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
         return Optional.ofNullable(userId);
     }
 
-    public InlineButtonSpec withType(KeyboardButton.Type value) {
-        Objects.requireNonNull(value);
-        if (type == value) return this;
-        return new InlineButtonSpec(value, text, data, query, url, forwardText,
-                requestWriteAccess, requiresPassword, samePeer, userId);
-    }
-
     public InlineButtonSpec withText(String value) {
         Objects.requireNonNull(value);
         if (text.equals(value)) return this;

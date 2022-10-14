@@ -92,7 +92,7 @@ public final class SendMessageSpec {
         return Optional.ofNullable(media);
     }
 
-    private SendMessageSpec withFlags(Set<Flag> value) {
+    private SendMessageSpec withFlags(Iterable<Flag> value) {
         Objects.requireNonNull(value);
         if (flags.equals(value)) return this;
         var newValue = ImmutableEnumSet.of(Flag.class, value);

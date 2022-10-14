@@ -9,7 +9,6 @@ ext {
     reactor_bom_version = '2020.0.22'
     jackson_version = '2.13.4'
     caffeine_version = '3.1.1'
-    immutables_version = '2.9.2'
     jsr305_version = '3.0.2'
 
     tl_parser_version = '0.1.2-SNAPSHOT'

@@ -4,14 +4,14 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.spec.PinMessageFlags;
 import telegram4j.core.util.BitFlag;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserSupport;
@@ -107,7 +107,7 @@ public final class Message implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link User user}.
      */
     public Mono<PeerEntity> getAuthor() {
-        return getAuthor(RetrievalUtil.IDENTITY);
+        return getAuthor(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -216,7 +216,7 @@ public final class Message implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link User bot}.
      */
     public Mono<User> getViaBot() {
-        return getViaBot(RetrievalUtil.IDENTITY);
+        return getViaBot(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -259,7 +259,7 @@ public final class Message implements TelegramObject {
     public Optional<ReplyMarkup> getReplyMarkup() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::replyMarkup)
-                .map(d -> EntityFactory.createReplyMarkup(client, d));
+                .map(d -> new ReplyMarkup(client, d));
     }
 
     /**
@@ -438,9 +438,7 @@ public final class Message implements TelegramObject {
                 .updatePinnedMessage(UpdatePinnedMessage.builder()
                         .peer(client.asResolvedInputPeer(resolvedChatId))
                         .id(getId())
-                        .flags(flags.stream()
-                                .map(PinMessageFlags::mask)
-                                .reduce(0, (l, r) -> l | r))
+                        .flags(MappingUtil.getMaskValue(flags))
                         .build()));
     }
 

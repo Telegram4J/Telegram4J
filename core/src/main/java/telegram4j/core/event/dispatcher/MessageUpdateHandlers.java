@@ -7,15 +7,16 @@ import telegram4j.core.event.domain.message.DeleteMessagesEvent;
 import telegram4j.core.event.domain.message.EditMessageEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.event.domain.message.UpdatePinnedMessagesEvent;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -55,8 +56,9 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        Chat chat = context.getChatEntity(message.peerId()).orElse(null);
+        Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
         PeerEntity author = Optional.ofNullable(message.fromId())
+                .map(Id::of)
                 .flatMap(context::getPeerEntity)
                 // fromId is often not set if the message was sent to the DM, so we will have to process it for convenience
                 .or(() -> Optional.ofNullable(chat)
@@ -81,8 +83,9 @@ class MessageUpdateHandlers {
             return Flux.empty();
         }
 
-        Chat chat = context.getChatEntity(message.peerId()).orElse(null);
+        Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
         PeerEntity author = Optional.ofNullable(message.fromId())
+                .map(Id::of)
                 .flatMap(context::getPeerEntity)
                 .or(() -> Optional.ofNullable(chat)
                         .filter(c -> c.getType() == Chat.Type.PRIVATE)
@@ -100,19 +103,22 @@ class MessageUpdateHandlers {
     }
 
     static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
-        return Mono.justOrEmpty(context.getOld())
-                .flatMapMany(re -> {
-                    Id chatId = Id.of(re.getPeer(), context.getClient().getSelfId());
+        var chatId = Optional.ofNullable(context.getOld())
+                .map(r -> Id.of(r.getPeer(), context.getClient().getSelfId()))
+                .orElse(null);
 
-                    var oldMessages = re.getMessages().stream()
-                            .map(d -> EntityFactory.createMessage(context.getClient(), d, chatId))
-                            .collect(Collectors.toUnmodifiableList());
+        var oldMessages = Optional.ofNullable(context.getOld())
+                .map(ResolvedDeletedMessages::getMessages)
+                .map(l -> l.stream()
+                        .map(d -> EntityFactory.createMessage(context.getClient(), d,
+                                Objects.requireNonNull(chatId)))
+                        .collect(Collectors.toUnmodifiableList()))
+                .orElse(null);
 
-                    boolean scheduled = context.getUpdate().identifier() == UpdateDeleteScheduledMessages.ID;
+        boolean scheduled = context.getUpdate().identifier() == UpdateDeleteScheduledMessages.ID;
 
-                    return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
-                            scheduled, oldMessages, context.getUpdate().messages()));
-                });
+        return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
+                scheduled, oldMessages, context.getUpdate().messages()));
     }
 
     static Flux<UpdatePinnedMessagesEvent> handleUpdatePinnedMessages(StatefulUpdateContext<UpdatePinnedMessagesFields, Void> context) {

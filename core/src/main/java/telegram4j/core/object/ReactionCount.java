@@ -1,7 +1,7 @@
 package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.util.EntityFactory;
+import telegram4j.core.internal.EntityFactory;
 
 import java.util.Objects;
 import java.util.Optional;

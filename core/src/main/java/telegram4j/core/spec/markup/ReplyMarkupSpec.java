@@ -4,37 +4,32 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.markup.ReplyMarkup;
+import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public final class ReplyMarkupSpec {
     private final ReplyMarkup.Type type;
+    private final ImmutableEnumSet<ReplyMarkup.Flag> flags;
     @Nullable
     private final List<List<KeyboardButtonSpec>> rows;
-    @Nullable
-    private final Boolean singleUse;
-    @Nullable
-    private final Boolean selective;
-    @Nullable
-    private final Boolean resize;
     @Nullable
     private final String placeholder;
 
     private ReplyMarkupSpec(ReplyMarkup.Type type, @Nullable List<List<KeyboardButtonSpec>> rows,
-                            @Nullable Boolean singleUse, @Nullable Boolean selective, @Nullable Boolean resize,
-                            @Nullable String placeholder) {
+                            ImmutableEnumSet<ReplyMarkup.Flag> flags, @Nullable String placeholder) {
         this.type = type;
         this.rows = rows;
-        this.singleUse = singleUse;
-        this.selective = selective;
-        this.resize = resize;
+        this.flags = flags;
         this.placeholder = placeholder;
     }
 
@@ -46,16 +41,8 @@ public final class ReplyMarkupSpec {
         return Optional.ofNullable(rows);
     }
 
-    public Optional<Boolean> singleUse() {
-        return Optional.ofNullable(singleUse);
-    }
-
-    public Optional<Boolean> selective() {
-        return Optional.ofNullable(selective);
-    }
-
-    public Optional<Boolean> resize() {
-        return Optional.ofNullable(resize);
+    public ImmutableEnumSet<ReplyMarkup.Flag> flags() {
+        return flags;
     }
 
     public Optional<String> placeholder() {
@@ -68,43 +55,31 @@ public final class ReplyMarkupSpec {
                 .map(TlEncodingUtil::<KeyboardButtonSpec>copyList)
                 .collect(Collectors.toUnmodifiableList());
         if (rows == newRows) return this;
-        return new ReplyMarkupSpec(type, newRows, singleUse, selective, resize, placeholder);
+        return new ReplyMarkupSpec(type, newRows, flags, placeholder);
     }
 
     public ReplyMarkupSpec withPlaceholder(@Nullable String value) {
         if (Objects.equals(placeholder, value)) return this;
-        return new ReplyMarkupSpec(type, rows, singleUse, selective, resize, value);
+        return new ReplyMarkupSpec(type, rows, flags, value);
     }
 
     public ReplyMarkupSpec withPlaceholder(Optional<String> opt) {
         return withPlaceholder(opt.orElse(null));
     }
 
-    public ReplyMarkupSpec withResize(@Nullable Boolean value) {
-        if (Objects.equals(resize, value)) return this;
-        return new ReplyMarkupSpec(type, rows, singleUse, selective, value, placeholder);
+    public ReplyMarkupSpec withFlags(ReplyMarkup.Flag... values) {
+        Objects.requireNonNull(values);
+        var flagsCopy = ImmutableEnumSet.of(values);
+        if (flags.getValue() == flagsCopy.getValue()) return this;
+        return new ReplyMarkupSpec(type, rows, flagsCopy, placeholder);
     }
 
-    public ReplyMarkupSpec withResize(Optional<Boolean> opt) {
-        return withResize(opt.orElse(null));
-    }
-
-    public ReplyMarkupSpec withSelective(@Nullable Boolean value) {
-        if (Objects.equals(selective, value)) return this;
-        return new ReplyMarkupSpec(type, rows, singleUse, value, resize, placeholder);
-    }
-
-    public ReplyMarkupSpec withSelective(Optional<Boolean> opt) {
-        return withSelective(opt.orElse(null));
-    }
-
-    public ReplyMarkupSpec withSingleUse(@Nullable Boolean value) {
-        if (Objects.equals(singleUse, value)) return this;
-        return new ReplyMarkupSpec(type, rows, value, selective, resize, placeholder);
-    }
-
-    public ReplyMarkupSpec withSingleUse(Optional<Boolean> opt) {
-        return withSingleUse(opt.orElse(null));
+    public ReplyMarkupSpec withFlags(Iterable<ReplyMarkup.Flag> values) {
+        Objects.requireNonNull(values);
+        if (flags == values) return this;
+        var flagsCopy = ImmutableEnumSet.of(ReplyMarkup.Flag.class, values);
+        if (flags.getValue() == flagsCopy.getValue()) return this;
+        return new ReplyMarkupSpec(type, rows, flagsCopy, placeholder);
     }
 
     public Mono<telegram4j.tl.ReplyMarkup> asData(MTProtoTelegramClient client) {
@@ -115,31 +90,28 @@ public final class ReplyMarkupSpec {
                             .flatMap(list -> Flux.fromIterable(list)
                                     .flatMap(s -> s.asData(client))
                                     .collectList()
-                                    .map(l -> KeyboardButtonRow.builder().buttons(l).build()))
+                                    .map(ImmutableKeyboardButtonRow::of))
                             .collectList()
                             .map(rows -> ReplyKeyboardMarkup.builder()
-                                    .selective(selective().orElse(false))
-                                    .singleUse(singleUse().orElse(false))
-                                    .resize(resize().orElse(false))
-                                    .placeholder(placeholder().orElse(null))
+                                    .flags(flags.getValue())
+                                    .placeholder(placeholder)
                                     .rows(rows)
                                     .build());
                 case HIDE:
-                    return Mono.just(ReplyKeyboardHide.builder().selective(selective().orElseThrow()).build());
-                case FORCE:
+                    return Mono.just(ImmutableReplyKeyboardHide.of(flags.getValue()));
+                case FORCE_REPLY:
                     return Mono.just(ReplyKeyboardForceReply.builder()
-                            .selective(selective().orElseThrow())
-                            .singleUse(singleUse().orElseThrow())
-                            .placeholder(placeholder().orElse(null))
+                            .flags(flags.getValue())
+                            .placeholder(placeholder)
                             .build());
                 case INLINE:
                     return Flux.fromIterable(rows().orElseThrow())
                             .flatMap(list -> Flux.fromIterable(list)
                                     .flatMap(s -> s.asData(client))
                                     .collectList()
-                                    .map(l -> KeyboardButtonRow.builder().buttons(l).build()))
+                                    .map(ImmutableKeyboardButtonRow::of))
                             .collectList()
-                            .map(rows -> ReplyInlineMarkup.builder().rows(rows).build());
+                            .map(ImmutableReplyInlineMarkup::of);
                 default:
                     return Mono.error(new IllegalStateException());
             }
@@ -153,9 +125,7 @@ public final class ReplyMarkupSpec {
         ReplyMarkupSpec that = (ReplyMarkupSpec) o;
         return type.equals(that.type)
                 && Objects.equals(rows, that.rows)
-                && Objects.equals(singleUse, that.singleUse)
-                && Objects.equals(selective, that.selective)
-                && Objects.equals(resize, that.resize)
+                && flags.equals(that.flags)
                 && Objects.equals(placeholder, that.placeholder);
     }
 
@@ -164,9 +134,7 @@ public final class ReplyMarkupSpec {
         int h = 5381;
         h += (h << 5) + type.hashCode();
         h += (h << 5) + Objects.hashCode(rows);
-        h += (h << 5) + Objects.hashCode(singleUse);
-        h += (h << 5) + Objects.hashCode(selective);
-        h += (h << 5) + Objects.hashCode(resize);
+        h += (h << 5) + flags.hashCode();
         h += (h << 5) + Objects.hashCode(placeholder);
         return h;
     }
@@ -175,10 +143,8 @@ public final class ReplyMarkupSpec {
     public String toString() {
         return "ReplyMarkupSpec{" +
                 "type=" + type +
+                ", flags=" + flags +
                 ", rows=" + rows +
-                ", singleUse=" + singleUse +
-                ", selective=" + selective +
-                ", resize=" + resize +
                 ", placeholder='" + placeholder + '\'' +
                 '}';
     }
@@ -187,23 +153,50 @@ public final class ReplyMarkupSpec {
         var rowsCopy = StreamSupport.stream(rows.spliterator(), false)
                 .map(TlEncodingUtil::<KeyboardButtonSpec>copyList)
                 .collect(Collectors.toUnmodifiableList());
-        return new ReplyMarkupSpec(ReplyMarkup.Type.INLINE, rowsCopy, null, null, null, null);
+        return new ReplyMarkupSpec(ReplyMarkup.Type.INLINE, rowsCopy, ImmutableEnumSet.of(ReplyMarkup.Flag.class, 0), null);
     }
 
-    public static ReplyMarkupSpec forceReplyKeyboard(boolean singleUse, boolean selective) {
-        return new ReplyMarkupSpec(ReplyMarkup.Type.FORCE, null, singleUse, selective, null, null);
+    public static ReplyMarkupSpec forceReplyKeyboard(Iterable<ReplyMarkup.Flag> flags) {
+        var flagsCopy = ImmutableEnumSet.of(ReplyMarkup.Flag.class, flags);
+        Preconditions.requireArgument(!flagsCopy.contains(ReplyMarkup.Flag.RESIZE), "Reply keyboards can't have resize option");
+        return new ReplyMarkupSpec(ReplyMarkup.Type.FORCE_REPLY, null, flagsCopy, null);
+    }
+
+    public static ReplyMarkupSpec forceReplyKeyboard(ReplyMarkup.Flag... flags) {
+        var flagsCopy = ImmutableEnumSet.of(flags);
+        Preconditions.requireArgument(!flagsCopy.contains(ReplyMarkup.Flag.RESIZE), "Reply keyboards can't have resize option");
+        return new ReplyMarkupSpec(ReplyMarkup.Type.FORCE_REPLY, null, flagsCopy, null);
+    }
+
+    public static ReplyMarkupSpec hideKeyboard() {
+        return hideKeyboard(false);
     }
 
     public static ReplyMarkupSpec hideKeyboard(boolean selective) {
-        return new ReplyMarkupSpec(ReplyMarkup.Type.HIDE, null, null, selective, null, null);
+        var flags = ImmutableEnumSet.of(ReplyMarkup.Flag.class,
+                selective ? ReplyKeyboardMarkup.SELECTIVE_MASK : 0);
+        return new ReplyMarkupSpec(ReplyMarkup.Type.HIDE, null, flags, null);
     }
 
-    public static ReplyMarkupSpec keyboard(boolean resize, boolean singleUse, boolean selective,
-                                           @Nullable String placeholder, Iterable<? extends Iterable<ReplyButtonSpec>> rows) {
+    public static ReplyMarkupSpec keyboard(Iterable<? extends Iterable<ReplyButtonSpec>> rows) {
+        return keyboard(null, rows, Set.of());
+    }
+
+    public static ReplyMarkupSpec keyboard(@Nullable String placeholder, Iterable<? extends Iterable<ReplyButtonSpec>> rows,
+                                           Iterable<ReplyMarkup.Flag> flags) {
+        var flagsCopy = ImmutableEnumSet.of(ReplyMarkup.Flag.class, flags);
         var rowsCopy = StreamSupport.stream(rows.spliterator(), false)
                 .map(TlEncodingUtil::<KeyboardButtonSpec>copyList)
                 .collect(Collectors.toUnmodifiableList());
-        return new ReplyMarkupSpec(ReplyMarkup.Type.KEYBOARD, rowsCopy,
-                singleUse, selective, resize, placeholder);
+        return new ReplyMarkupSpec(ReplyMarkup.Type.KEYBOARD, rowsCopy, flagsCopy, placeholder);
+    }
+
+    public static ReplyMarkupSpec keyboard(@Nullable String placeholder, Iterable<? extends Iterable<ReplyButtonSpec>> rows,
+                                           ReplyMarkup.Flag... flags) {
+        var flagsCopy = ImmutableEnumSet.of(flags);
+        var rowsCopy = StreamSupport.stream(rows.spliterator(), false)
+                .map(TlEncodingUtil::<KeyboardButtonSpec>copyList)
+                .collect(Collectors.toUnmodifiableList());
+        return new ReplyMarkupSpec(ReplyMarkup.Type.KEYBOARD, rowsCopy, flagsCopy, placeholder);
     }
 }

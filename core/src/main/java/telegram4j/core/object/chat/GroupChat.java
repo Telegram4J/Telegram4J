@@ -4,6 +4,8 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
@@ -14,7 +16,6 @@ import telegram4j.core.object.Reaction;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -94,6 +95,7 @@ public final class GroupChat extends BaseChat {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(BaseChatFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        // since the data may be outdated, we can't use InputMessagePinned
                         .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
     }
 
@@ -196,13 +198,44 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets list of {@link ChatParticipant participants} in this chat, if present.
-     * Can contain only participant info about <i>current</i> user if it's joined.
+     * Gets version of participant's list, if present and {@link Flag#CAN_VIEW_PARTICIPANTS} flag is present.
+     *
+     * @return The version of participant's list, if present and {@link Flag#CAN_VIEW_PARTICIPANTS} flag is present.
+     */
+    public Optional<Integer> getParticipantsVersion() {
+        return Optional.ofNullable(fullData)
+                .map(c -> c.participants().identifier() == BaseChatParticipants.ID
+                        ? ((BaseChatParticipants) c.participants()).version()
+                        : null);
+    }
+
+    /**
+     * Gets list of {@link ChatParticipant participants} in this chat,
+     * if present and full information about chat is available.
+     * <p>
+     * Can contain only participant info about <i>current</i> user, to determinate this situation
+     * check {@link Flag#CAN_VIEW_PARTICIPANTS} is not present in {@link #getFlags() flags}.
      *
      * @return The list of {@link ChatParticipant participants} in this chat, if present.
      */
     public Optional<List<ChatParticipant>> getParticipants() {
         return Optional.ofNullable(chatParticipants);
+    }
+
+    /**
+     * Gets chat participant by specified user id, if present and full information about chat is available.
+     * <p>
+     * Can contain only participant info about <i>current</i> user, to determinate this situation
+     * check {@link Flag#CAN_VIEW_PARTICIPANTS} is not present in {@link #getFlags() flags}.
+     *
+     * @return The list of {@link ChatParticipant participants} in this chat, if present.
+     */
+    public Optional<ChatParticipant> getParticipant(Id userId) {
+        Preconditions.requireArgument(userId.getType() == Id.Type.USER, () -> "userId must be of the USER type, but has: " + userId);
+        return Optional.ofNullable(chatParticipants)
+                .flatMap(l -> l.stream()
+                        .filter(c -> c.getId().equals(userId))
+                        .findFirst());
     }
 
     /**
@@ -215,9 +248,9 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets list of {@link BotInfo bots} of chat, if present.
+     * Gets mutable list of {@link BotInfo bots} of chat, if present.
      *
-     * @return The list of {@link BotInfo bots} of chat, if present.
+     * @return The mutable list of {@link BotInfo bots} of chat, if present.
      */
     public Optional<List<BotInfo>> getBotInfo() {
         return Optional.ofNullable(fullData)
@@ -258,10 +291,10 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets list of user ids, who requested to join recently, if present.
+     * Gets mutable list of user ids, who requested to join recently, if present.
      *
      * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
-     * @return The list of user ids, who requested to join recently, if present.
+     * @return The mutable list of user ids, who requested to join recently, if present.
      */
     public Optional<List<Id>> getRecentRequesters() {
         return Optional.ofNullable(fullData)
@@ -301,6 +334,8 @@ public final class GroupChat extends BaseChat {
 
     /**
      * Request to leave group chat.
+     * Invoking this method is equivalent of following code:
+     * {@code chat.deleteChatParticipant(client.getSelfId(), revokeHistory)}
      *
      * @see #deleteChatParticipant(Id, boolean)
      * @param revokeHistory The remove the entire chat history of self in this chat.
@@ -401,7 +436,12 @@ public final class GroupChat extends BaseChat {
         CAN_SET_USERNAME(CAN_SET_USERNAME_POS),
 
         /** Whether <a href="https://core.telegram.org/api/scheduled-messages">scheduled messages</a> are available. */
-        HAS_SCHEDULED(HAS_SCHEDULED_POS);
+        HAS_SCHEDULED(HAS_SCHEDULED_POS),
+
+        // non-existent in chat object flags
+
+        /** Whether current user can view list or participants. */
+        CAN_VIEW_PARTICIPANTS((byte) 31);
 
         private final byte position;
 
@@ -426,7 +466,11 @@ public final class GroupChat extends BaseChat {
             if (fullData != null) {
                 var set = EnumSet.allOf(Flag.class);
                 int flags = fullData.flags();
-                set.removeIf(value -> value.ordinal() < CAN_SET_USERNAME.ordinal() || (flags & value.mask()) == 0);
+                set.removeIf(value -> value.compareTo(CAN_SET_USERNAME) < 0 || (flags & value.mask()) == 0 ||
+                        value.compareTo(HAS_SCHEDULED) > 0);
+                if (fullData.participants().identifier() == BaseChatParticipants.ID) {
+                    set.add(Flag.CAN_VIEW_PARTICIPANTS);
+                }
                 set.addAll(minFlags);
                 return set;
             }
@@ -443,7 +487,7 @@ public final class GroupChat extends BaseChat {
         public static EnumSet<Flag> of(telegram4j.tl.BaseChat data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            set.removeIf(value -> value.ordinal() >= CAN_SET_USERNAME.ordinal() || (flags & value.mask()) == 0);
+            set.removeIf(value -> value.compareTo(CAN_SET_USERNAME) >= 0 || (flags & value.mask()) == 0);
             return set;
         }
     }

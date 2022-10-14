@@ -1,21 +1,25 @@
 package telegram4j.core.event.domain.message;
 
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Message;
 import telegram4j.core.util.Id;
 
 import java.util.List;
+import java.util.Optional;
 
 /** Event of single or batch delete of ordinal or scheduled messages. */
 public class DeleteMessagesEvent extends MessageEvent {
 
+    @Nullable
     private final Id chatId;
     private final boolean scheduled;
+    @Nullable
     private final List<Message> deletedMessages;
     private final List<Integer> deleteMessagesIds;
 
-    public DeleteMessagesEvent(MTProtoTelegramClient client, Id chatId, boolean scheduled,
-                               List<Message> deletedMessages, List<Integer> deleteMessagesIds) {
+    public DeleteMessagesEvent(MTProtoTelegramClient client, @Nullable Id chatId, boolean scheduled,
+                               @Nullable List<Message> deletedMessages, List<Integer> deleteMessagesIds) {
         super(client);
         this.chatId = chatId;
         this.scheduled = scheduled;
@@ -24,12 +28,12 @@ public class DeleteMessagesEvent extends MessageEvent {
     }
 
     /**
-     * Gets id of the chat/channel where messages was deleted.
+     * Gets id of the chat/channel where messages was deleted, if present.
      *
-     * @return The id of the chat/channel where messages was deleted.
+     * @return The id of the chat/channel where messages was deleted, if present.
      */
-    public Id getChatId() {
-        return chatId;
+    public Optional<Id> getChatId() {
+        return Optional.ofNullable(chatId);
     }
 
     /**
@@ -42,12 +46,12 @@ public class DeleteMessagesEvent extends MessageEvent {
     }
 
     /**
-     * Gets {@link List} with found deleted {@link Message messages}.
+     * Gets {@link List} with found deleted {@link Message messages}, if present.
      *
-     * @return The list with found deleted messages.
+     * @return The list with found deleted messages, if present.
      */
-    public List<Message> getDeletedMessages() {
-        return deletedMessages;
+    public Optional<List<Message>> getDeletedMessages() {
+        return Optional.ofNullable(deletedMessages);
     }
 
     /**

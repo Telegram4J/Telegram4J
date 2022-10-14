@@ -3,7 +3,7 @@ package telegram4j.core.object;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.SupergroupChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
@@ -89,7 +89,7 @@ public class MessageReplies implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link SupergroupChat discussion channel}.
      */
     public Mono<SupergroupChat> getDiscussionChannel() {
-        return getDiscussionChannel(RetrievalUtil.IDENTITY);
+        return getDiscussionChannel(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**

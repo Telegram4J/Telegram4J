@@ -5,7 +5,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
@@ -60,7 +60,7 @@ public class MessageForwardHeader implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link PeerEntity peer}.
      */
     public Mono<PeerEntity> getFrom() {
-        return getFrom(RetrievalUtil.IDENTITY);
+        return getFrom(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -109,7 +109,7 @@ public class MessageForwardHeader implements TelegramObject {
      * {@link AuxiliaryMessages} message container, otherwise empty signals.
      */
     public Mono<AuxiliaryMessages> getOriginalMessage() {
-        return getOriginalMessage(RetrievalUtil.IDENTITY);
+        return getOriginalMessage(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -161,7 +161,7 @@ public class MessageForwardHeader implements TelegramObject {
      * {@link AuxiliaryMessages} message container, otherwise empty signals.
      */
     public Mono<AuxiliaryMessages> getSavedFrom() {
-        return getSavedFrom(RetrievalUtil.IDENTITY);
+        return getSavedFrom(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**

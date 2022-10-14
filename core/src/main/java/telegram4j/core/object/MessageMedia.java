@@ -2,9 +2,9 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.object.media.PollResults;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;

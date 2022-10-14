@@ -1,6 +1,5 @@
 package telegram4j.core.spec.media;
 
-import org.immutables.value.Value;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.FileReferenceId;
@@ -14,15 +13,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-@Value.Immutable
 interface InputMediaUploadedDocumentSpecDef extends InputMediaSpec {
 
-    @Value.Default
     default boolean noSoundVideo() {
         return false;
     }
 
-    @Value.Default
     default boolean forceFile() {
         return false;
     }

@@ -2,10 +2,10 @@ package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.Video;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;

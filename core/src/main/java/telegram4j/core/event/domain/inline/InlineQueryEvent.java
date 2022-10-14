@@ -4,10 +4,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.User;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.spec.AnswerInlineCallbackQuerySpec;
-import telegram4j.core.util.EntityFactory;
 import telegram4j.tl.InlineQueryPeerType;
 import telegram4j.tl.request.messages.SetInlineBotResults;
 
@@ -94,8 +94,7 @@ public class InlineQueryEvent extends BotEvent {
                 .flatMap(list -> client.getServiceHolder().getChatService()
                         .setInlineBotResults(SetInlineBotResults.builder()
                                 .queryId(getQueryId())
-                                .gallery(spec.gallery())
-                                .isPrivate(spec.privacy())
+                                .flags(spec.flags().getValue())
                                 .results(list)
                                 .nextOffset(spec.nextOffset().orElse(null))
                                 .switchPm(spec.switchPm().orElse(null))

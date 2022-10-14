@@ -7,6 +7,7 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatInviteExported;
 import telegram4j.tl.UpdateChannelParticipant;
@@ -32,17 +33,19 @@ class ChannelUpdateHandlers {
     static Flux<ChatParticipantUpdateEvent> handleUpdateChannelParticipant(StatefulUpdateContext<UpdateChannelParticipant, Void> context) {
         UpdateChannelParticipant upd = context.getUpdate();
 
-        if (!context.getChats().containsKey(upd.channelId())) {
+        Id channelId = Id.ofChannel(upd.channelId(), null);
+        if (!context.getChats().containsKey(channelId)) {
             return Flux.empty();
         }
 
-        Channel channel = (Channel) Objects.requireNonNull(context.getChats().get(upd.channelId()));
+        Channel channel = (Channel) Objects.requireNonNull(context.getChats().get(channelId));
         // I can't be sure that ChatParticipant have user information attached because that field named as userId :/
-        User peer = Objects.requireNonNull(context.getUsers().get(upd.userId()));
-        User actor = Objects.requireNonNull(context.getUsers().get(upd.actorId()));
+        User peer = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId(), null)));
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                .map(d -> new ExportedChatInvite(context.getClient(), d, context.getUsers().get(d.adminId())))
+                .map(d -> new ExportedChatInvite(context.getClient(), d, context.getUsers()
+                        .get(Id.ofUser(d.adminId(), null))))
                 .orElse(null);
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())

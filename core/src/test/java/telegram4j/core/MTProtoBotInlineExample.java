@@ -8,12 +8,17 @@ import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageMedia;
 import telegram4j.core.spec.AnswerInlineCallbackQuerySpec;
-import telegram4j.core.spec.inline.*;
+import telegram4j.core.spec.inline.InlineMessageSpec;
+import telegram4j.core.spec.inline.InlineResultArticleSpec;
+import telegram4j.core.spec.inline.InlineResultDocumentSpec;
+import telegram4j.core.spec.markup.InlineButtonSpec;
+import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.function.Function;
 
 public class MTProtoBotInlineExample {
@@ -63,38 +68,37 @@ public class MTProtoBotInlineExample {
                                 .id("1")
                                 .title("Telegram wikipedia page.")
                                 .url("https://en.wikipedia.org/wiki/Telegram_(software)")
-                                .message(InlineMessageTextSpec.builder()
-                                        .message("[Telegram wikipedia page.](https://en.wikipedia.org/wiki/Telegram_\\(software\\))")
-                                        .parser(EntityParserFactory.MARKDOWN_V2)
-                                        .build())
+                                .message(InlineMessageSpec.text("[Telegram wikipedia page.](https://en.wikipedia.org/wiki/Telegram_\\(software\\))")
+                                        .withParser(EntityParserFactory.MARKDOWN_V2))
                                 .build())
                         .build());
             case "gif":
                 return e.answer(AnswerInlineCallbackQuerySpec.builder()
                         .cacheTime(CACHE_TIME)
                         .addResult(InlineResultDocumentSpec.builder()
-                                .id("2")
+                                .id("4")
                                 .type(FileReferenceId.DocumentType.GIF)
                                 .title("Niko caramelldansen!")
                                 .file("https://media.tenor.com/VqUFZ4uNMCoAAAAC/niko-dance-one-shot-dancing.gif")
-                                .size(SizeSpec.of(498, 373))
+                                .size(498, 373)
                                 .mimeType("image/gif")
                                 .duration(Duration.ofMillis(800))
-                                .message(InlineMessageMediaAutoSpec.builder()
-                                        .message("<i>Cute gif animation, isn't it?</i>")
-                                        .parser(EntityParserFactory.HTML)
-                                        .build())
+                                .message(InlineMessageSpec.mediaAuto("<i>Cute gif animation, isn't it?</i>")
+                                        .withParser(EntityParserFactory.HTML)
+                                        .withReplyMarkup(ReplyMarkupSpec.inlineKeyboard(List.of(List.of(
+                                                InlineButtonSpec.url("yes!", "https://www.youtube.com/watch?v=zvq9r6R6QAY"),
+                                                InlineButtonSpec.url("no!", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"))))))
                                 .build())
                         .build());
             case "photo":
                 return e.answer(AnswerInlineCallbackQuerySpec.builder()
                         .cacheTime(CACHE_TIME)
                         .addResult(InlineResultDocumentSpec.builder()
-                                .id("3")
+                                .id("5")
                                 .type(FileReferenceId.DocumentType.PHOTO)
-                                .size(SizeSpec.of(256))
+                                .size(256)
                                 .file("https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon256%402x.png")
-                                .message(InlineMessageMediaAutoSpec.of("Icon of TDesktop"))
+                                .message(InlineMessageSpec.mediaAuto("Icon of TDesktop"))
                                 .build())
                         .build());
             case "lastphoto":
@@ -107,10 +111,8 @@ public class MTProtoBotInlineExample {
                         .addResult(InlineResultDocumentSpec.builder()
                                 .id("4")
                                 .file(photoId)
-                                .message(InlineMessageMediaAutoSpec.builder()
-                                        .message("_Hmm... It's a last photo which I saw_")
-                                        .parser(EntityParserFactory.MARKDOWN_V2)
-                                        .build())
+                                .message(InlineMessageSpec.mediaAuto("_Hmm... It's a last photo which I saw_")
+                                        .withParser(EntityParserFactory.MARKDOWN_V2))
                                 .build())
                         .build());
             default: return Mono.empty();

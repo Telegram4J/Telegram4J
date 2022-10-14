@@ -3,7 +3,7 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ExportedChatInvite;
@@ -16,6 +16,7 @@ import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.*;
 
 import java.time.Instant;
@@ -253,7 +254,7 @@ public interface Channel extends Chat {
      * @return An {@link Mono} emitting on successful completion the {@link Channel channel}.
      */
     default Mono<Channel> getLinkedChannel() {
-        return getLinkedChannel(RetrievalUtil.IDENTITY);
+        return getLinkedChannel(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -333,6 +334,7 @@ public interface Channel extends Chat {
     /**
      * Requests to edit current channel photo.
      *
+     * @see FileReferenceId#asInputPhoto()
      * @param photo A new photo for channel, {@code null} value indicates removing.
      * @return A {@link Mono} emitting on successful completion nothing.
      */

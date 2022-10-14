@@ -5,11 +5,15 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
-import telegram4j.core.util.*;
+import telegram4j.core.util.BitFlag;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PaginationSupport;
+import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.photos.Photos;
@@ -256,7 +260,7 @@ public class User implements PeerEntity {
      * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
      */
     public Mono<AuxiliaryMessages> getPinnedMessage() {
-        return getPinnedMessage(RetrievalUtil.IDENTITY);
+        return getPinnedMessage(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**

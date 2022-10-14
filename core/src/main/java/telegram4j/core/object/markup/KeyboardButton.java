@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.RetrievalUtil;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -178,7 +178,7 @@ public final class KeyboardButton implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link User user}.
      */
     public Mono<User> getBot() {
-        return getBot(RetrievalUtil.IDENTITY);
+        return getBot(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -213,7 +213,7 @@ public final class KeyboardButton implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link User user}.
      */
     public Mono<User> getUser() {
-        return getUser(RetrievalUtil.IDENTITY);
+        return getUser(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**

@@ -5,6 +5,8 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ChatPhoto;
@@ -15,7 +17,9 @@ import telegram4j.core.object.Reaction;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.util.*;
+import telegram4j.core.util.Id;
+import telegram4j.core.util.PaginationSupport;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.BaseChannelParticipants;
@@ -302,9 +306,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
         return client.asInputUser(userId)
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editAdmin(channel, target, ImmutableChatAdminRights.of(rights.stream()
-                                .map(BitFlag::mask)
-                                .reduce(0, (l, r) -> l | r)), rank))
+                        .editAdmin(channel, target, ImmutableChatAdminRights.of(MappingUtil.getMaskValue(rights)), rank))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
     }
@@ -315,29 +317,31 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
         return client.asInputPeer(peerId)
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editBanned(channel, target, ImmutableChatBannedRights.of(rights.stream()
-                                        .map(BitFlag::mask)
-                                        .reduce(0, (l, r) -> l | r),
-                                        Math.toIntExact(untilTimestamp.getEpochSecond()))))
+                        .editBanned(channel, target, ImmutableChatBannedRights.of(MappingUtil.getMaskValue(rights),
+                                Math.toIntExact(untilTimestamp.getEpochSecond()))))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
     }
 
     @Override
     public Mono<Void> editPhoto(@Nullable BaseInputPhoto photo) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
         return Mono.justOrEmpty(photo)
                 .<InputChatPhoto>map(ImmutableBaseInputChatPhoto::of)
                 .defaultIfEmpty(InputChatPhotoEmpty.instance())
                 .flatMap(c -> client.getServiceHolder().getChatService()
-                        .editChatPhoto(minData.id(), c));
+                        .editPhoto(channel, c));
     }
 
     @Override
     public Mono<Void> editPhoto(@Nullable InputChatUploadedPhoto spec) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
         return Mono.<InputChatPhoto>justOrEmpty(spec)
                 .defaultIfEmpty(InputChatPhotoEmpty.instance())
                 .flatMap(c -> client.getServiceHolder().getChatService()
-                        .editChatPhoto(minData.id(), c));
+                        .editPhoto(channel, c));
     }
 
     @Override
@@ -362,8 +366,6 @@ abstract class BaseChannel extends BaseChat implements Channel {
                 .flatMap(participantPeer -> client.getServiceHolder()
                         .getChatService().getParticipant(toInputChannel(client.asResolvedInputPeer(getId())), participantPeer))
                 .map(d -> {
-                    // Since ChannelParticipantBanned/ChannelParticipantLeft have Peer typed id field,
-                    // then most likely there may be a chat/channel as the participant
                     Peer peerId = TlEntityUtil.getUserId(d.participant());
                     PeerEntity peerEntity;
                     switch (peerId.identifier()) {
@@ -398,30 +400,29 @@ abstract class BaseChannel extends BaseChat implements Channel {
                 .getParticipants(channel, filter, o, limit, 0)
                 .cast(BaseChannelParticipants.class), BaseChannelParticipants::count, offset, limit)
                 .flatMap(data -> {
-                    var chatsMap = data.chats().stream()
+                    var chats = data.chats().stream()
                             .map(c -> EntityFactory.createChat(client, c, null))
                             .filter(Objects::nonNull)
-                            .collect(Collectors.toMap(c -> c.getId().asLong(), Function.identity()));
-                    var usersMap = data.users().stream()
+                            .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+                    var users = data.users().stream()
                             .map(u -> EntityFactory.createUser(client, u))
                             .filter(Objects::nonNull)
-                            .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                            .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                     return Flux.fromIterable(data.participants())
                             .map(c -> {
-                                Peer peerId = TlEntityUtil.getUserId(c);
-                                long rawPeerId = TlEntityUtil.getRawPeerId(peerId);
+                                Id peerId = Id.of(TlEntityUtil.getUserId(c));
                                 PeerEntity peerEntity;
-                                switch (peerId.identifier()) {
-                                    case PeerChat.ID:
-                                    case PeerChannel.ID:
-                                        peerEntity = chatsMap.get(rawPeerId);
+                                switch (peerId.getType()) {
+                                    case USER:
+                                        peerEntity = users.get(peerId);
                                         break;
-                                    case PeerUser.ID:
-                                        peerEntity = usersMap.get(rawPeerId);
+                                    case CHAT:
+                                    case CHANNEL:
+                                        peerEntity = chats.get(peerId);
                                         break;
                                     default:
-                                        throw new IllegalArgumentException("Unknown Peer type: " + peerId);
+                                        throw new IllegalStateException();
                                 }
 
                                 return new ChatParticipant(client, peerEntity, c, id);
