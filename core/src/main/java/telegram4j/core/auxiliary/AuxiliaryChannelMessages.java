@@ -5,8 +5,10 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.util.Id;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
@@ -18,7 +20,7 @@ public final class AuxiliaryChannelMessages extends AuxiliaryMessages {
 
     public AuxiliaryChannelMessages(MTProtoTelegramClient client,
                                     boolean inexact, int pts, int count, @Nullable Integer offsetId,
-                                    List<Message> messages, List<Chat> chats, List<User> users) {
+                                    List<Message> messages, Map<Id, Chat> chats, Map<Id, User> users) {
         super(client, messages, chats, users);
         this.inexact = inexact;
         this.pts = pts;

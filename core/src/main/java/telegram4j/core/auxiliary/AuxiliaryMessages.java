@@ -5,18 +5,21 @@ import telegram4j.core.object.Message;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.util.Id;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /** Container with found {@link Message}s with auxiliary {@link Chat} and {@link User} objects. */
 public class AuxiliaryMessages {
     private final MTProtoTelegramClient client;
     private final List<Message> messages;
-    private final List<Chat> chats;
-    private final List<User> users;
+    private final Map<Id, Chat> chats;
+    private final Map<Id, User> users;
 
     public AuxiliaryMessages(MTProtoTelegramClient client, List<Message> messages,
-                             List<Chat> chats, List<User> users) {
+                             Map<Id, Chat> chats, Map<Id, User> users) {
         this.client = client;
         this.messages = messages;
         this.chats = chats;
@@ -37,22 +40,30 @@ public class AuxiliaryMessages {
     }
 
     /**
-     * Gets immutable list of {@link Chat}s mentioned in messages.
-     * This list doesn't contain {@link PrivateChat} objects.
+     * Gets immutable map of {@link Chat}s mentioned in messages.
+     * This map doesn't contain {@link PrivateChat} objects.
      *
-     * @return The {@link List} of {@link Chat} mentioned in messages.
+     * @return The immutable {@link Map} of {@link Chat} mentioned in messages.
      */
-    public List<Chat> getChats() {
+    public Map<Id, Chat> getChats() {
         return chats;
     }
 
+    public Optional<Chat> getChat(Id userId) {
+        return Optional.ofNullable(chats.get(userId));
+    }
+
     /**
-     * Gets immutable list of {@link User}s mentioned in messages.
+     * Gets immutable map of {@link User}s mentioned in messages.
      *
-     * @return The immutable {@link List} of {@link User} mentioned in messages.
+     * @return The immutable {@link Map} of {@link User} mentioned in messages.
      */
-    public List<User> getUsers() {
+    public Map<Id, User> getUsers() {
         return users;
+    }
+
+    public Optional<User> getUser(Id userId) {
+        return Optional.ofNullable(users.get(userId));
     }
 
     @Override
