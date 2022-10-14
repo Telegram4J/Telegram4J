@@ -2,7 +2,7 @@ dependencies {
     api "io.projectreactor.netty:reactor-netty-core"
     api "io.projectreactor.addons:reactor-extra"
 
-    api "com.telegram4j:tl-parser:$tl_parser_version"
+    api "com.telegram4j:tl-parser:$tlParserVersion"
     api "com.fasterxml.jackson.core:jackson-databind:$jackson_version"
     api "com.github.ben-manes.caffeine:caffeine:$caffeine_version"
 }

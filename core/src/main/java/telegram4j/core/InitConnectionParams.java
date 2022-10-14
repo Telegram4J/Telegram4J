@@ -98,8 +98,7 @@ public final class InitConnectionParams {
     /**
      * Gets the client OS ISO 639-1 language code.
      *
-     * <h3>Example to get ISO 639-1 lang codes.</h3>
-     *
+     * <p>Example to get ISO 639-1 lang codes.
      * <pre>
      * String langCode = Locale.getDefault().getLanguage().toLowerCase(Locale.ROOT).
      * </pre>
@@ -133,8 +132,7 @@ public final class InitConnectionParams {
     /**
      * Gets device's OS ISO 639-1 language code.
      *
-     * <h3>Example to get ISO 639-1 lang codes.</h3>
-     *
+     * <p>Example to get ISO 639-1 lang codes.
      * <pre>
      * String langCode = Locale.getDefault().getLanguage().toLowerCase(Locale.ROOT).
      * </pre>
@@ -159,8 +157,7 @@ public final class InitConnectionParams {
      * For now, only {@code tz_offset} field is supported,
      * for specifying timezone offset in seconds.
      *
-     * <h3>Example of getting time zone offset</h3>
-     *
+     * <p>Example of getting time zone offset
      * <pre>
      * JsonNode node = JsonNodeFactory.instance.objectNode()
      *         .put("tz_offset", java.util.TimeZone.getDefault()

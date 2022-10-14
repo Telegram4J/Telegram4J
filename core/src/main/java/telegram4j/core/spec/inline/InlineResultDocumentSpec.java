@@ -11,13 +11,15 @@ import java.util.Optional;
 
 /**
  * Spec for documents and photos inline results.
- * <p>
- * <h3>To create audio file inline result these fields must be present:</h1>
- * <li>{@link #type()} to {@link DocumentType#AUDIO} if it's web file</li>
- * <li>{@link #title()} - the title of audio file</li>
- * <li>{@link #performer()} - the performer of audio file</li>
- * <li>{@link #duration()} - the duration of audio file</li>
- * <li>{@link #thumb()} - the static thumbnail of audio file</li>
+ *
+ * <p>To create audio file inline result these fields must be present:
+ * <ol>
+ *   <li>{@link #type()} to {@link DocumentType#AUDIO} if it's web file</li>
+ *   <li>{@link #title()} - the title of audio file</li>
+ *   <li>{@link #performer()} - the performer of audio file</li>
+ *   <li>{@link #duration()} - the duration of audio file</li>
+ *   <li>{@link #thumb()} - the static thumbnail of audio file</li>
+ * </ol>
  */
 public final class InlineResultDocumentSpec implements InlineResultSpec {
 

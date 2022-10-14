@@ -6,7 +6,7 @@ import telegram4j.core.event.domain.Event;
 /**
  * Subtype of chat/channel related events.
  *
- * <h3>Chat Participant Events (Bot-Only)</h3>
+ * <p>Chat Participant Events (Bot-Only)
  * <ul>
  *     <li>{@link ChatParticipantAddEvent}: a new participant was joined to group chat.</li>
  *     <li>{@link ChatParticipantDeleteEvent}: a participant leaved group chat.</li>
