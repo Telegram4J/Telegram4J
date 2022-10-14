@@ -2,7 +2,6 @@ package telegram4j.core.spec.inline;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.internal.Preconditions;
-import telegram4j.core.spec.Spec;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.spec.media.InputMediaVenueSpec;
 import telegram4j.core.util.parser.EntityParserFactory;
@@ -10,7 +9,7 @@ import telegram4j.core.util.parser.EntityParserFactory;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class InlineMessageSpec implements Spec {
+public final class InlineMessageSpec {
     private final Type type;
     @Nullable
     private final InputMediaVenueSpec venue;

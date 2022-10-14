@@ -3,26 +3,25 @@ package telegram4j.core.spec.markup;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.markup.KeyboardButton;
-import telegram4j.core.spec.Spec;
 import telegram4j.tl.*;
 
-public interface KeyboardButtonSpec extends Spec {
+public interface KeyboardButtonSpec {
 
     static KeyboardButtonSpec from(KeyboardButton object) {
         switch (object.getType()) {
             // Inline buttons
             case URL_AUTH:
-                return InlineButtonSpec.urlAuth(object.getText(), object.isRequestWriteAccess().orElse(false),
+                return InlineButtonSpec.urlAuth(object.getText(), object.isRequestWriteAccess(),
                         object.getForwardText().orElse(null),
                         object.getUrl().orElseThrow(), object.getBotId().orElseThrow());
             case BUY: return InlineButtonSpec.buy(object.getText());
             case CALLBACK:
-                return InlineButtonSpec.callback(object.getText(), object.isRequiresPassword().orElse(false),
+                return InlineButtonSpec.callback(object.getText(), object.isRequiresPassword(),
                         object.getData().orElseThrow());
             case GAME: return InlineButtonSpec.game(object.getText());
             case SWITCH_INLINE:
                 return InlineButtonSpec.switchInline(object.getText(),
-                        object.isSamePeer().orElse(false), object.getQuery().orElseThrow());
+                        object.isSamePeer(), object.getQuery().orElseThrow());
             case URL: return InlineButtonSpec.url(object.getText(), object.getUrl().orElseThrow());
             case USER_PROFILE: return InlineButtonSpec.userProfile(object.getText(), object.getUserId().orElseThrow());
             // Reply buttons
@@ -30,7 +29,7 @@ public interface KeyboardButtonSpec extends Spec {
             case REQUEST_PHONE:
             case DEFAULT:
                 return new ReplyButtonSpec(object.getType(), object.getText());
-            case REQUEST_POLL: return ReplyButtonSpec.requestPoll(object.getText(), object.isQuiz().orElse(false));
+            case REQUEST_POLL: return ReplyButtonSpec.requestPoll(object.getText(), object.isQuiz().orElse(null));
             default: throw new IllegalStateException();
         }
     }
@@ -48,7 +47,7 @@ public interface KeyboardButtonSpec extends Spec {
                             .map(id -> ImmutableInputKeyboardButtonUrlAuth.builder()
                                     .text(text())
                                     .fwdText(s.forwardText().orElse(null))
-                                    .requestWriteAccess(s.requestWriteAccess().orElse(false))
+                                    .requestWriteAccess(s.requestWriteAccess())
                                     .bot(id)
                                     .url(s.url().orElseThrow())
                                     .build());
@@ -67,7 +66,7 @@ public interface KeyboardButtonSpec extends Spec {
                 case SWITCH_INLINE: {
                     InlineButtonSpec s = (InlineButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonSwitchInline.of(
-                            s.samePeer().orElse(false) ? ImmutableKeyboardButtonSwitchInline.SAME_PEER_MASK : 0,
+                            s.samePeer() ? ImmutableKeyboardButtonSwitchInline.SAME_PEER_MASK : 0,
                             text(), s.query().orElseThrow()));
                 }
                 case REQUEST_POLL: {
@@ -81,7 +80,7 @@ public interface KeyboardButtonSpec extends Spec {
                 case CALLBACK: {
                     InlineButtonSpec s = (InlineButtonSpec) this;
                     return Mono.just(ImmutableKeyboardButtonCallback.of(
-                            s.requiresPassword().orElse(false) ? ImmutableKeyboardButtonCallback.REQUIRES_PASSWORD_MASK : 0,
+                            s.requiresPassword() ? ImmutableKeyboardButtonCallback.REQUIRES_PASSWORD_MASK : 0,
                             text(), s.data().orElseThrow()));
                 }
                 // TODO: implement web view

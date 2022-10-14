@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Represents a scope where the bot commands will be valid. */
-public class BotCommandScopeSpec implements Spec {
+public class BotCommandScopeSpec {
     private final Type type;
     @Nullable
     private final Id peerId;

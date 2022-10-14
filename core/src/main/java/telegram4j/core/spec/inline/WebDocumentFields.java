@@ -1,14 +1,13 @@
 package telegram4j.core.spec.inline;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.spec.Spec;
 import telegram4j.tl.DocumentAttributeImageSize;
 import telegram4j.tl.ImmutableDocumentAttributeImageSize;
 
 public class WebDocumentFields {
     private WebDocumentFields() {}
 
-    public static final class Size implements Spec {
+    public static final class Size {
         private final int width;
         private final int height;
 

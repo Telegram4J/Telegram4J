@@ -65,9 +65,12 @@ public final class KeyboardButton implements TelegramObject {
     }
 
     /**
-     * Gets whether button allows creating quiz polls, if {@link #getType() type} is {@link Type#REQUEST_POLL}.
+     * Gets whether button allows creating quiz polls.
+     * Can have 3 states: can be absent if {@link #getType() type} is not {@link Type#REQUEST_POLL}
+     * or no these restriction (poll can be either quiz or regular);
+     * {@code true} for quiz-only polls and {@code false} for regular polls.
      *
-     * @return {@code true} if button allows creating and if {@link #getType() type} is {@link Type#REQUEST_POLL}.
+     * @return {@code true} if button allows creating quiz polls.
      */
     public Optional<Boolean> isQuiz() {
         return data.identifier() == KeyboardButtonRequestPoll.ID
@@ -89,12 +92,11 @@ public final class KeyboardButton implements TelegramObject {
     /**
      * Gets whether button uses current chat/channel for inline query, if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
      *
-     * @return {@code true} if button uses current chat/channel for inline query and if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
+     * @return {@code true} if button uses current chat/channel for inline query.
      */
-    public Optional<Boolean> isSamePeer() {
+    public boolean isSamePeer() {
         return data.identifier() == KeyboardButtonSwitchInline.ID
-                ? Optional.of(((KeyboardButtonSwitchInline) data).samePeer())
-                : Optional.empty();
+                && ((KeyboardButtonSwitchInline) data).samePeer();
     }
 
     /**
@@ -140,23 +142,21 @@ public final class KeyboardButton implements TelegramObject {
     /**
      * Gets whether bot requests the permission to send messages to user, if {@link #getType() type} is {@link Type#URL_AUTH}.
      *
-     * @return {@code true} if bot requests the permission to send messages to user and if {@link #getType() type} is {@link Type#URL_AUTH}.
+     * @return {@code true} if bot requests the permission to send messages to user.
      */
-    public Optional<Boolean> isRequestWriteAccess() {
+    public boolean isRequestWriteAccess() {
         return data.identifier() == InputKeyboardButtonUrlAuth.ID
-                ? Optional.of(((InputKeyboardButtonUrlAuth) data).requestWriteAccess())
-                : Optional.empty();
+                && ((InputKeyboardButtonUrlAuth) data).requestWriteAccess();
     }
 
     /**
      * Gets whether user should verify his identity by password, if {@link #getType() type} is {@link Type#CALLBACK}.
      *
-     * @return {@code true} if user should verify his identity by password and if {@link #getType() type} is {@link Type#CALLBACK}.
+     * @return {@code true} if user should verify his identity by password.
      */
-    public Optional<Boolean> isRequiresPassword() {
+    public boolean isRequiresPassword() {
         return data.identifier() == KeyboardButtonCallback.ID
-                ? Optional.of(((KeyboardButtonCallback) data).requiresPassword())
-                : Optional.empty();
+                && ((KeyboardButtonCallback) data).requiresPassword();
     }
 
     /**

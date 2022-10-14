@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** The {@link PeerEntity} identifier with optional access hash. */
+/** The unsigned {@link PeerEntity} identifier with optional access hash. */
 public final class Id implements Comparable<Id> {
 
     private final Type type;
@@ -339,7 +339,7 @@ public final class Id implements Comparable<Id> {
 
         @Override
         public int hashCode() {
-            return Objects.hash(peerId, messageId);
+            return peerId.hashCode() + 51 * messageId;
         }
 
         @Override

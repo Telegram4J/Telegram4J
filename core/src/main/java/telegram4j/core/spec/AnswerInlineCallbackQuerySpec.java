@@ -13,7 +13,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-public final class AnswerInlineCallbackQuerySpec implements Spec {
+public final class AnswerInlineCallbackQuerySpec {
     private final ImmutableEnumSet<Flag> flags;
     private final List<InlineResultSpec> results;
     private final Duration cacheTime;

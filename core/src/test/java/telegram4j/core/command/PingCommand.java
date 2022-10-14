@@ -12,7 +12,8 @@ public class PingCommand implements Command {
         var chat = event.getChat().orElseThrow();
         long pre = System.currentTimeMillis();
 
-        return chat.sendMessage(SendMessageSpec.of("Wait a second..."))
+        return chat.sendMessage(SendMessageSpec.of("Wait a second...")
+                        .withReplyToMessageId(event.getMessage().getId()))
                 .flatMap(m -> m.edit(EditMessageSpec.builder()
                         .message("Pong! " + (System.currentTimeMillis() - pre) + "ms.")
                         .build()));

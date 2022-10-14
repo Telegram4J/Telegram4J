@@ -1,13 +1,12 @@
 package telegram4j.core.spec.inline;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.spec.Spec;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class WebDocumentSpec implements Spec {
+public final class WebDocumentSpec {
     private final String url;
     @Nullable
     private final WebDocumentFields.Size size;

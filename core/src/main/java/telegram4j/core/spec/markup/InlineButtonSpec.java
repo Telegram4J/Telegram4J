@@ -3,6 +3,7 @@ package telegram4j.core.spec.markup;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import reactor.util.annotation.Nullable;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.util.Id;
 import telegram4j.tl.api.TlEncodingUtil;
@@ -21,12 +22,10 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     private final String url;
     @Nullable
     private final String forwardText;
-    @Nullable
-    private final Boolean requestWriteAccess;
-    @Nullable
-    private final Boolean requiresPassword;
-    @Nullable
-    private final Boolean samePeer;
+    // Can't be replaced; different positions in bit-set
+    private final boolean requestWriteAccess;
+    private final boolean requiresPassword;
+    private final boolean samePeer;
     @Nullable
     private final Id userId;
 
@@ -37,16 +36,16 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
         this.query = null;
         this.url = null;
         this.forwardText = null;
-        this.requestWriteAccess = null;
-        this.requiresPassword = null;
-        this.samePeer = null;
+        this.requestWriteAccess = false;
+        this.requiresPassword = false;
+        this.samePeer = false;
         this.userId = null;
     }
 
     private InlineButtonSpec(KeyboardButton.Type type, String text, @Nullable ByteBuf data,
                              @Nullable String query, @Nullable String url, @Nullable String forwardText,
-                             @Nullable Boolean requestWriteAccess, @Nullable Boolean requiresPassword,
-                             @Nullable Boolean samePeer, @Nullable Id userId) {
+                             boolean requestWriteAccess, boolean requiresPassword,
+                             boolean samePeer, @Nullable Id userId) {
         this.type = type;
         this.text = text;
         this.data = data;
@@ -85,16 +84,16 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
         return Optional.ofNullable(forwardText);
     }
 
-    public Optional<Boolean> requestWriteAccess() {
-        return Optional.ofNullable(requestWriteAccess);
+    public boolean requestWriteAccess() {
+        return requestWriteAccess;
     }
 
-    public Optional<Boolean> requiresPassword() {
-        return Optional.ofNullable(requiresPassword);
+    public boolean requiresPassword() {
+        return requiresPassword;
     }
 
-    public Optional<Boolean> samePeer() {
-        return Optional.ofNullable(samePeer);
+    public boolean samePeer() {
+        return samePeer;
     }
 
     public Optional<Id> userId() {
@@ -109,6 +108,7 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     }
 
     public InlineButtonSpec withData(@Nullable ByteBuf value) {
+        Preconditions.requireState(type == KeyboardButton.Type.CALLBACK, () -> "unexpected type: " + type);
         if (data == value) return this;
         ByteBuf newValue = value != null ? TlEncodingUtil.copyAsUnpooled(value) : null;
         return new InlineButtonSpec(type, text, newValue, query, url, forwardText,
@@ -120,6 +120,7 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     }
 
     public InlineButtonSpec withQuery(@Nullable String value) {
+        Preconditions.requireState(type == KeyboardButton.Type.SWITCH_INLINE, () -> "unexpected type: " + type);
         if (Objects.equals(query, value)) return this;
         return new InlineButtonSpec(type, text, data, value, url, forwardText,
                 requestWriteAccess, requiresPassword, samePeer, userId);
@@ -130,6 +131,8 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     }
 
     public InlineButtonSpec withUrl(@Nullable String value) {
+        Preconditions.requireState(type == KeyboardButton.Type.URL_AUTH || type == KeyboardButton.Type.URL,
+                () -> "unexpected type: " + type);
         if (Objects.equals(url, value)) return this;
         return new InlineButtonSpec(type, text, data, query, value, forwardText,
                 requestWriteAccess, requiresPassword, samePeer, userId);
@@ -140,6 +143,7 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     }
 
     public InlineButtonSpec withForwardText(@Nullable String value) {
+        Preconditions.requireState(type == KeyboardButton.Type.URL_AUTH, () -> "unexpected type: " + type);
         if (Objects.equals(forwardText, value)) return this;
         return new InlineButtonSpec(type, text, data, query, url, value,
                 requestWriteAccess, requiresPassword, samePeer, userId);
@@ -149,38 +153,31 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
         return withForwardText(opt.orElse(null));
     }
 
-    public InlineButtonSpec withRequestWriteAccess(@Nullable Boolean value) {
-        if (Objects.equals(requestWriteAccess, value)) return this;
+    public InlineButtonSpec withRequestWriteAccess(boolean value) {
+        Preconditions.requireState(type == KeyboardButton.Type.URL_AUTH, () -> "unexpected type: " + type);
+        if (requestWriteAccess == value) return this;
         return new InlineButtonSpec(type, text, data, query, url, forwardText,
                 value, requiresPassword, samePeer, userId);
     }
 
-    public InlineButtonSpec withRequestWriteAccess(Optional<Boolean> opt) {
-        return withRequestWriteAccess(opt.orElse(null));
-    }
-
-    public InlineButtonSpec withRequiresPassword(@Nullable Boolean value) {
-        if (Objects.equals(requiresPassword, value)) return this;
+    public InlineButtonSpec withRequiresPassword(boolean value) {
+        Preconditions.requireState(type == KeyboardButton.Type.CALLBACK, () -> "unexpected type: " + type);
+        if (requiresPassword == value) return this;
         return new InlineButtonSpec(type, text, data, query, url, forwardText,
                 requestWriteAccess, value, samePeer, userId);
     }
 
-    public InlineButtonSpec withRequiresPassword(Optional<Boolean> opt) {
-        return withRequiresPassword(opt.orElse(null));
-    }
-
-    public InlineButtonSpec withSamePeer(@Nullable Boolean value) {
-        if (Objects.equals(samePeer, value)) return this;
+    public InlineButtonSpec withSamePeer(boolean value) {
+        Preconditions.requireState(type == KeyboardButton.Type.SWITCH_INLINE, () -> "unexpected type: " + type);
+        if (samePeer == value) return this;
         return new InlineButtonSpec(type, text, data, query, url, forwardText,
                 requestWriteAccess, requiresPassword, value, userId);
     }
 
-    public InlineButtonSpec withSamePeer(Optional<Boolean> opt) {
-        return withSamePeer(opt.orElse(null));
-    }
-
     public InlineButtonSpec withUserId(@Nullable Id value) {
-        if (userId == value) return this;
+        Preconditions.requireState(type == KeyboardButton.Type.URL_AUTH || type == KeyboardButton.Type.USER_PROFILE,
+                () -> "unexpected type: " + type);
+        if (Objects.equals(userId, value)) return this;
         return new InlineButtonSpec(type, text, data, query, url, forwardText,
                 requestWriteAccess, requiresPassword, samePeer, value);
     }
@@ -190,20 +187,16 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     }
 
     @Override
-    public boolean equals(Object o) {
+    public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof InlineButtonSpec)) return false;
+        if (o == null || getClass() != o.getClass()) return false;
         InlineButtonSpec that = (InlineButtonSpec) o;
-        return type.equals(that.type)
-                && text.equals(that.text)
-                && Objects.equals(data, that.data)
-                && Objects.equals(query, that.query)
-                && Objects.equals(url, that.url)
-                && Objects.equals(forwardText, that.forwardText)
-                && Objects.equals(requestWriteAccess, that.requestWriteAccess)
-                && Objects.equals(requiresPassword, that.requiresPassword)
-                && Objects.equals(samePeer, that.samePeer)
-                && Objects.equals(userId, that.userId);
+        return requestWriteAccess == that.requestWriteAccess &&
+                requiresPassword == that.requiresPassword &&
+                samePeer == that.samePeer && type == that.type &&
+                text.equals(that.text) && Objects.equals(data, that.data) &&
+                Objects.equals(query, that.query) && Objects.equals(url, that.url) &&
+                Objects.equals(forwardText, that.forwardText) && Objects.equals(userId, that.userId);
     }
 
     @Override
@@ -215,9 +208,9 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
         h += (h << 5) + Objects.hashCode(query);
         h += (h << 5) + Objects.hashCode(url);
         h += (h << 5) + Objects.hashCode(forwardText);
-        h += (h << 5) + Objects.hashCode(requestWriteAccess);
-        h += (h << 5) + Objects.hashCode(requiresPassword);
-        h += (h << 5) + Objects.hashCode(samePeer);
+        h += (h << 5) + Boolean.hashCode(requestWriteAccess);
+        h += (h << 5) + Boolean.hashCode(requiresPassword);
+        h += (h << 5) + Boolean.hashCode(samePeer);
         h += (h << 5) + Objects.hashCode(userId);
         return h;
     }

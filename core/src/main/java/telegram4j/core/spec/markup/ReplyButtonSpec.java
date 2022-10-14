@@ -40,7 +40,7 @@ public final class ReplyButtonSpec implements KeyboardButtonSpec {
     }
 
     public ReplyButtonSpec withQuiz(@Nullable Boolean value) {
-        Preconditions.requireState(type == KeyboardButton.Type.REQUEST_POLL);
+        Preconditions.requireState(type == KeyboardButton.Type.REQUEST_POLL, () -> "unexpected type: " + type);
         if (Objects.equals(quiz, value)) return this;
         return new ReplyButtonSpec(type, text, value);
     }
@@ -91,6 +91,6 @@ public final class ReplyButtonSpec implements KeyboardButtonSpec {
 
     public static ReplyButtonSpec requestPoll(String text, @Nullable Boolean quiz) {
         return new ReplyButtonSpec(KeyboardButton.Type.REQUEST_POLL, text)
-                .withQuiz(Optional.ofNullable(quiz));
+                .withQuiz(quiz);
     }
 }

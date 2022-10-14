@@ -41,10 +41,10 @@ public class Sticker extends Document {
     /**
      * Gets type of emoji.
      *
-     * @return The {@link Sticker.Type} of emoji.
+     * @return The {@link Type} of emoji.
      */
-    public Sticker.Type getType() {
-        return Sticker.Type.fromMimeType(getMimeType());
+    public Type getType() {
+        return Type.fromMimeType(getMimeType());
     }
 
     public boolean isFree() {

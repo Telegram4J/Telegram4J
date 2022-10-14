@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-public final class AnswerCallbackQuerySpec implements Spec {
+public final class AnswerCallbackQuerySpec {
     private final boolean alert;
     private final String message;
     private final String url;

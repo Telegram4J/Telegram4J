@@ -31,7 +31,6 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
         return new ImmutableEnumSet<>(type, value);
     }
 
-    @SafeVarargs
     @SuppressWarnings("unchecked")
     public static <E extends Enum<E> & BitFlag> ImmutableEnumSet<E> of(E... value) {
         Class<?> ctype = value.getClass().getComponentType();
