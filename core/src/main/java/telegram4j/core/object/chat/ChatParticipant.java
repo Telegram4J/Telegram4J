@@ -70,11 +70,11 @@ public final class ChatParticipant implements TelegramObject {
     }
 
     /**
-     * Gets id of participant. That's might be not only user if status type is {@link Status#LEFT} or {@link Status#BANNED}.
+     * Gets id of participant.
      *
      * @return The id of participant.
      */
-    public Id getUserId() {
+    public Id getId() {
         switch (data.identifier()) {
             case BaseChannelParticipant.ID: return Id.ofUser(((BaseChannelParticipant) data).userId(), null);
             case ChannelParticipantSelf.ID: return Id.ofUser(((ChannelParticipantSelf) data).userId(), null);

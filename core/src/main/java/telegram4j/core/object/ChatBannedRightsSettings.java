@@ -13,7 +13,7 @@ import static telegram4j.tl.ChatBannedRights.*;
 public class ChatBannedRightsSettings {
     private final ChatBannedRights data;
 
-    public ChatBannedRightsSettings(ChatBannedRights data) {;
+    public ChatBannedRightsSettings(ChatBannedRights data) {
         this.data = Objects.requireNonNull(data);
     }
 

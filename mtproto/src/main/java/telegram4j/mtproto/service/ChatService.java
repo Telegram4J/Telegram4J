@@ -354,7 +354,7 @@ public class ChatService extends RpcService {
     }
 
     public Mono<PeerDialogs> getPeerDialogs(Iterable<? extends InputDialogPeer> peers) {
-        return client.sendAwait(GetPeerDialogs.builder().peers(peers).build());
+        return Mono.defer(() -> client.sendAwait(ImmutableGetPeerDialogs.of(peers)));
     }
 
     public Mono<Boolean> saveDraft(SaveDraft request) {
@@ -432,10 +432,8 @@ public class ChatService extends RpcService {
     }
 
     public Mono<Boolean> toggleDialogPin(boolean pinned, InputDialogPeer peer) {
-        return client.sendAwait(ToggleDialogPin.builder()
-                .pinned(pinned)
-                .peer(peer)
-                .build());
+        return client.sendAwait(ImmutableToggleDialogPin.of(pinned
+                ? ImmutableToggleDialogPin.PINNED_MASK : 0, peer));
     }
 
     public Mono<Boolean> reorderPinnedDialogs(boolean force, int folderId, Iterable<? extends InputDialogPeer> order) {
@@ -571,14 +569,8 @@ public class ChatService extends RpcService {
         return Mono.defer(() -> client.sendAwait(ImmutableGetSearchCounters.of(peer, filters)));
     }
 
-    public Mono<UrlAuthResult> requestUrlAuth(@Nullable InputPeer peer, @Nullable Integer msgId,
-                                              @Nullable Integer buttonId, @Nullable String url) {
-        return client.sendAwait(RequestUrlAuth.builder()
-                .peer(peer)
-                .msgId(msgId)
-                .buttonId(buttonId)
-                .url(url)
-                .build());
+    public Mono<UrlAuthResult> requestUrlAuth(RequestUrlAuth request) {
+        return client.sendAwait(request);
     }
 
     public Mono<UrlAuthResult> acceptUrlAuth(AcceptUrlAuth request) {
@@ -783,22 +775,20 @@ public class ChatService extends RpcService {
     public Mono<BaseMessageFields> editMessage(EditMessage request) {
         return client.sendAwait(request)
                 .map(updates -> {
-                    switch (updates.identifier()) {
-                        case BaseUpdates.ID:
-                            BaseUpdates casted = (BaseUpdates) updates;
+                    if (updates.identifier() == BaseUpdates.ID) {
+                        BaseUpdates casted = (BaseUpdates) updates;
 
-                            UpdateEditMessageFields update = casted.updates().stream()
-                                    .filter(upd -> upd instanceof UpdateEditMessageFields)
-                                    .map(upd -> (UpdateEditMessageFields) upd)
-                                    .findFirst()
-                                    .orElseThrow();
+                        UpdateEditMessageFields update = casted.updates().stream()
+                                .filter(upd -> upd instanceof UpdateEditMessageFields)
+                                .map(upd -> (UpdateEditMessageFields) upd)
+                                .findFirst()
+                                .orElseThrow();
 
-                            client.updates().emitNext(updates, DEFAULT_PARKING);
+                        client.updates().emitNext(updates, DEFAULT_PARKING);
 
-                            return (BaseMessageFields) update.message();
-                        default:
-                            throw new IllegalArgumentException("Unknown updates type: " + updates);
+                        return (BaseMessageFields) update.message();
                     }
+                    throw new IllegalArgumentException("Unknown updates type: " + updates);
                 });
     }
 
@@ -962,8 +952,9 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Updates> editPhoto(InputChannel channel, InputChatPhoto photo) {
-        return client.sendAwait(ImmutableEditPhoto.of(channel, photo));
+    public Mono<Void> editPhoto(InputChannel channel, InputChatPhoto photo) {
+        return client.sendAwait(ImmutableEditPhoto.of(channel, photo))
+                .flatMap(u -> Mono.fromRunnable(() -> client.updates().emitNext(u, DEFAULT_PARKING)));
     }
 
     @BotCompatible
@@ -1206,8 +1197,8 @@ public class ChatService extends RpcService {
 
                             UpdateMessageID updateMessageID = casted.updates().stream()
                                     .filter(u -> u.identifier() == UpdateMessageID.ID)
-                                    .map(upd -> (UpdateMessageID) upd)
                                     .findFirst()
+                                    .map(upd -> (UpdateMessageID) upd)
                                     .orElseThrow();
 
                             if (updateMessageID.randomId() != request.randomId()) {

@@ -136,7 +136,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             cacheBuilder.<Integer, Long>evictionListener((key, value, cause) -> {
                 if (cause == RemovalCause.EXPIRED) {
                     Objects.requireNonNull(value);
-                    rpcLog.debug("[C:0x{}] Evicted unhandled quick acknowledge for 0x{}", this.id, Long.toHexString(value));
+                    rpcLog.debug("[C:0x{}] Evicted quick acknowledge for 0x{}", this.id, Long.toHexString(value));
                 }
             });
         }

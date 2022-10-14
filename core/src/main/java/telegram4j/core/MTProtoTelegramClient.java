@@ -451,7 +451,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             return Mono.error(new IllegalArgumentException("Specified id must be user-typed: " + userId));
         }
 
-        if (userId.equals(getSelfId())) { // Possible optimisation
+        if (userId.equals(getSelfId())) {
             return Mono.just(InputUserSelf.instance());
         }
 

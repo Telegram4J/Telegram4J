@@ -27,7 +27,7 @@ import java.util.Optional;
  */
 public class FileReferenceId {
 
-    static final String PREFIX = "x74JF1D"; // xT4JFID
+    static final String PREFIX = "x74JF1D";
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
 
     static final byte SIZE_TYPE_ABSENT = -1;
