@@ -41,24 +41,20 @@ import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 /** Manager for correct and complete work with general and channel updates. */
 public class DefaultUpdatesManager implements UpdatesManager {
 
-    private static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
+    protected static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
 
-    private static final int MAX_CHANNEL_DIFFERENCE = 100;
-    private static final int MAX_BOT_CHANNEL_DIFFERENCE = 10000;
-    private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(2);
+    protected final MTProtoTelegramClient client;
+    protected final Options options;
+    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel());
 
-    private final MTProtoTelegramClient client;
-    private final UpdatesMapper updatesMapper;
-    private final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel());
+    protected volatile int pts = -1;
+    protected volatile int qts = -1;
+    protected volatile int date = -1;
+    protected volatile int seq = -1;
 
-    private volatile int pts = -1;
-    private volatile int qts = -1;
-    private volatile int date = -1;
-    private volatile int seq = -1;
-
-    public DefaultUpdatesManager(MTProtoTelegramClient client, UpdatesMapper updatesMapper) {
+    public DefaultUpdatesManager(MTProtoTelegramClient client, Options options) {
         this.client = Objects.requireNonNull(client);
-        this.updatesMapper = Objects.requireNonNull(updatesMapper);
+        this.options = Objects.requireNonNull(options);
     }
 
     @Override
@@ -176,7 +172,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .ttlPeriod(data.ttlPeriod())
                         .message(data.message());
 
-                Flux<Event> mapUpdate = updatesMapper.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                Flux<Event> mapUpdate = UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(message.build())
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
@@ -218,7 +214,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     message.fromId(ImmutablePeerUser.of(data.userId()));
                 }
 
-                Flux<Event> mapUpdate = updatesMapper.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                Flux<Event> mapUpdate = UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(message.build())
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
@@ -236,14 +232,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
         stateInterval.dispose();
     }
 
-    private void applyStateLocal(State state) {
+    protected void applyStateLocal(State state) {
         pts = state.pts();
         qts = state.qts();
         date = state.date();
         seq = state.seq();
     }
 
-    private Mono<Void> applyState(State state) {
+    protected Mono<Void> applyState(State state) {
         return Mono.defer(() -> {
             if (log.isDebugEnabled()) {
                 StringJoiner j = new StringJoiner(", ");
@@ -279,11 +275,11 @@ public class DefaultUpdatesManager implements UpdatesManager {
         });
     }
 
-    private Flux<Event> getDifference() {
+    protected Flux<Event> getDifference() {
         return Flux.defer(() -> getDifference(pts, qts, date));
     }
 
-    private Flux<Event> getDifference(int pts, int qts, int date) {
+    protected Flux<Event> getDifference(int pts, int qts, int date) {
         if (pts == -1 || qts == -1 || date == -1) {
             log.debug("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
             return Flux.empty();
@@ -293,7 +289,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
             log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
         }
 
-        stateInterval.start(DEFAULT_CHECKIN, DEFAULT_CHECKIN);
+        stateInterval.start(options.checkin, options.checkin);
         return client.getServiceHolder()
                 .getUpdatesService()
                 .getDifference(ImmutableGetDifference.of(pts, date, qts))
@@ -304,27 +300,26 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     switch (difference.identifier()) {
                         case DifferenceEmpty.ID: {
-                            DifferenceEmpty data = (DifferenceEmpty) difference;
+                            DifferenceEmpty diff = (DifferenceEmpty) difference;
 
-                            this.seq = data.seq();
-                            this.date = data.date();
+                            this.seq = diff.seq();
+                            this.date = diff.date();
 
                             return Mono.empty();
                         }
                         case BaseDifference.ID: {
-                            BaseDifference difference0 = (BaseDifference) difference;
+                            BaseDifference diff = (BaseDifference) difference;
 
-                            return applyState(difference0.state())
-                                    .thenMany(handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
-                                            difference0.chats(), difference0.users()));
+                            return applyState(diff.state())
+                                    .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
+                                            diff.chats(), diff.users()));
                         }
                         case DifferenceSlice.ID: {
-                            DifferenceSlice difference0 = (DifferenceSlice) difference;
+                            DifferenceSlice diff = (DifferenceSlice) difference;
 
-                            applyStateLocal(difference0.intermediateState());
+                            applyStateLocal(diff.intermediateState());
 
-                            return handleUpdates0(difference0.newMessages(), difference0.otherUpdates(),
-                                    difference0.chats(), difference0.users())
+                            return handleUpdates0(diff.newMessages(), diff.otherUpdates(), diff.chats(), diff.users())
                                     .concatWith(getDifference());
                         }
                         default:
@@ -333,8 +328,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 });
     }
 
-    private Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
-                                       List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users) {
+    protected Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
+                                         List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users) {
         var usersMap = users.stream()
                 .map(u -> EntityFactory.createUser(client, u))
                 .filter(Objects::nonNull)
@@ -392,9 +387,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
                     int dpts = Math.max(1, Math.max(upts, cpts));
-                    int limit = client.getAuthResources().isBot()
-                            ? MAX_BOT_CHANNEL_DIFFERENCE
-                            : MAX_CHANNEL_DIFFERENCE;
+                    int limit = getMaxChannelDifference();
 
                     if (log.isDebugEnabled()) {
                         log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", u.channelId(), dpts, limit);
@@ -425,7 +418,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .thenMany(concatedUpdates);
     }
 
-    private Flux<Event> handleChannelDifference(GetChannelDifference request, ChannelDifference diff) {
+    protected Flux<Event> handleChannelDifference(GetChannelDifference request, ChannelDifference diff) {
         if (log.isTraceEnabled()) {
             log.trace("channel difference: {}", diff);
         }
@@ -517,7 +510,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                 return saveContacts.and(updatePts)
                         .thenMany(Flux.fromIterable(diff0.otherUpdates()))
-                        .flatMap(update -> updatesMapper.handle(UpdateContext.create(
+                        .flatMap(update -> UpdatesMapper.instance.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
                         .concatWith(messageCreateEvents)
                         .concatWith(refetchDifference);
@@ -570,8 +563,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
-    private Flux<Event> applyUpdate(UpdateContext<Update> ctx) {
-        Flux<Event> mapUpdate = updatesMapper.handle(ctx);
+    protected Flux<Event> applyUpdate(UpdateContext<Update> ctx) {
+        Flux<Event> mapUpdate = UpdatesMapper.instance.handle(ctx);
 
         if (ctx.getUpdate() instanceof PtsUpdate) {
             PtsUpdate ptsUpdate = (PtsUpdate) ctx.getUpdate();
@@ -636,7 +629,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
             long id = channelId;
 
-            // If -1, just apply update
+            // If local channel pts is -1 just apply update
             AtomicBoolean justApplied = new AtomicBoolean();
             return client.getMtProtoResources()
                     .getStoreLayout().getChannelFullById(id)
@@ -689,10 +682,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
         return mapUpdate;
     }
 
-    private Flux<Event> getChannelDifference(InputChannel id, int pts) {
-        int limit = client.getAuthResources().isBot()
-                ? MAX_BOT_CHANNEL_DIFFERENCE
-                : MAX_CHANNEL_DIFFERENCE;
+    protected Flux<Event> getChannelDifference(InputChannel id, int pts) {
+        int limit = getMaxChannelDifference();
 
         if (log.isDebugEnabled()) {
             log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", getRawPeerId(id), pts, limit);
@@ -713,7 +704,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     @Nullable
-    private Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap,
+    protected Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap,
                                Map<Id, User> usersMap, @Nullable User selfUser) {
         switch (peer.getType()) {
             case CHAT:
@@ -726,12 +717,40 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
-    private Optional<PeerEntity> getPeerEntity(Id peer, Map<Id, Chat> chatsMap, Map<Id, User> usersMap) {
+    protected Optional<PeerEntity> getPeerEntity(Id peer, Map<Id, Chat> chatsMap, Map<Id, User> usersMap) {
         switch (peer.getType()) {
             case USER: return Optional.ofNullable(usersMap.get(peer));
             case CHANNEL:
             case CHAT: return Optional.ofNullable(chatsMap.get(peer));
             default: throw new IllegalStateException();
+        }
+    }
+
+    protected int getMaxChannelDifference() {
+        return client.getAuthResources().isBot()
+                ? options.maxBotChannelDifference
+                : options.maxUserChannelDifference;
+    }
+
+    public static class Options {
+        private static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
+        private static final int MAX_BOT_CHANNEL_DIFFERENCE  = 10000;
+        private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
+
+        public final Duration checkin;
+        public final int maxUserChannelDifference;
+        public final int maxBotChannelDifference;
+
+        public Options() {
+            checkin = DEFAULT_CHECKIN;
+            maxUserChannelDifference = MAX_USER_CHANNEL_DIFFERENCE;
+            maxBotChannelDifference = MAX_BOT_CHANNEL_DIFFERENCE;
+        }
+
+        public Options(Duration checkin, int maxUserChannelDifference, int maxBotChannelDifference) {
+            this.checkin = Objects.requireNonNull(checkin);
+            this.maxUserChannelDifference = maxUserChannelDifference;
+            this.maxBotChannelDifference = maxBotChannelDifference;
         }
     }
 }

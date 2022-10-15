@@ -29,8 +29,7 @@ public interface EntityRetriever {
      * Retrieve user with retriever strategy by the specified id.
      *
      * @param userId The id of user.
-     * @return A {@link Mono} emitting on successful completion
-     * the {@link User} with minimal information.
+     * @return A {@link Mono} emitting on successful completion the {@link User}.
      */
     default Mono<User> getUserById(Id userId) {
         return getUserMinById(userId);
@@ -60,8 +59,7 @@ public interface EntityRetriever {
      * @implSpec {@link PrivateChat} must contain full information about self user.
      *
      * @param chatId The id of chat.
-     * @return A {@link Mono} emitting on successful completion
-     * the {@link Chat} with minimal information.
+     * @return A {@link Mono} emitting on successful completion the {@link Chat}.
      */
     default Mono<Chat> getChatById(Id chatId) {
         return getChatMinById(chatId);

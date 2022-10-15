@@ -413,8 +413,8 @@ public final class Message implements TelegramObject {
     /**
      * Requests to delete this message.
      *
-     * @param revoke Whether to delete messages for all participants of the chat.
-     * @return A {@link Mono} emitting on successful completion updated message.
+     * @param revoke Whether to delete messages for all participants of the chat. Will be ignored for channel messages.
+     * @return A {@link Mono} emitting on successful completion range of message updates.
      */
     public Mono<AffectedMessages> delete(boolean revoke) {
         return Mono.defer(() -> {

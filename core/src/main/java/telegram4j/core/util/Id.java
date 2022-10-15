@@ -12,7 +12,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 
-/** The unsigned {@link PeerEntity} identifier with optional access hash. */
+/**
+ * The unsigned 64-bot identifier for {@link PeerEntity} objects which
+ * can contains access hash or min information about channel/user.
+ */
 public final class Id implements Comparable<Id> {
 
     private final Type type;
@@ -44,7 +47,7 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} of channel.
      */
     public static Id ofChannel(long value, @Nullable Long accessHash) {
-        return of(Type.CHANNEL, value, accessHash);
+        return new Id(Type.CHANNEL, value, accessHash);
     }
 
     /**
@@ -68,7 +71,7 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} of user.
      */
     public static Id ofUser(long value, @Nullable Long accessHash) {
-        return of(Type.USER, value, accessHash);
+        return new Id(Type.USER, value, accessHash);
     }
 
     /**
@@ -136,6 +139,7 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputChannel}.
      */
     public static Id of(InputChannel inputChannel, Id selfId) {
+        Objects.requireNonNull(selfId);
         switch (inputChannel.identifier()) {
             case BaseInputChannel.ID: {
                 BaseInputChannel d = (BaseInputChannel) inputChannel;
@@ -162,6 +166,7 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputPeer}.
      */
     public static Id of(InputPeer inputPeer, Id selfId) {
+        Objects.requireNonNull(selfId);
         switch (inputPeer.identifier()) {
             case InputPeerChannel.ID: {
                 InputPeerChannel d = (InputPeerChannel) inputPeer;
@@ -193,10 +198,6 @@ public final class Id implements Comparable<Id> {
         }
     }
 
-    private static Id of(Type type, long value, @Nullable Long accessHash) {
-        return new Id(type, value, accessHash);
-    }
-
     /**
      * Gets a raw value of id.
      *
@@ -207,7 +208,7 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
-     * Gets a string representation of {@link #asLong} method.
+     * Gets a string representation of {@link #asLong()} method.
      *
      * @return The string representation of raw id.
      */
@@ -225,7 +226,7 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
-     * Gets the access hash of this id, if present and applicable.
+     * Gets the access hash of this id, if present and {@link #getType() type} is not {@link Type#CHAT}.
      *
      * @return The access hash of this id, if present and applicable.
      */
@@ -254,7 +255,7 @@ public final class Id implements Comparable<Id> {
      * The comparison is based on the {@link #getType()} and after {@link #asLong()}.
      *
      * @param o The other id to be compared.
-     * @return The comparator value, negative if less, positive if greater
+     * @return The comparator value, negative if less, positive if greater.
      */
     @Override
     public int compareTo(Id o) {

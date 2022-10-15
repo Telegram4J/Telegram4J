@@ -20,7 +20,7 @@ import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
-import telegram4j.core.event.dispatcher.DefaultUpdatesMapper;
+import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
@@ -44,7 +44,6 @@ import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -68,7 +67,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EntityParserFactory defaultEntityParserFactory;
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
-            new DefaultUpdatesManager(c, DefaultUpdatesMapper.instance);
+            new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options());
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private HttpClient httpClient;
 
@@ -176,7 +175,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     /**
      * Sets updates manager factory for creating updates manager.
      * <p>
-     * If custom updates manager factory doesn't set, {@link DefaultUpdatesMapper} will be used.
+     * If custom updates manager factory doesn't set, {@link UpdatesMapper} will be used.
      *
      * @param updatesManagerFactory A new factory for creating {@link UpdatesManager}.
      * @return This builder.
@@ -297,7 +296,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initRetry(), initAuthRetry(),
-                            Collections.unmodifiableList(responseTransformers))));
+                            List.copyOf(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
                     defaultEntityParserFactory, initHttpClient(), unavailableChatPolicy);
@@ -448,7 +447,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (storeLayout != null) {
             return storeLayout;
         }
-        return new StoreLayoutImpl(c -> c.maximumSize(10000));
+        return new StoreLayoutImpl(c -> c.maximumSize(1000));
     }
 
     private DataCenter initDataCenter() {

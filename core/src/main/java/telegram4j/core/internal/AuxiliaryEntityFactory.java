@@ -91,7 +91,7 @@ public final class AuxiliaryEntityFactory {
                 return new AuxiliaryMessages(client, messages, chats, users);
             }
             default:
-                throw new IllegalArgumentException("Unknown messages type: " + data);
+                throw new IllegalArgumentException("Unknown Messages type: " + data);
         }
     }
 
@@ -117,15 +117,19 @@ public final class AuxiliaryEntityFactory {
                                          Map<Id, Chat> chatsMap, Map<Id, User> usersMap) {
         // here we're getting id of chat with access_hash for Message methods
         Id chatId = Id.of(message.peerId());
+        PeerEntity peer;
         switch (chatId.getType()) {
             case USER:
-                chatId = usersMap.get(chatId).getId();
+                peer = usersMap.get(chatId);
                 break;
             case CHAT:
             case CHANNEL:
-                chatId = chatsMap.get(chatId).getId();
+                peer = chatsMap.get(chatId);
+                break;
+            default: throw new IllegalStateException();
         }
 
+        chatId = peer != null ? peer.getId() : chatId;
         return EntityFactory.createMessage(client, message, chatId);
     }
 }
