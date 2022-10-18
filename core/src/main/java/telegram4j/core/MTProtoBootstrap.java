@@ -370,16 +370,16 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .then();
 
                                 return mtProtoClient.sendAwait(invokeWithLayout)
-                                        // startup errors must close client
-                                        .onErrorResume(e -> mtProtoClient.close()
-                                                .then(onDisconnect.asMono())
-                                                .then(Mono.fromRunnable(() -> sink.error(e))))
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(e -> !authResources.isBot() &&
                                                         e instanceof RpcException &&
                                                         ((RpcException) e).getError().errorCode() == 401)
                                                 .doBeforeRetryAsync(signal -> userAuth))
+                                        // startup errors must close client
+                                        .onErrorResume(e -> mtProtoClient.close()
+                                                .then(onDisconnect.asMono())
+                                                .then(Mono.fromRunnable(() -> sink.error(e))))
                                         .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
                                         .doFinally(signal -> {
                                             if (signal == SignalType.ON_COMPLETE) {

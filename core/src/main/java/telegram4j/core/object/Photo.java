@@ -11,7 +11,12 @@ import telegram4j.tl.InputPeer;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Representation for message and profile photos. */
+/**
+ * Representation for message and profile photos.
+ *
+ * <p>For separation between ordinal photos and sent as document you
+ * can check {@link FileReferenceId#getFileType()} of {@link #getFileReferenceId()}.
+ */
 public class Photo extends Document {
     @Nullable
     private final DocumentAttributeImageSize sizeData;

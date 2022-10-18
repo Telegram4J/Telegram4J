@@ -41,12 +41,12 @@ public class AuthService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Authorization> importBotAuthorization(int flags, int appId, String apiHash, String botAuthToken) {
-        return client.sendAwait(ImmutableImportBotAuthorization.of(flags, appId, apiHash, botAuthToken));
+    public Mono<Authorization> importBotAuthorization(int flags, int apiId, String apiHash, String botAuthToken) {
+        return client.sendAwait(ImmutableImportBotAuthorization.of(flags, apiId, apiHash, botAuthToken));
     }
 
-    public Mono<SentCode> sendCode(String phoneNumber, int appId, String appHash, CodeSettings settings) {
-        return client.sendAwait(ImmutableSendCode.of(phoneNumber, appId, appHash, settings));
+    public Mono<SentCode> sendCode(String phoneNumber, int apiId, String apiHash, CodeSettings settings) {
+        return client.sendAwait(ImmutableSendCode.of(phoneNumber, apiId, apiHash, settings));
     }
 
     public Mono<Authorization> signUp(String phoneNumber, String phoneNumberHash, String firstName, String lastName) {
@@ -85,8 +85,8 @@ public class AuthService extends RpcService {
         return Mono.defer(() -> client.sendAwait(ImmutableDropTempAuthKeys.of(exceptAuthKeys)));
     }
 
-    public Mono<LoginToken> exportLoginToken(int appId, String apiHash, Iterable<Long> exceptIds) {
-        return Mono.defer(() -> client.sendAwait(ImmutableExportLoginToken.of(appId, apiHash, exceptIds)));
+    public Mono<LoginToken> exportLoginToken(int apiId, String apiHash, Iterable<Long> exceptIds) {
+        return Mono.defer(() -> client.sendAwait(ImmutableExportLoginToken.of(apiId, apiHash, exceptIds)));
     }
 
     public Mono<LoginToken> importLoginToken(ByteBuf token) {

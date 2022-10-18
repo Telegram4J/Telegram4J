@@ -31,8 +31,8 @@ public class FileReferenceId {
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
 
     static final byte SIZE_TYPE_ABSENT = -1;
-    static final byte SIZE_TYPE_SMALL = 4;
-    static final byte SIZE_TYPE_BIG = 5;
+    static final byte SIZE_TYPE_SMALL = 0;
+    static final byte SIZE_TYPE_BIG = 1;
 
     static final int MESSAGE_ID_MASK = 1;
     static final int PEER_MASK = 1 << 1;
