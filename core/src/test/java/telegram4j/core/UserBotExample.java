@@ -14,9 +14,9 @@ import telegram4j.tl.json.TlModule;
 
 import java.util.function.Function;
 
-public class UserExample {
+public class UserBotExample {
 
-    private static final Logger log = Loggers.getLogger(UserExample.class);
+    private static final Logger log = Loggers.getLogger(UserBotExample.class);
 
     public static void main(String[] args) {
 

@@ -13,12 +13,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Scanner;
 
+/**
+ * Simple implementation of user auth flow, which
+ * can only handle SMS and APP codes.
+ */
 public class CodeAuthorization {
 
     private static final String delimiter = "=".repeat(32);
     private static final Throwable RESEND = new Throwable();
 
     private static volatile SentCode currentCode;
+    private static volatile Instant sendTimestamp;
 
     private static String readPhoneNumber(Scanner sc) {
         String phoneNumber = sc.nextLine();
@@ -36,9 +41,9 @@ public class CodeAuthorization {
                 System.out.print("Write your phone number: ");
             }
             String phoneNumber = readPhoneNumber(sc);
-            Instant send = Instant.now();
 
             return Mono.defer(() -> {
+                        sendTimestamp = Instant.now();
                         SentCode c = currentCode;
                         if (c == null) {
                             int apiId = client.getAuthResources().getApiId();
@@ -61,7 +66,8 @@ public class CodeAuthorization {
                         }
 
                         Integer t = scode.timeout();
-                        if (code.equals("resend") || t != null && send.plusSeconds(t).isAfter(Instant.now())) {
+                        if (code.equals("resend") || t != null && sendTimestamp != null &&
+                                sendTimestamp.plusSeconds(t).isAfter(Instant.now())) {
                             return Mono.error(RESEND);
                         }
                         if (code.equals("cancel")) {
