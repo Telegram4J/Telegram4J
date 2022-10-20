@@ -68,6 +68,7 @@ public interface MTProtoClient {
      */
     Type getType();
 
+    // TODO: It shouldn't be in a public api
     /**
      * Update time offset which is used in message id generation.
      * This method is included in the interface, since the
@@ -154,6 +155,7 @@ public interface MTProtoClient {
         RECONNECT
     }
 
+    // TODO: maybe remove and use DataCenter#getType()?
     /** Available client types and modes. */
     enum Type {
         /** The regular mtproto client. */

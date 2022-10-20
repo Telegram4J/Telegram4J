@@ -454,7 +454,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (dataCenter != null) {
             return dataCenter;
         }
-        return DataCenter.productionDataCentersIpv4.get(1); // dc#2
+        return DataCenter.list.stream()
+                .filter(dc -> dc.getType() == DataCenter.Type.PRODUCTION && dc.getId() == 2)
+                .findFirst()
+                .orElseThrow();
     }
 
     private RetryBackoffSpec initRetry() {

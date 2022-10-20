@@ -17,7 +17,6 @@ import telegram4j.tl.auth.LoginTokenSuccess;
 
 import java.io.InputStreamReader;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
@@ -68,7 +67,7 @@ public class QrCodeAuthorization {
             return Mono.defer(() -> client.getServiceHolder().getAuthService()
                             .exportLoginToken(apiId, apiHash, List.of())
                             .cast(BaseLoginToken.class)
-                            .doOnNext(b -> timeout.set(Duration.between(Instant.now(), Instant.ofEpochSecond(b.expires()))))
+                            .doOnNext(b -> timeout.set(Duration.ofSeconds(System.currentTimeMillis() - b.expires())))
                             .doOnNext(b -> {
                                 String token = java.util.Base64.getUrlEncoder().encodeToString(CryptoUtil.toByteArray(b.token()));
 

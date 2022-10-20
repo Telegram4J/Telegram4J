@@ -141,7 +141,7 @@ public final class AuthorizationHandler {
                 .nonce(nonce)
                 .serverNonce(serverNonce)
                 .newNonce(newNonce)
-                .dc(client.getDatacenter().getId())
+                .dc(client.getDatacenter().getInternalId())
                 .build();
 
         ByteBuf pqInnerDataBuf = TlSerializer.serialize(alloc, pqInnerData);

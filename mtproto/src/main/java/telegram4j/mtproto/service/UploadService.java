@@ -37,6 +37,7 @@ import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 public class UploadService extends RpcService {
     public static final int MIN_PART_SIZE = 1024;
     public static final int MAX_PART_SIZE = 512 * 1024;
+
     // it is necessary that the server does not consider our frequent packets to be a flood
     private static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
     private static final int TEN_MB = 10 * 1024 * 1024;
@@ -49,7 +50,7 @@ public class UploadService extends RpcService {
 
     public static int suggestPartSize(int size, int partSize) {
         if (partSize == -1) {
-            return MAX_PART_SIZE; // TODO
+            return MAX_PART_SIZE; // TODO: adaptive part size
         } else if (partSize > MAX_PART_SIZE) {
             throw new IllegalArgumentException(size + " > " + MAX_PART_SIZE);
         } else if (partSize < MIN_PART_SIZE) {
@@ -69,6 +70,7 @@ public class UploadService extends RpcService {
     @BotCompatible
     public Mono<InputFile> saveFile(ByteBufFlux data, int size, int partSize, String name) {
         return Mono.defer(() -> {
+            // TODO: allow publishing requests on configured scheduler?
             // TODO: perhaps necessary checks:
             //  - check size
             //  - verify final counter.value with computed parts count
@@ -87,8 +89,9 @@ public class UploadService extends RpcService {
                 AtomicInteger suc = new AtomicInteger();
 
                 List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
-                DataCenter mediaDc = DataCenter.mediaDataCentersIpv4.stream()
-                        .filter(dc -> dc.getId() == client.getDatacenter().getId())
+                DataCenter mediaDc = DataCenter.list.stream()
+                        .filter(dc -> dc.getType() == DataCenter.Type.MEDIA &&
+                                dc.getId() == client.getDatacenter().getId())
                         .findFirst()
                         .orElseThrow(); // TODO: dc by default
 
