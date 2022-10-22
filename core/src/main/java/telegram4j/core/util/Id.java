@@ -250,6 +250,15 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
+     * Gets whether {@link #getMinInformation()} or {@link #getAccessHash()} is present.
+     *
+     * @return {@code true} if {@link #getMinInformation()} or {@link #getAccessHash()} is present.
+     */
+    public boolean isWithAccessInfo() {
+        return context != null;
+    }
+
+    /**
      * Compares this id with the specified id.
      * <p>
      * The comparison is based on the {@link #getType()} and after {@link #asLong()}.
@@ -282,7 +291,20 @@ public final class Id implements Comparable<Id> {
 
     @Override
     public String toString() {
-        return "Id{" + value + '}';
+        String prefix;
+        switch (type) {
+            case USER:
+                prefix = "User";
+                break;
+            case CHAT:
+                prefix = "Chat";
+                break;
+            case CHANNEL:
+                prefix = "Channel";
+                break;
+            default: throw new IllegalStateException();
+        }
+        return prefix + "Id{" + value + '}';
     }
 
     /** Available types of entities ids. */

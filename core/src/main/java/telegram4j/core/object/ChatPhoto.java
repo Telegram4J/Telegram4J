@@ -13,7 +13,8 @@ import java.util.Optional;
 
 /**
  * Low-quality chat profile photo.
- * There are <b>2</b> versions available for download: small ({@link ChatPhoto#getSmallFileReferenceId()})
+ *
+ * <p>There are 2 versions available for download: small ({@link ChatPhoto#getSmallFileReferenceId()})
  * and big ({@link ChatPhoto#getBigFileReferenceId()}).
  */
 public class ChatPhoto implements TelegramObject {

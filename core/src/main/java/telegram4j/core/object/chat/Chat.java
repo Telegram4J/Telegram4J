@@ -116,6 +116,16 @@ public interface Chat extends PeerEntity {
     // Interaction methods
 
     /**
+     * Requests to create new message with specified text.
+     *
+     * @param text The text of message.
+     * @return A {@link Mono} emitting on successful completion created message.
+     */
+    default Mono<Message> sendMessage(String text) {
+        return sendMessage(SendMessageSpec.of(text));
+    }
+
+    /**
      * Requests to create new message or media by specified edit specification in this chat.
      *
      * @param spec an immutable object that specifies how to create the message.

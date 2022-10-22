@@ -78,7 +78,7 @@ public final class InitConnectionParams {
     }
 
     /**
-     * Gets the application version, e.g., {@code "0.1.0"}.
+     * Gets the application version, e.g. {@code "0.1.0"}.
      *
      * @return The application version.
      */
