@@ -37,11 +37,17 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
 
+    private volatile DataCenter dataCenter;
     private volatile long selfId = -1;
     private volatile ImmutableState state;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
         this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
+    }
+
+    @Override
+    public Mono<DataCenter> getDataCenter() {
+        return Mono.justOrEmpty(dataCenter);
     }
 
     @Override
@@ -380,13 +386,20 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateDataCenter(DataCenter dc) {
+        Objects.requireNonNull(dc);
+        return Mono.fromRunnable(() -> dataCenter = dc);
+    }
+
+    @Override
     public Mono<Void> updateState(State state) {
+        Objects.requireNonNull(state);
         return Mono.fromRunnable(() -> this.state = ImmutableState.copyOf(state));
     }
 
     @Override
-    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey) {
-        return Mono.fromRunnable(() -> authKeys.put(authorizationKey.getDc(), authorizationKey));
+    public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
+        return Mono.fromRunnable(() -> authKeys.put(dc, authKey));
     }
 
     @Override
@@ -402,11 +415,6 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
         return Mono.fromRunnable(() -> saveChatFull(payload));
-    }
-
-    @Override
-    public Mono<Void> onResolvedPeer(ResolvedPeer payload) {
-        return Mono.fromRunnable(() -> saveContacts(payload.chats(), payload.users()));
     }
 
     private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
@@ -449,8 +457,8 @@ public class StoreLayoutImpl implements StoreLayout {
         var user0 = ImmutableUserFull.copyOf(user.fullUser());
         var user1 = user.users().stream()
                 .filter(u -> isAccessible(u) && u.id() == user0.id())
-                .map(u -> (BaseUser) u)
                 .findFirst()
+                .map(u -> (BaseUser) u)
                 .map(ImmutableBaseUser::copyOf)
                 .orElse(null);
 

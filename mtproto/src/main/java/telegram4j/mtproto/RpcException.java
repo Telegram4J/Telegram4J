@@ -1,8 +1,8 @@
 package telegram4j.mtproto;
 
-import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
@@ -14,7 +14,7 @@ public class RpcException extends MTProtoException {
 
     public RpcException(String message, RpcError error) {
         super(message);
-        this.error = error;
+        this.error = Objects.requireNonNull(error);
     }
 
     /**
@@ -30,32 +30,27 @@ public class RpcException extends MTProtoException {
             if (t instanceof RpcException) {
                 RpcException t0 = (RpcException) t;
 
-                return IntStream.of(codes).anyMatch(c -> t0.getError().errorCode() == c);
+                return IntStream.of(codes).anyMatch(c -> t0.error.errorCode() == c);
             }
             return false;
         };
     }
 
-    static String prettyMethodName(TlMethod<?> method) {
-        return method.getClass().getCanonicalName()
-                .replace("telegram4j.tl.", "")
-                .replace("request.", "")
-                .replace("Immutable", "");
-    }
+    /**
+     * Create {@link Predicate} for throwable which matches on flood wait.
+     *
+     * @return A {@link Predicate} for throwable which matches flood wait errors.
+     */
+    public static Predicate<Throwable> isFloodWait() {
+        return t -> {
+            if (t instanceof RpcException) {
+                RpcException t0 = (RpcException) t;
 
-    static RpcException create(RpcError error, long messageId, DefaultMTProtoClient.PendingRequest request) {
-        String orig = error.errorMessage();
-        int argIdx = orig.indexOf("_X");
-        String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
-        String arg = argIdx != -1 ? orig.substring(argIdx) : null;
-        String hexMsgId = Long.toHexString(messageId);
-        String methodName = String.format("%s/0x%s", prettyMethodName(request.method), hexMsgId);
-
-        String format = String.format("%s returned code: %d, message: %s%s",
-                methodName, error.errorCode(),
-                message, arg != null ? ", param: " + arg : "");
-
-        return new RpcException(format, error);
+                return t0.error.errorCode() == 420 &&
+                        t0.error.errorMessage().startsWith("FLOOD_WAIT_");
+            }
+            return false;
+        };
     }
 
     /**

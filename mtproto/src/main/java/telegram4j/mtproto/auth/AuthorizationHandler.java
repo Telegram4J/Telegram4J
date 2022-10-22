@@ -246,7 +246,7 @@ public final class AuthorizationHandler {
 
         context.setServerSalt(serverSalt);
 
-        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(client.getDatacenter(), context.getAuthKey().retain());
+        AuthorizationKeyHolder authKey = new AuthorizationKeyHolder(context.getAuthKey().retain());
         onAuthSink.emitValue(authKey, Sinks.EmitFailureHandler.FAIL_FAST);
         return Mono.empty();
     }

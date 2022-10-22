@@ -30,6 +30,25 @@ public interface ResponseTransformer {
     }
 
     /**
+     * Create new {@code ResponseTransformer} which reties signals
+     * on flood wait errors for given methods scope.
+     *
+     * @param methodPredicate The method scope.
+     * @return The new {@code ResponseTransformer} which retries signals on flood wait for matched methods.
+     */
+    static ResponseTransformer retryFloodWait(MethodPredicate methodPredicate) {
+        return new ResponseTransformer() {
+            @Override
+            public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
+                if (methodPredicate.test(method)) {
+                    return mono -> mono.retryWhen(MTProtoRetrySpec.instance());
+                }
+                return Function.identity();
+            }
+        };
+    }
+
+    /**
      * Modifies specified reactive sequence with rpc response.
      *
      * @param <R> The type of method response.

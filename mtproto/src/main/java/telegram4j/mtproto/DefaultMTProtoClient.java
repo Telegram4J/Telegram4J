@@ -56,7 +56,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
@@ -64,7 +63,6 @@ import java.util.stream.Collectors;
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.DefaultMTProtoClient.PendingRequest.ACKNOWLEDGED;
 import static telegram4j.mtproto.DefaultMTProtoClient.PendingRequest.PENDING;
-import static telegram4j.mtproto.RpcException.prettyMethodName;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
@@ -95,8 +93,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final String id = Integer.toHexString(hashCode());
     private final MTProtoOptions options;
 
-    private volatile long lastPing;
-    private final AtomicLong lastPong = new AtomicLong();
+    private volatile long lastPing; // nanotime of sent Ping
+    private volatile long lastPong; // nanotime of received Pong
     private final AtomicInteger missedPong = new AtomicInteger();
 
     private final long sessionId = random.nextLong();
@@ -190,7 +188,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                                         .onErrorResume(t -> Mono.empty())
                                         .then(Mono.error(RETRY));
                             case CONFIGURED: // if not reset there is a chance that the ping interval will not work after reconnect
-                                lastPong.set(0);
+                                lastPong = 0;
                                 lastPing = 0;
                                 missedPong.set(0);
                             default:
@@ -299,7 +297,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             return Mono.error(new IllegalStateException("Data isn't aligned by 4 bytes"));
                         }
 
-                        updateTimeOffset(messageId >> 32);
+                        updateTimeOffset((int) (messageId >> 32));
 
                         ByteBuf payload = decrypted.readSlice(length);
                         try {
@@ -484,8 +482,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Mono<Void> ping = pingEmitter.ticks()
                     .flatMap(tick -> {
-                        long now = System.nanoTime();
-                        if (lastPing - lastPong.get() > 0) {
+                        if (lastPing - lastPong > 0) {
                             int missed = missedPong.incrementAndGet();
                             if (missed >= MAX_MISSED_PONG) {
                                 lastMessageId = 0; // to break connection
@@ -495,7 +492,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                             }
                         }
 
-                        lastPing = now;
+                        lastPing = System.nanoTime();
                         return sendAwait(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT));
                     })
                     .then();
@@ -515,13 +512,17 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                     })
                     .flatMap(key -> options.getStoreLayout()
-                            .updateAuthorizationKey(key).thenReturn(key));
+                            .updateAuthorizationKey(dataCenter, key).thenReturn(key));
 
             Mono<Void> awaitKey = Mono.justOrEmpty(authKey)
                     .switchIfEmpty(options.getStoreLayout().getAuthorizationKey(dataCenter))
                     .doOnNext(key -> onAuthSink.emitValue(key, FAIL_FAST))
                     .switchIfEmpty(startAuth)
                     .doOnNext(key -> this.authKey = key)
+                    .then();
+
+            Mono<Void> updateStoreDataCenter = options.storeLayout.getDataCenter()
+                    .switchIfEmpty(options.storeLayout.updateDataCenter(dataCenter).then(Mono.empty()))
                     .then();
 
             Mono<Void> startSchedule = Mono.defer(() -> {
@@ -536,7 +537,9 @@ public class DefaultMTProtoClient implements MTProtoClient {
             Mono<Void> initialize = state.asFlux()
                     .filter(s -> s == State.CONFIGURED)
                     .next()
-                    .flatMap(s -> awaitKey.then(startSchedule))
+                    .flatMap(s -> updateStoreDataCenter
+                            .then(awaitKey)
+                            .then(startSchedule))
                     .then();
 
             return Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
@@ -553,7 +556,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
         })
         // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
         .switchIfEmpty(reconnect())
-        .retryWhen(options.getRetry()
+        .retryWhen(options.getConnectionRetry()
                 .filter(t -> !closed && isRetryException(t))
                 .doAfterRetry(signal -> {
                     state.emitNext(State.RECONNECT, options.getEmissionHandler());
@@ -575,33 +578,18 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     @Override
-    public void updateTimeOffset(long serverTime) {
-        int updated = (int) (serverTime - System.currentTimeMillis() / 1000);
-        boolean changed = Math.abs(timeOffset - updated) > 3;
-        if (changed) {
+    public void updateTimeOffset(int serverTime) {
+        int now = (int) (System.currentTimeMillis() / 1000);
+        int updated = serverTime - now;
+        if (Math.abs(timeOffset - updated) > 3) {
             lastMessageId = 0;
             timeOffset = updated;
         }
     }
 
     @Override
-    public int getTimeOffset() {
-        return timeOffset;
-    }
-
-    @Override
-    public long getSessionId() {
-        return sessionId;
-    }
-
-    @Override
-    public int getSeqNo() {
-        return seqNo.get();
-    }
-
-    @Override
-    public long getServerSalt() {
-        return serverSalt;
+    public SessionInfo getSessionInfo() {
+        return new SessionInfo(timeOffset, sessionId, seqNo.get(), serverSalt, lastMessageId);
     }
 
     @Override
@@ -619,8 +607,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .transform(options.getResponseTransformers().stream()
                             .map(tr -> tr.transform(method)
                                     .andThen(m -> m.checkpoint("Apply " + tr + " to " + method + " [DefaultMTProtoClient]")))
-                            .reduce(Function.identity(), Function::andThen))
-                    .retryWhen(serverErrorRetry());
+                            .reduce(Function.identity(), Function::andThen));
         });
     }
 
@@ -641,23 +628,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public MTProtoClient createMediaClient(DataCenter dc) {
-        if (type != Type.DEFAULT) {
+        if (type != Type.DEFAULT)
             throw new IllegalStateException("Not default client can't create media clients");
-        }
+        if (dc.getType() != DataCenter.Type.MEDIA)
+            throw new IllegalStateException("Invalid datacenter type: " + dc);
 
         DefaultMTProtoClient client = new DefaultMTProtoClient(Type.MEDIA, dc, options);
-
-        client.authKey = authKey;
-        client.lastMessageId = lastMessageId;
-        client.timeOffset = timeOffset;
-        client.serverSalt = serverSalt;
-
-        return client;
-    }
-
-    @Override
-    public MTProtoClient createChildClient() {
-        DefaultMTProtoClient client = new DefaultMTProtoClient(type, dataCenter, options);
 
         client.authKey = authKey;
         client.lastMessageId = lastMessageId;
@@ -721,18 +697,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     log.debug("[C:0x{}] Retrying regenerate auth key (attempts: {})",
                             id, signal.totalRetriesInARow());
                     authContext.clear();
-                });
-    }
-
-    private Retry serverErrorRetry() {
-        return Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(2))
-                .maxBackoff(Duration.ofSeconds(15))
-                .filter(RpcException.isErrorCode(500))
-                .doAfterRetry(signal -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("[C:0x{}] Retrying request due to {} auth key for {} (attempts: {})",
-                                id, signal.failure().toString(), signal.totalRetriesInARow());
-                    }
                 });
     }
 
@@ -809,31 +773,10 @@ public class DefaultMTProtoClient implements MTProtoClient {
             handleMsgsAck(obj, messageId);
 
             PendingRequest req = requests.get(messageId);
-
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
-
-                if (rpcError.errorCode() == 420) { // FLOOD_WAIT_X
-                    String arg = rpcError.errorMessage().substring(
-                            rpcError.errorMessage().lastIndexOf('_') + 1);
-                    Duration delay = Duration.ofSeconds(Integer.parseInt(arg));
-
-                    if (rpcLog.isDebugEnabled()) {
-                        rpcLog.debug("[C:0x{}, M:0x{}] Delaying resend for {}", id, Long.toHexString(messageId), delay);
-                    }
-
-                    // Need resend with delay.
-                    return Mono.justOrEmpty(requests.remove(messageId))
-                            .delayElement(delay)
-                            .doOnNext(r -> {
-                                r.state = PENDING;
-                                outbound.emitNext(r, options.getEmissionHandler());
-                            })
-                            .then();
-                }
-
                 if (req != null) {
-                    obj = RpcException.create(rpcError, messageId, req);
+                    obj = createRpcException(rpcError, messageId, req);
                 }
             }
 
@@ -874,11 +817,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
         if (obj instanceof Pong) {
             Pong pong = (Pong) obj;
             messageId = pong.msgId();
+
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Receiving pong", id, Long.toHexString(messageId));
+                rpcLog.debug("[C:0x{}, M:0x{}] Receiving pong after {}", id, Long.toHexString(messageId),
+                        Duration.ofNanos(System.nanoTime() - lastPing));
             }
 
-            lastPong.set(System.nanoTime());
+            lastPong = System.nanoTime();
             missedPong.set(0);
 
             resolve(messageId, obj);
@@ -939,7 +884,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
             switch (badMsgNotification.errorCode()) {
                 case 16: // msg_id too low
                 case 17: // msg_id too high
-                    updateTimeOffset(messageId);
+                    updateTimeOffset((int) (messageId >> 32));
                     break;
                 case 48:
                     BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;
@@ -1077,6 +1022,28 @@ public class DefaultMTProtoClient implements MTProtoClient {
         }
     }
 
+    static String prettyMethodName(TlMethod<?> method) {
+        return method.getClass().getCanonicalName()
+                .replace("telegram4j.tl.", "")
+                .replace("request.", "")
+                .replace("Immutable", "");
+    }
+
+    static RpcException createRpcException(RpcError error, long messageId, PendingRequest request) {
+        String orig = error.errorMessage();
+        int argIdx = orig.indexOf("_X");
+        String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
+        String arg = argIdx != -1 ? orig.substring(argIdx) : null;
+        String hexMsgId = Long.toHexString(messageId);
+        String methodName = String.format("%s/0x%s", prettyMethodName(request.method), hexMsgId);
+
+        String format = String.format("%s returned code: %d, message: %s%s",
+                methodName, error.errorCode(),
+                message, arg != null ? ", param: " + arg : "");
+
+        return new RpcException(format, error);
+    }
+
     static class PendingRequest {
         static final VarHandle STATE;
 
@@ -1126,11 +1093,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     static class RetryConnectException extends RuntimeException {
 
-        RetryConnectException() {}
-
-        @Override
-        public Throwable fillInStackTrace() {
-            return this;
+        RetryConnectException() {
+            super(null, null, false, false);
         }
     }
 

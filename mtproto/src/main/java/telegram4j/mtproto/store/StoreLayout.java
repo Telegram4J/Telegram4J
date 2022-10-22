@@ -12,10 +12,17 @@ import telegram4j.tl.users.UserFull;
 
 /**
  * Storage interface for interacting with tl entities and session information.
- * Due to message ids specific differ from user to user,
+ * <p>Due to message ids specific differ from user to user,
  * the storage cannot be used by more than one user.
  */
 public interface StoreLayout {
+
+    /**
+     * Retrieve main dc to which store assigned.
+     *
+     * @return A {@link Mono} emitting on successful completion the {@link DataCenter dc} id
+     */
+    Mono<DataCenter> getDataCenter();
 
     /**
      * Retrieve local updates state.
@@ -72,7 +79,7 @@ public interface StoreLayout {
 
     /**
      * Check existence of message.
-     * Currently used only in updates handling.
+     * <p>Currently used only in updates handling.
      *
      * @param message The ordinal or service message to check.
      * @return A {@link Mono} emitting on successful completion {@code true} if message exists.
@@ -192,9 +199,11 @@ public interface StoreLayout {
 
     // not an update-related methods
 
+    Mono<Void> updateDataCenter(DataCenter dc);
+
     Mono<Void> updateState(State state);
 
-    Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authorizationKey);
+    Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey);
 
     // common request methods
 
@@ -203,6 +212,4 @@ public interface StoreLayout {
     Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
 
     Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
-
-    Mono<Void> onResolvedPeer(ResolvedPeer payload);
 }

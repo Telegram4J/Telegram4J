@@ -7,6 +7,7 @@ import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 
 public class MTProtoOptions {
@@ -15,23 +16,23 @@ public class MTProtoOptions {
     protected final Supplier<Transport> transport;
     protected final StoreLayout storeLayout;
     protected final Sinks.EmitFailureHandler emissionHandler;
-    protected final RetryBackoffSpec retry;
+    protected final RetryBackoffSpec connectionRetry;
     protected final RetryBackoffSpec authRetry;
     protected final List<ResponseTransformer> responseTransformers;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<Transport> transport, StoreLayout storeLayout,
                           Sinks.EmitFailureHandler emissionHandler,
-                          RetryBackoffSpec retry, RetryBackoffSpec authRetry,
+                          RetryBackoffSpec connectionRetry, RetryBackoffSpec authRetry,
                           List<ResponseTransformer> responseTransformers) {
-        this.datacenter = datacenter;
-        this.tcpClient = tcpClient;
-        this.transport = transport;
-        this.storeLayout = storeLayout;
-        this.emissionHandler = emissionHandler;
-        this.retry = retry;
-        this.authRetry = authRetry;
-        this.responseTransformers = responseTransformers;
+        this.datacenter = Objects.requireNonNull(datacenter);
+        this.tcpClient = Objects.requireNonNull(tcpClient);
+        this.transport = Objects.requireNonNull(transport);
+        this.storeLayout = Objects.requireNonNull(storeLayout);
+        this.emissionHandler = Objects.requireNonNull(emissionHandler);
+        this.connectionRetry = Objects.requireNonNull(connectionRetry);
+        this.authRetry = Objects.requireNonNull(authRetry);
+        this.responseTransformers = Objects.requireNonNull(responseTransformers);
     }
 
     public DataCenter getDatacenter() {
@@ -54,8 +55,8 @@ public class MTProtoOptions {
         return emissionHandler;
     }
 
-    public RetryBackoffSpec getRetry() {
-        return retry;
+    public RetryBackoffSpec getConnectionRetry() {
+        return connectionRetry;
     }
 
     public RetryBackoffSpec getAuthRetry() {

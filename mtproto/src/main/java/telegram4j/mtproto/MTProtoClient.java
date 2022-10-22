@@ -76,35 +76,14 @@ public interface MTProtoClient {
      *
      * @param serverTime The server unix time in seconds.
      */
-    void updateTimeOffset(long serverTime);
+    void updateTimeOffset(int serverTime);
 
     /**
-     * Gets calculated server time offset used in message id generation.
+     * Gets current info about mtproto session.
      *
-     * @return The calculated server time offset.
+     * @return The current info about mtproto session.
      */
-    int getTimeOffset();
-
-    /**
-     * Gets id of current mtproto session.
-     *
-     * @return The id of current mtproto session
-     */
-    long getSessionId();
-
-    /**
-     * Gets current packet sequence number.
-     *
-     * @return The current packet sequence number.
-     */
-    int getSeqNo();
-
-    /**
-     * Gets active server salt.
-     *
-     * @return The active server salt.
-     */
-    long getServerSalt();
+    SessionInfo getSessionInfo();
 
     /**
      * Create child media client, associated with given datacenter.
@@ -113,13 +92,6 @@ public interface MTProtoClient {
      * @return The new child media client.
      */
     MTProtoClient createMediaClient(DataCenter dc);
-
-    /**
-     * Create child client, associated with parent datacenter.
-     *
-     * @return The new child client.
-     */
-    MTProtoClient createChildClient();
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.

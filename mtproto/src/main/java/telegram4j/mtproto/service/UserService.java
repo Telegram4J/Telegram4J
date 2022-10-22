@@ -130,7 +130,7 @@ public class UserService extends RpcService {
     @BotCompatible
     public Mono<ResolvedPeer> resolveUsername(String username) {
         return client.sendAwait(ImmutableResolveUsername.of(username))
-                .flatMap(d -> storeLayout.onResolvedPeer(d).thenReturn(d));
+                .flatMap(d -> storeLayout.onContacts(d.chats(), d.users()).thenReturn(d));
     }
 
     public Mono<TopPeers> getTopPeers(GetTopPeers request) {

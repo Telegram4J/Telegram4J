@@ -52,6 +52,7 @@ public class MTProtoBotExample {
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
                 .addResponseTransformer(ResponseTransformer.emptyOnErrorCodes(MethodPredicate.all(), 400))
+                .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all()))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(Type.CHATS), "en")

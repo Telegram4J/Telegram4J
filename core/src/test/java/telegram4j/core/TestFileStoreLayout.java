@@ -6,8 +6,10 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
@@ -16,15 +18,13 @@ import telegram4j.tl.*;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
-import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-// Skat: This class is not designed in the best way, so do not copy it into your applications.
-// When there is time, I will make the default file store implementation.
 public class TestFileStoreLayout implements StoreLayout {
 
     private static final String DB_FILE = "core/src/test/resources/db-%s.bin";
@@ -33,9 +33,6 @@ public class TestFileStoreLayout implements StoreLayout {
 
     private final ByteBufAllocator allocator;
     private final StoreLayout delegate;
-
-    private volatile AuthorizationKeyHolder authKey;
-    private volatile ImmutableState state;
 
     public TestFileStoreLayout(StoreLayout storeLayout) {
         this(ByteBufAllocator.DEFAULT, storeLayout);
@@ -48,38 +45,20 @@ public class TestFileStoreLayout implements StoreLayout {
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.fromSupplier(() -> authKey)
+        return delegate.getAuthorizationKey(dc)
                 .publishOn(Schedulers.boundedElastic())
-                .switchIfEmpty(Mono.fromCallable(() -> {
-                    Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
-                    if (!Files.exists(fileName)) {
-                        return null;
-                    }
-
-                    log.debug("Loading session information from the file store for dc №{}.", dc.getId());
-                    String lines = String.join("", Files.readAllLines(fileName));
-                    ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
-                    ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
-                    ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
-                    this.state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
-                    buf.release();
-
-                    var holder = new AuthorizationKeyHolder(dc, authKey, authKeyId);
-                    this.authKey = holder;
-                    return holder;
-                }));
+                .switchIfEmpty(load(dc));
     }
 
     @Override
-    public Mono<Void> updateAuthorizationKey(AuthorizationKeyHolder authKey) {
-        return Mono.defer(() -> {
-            if (!authKey.equals(this.authKey)) {
-                this.authKey = authKey;
-                return save();
-            }
-            return Mono.empty();
-        })
-        .subscribeOn(Schedulers.boundedElastic());
+    public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
+        return delegate.getAuthorizationKey(dc)
+                .filter(authKey::equals)
+                .switchIfEmpty(delegate.updateAuthorizationKey(dc, authKey)
+                        .publishOn(Schedulers.boundedElastic())
+                        .and(save(dc, authKey, null))
+                        .then(Mono.empty()))
+                .then();
     }
 
     @Override
@@ -87,37 +66,15 @@ public class TestFileStoreLayout implements StoreLayout {
         return delegate.onContacts(chats, users);
     }
 
-    private Mono<Void> save() {
-        return Mono.fromCallable(() -> {
-            var key = authKey;
-            if (key == null) {
-                return null;
-            }
-
-            log.debug("Saving session information to file store for dc №{}.", key.getDc().getId());
-
-            ByteBuf authKey = TlSerialUtil.serializeBytes(allocator, key.getAuthKey().retainedDuplicate());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, key.getAuthKeyId().retainedDuplicate());
-            ByteBuf state = this.state != null ? TlSerializer.serialize(allocator, this.state) : Unpooled.EMPTY_BUFFER;
-            ByteBuf buf = Unpooled.wrappedBuffer(authKey, authKeyId, state);
-
-            Path fileName = Path.of(String.format(DB_FILE, key.getDc().getId()));
-            try {
-                Files.writeString(fileName, ByteBufUtil.hexDump(buf));
-            } finally {
-                buf.release();
-            }
-
-            return null;
-        });
+    @Override
+    public Mono<DataCenter> getDataCenter() {
+        return delegate.getDataCenter();
     }
-
-    // Delegation of methods
-    // =====================
 
     @Override
     public Mono<State> getCurrentState() {
-        return Mono.fromSupplier(() -> state);
+        return delegate.getCurrentState()
+                .switchIfEmpty(loadMain().mapNotNull(p -> p.state));
     }
 
     @Override
@@ -236,15 +193,22 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateDataCenter(DataCenter dc) {
+        return delegate.updateDataCenter(dc);
+    }
+
+    @Override
     public Mono<Void> updateState(State state) {
-        return Mono.defer(() -> {
-            if (!state.equals(this.state)) {
-                this.state = ImmutableState.copyOf(state);
-                return save();
-            }
-            return Mono.empty();
-        })
-        .publishOn(Schedulers.boundedElastic());
+        return delegate.getCurrentState()
+                .filter(state::equals)
+                // no state info or outdated
+                .switchIfEmpty(delegate.updateState(state)
+                        .publishOn(Schedulers.boundedElastic())
+                        .and(getDataCenter()
+                                .zipWhen(this::getAuthorizationKey)
+                                .flatMap(TupleUtils.function((dc, authKey) -> save(dc, authKey, state))))
+                        .then(Mono.empty()))
+                .then();
     }
 
     @Override
@@ -257,8 +221,90 @@ public class TestFileStoreLayout implements StoreLayout {
         return delegate.onChatUpdate(payload);
     }
 
-    @Override
-    public Mono<Void> onResolvedPeer(ResolvedPeer payload) {
-        return delegate.onResolvedPeer(payload);
+    private Mono<Void> save(DataCenter dc, AuthorizationKeyHolder authKey, @Nullable State state) {
+        return Mono.fromCallable(() -> {
+            log.debug("Saving session information to file store for dc №{}.", dc.getId());
+
+            ByteBuf authKeyBytes = TlSerialUtil.serializeBytes(allocator, authKey.getAuthKey().retainedDuplicate());
+            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, authKey.getAuthKeyId().retainedDuplicate());
+            ByteBuf stateBytes = state != null ? TlSerializer.serialize(allocator, state) : Unpooled.EMPTY_BUFFER;
+            ByteBuf buf = Unpooled.wrappedBuffer(authKeyBytes, authKeyId, stateBytes);
+
+            Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
+            try {
+                Files.writeString(fileName, ByteBufUtil.hexDump(buf));
+            } finally {
+                buf.release();
+            }
+
+            return null;
+        });
+    }
+
+    private Mono<PersistenceInfo> loadMain() {
+        return getDataCenter()
+                .publishOn(Schedulers.boundedElastic())
+                .flatMap(dc -> {
+                    Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
+                    if (!Files.exists(fileName)) {
+                        return Mono.empty();
+                    }
+
+                    log.debug("Loading session information from the file store for main dc №{}.", dc.getId());
+                    String lines;
+                    try {
+                        lines = Files.readString(fileName);
+                    } catch (IOException e) {
+                        return Mono.error(e);
+                    }
+
+                    ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
+                    ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
+                    ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
+                    var keyHolder = new AuthorizationKeyHolder(authKey, authKeyId);
+                    State state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
+
+                    buf.release();
+                    return delegate.updateAuthorizationKey(dc, keyHolder)
+                            .and(state != null ? delegate.updateState(state) : Mono.empty())
+                            .thenReturn(new PersistenceInfo(keyHolder, state));
+                });
+    }
+
+    private Mono<AuthorizationKeyHolder> load(DataCenter dc) {
+        return Mono.defer(() -> {
+            Path fileName = Path.of(String.format(DB_FILE, dc.getId()));
+            if (!Files.exists(fileName)) {
+                return Mono.empty();
+            }
+
+            log.debug("Loading session information from the file store for dc №{}.", dc.getId());
+            String lines;
+            try {
+                lines = Files.readString(fileName);
+            } catch (IOException e) {
+                return Mono.error(e);
+            }
+
+            ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
+            ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
+            ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
+            var keyHolder = new AuthorizationKeyHolder(authKey, authKeyId);
+            buf.release();
+
+            return delegate.updateAuthorizationKey(dc, keyHolder)
+                    .thenReturn(keyHolder);
+        });
+    }
+
+    static class PersistenceInfo {
+        final AuthorizationKeyHolder authKey;
+        @Nullable
+        final State state;
+
+        PersistenceInfo(AuthorizationKeyHolder authKey, @Nullable State state) {
+            this.authKey = authKey;
+            this.state = state;
+        }
     }
 }
