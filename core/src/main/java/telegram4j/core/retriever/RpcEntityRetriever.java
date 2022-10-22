@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -48,7 +49,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                 .flatMap(p -> {
                     switch (p.peer().identifier()) {
                         case PeerChannel.ID: return getUserFullById(client.getSelfId())
-                                .switchIfEmpty(Mono.error(IllegalStateException::new))
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId()))
                                 .mapNotNull(selfUser -> EntityFactory.createChat(client, p.chats().get(0), selfUser));
                         case PeerUser.ID: return Mono.justOrEmpty(EntityFactory.createUser(client, p.users().get(0)));
                         default: return Mono.error(new IllegalStateException("Unknown Peer type: " + p.peer()));
@@ -94,7 +95,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                         .flatMap(serviceHolder.getUserService()::getUser)
                         .zipWith(client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
                                 .getUserFullById(client.getSelfId())
-                                .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                         .mapNotNull(TupleUtils.function((c, userFull) -> EntityFactory.createChat(client, c, userFull)));
                 default: return Mono.error(new IllegalStateException());
             }
@@ -114,7 +115,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                         .flatMap(serviceHolder.getUserService()::getFullUser)
                         .zipWith(client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
                                 .getUserFullById(client.getSelfId())
-                                .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                         .mapNotNull(TupleUtils.function((c, userFull) -> EntityFactory.createChat(client, c, userFull)));
                 default: return Mono.error(new IllegalStateException());
             }
@@ -136,6 +137,7 @@ public class RpcEntityRetriever implements EntityRetriever {
         }
 
         return client.asInputChannel(channelId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(channelId))
                 .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds))
                 .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
                 .map(d -> AuxiliaryEntityFactory.createMessages(client, d));

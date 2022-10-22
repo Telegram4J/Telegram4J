@@ -7,7 +7,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
-import reactor.netty.http.client.HttpClient;
 import reactor.netty.tcp.TcpClient;
 import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
@@ -23,6 +22,7 @@ import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
@@ -60,7 +60,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private TcpClient tcpClient;
     private Supplier<Transport> transport = () -> new IntermediateTransport(true);
-    private RetryBackoffSpec retry;
+    private RetryBackoffSpec connectionRetry;
     private RetryBackoffSpec authRetry;
 
     @Nullable
@@ -69,7 +69,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options());
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
-    private HttpClient httpClient;
 
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
@@ -185,16 +184,40 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return this;
     }
 
-    public MTProtoBootstrap<O> setRetry(RetryBackoffSpec retry) {
-        this.retry = Objects.requireNonNull(retry);
+    /**
+     * Sets retry strategy for mtproto client reconnection.
+     * <p>
+     * If custom doesn't set, {@code Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(5))} will be used.
+     *
+     * @param connectionRetry A new retry strategy for mtproto client reconnection.
+     * @return This builder.
+     */
+    public MTProtoBootstrap<O> setConnectionRetry(RetryBackoffSpec connectionRetry) {
+        this.connectionRetry = Objects.requireNonNull(connectionRetry);
         return this;
     }
 
+    /**
+     * Sets retry strategy for auth key generation.
+     * <p>
+     * If custom doesn't set, {@code Retry.fixedDelay(5, Duration.ofSeconds(3))} will be used.
+     *
+     * @param authRetry A new retry strategy for auth key generation.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setAuthRetry(RetryBackoffSpec authRetry) {
         this.authRetry = Objects.requireNonNull(authRetry);
         return this;
     }
 
+    /**
+     * Sets entity retrieval strategy factory for creating default entity retriever.
+     * <p>
+     * If custom entity retrieval strategy doesn't set, {@link EntityRetrievalStrategy#STORE_FALLBACK_RPC} will be used.
+     *
+     * @param strategy A new default strategy for creating {@link EntityRetriever}.
+     * @return This builder.
+     */
     public MTProtoBootstrap<O> setEntityRetrieverStrategy(EntityRetrievalStrategy strategy) {
         this.entityRetrievalStrategy = Objects.requireNonNull(strategy);
         return this;
@@ -233,23 +256,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     public MTProtoBootstrap<O> addResponseTransformer(ResponseTransformer responseTransformer) {
         Objects.requireNonNull(responseTransformer);
         responseTransformers.add(responseTransformer);
-        return this;
-    }
-
-    /**
-     * Sets {@link HttpClient} client for direct file downloading.
-     * <p>
-     * If custom http client doesn't set, pooled with ssl and compression will be used.
-     *
-     * @throws IllegalStateException if you try to do it on bots.
-     * @param httpClient A new {@link HttpClient} for direct file downloading.
-     * @return This builder.
-     */
-    public MTProtoBootstrap<O> setHttpClient(HttpClient httpClient) {
-        if (authResources.isBot()) {
-            throw new IllegalStateException("HttpClient can't be set for bots, as they cannot download web files");
-        }
-        this.httpClient = Objects.requireNonNull(httpClient);
         return this;
     }
 
@@ -295,11 +301,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
-                            initRetry(), initAuthRetry(),
+                            initConnectionRetry(), initAuthRetry(),
                             List.copyOf(responseTransformers))));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
-                    defaultEntityParserFactory, initHttpClient(), unavailableChatPolicy);
+                    defaultEntityParserFactory, unavailableChatPolicy);
             ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
             var invokeWithLayout = InvokeWithLayer.builder()
                     .layer(TlInfo.LAYER)
@@ -347,7 +353,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             case CONNECTED:
                                 // delegate all auth work to the user and trigger authorization only if auth key is new
                                 Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
-                                        .flatMapMany(f -> Flux.from(f.apply(telegramClient)))
+                                        .flatMapMany(f -> f.apply(telegramClient))
                                         .then();
 
                                 Mono<Void> fetchSelfId = Mono.defer(() -> {
@@ -460,9 +466,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .orElseThrow();
     }
 
-    private RetryBackoffSpec initRetry() {
-        if (retry != null) {
-            return retry;
+    private RetryBackoffSpec initConnectionRetry() {
+        if (connectionRetry != null) {
+            return connectionRetry;
         }
         return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(5));
     }
@@ -472,13 +478,5 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return authRetry;
         }
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
-    }
-
-    @Nullable
-    private HttpClient initHttpClient() {
-        if (httpClient != null || authResources.isBot()) {
-            return httpClient;
-        }
-        return HttpClient.create().compress(true).followRedirect(true).secure();
     }
 }

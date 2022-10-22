@@ -24,7 +24,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public final class AuxiliaryEntityFactory {
+public class AuxiliaryEntityFactory {
 
     private AuxiliaryEntityFactory() {}
 

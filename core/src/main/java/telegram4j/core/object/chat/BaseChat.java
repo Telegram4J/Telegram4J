@@ -8,6 +8,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.Message;
 import telegram4j.core.spec.ForwardMessagesSpec;
 import telegram4j.core.spec.SendMessageSpec;
@@ -69,7 +70,8 @@ abstract class BaseChat implements Chat {
 
             var sendAs = Mono.justOrEmpty(spec.sendAs())
                     .flatMap(client::resolvePeer)
-                    .flatMap(p -> client.asInputPeer(p.getId()));
+                    .flatMap(p -> client.asInputPeer(p.getId())
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())));
 
             return Mono.justOrEmpty(spec.media())
                     .flatMap(d -> d.asData(client))
@@ -111,10 +113,12 @@ abstract class BaseChat implements Chat {
     @Override
     public Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer) {
         return client.resolvePeer(toPeer)
-                .flatMap(p -> client.asInputPeer(p.getId()))
+                .flatMap(p -> client.asInputPeer(p.getId())
+                        .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())))
                 .zipWith(Mono.justOrEmpty(spec.sendAs())
                         .flatMap(client::resolvePeer)
-                        .flatMap(p -> client.asInputPeer(p.getId()))
+                        .flatMap(p -> client.asInputPeer(p.getId())
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())))
                         .defaultIfEmpty(InputPeerEmpty.instance()))
                 .flatMapMany(function((toPeerResend, sendAs) -> client.getServiceHolder().getChatService()
                         .forwardMessages(ForwardMessages.builder()
@@ -130,10 +134,9 @@ abstract class BaseChat implements Chat {
                                         .map(Instant::getEpochSecond)
                                         .map(Math::toIntExact)
                                         .orElse(null))
-                                .build())))
-                        .flatMap(e -> client.asInputPeer(Id.of(e.peerId()))
-                                .map(p -> EntityFactory.createMessage(client, e,
-                                        Id.of(p, client.getSelfId()))));
+                                .build())
+                        .map(e -> EntityFactory.createMessage(client, e,
+                                Id.of(toPeerResend, client.getSelfId())))));
     }
 
     @Override

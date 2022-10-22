@@ -42,7 +42,7 @@ public final class Message implements TelegramObject {
     private final BaseMessage baseData;
     @Nullable
     private final MessageService serviceData;
-    private final Id resolvedChatId;
+    private final Id resolvedChatId; // possibly chat id with access hash
 
     public Message(MTProtoTelegramClient client, MessageService serviceData, Id resolvedChatId) {
         this.client = Objects.requireNonNull(client);
@@ -98,7 +98,8 @@ public final class Message implements TelegramObject {
     public Optional<Id> getAuthorId() {
         return Optional.ofNullable(getBaseData().fromId()).map(Id::of)
                 // If message from DM (and not outgoing message) fromId might be absent, just use chatId
-                .or(() -> resolvedChatId.getType() == Id.Type.USER ? Optional.of(resolvedChatId) : Optional.empty());
+                .or(() -> resolvedChatId.getType() == Id.Type.USER && baseData != null &&
+                        !baseData.out() ? Optional.of(resolvedChatId) : Optional.empty());
     }
 
     /**
@@ -368,6 +369,7 @@ public final class Message implements TelegramObject {
         return Optional.ofNullable(serviceData)
                 .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
                 .map(e -> EntityFactory.createMessageAction(client, e,
+                        // TODO: possible bug, access_hash can be absent
                         client.asResolvedInputPeer(resolvedChatId), getId()));
     }
 
@@ -380,7 +382,7 @@ public final class Message implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion updated message.
      */
     public Mono<Message> edit(EditMessageSpec spec) {
-        return Mono.defer(() -> {
+        return client.asInputPeer(resolvedChatId).switchIfEmpty(MappingUtil.unresolvedPeer(resolvedChatId)).flatMap(peer -> {
             var parsed = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                     .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s.trim()))))
@@ -401,12 +403,13 @@ public final class Message implements TelegramObject {
                                     .map(Instant::getEpochSecond)
                                     .map(Math::toIntExact)
                                     .orElse(null))
-                            .peer(client.asResolvedInputPeer(resolvedChatId))))
+                            .peer(peer)))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(client.getServiceHolder().getChatService()::editMessage)
-                    .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
+                    .flatMap(request -> client.getServiceHolder().getChatService().editMessage(request))
+                    .map(e -> EntityFactory.createMessage(client, e,
+                            Id.of(peer, client.getSelfId())));
         });
     }
 
@@ -434,12 +437,14 @@ public final class Message implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion nothing.
      */
     public Mono<Void> pin(Set<PinMessageFlags> flags) {
-        return Mono.defer(() -> client.getServiceHolder().getChatService()
-                .updatePinnedMessage(UpdatePinnedMessage.builder()
-                        .peer(client.asResolvedInputPeer(resolvedChatId))
-                        .id(getId())
-                        .flags(MappingUtil.getMaskValue(flags))
-                        .build()));
+        return client.asInputPeer(resolvedChatId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(resolvedChatId))
+                .flatMap(peer -> client.getServiceHolder().getChatService()
+                        .updatePinnedMessage(UpdatePinnedMessage.builder()
+                                .peer(peer)
+                                .id(getId())
+                                .flags(MappingUtil.getMaskValue(flags))
+                                .build()));
     }
 
     // Private methods

@@ -1,7 +1,10 @@
 package telegram4j.core.internal;
 
+import reactor.core.publisher.Mono;
+import telegram4j.core.object.chat.UnresolvedPeerException;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
+import telegram4j.core.util.Id;
 import telegram4j.core.util.ImmutableEnumSet;
 
 import java.util.Set;
@@ -17,5 +20,9 @@ public class MappingUtil {
         return values.stream()
                 .map(E::mask)
                 .reduce(0, (l, r) -> l | r);
+    }
+
+    public static <T> Mono<T> unresolvedPeer(Id peerId) {
+        return Mono.error(() -> new UnresolvedPeerException(peerId));
     }
 }

@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -46,7 +47,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                 .flatMap(p -> {
                     switch (p.peer().identifier()) {
                         case PeerChannel.ID: return getUserFullById(client.getSelfId())
-                                .switchIfEmpty(Mono.error(IllegalStateException::new))
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId()))
                                 .mapNotNull(selfUser -> EntityFactory.createChat(client, p.chats().get(0), selfUser));
                         case PeerUser.ID: return Mono.justOrEmpty(EntityFactory.createUser(client, p.users().get(0)));
                         default: return Mono.error(new IllegalStateException("Unknown Peer type: " + p.peer()));
@@ -97,7 +98,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserMinById(chatId.asLong())
                                 .zipWith(getUserFullById(client.getSelfId())
-                                        .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                        .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                                 .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());
                     }
@@ -114,7 +115,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserFullById(chatId.asLong())
                                 .zipWith(getUserFullById(client.getSelfId())
-                                        .switchIfEmpty(Mono.error(IllegalStateException::new)))
+                                        .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                                 .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());
                     }

@@ -2,7 +2,9 @@ package telegram4j.core.spec.markup;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.markup.KeyboardButton;
+import telegram4j.core.util.Id;
 import telegram4j.tl.*;
 
 public interface KeyboardButtonSpec {
@@ -43,7 +45,9 @@ public interface KeyboardButtonSpec {
             switch (type()) {
                 case URL_AUTH: {
                     InlineButtonSpec s = (InlineButtonSpec) this;
-                    return client.asInputUser(s.userId().orElseThrow())
+                    Id userId = s.userId().orElseThrow();
+                    return client.asInputUser(userId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
                             .map(id -> ImmutableInputKeyboardButtonUrlAuth.builder()
                                     .text(text())
                                     .fwdText(s.forwardText().orElse(null))
@@ -60,7 +64,9 @@ public interface KeyboardButtonSpec {
                 }
                 case USER_PROFILE: {
                     InlineButtonSpec s = (InlineButtonSpec) this;
-                    return client.asInputUser(s.userId().orElseThrow())
+                    Id userId = s.userId().orElseThrow();
+                    return client.asInputUser(userId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
                             .map(id -> ImmutableInputKeyboardButtonUserProfile.of(text(), id));
                 }
                 case SWITCH_INLINE: {

@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ChatAdminRights;
@@ -328,6 +329,7 @@ public final class GroupChat extends BaseChat {
      */
     public Mono<Void> deleteChatParticipant(Id userId, boolean revokeHistory) {
         return client.asInputUser(userId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
                 .flatMap(p -> client.getServiceHolder().getChatService()
                         .deleteChatUser(minData.id(), p, revokeHistory));
     }

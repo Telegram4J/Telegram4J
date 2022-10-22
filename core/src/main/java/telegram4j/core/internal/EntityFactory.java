@@ -47,7 +47,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public final class EntityFactory {
+public class EntityFactory {
 
     private EntityFactory() {
     }
@@ -159,8 +159,7 @@ public final class EntityFactory {
                     return null;
                 }
 
-                var exportedChatInvite = Optional.of(chatFull.fullChat())
-                        .map(telegram4j.tl.ChatFull::exportedInvite)
+                var exportedChatInvite = Optional.ofNullable(chatFull.fullChat().exportedInvite())
                         .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                         .map(d -> new ExportedChatInvite(client, d, chatFull.users().stream()
                                 // This list is *usually* small, so there is no point in computing map

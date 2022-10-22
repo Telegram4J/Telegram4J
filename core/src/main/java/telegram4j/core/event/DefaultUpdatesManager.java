@@ -15,6 +15,7 @@ import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -361,6 +362,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             .map(Chat::getId)
                             .switchIfEmpty(client.asInputPeer(peerId)
                                     .map(p -> Id.of(p, client.getSelfId())))
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
                             .map(i -> EntityFactory.createMessage(client, data, i))
                             .map(m -> new SendMessageEvent(client, m, chat, author));
                 });

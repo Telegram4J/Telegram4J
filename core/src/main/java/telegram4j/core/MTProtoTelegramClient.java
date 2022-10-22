@@ -1,7 +1,6 @@
 package telegram4j.core;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.HttpHeaderNames;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -10,6 +9,7 @@ import reactor.netty.ByteBufFlux;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -27,12 +27,10 @@ import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
-import telegram4j.tl.api.TlEncodingUtil;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.ChannelMessages;
 import telegram4j.tl.messages.Messages;
-import telegram4j.tl.storage.FileType;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -203,8 +201,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     /**
      * Request to download file by their reference from Telegram Media DC or
-     * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
-     * Method will return {@link Flux#empty()} when web-file id passed on bot accounts.
+     * if file is {@link Document#isWeb() web} and haven't telegram-proxying emit {@link IllegalStateException} exception.
+     *
+     * <p>Method will return {@link Flux#empty()} when proxied web-file id passed on bot accounts.
      *
      * @param loc The location of file.
      * @return A {@link Flux} emitting full or parts of downloading file.
@@ -212,22 +211,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     public Flux<FilePart> downloadFile(FileReferenceId loc) {
         return Flux.defer(() -> {
             if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-                if (authResources.isBot()) {
-                    return Flux.empty();
+                if (loc.getAccessHash() == -1) {
+                    return Flux.error(new IllegalStateException("Web document without access hash"));
                 }
 
-                if (loc.getAccessHash() == -1) { // Non-proxied file, just download via netty's HttpClient
-                    return mtProtoResources.getHttpClient().orElseThrow()
-                            .get().uri(loc.getUrl().orElseThrow())
-                            .responseSingle((res, buf) -> buf
-                                    .map(TlEncodingUtil::copyAsUnpooled)
-                                    .map(bytes -> {
-                                        String mimeType = res.responseHeaders().getAsString(HttpHeaderNames.CONTENT_TYPE);
-                                        int size = res.responseHeaders().getInt(HttpHeaderNames.CONTENT_LENGTH, -1);
-                                        FileType type = TlEntityUtil.suggestFileType(mimeType);
-                                        return new FilePart(type, -1, bytes, size, mimeType);
-                                    }))
-                            .flux();
+                if (authResources.isBot()) {
+                    return Flux.empty();
                 }
                 return serviceHolder.getUploadService()
                         .getWebFile(loc.asWebLocation().orElseThrow())
@@ -259,11 +248,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>channel</b> events.
      */
     public Mono<AffectedMessages> deleteChannelMessages(Id channelId, Iterable<Integer> ids) {
-        if (channelId.getType() != Id.Type.CHANNEL) {
-            return Mono.error(new IllegalArgumentException("Channel id type must be CHANNEL"));
-        }
-
-        return asInputChannel(channelId)
+        return asInputChannel(channelId) // contains check of id type
+                .switchIfEmpty(MappingUtil.unresolvedPeer(channelId))
                 .flatMap(p -> serviceHolder.getChatService()
                         .deleteMessages(p, ids));
     }

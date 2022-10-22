@@ -305,6 +305,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.asInputUser(userId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
                 .flatMap(target -> client.getServiceHolder().getChatService()
                         .editAdmin(channel, target, ImmutableChatAdminRights.of(MappingUtil.getMaskValue(rights)), rank))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
@@ -316,6 +317,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.asInputPeer(peerId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
                 .flatMap(target -> client.getServiceHolder().getChatService()
                         .editBanned(channel, target, ImmutableChatBannedRights.of(MappingUtil.getMaskValue(rights),
                                 Math.toIntExact(untilTimestamp.getEpochSecond()))))
@@ -362,9 +364,12 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Mono<ChatParticipant> getParticipant(Id participantId) {
+        InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+
         return client.asInputPeer(participantId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(participantId))
                 .flatMap(participantPeer -> client.getServiceHolder()
-                        .getChatService().getParticipant(toInputChannel(client.asResolvedInputPeer(getId())), participantPeer))
+                        .getChatService().getParticipant(channel, participantPeer))
                 .map(d -> {
                     Peer peerId = TlEntityUtil.getUserId(d.participant());
                     PeerEntity peerEntity;
