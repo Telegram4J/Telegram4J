@@ -376,7 +376,7 @@ public interface Channel extends Chat {
      *
      * @param filter The filter to retrieve channel participants.
      * @param offset The amount of participants to ignore.
-     * @param limit The max count of participants to retrieve.
+     * @param limit The max count of participants to retrieve, must not exceed 200.
      * @return A {@link Flux} emitting channel participants with user data.
      */
     Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit);

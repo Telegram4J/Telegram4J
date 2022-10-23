@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.spec.inline.InlineResultSpec;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.ImmutableEnumSet;
+import telegram4j.tl.ImmutableInlineBotSwitchPM;
 import telegram4j.tl.InlineBotSwitchPM;
 import telegram4j.tl.api.TlEncodingUtil;
 import telegram4j.tl.request.messages.SetInlineBotResults;
@@ -101,6 +102,10 @@ public final class AnswerInlineCallbackQuerySpec {
         String value = optional.orElse(null);
         if (Objects.equals(nextOffset, value)) return this;
         return new AnswerInlineCallbackQuerySpec(flags, results, cacheTime, value, switchPm);
+    }
+
+    public AnswerInlineCallbackQuerySpec withSwitchPm(String text, String startParam) {
+        return withSwitchPm(ImmutableInlineBotSwitchPM.of(text, startParam));
     }
 
     public AnswerInlineCallbackQuerySpec withSwitchPm(@Nullable InlineBotSwitchPM value) {
@@ -228,7 +233,7 @@ public final class AnswerInlineCallbackQuerySpec {
             return this;
         }
 
-        public Builder nextOffset(String nextOffset) {
+        public Builder nextOffset(@Nullable String nextOffset) {
             this.nextOffset = nextOffset;
             return this;
         }
@@ -238,7 +243,12 @@ public final class AnswerInlineCallbackQuerySpec {
             return this;
         }
 
-        public Builder switchPm(InlineBotSwitchPM switchPm) {
+        public Builder switchPm(String text, String startParam) {
+            this.switchPm = ImmutableInlineBotSwitchPM.of(text, startParam);
+            return this;
+        }
+
+        public Builder switchPm(@Nullable InlineBotSwitchPM switchPm) {
             this.switchPm = switchPm;
             return this;
         }

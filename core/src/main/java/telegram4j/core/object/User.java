@@ -179,23 +179,28 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets placeholder for inline query text field, if bot is user.
+     * Gets placeholder for inline query text field, if present.
      *
-     * @return The placeholder for inline query text field, if bot is user.
+     * @return The placeholder for inline query text field, if present.
      */
     public Optional<String> getBotInlinePlaceholder() {
         return Optional.ofNullable(minData.botInlinePlaceholder());
     }
 
     /**
-     * Gets the user's language in OS ISO 639-1 format.
+     * Gets the user's language in OS ISO 639-1 format, if present.
      *
-     * @return The ISO 639-1 lang code of the user locale.
+     * @return The ISO 639-1 lang code of the user locale, if present.
      */
     public Optional<String> getLangCode() {
         return Optional.ofNullable(minData.langCode());
     }
 
+    /**
+     * Gets the custom emoji status of user, if present.
+     *
+     * @return The custom emoji status of user, if present.
+     */
     public Optional<EmojiStatus> getEmojiStatus() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.emojiStatus()))
                 .map(e -> {
@@ -214,9 +219,9 @@ public class User implements PeerEntity {
     // FullUser fields
 
     /**
-     * Gets user's bio/about text, if present.
+     * Gets user's bio/about text, if full information available and present.
      *
-     * @return The user's bio text, if present.
+     * @return The user's bio text, if full information available and present.
      */
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(UserFull::about);
@@ -235,9 +240,9 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets detailed info about bot, if present.
+     * Gets detailed info about bot, if full information available and present.
      *
-     * @return The detailed info about bot, if present.
+     * @return The detailed info about bot, if full information available and present.
      */
     public Optional<BotInfo> getBotInfo() {
         return Optional.ofNullable(fullData)
@@ -246,9 +251,9 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets id of pinned message in this user dialog, if present.
+     * Gets id of pinned message in this user dialog, if full information available and present.
      *
-     * @return The id of pinned message in this user dialog, if present.
+     * @return The id of pinned message in this user dialog, if full information available and present.
      */
     public Optional<Integer> getPinnedMessageId() {
         return Optional.ofNullable(fullData).map(UserFull::pinnedMsgId);
@@ -290,9 +295,9 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets {@link Duration} of the message Time-To-Live in this user dialog, if present.
+     * Gets {@link Duration} of the message Time-To-Live in this user dialog, if full information available and present.
      *
-     * @return The {@link Duration} of the message Time-To-Live in this user dialog, if present.
+     * @return The {@link Duration} of the message Time-To-Live in this user dialog, if full information available and present.
      */
     public Optional<Duration> getMessageAutoDeleteDuration() {
         return Optional.ofNullable(fullData)
@@ -300,6 +305,11 @@ public class User implements PeerEntity {
                 .map(Duration::ofSeconds);
     }
 
+    /**
+     * Gets emoji representing a chat theme for dialog between current user and this user, if full information available and present.
+     *
+     * @return The emoji representing a chat theme, if full information available and emoticon present.
+     */
     public Optional<String> getThemeEmoticon() {
         return Optional.ofNullable(fullData).map(UserFull::themeEmoticon);
     }
@@ -332,7 +342,7 @@ public class User implements PeerEntity {
      * @see <a href="https://core.telegram.org/api/offsets">Pagonation</a>
      * @param offset The number of photos to be skipped.
      * @param maxId The id of max {@link Photo#getId()}.
-     * @param limit The number of photos to be returned.
+     * @param limit The number of photos to be returned, must not exceed 100.
      * @return A {@link Flux} emitting {@link Photo} objects.
      */
     public Flux<Photo> getPhotos(int offset, long maxId, int limit) {

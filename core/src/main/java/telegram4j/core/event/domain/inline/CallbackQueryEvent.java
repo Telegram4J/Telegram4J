@@ -1,10 +1,18 @@
 package telegram4j.core.event.domain.inline;
 
 import io.netty.buffer.ByteBuf;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.retriever.EntityRetriever;
+import telegram4j.tl.ImmutableInputMessageID;
+
+import java.util.List;
 
 /** Event of ordinary inline button callback. */
 public class CallbackQueryEvent extends CallbackEvent {
@@ -26,6 +34,35 @@ public class CallbackQueryEvent extends CallbackEvent {
      */
     public int getMessageId() {
         return messageId;
+    }
+
+    /**
+     * Requests to retrieve original message.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMessage() {
+        return getMessage(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve original message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMessage(EntityRetrievalStrategy strategy) {
+        return Mono.defer(() -> {
+            EntityRetriever retriever = strategy.apply(client);
+            switch (chat.getId().getType()) {
+                case CHANNEL:
+                    return retriever.getMessagesById(chat.getId(), List.of(ImmutableInputMessageID.of(messageId)));
+                case USER:
+                case CHAT:
+                    return retriever.getMessagesById(List.of(ImmutableInputMessageID.of(messageId)));
+                default: throw new IllegalStateException();
+            }
+        });
     }
 
     /**

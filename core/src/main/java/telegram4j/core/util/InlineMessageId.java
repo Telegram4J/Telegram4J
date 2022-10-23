@@ -71,9 +71,9 @@ public final class InlineMessageId {
     }
 
     /**
-     * Gets owner id of inline message.
+     * Gets owner user id of inline message.
      *
-     * @return The owner id of inline message.
+     * @return The owner user id of inline message.
      */
     public long getOwnerId() {
         return ownerId;

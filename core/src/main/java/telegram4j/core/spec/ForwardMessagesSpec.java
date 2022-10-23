@@ -2,6 +2,7 @@ package telegram4j.core.spec;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.util.BitFlag;
+import telegram4j.core.util.Id;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.api.TlEncodingUtil;
@@ -87,6 +88,14 @@ public final class ForwardMessagesSpec {
 
     public ForwardMessagesSpec withScheduleTimestamp(Optional<Instant> opt) {
         return withScheduleTimestamp(opt.orElse(null));
+    }
+
+    public ForwardMessagesSpec withSendAs(@Nullable String value) {
+        return withSendAs(value != null ? PeerId.of(value) : null);
+    }
+
+    public ForwardMessagesSpec withSendAs(@Nullable Id value) {
+        return withSendAs(value != null ? PeerId.of(value) : null);
     }
 
     public ForwardMessagesSpec withSendAs(@Nullable PeerId value) {
@@ -227,6 +236,16 @@ public final class ForwardMessagesSpec {
 
         public Builder sendAs(@Nullable PeerId sendAs) {
             this.sendAs = sendAs;
+            return this;
+        }
+
+        public Builder sendAs(@Nullable Id sendAs) {
+            this.sendAs = sendAs != null ? PeerId.of(sendAs) : null;
+            return this;
+        }
+
+        public Builder sendAs(@Nullable String sendAs) {
+            this.sendAs = sendAs != null ? PeerId.of(sendAs) : null;
             return this;
         }
 

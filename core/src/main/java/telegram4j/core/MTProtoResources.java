@@ -23,7 +23,7 @@ public final class MTProtoResources {
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         this.defaultEntityParser = defaultEntityParser;
-        this.unavailableChatPolicy = unavailableChatPolicy;
+        this.unavailableChatPolicy = Objects.requireNonNull(unavailableChatPolicy);
     }
 
     /**

@@ -416,6 +416,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             }
 
             return asInputPeer(min.getPeerId())
+                    .switchIfEmpty(MappingUtil.unresolvedPeer(min.getPeerId()))
                     .map(p -> ImmutableInputChannelFromMessage.of(p, min.getMessageId(), channelId.asLong()));
         }
 
@@ -448,6 +449,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
             }
 
             return asInputPeer(min.getPeerId())
+                    .switchIfEmpty(MappingUtil.unresolvedPeer(min.getPeerId()))
                     .map(p -> ImmutableInputUserFromMessage.of(p, min.getMessageId(), userId.asLong()));
         }
 
@@ -483,7 +485,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 }
 
                 return ImmutableInputPeerUser.of(peerId.asLong(), peerId.getAccessHash()
-                        .orElseThrow(() -> new IllegalArgumentException("No access hash present")));
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId)));
             }
             case CHAT: return ImmutableInputPeerChat.of(peerId.asLong());
             case CHANNEL: {
@@ -499,7 +501,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 }
 
                 return ImmutableInputPeerChannel.of(peerId.asLong(), peerId.getAccessHash()
-                        .orElseThrow(() -> new IllegalArgumentException("No access hash present")));
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId)));
             }
             default: throw new IllegalStateException();
         }

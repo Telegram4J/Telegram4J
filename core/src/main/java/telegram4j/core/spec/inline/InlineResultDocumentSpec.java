@@ -183,6 +183,14 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         return withDuration(opt.orElse(null));
     }
 
+    public InlineResultDocumentSpec withSize(int size) {
+        return withSize(WebDocumentFields.Size.of(size));
+    }
+
+    public InlineResultDocumentSpec withSize(int width, int height) {
+        return withSize(WebDocumentFields.Size.of(width, height));
+    }
+
     public InlineResultDocumentSpec withSize(@Nullable WebDocumentFields.Size value) {
         if (size == value) return this;
         return new InlineResultDocumentSpec(type, title, performer, description, duration, value, file, mimeType, thumb, filename, id, message);

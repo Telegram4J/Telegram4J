@@ -1,6 +1,7 @@
 package telegram4j.core.event.domain.inline;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
@@ -12,7 +13,7 @@ import telegram4j.tl.request.messages.SetBotCallbackAnswer;
 import java.util.Optional;
 
 /** Subtype of callback events invoking on pushing {@link KeyboardButton} with type {@link KeyboardButton.Type#CALLBACK}. */
-public class CallbackEvent extends BotEvent {
+public abstract class CallbackEvent extends BotEvent {
     private final long queryId;
     private final User user;
     private final long chatInstance;
@@ -93,7 +94,7 @@ public class CallbackEvent extends BotEvent {
                 "queryId=" + queryId +
                 ", user=" + user +
                 ", chatInstance=" + chatInstance +
-                ", data=" + data +
+                ", data=" + (data != null ? ByteBufUtil.hexDump(data) : null) +
                 ", gameShortName='" + gameShortName + '\'' +
                 '}';
     }

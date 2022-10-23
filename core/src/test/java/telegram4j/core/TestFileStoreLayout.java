@@ -88,6 +88,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<InputPeer> resolvePeer(Peer peerId) {
+        return delegate.resolvePeer(peerId);
+    }
+
+    @Override
     public Mono<InputUser> resolveUser(long userId) {
         return delegate.resolveUser(userId);
     }

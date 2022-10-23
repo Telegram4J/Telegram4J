@@ -651,9 +651,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             log.debug("Updates gap found for channel {}. Received pts: {}-{}, local pts: {}",
                                     id, ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
 
-                            return client.getMtProtoResources()
-                                    .getStoreLayout()
-                                    .resolveChannel(id)
+                            return client.getMtProtoResources().getStoreLayout().resolveChannel(id)
                                     .flatMapMany(c -> getChannelDifference(c, pts))
                                     .concatWith(mapUpdate);
                         } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {

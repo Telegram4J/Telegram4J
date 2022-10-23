@@ -78,7 +78,7 @@ class MessageUpdateHandlers {
         MTProtoTelegramClient client = context.getClient();
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
-        // Typically reaction adding
+        // Typically reaction adding on bots accounts
         if (message.equals(context.getOld())) {
             return Flux.empty();
         }
@@ -111,7 +111,7 @@ class MessageUpdateHandlers {
                 .map(ResolvedDeletedMessages::getMessages)
                 .map(l -> l.stream()
                         .map(d -> EntityFactory.createMessage(context.getClient(), d,
-                                Objects.requireNonNull(chatId)))
+                                Objects.requireNonNull(chatId))) // must be present
                         .collect(Collectors.toUnmodifiableList()))
                 .orElse(null);
 

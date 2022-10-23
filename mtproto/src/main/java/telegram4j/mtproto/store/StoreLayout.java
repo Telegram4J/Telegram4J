@@ -53,6 +53,17 @@ public interface StoreLayout {
     Mono<ResolvedPeer> resolvePeer(String username);
 
     /**
+     * Resolve input peer from specified peer id.
+     * This method can be used to get access hash
+     * or to check if id equals self id.
+     *
+     * @param peerId The id of peer.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link InputPeer} object, but not {@link InputPeerEmpty}.
+     */
+    Mono<InputPeer> resolvePeer(Peer peerId);
+
+    /**
      * Resolve input user id from specified user id.
      * This method can be used to get access hash
      * or to check if id equals self id.

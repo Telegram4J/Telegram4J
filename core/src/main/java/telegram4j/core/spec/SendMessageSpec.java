@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.BitFlag;
+import telegram4j.core.util.Id;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserFactory;
@@ -151,6 +152,14 @@ public final class SendMessageSpec {
         if (sendAs == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, parser,
                 replyMarkup, scheduleTimestamp, value, media);
+    }
+
+    public SendMessageSpec withSendAs(@Nullable String value) {
+        return withSendAs(value != null ? PeerId.of(value) : null);
+    }
+
+    public SendMessageSpec withSendAs(@Nullable Id value) {
+        return withSendAs(value != null ? PeerId.of(value) : null);
     }
 
     public SendMessageSpec withSendAs(Optional<PeerId> opt) {
@@ -307,6 +316,16 @@ public final class SendMessageSpec {
 
         public Builder scheduleTimestamp(Optional<Instant> scheduleTimestamp) {
             this.scheduleTimestamp = scheduleTimestamp.orElse(null);
+            return this;
+        }
+
+        public Builder sendAs(@Nullable Id sendAs) {
+            this.sendAs = sendAs != null ? PeerId.of(sendAs) : null;
+            return this;
+        }
+
+        public Builder sendAs(@Nullable String sendAs) {
+            this.sendAs = sendAs != null ? PeerId.of(sendAs) : null;
             return this;
         }
 

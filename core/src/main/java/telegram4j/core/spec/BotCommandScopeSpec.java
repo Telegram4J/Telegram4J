@@ -5,6 +5,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
@@ -15,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Represents a scope where the bot commands will be valid. */
-public class BotCommandScopeSpec {
+public final class BotCommandScopeSpec {
     private final Type type;
     @Nullable
     private final Id peerId;
@@ -101,8 +102,8 @@ public class BotCommandScopeSpec {
      * @return A new {@code BotCommandScopeSpec} scope.
      */
     public static BotCommandScopeSpec of(Type type) {
-        if (type == Type.PEER_USER || type == Type.PEER || type == Type.PEER_ADMINS)
-            throw new IllegalArgumentException("Unexpected scope type: " + type);
+        Preconditions.requireArgument(type != Type.PEER && type != Type.PEER_USER && type != Type.PEER_ADMINS,
+                () -> "Unexpected scope type: " + type);
         return new BotCommandScopeSpec(type);
     }
 
@@ -138,8 +139,8 @@ public class BotCommandScopeSpec {
      */
     public static BotCommandScopeSpec peerUser(Id peerId, Id userId) {
         Objects.requireNonNull(peerId);
-        if (userId.getType() != Id.Type.USER)
-            throw new IllegalArgumentException("userId is not types as user: " + userId.getType());
+        Preconditions.requireArgument(userId.getType() == Id.Type.USER, () ->
+                "userId is not types as user: " + userId.getType());
         return new BotCommandScopeSpec(Type.PEER_USER, peerId, userId);
     }
 

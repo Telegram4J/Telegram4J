@@ -177,6 +177,9 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
     public InlineButtonSpec withUserId(@Nullable Id value) {
         Preconditions.requireState(type == KeyboardButton.Type.URL_AUTH || type == KeyboardButton.Type.USER_PROFILE,
                 () -> "unexpected type: " + type);
+        if (value != null) {
+            Preconditions.requireArgument(value.getType() == Id.Type.USER, () -> "Unexpected id type: " + value.getType());
+        }
         if (Objects.equals(userId, value)) return this;
         return new InlineButtonSpec(type, text, data, query, url, forwardText,
                 requestWriteAccess, requiresPassword, samePeer, value);
@@ -250,7 +253,7 @@ public final class InlineButtonSpec implements KeyboardButtonSpec {
                                            @Nullable String forwardText, String url, Id botId) {
         return new InlineButtonSpec(KeyboardButton.Type.URL_AUTH, text)
                 .withRequestWriteAccess(requestWriteAccess)
-                .withForwardText(Optional.ofNullable(forwardText))
+                .withForwardText(forwardText)
                 .withUrl(url)
                 .withUserId(botId);
     }

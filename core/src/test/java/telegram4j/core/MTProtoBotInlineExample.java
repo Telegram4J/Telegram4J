@@ -45,6 +45,7 @@ public class MTProtoBotInlineExample {
                             .flatMap(MTProtoBotInlineExample::handleInlineQuery)
                             .then();
 
+                    // listen all messages with documents/photos to update lastPhotoId
                     Mono<Void> listenIncomingFri = client.on(SendMessageEvent.class)
                             .flatMap(s -> Mono.justOrEmpty(s.getMessage().getMedia()))
                             .ofType(MessageMedia.Document.class)

@@ -11,7 +11,7 @@ import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.contacts.ImmutableResolvedPeer;
 import telegram4j.tl.contacts.ResolvedPeer;
-import telegram4j.tl.messages.BaseMessages;
+import telegram4j.tl.messages.ImmutableBaseMessages;
 import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
@@ -73,6 +73,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<InputPeer> resolvePeer(Peer peerId) {
+        return Mono.fromSupplier(() -> peers.get(peerId));
+    }
+
+    @Override
     public Mono<InputUser> resolveUser(long userId) {
         return Mono.fromSupplier(() -> peers.get(ImmutablePeerUser.of(userId)))
                 .map(TlEntityUtil::toInputUser);
@@ -123,11 +128,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 }
             }
 
-            return BaseMessages.builder()
-                    .messages(messages)
-                    .chats(chats)
-                    .users(users)
-                    .build();
+            return ImmutableBaseMessages.of(messages, chats, users);
         });
     }
 
@@ -171,11 +172,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 }
             }
 
-            return BaseMessages.builder()
-                    .messages(messages)
-                    .chats(chats)
-                    .users(users)
-                    .build();
+            return ImmutableBaseMessages.of(messages, chats, users);
         });
     }
 
@@ -238,15 +235,15 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> onNewMessage(Message message) {
         return Mono.fromRunnable(() -> {
-            BaseMessageFields cast = (BaseMessageFields) message;
-            MessageId key = MessageId.create(cast);
+            BaseMessageFields copy = copy((BaseMessageFields) message);
+            MessageId key = MessageId.create(copy);
 
-            messages.put(key, cast);
+            messages.put(key, copy);
 
-            savePeer(cast.peerId(), cast);
-            Peer p = cast.fromId();
+            savePeer(copy.peerId(), copy);
+            Peer p = copy.fromId();
             if (p != null) {
-                savePeer(p, cast);
+                savePeer(p, copy);
             }
         });
     }
@@ -254,7 +251,7 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Message> onEditMessage(Message message) {
         return Mono.fromSupplier(() -> {
-            BaseMessageFields cast = (BaseMessageFields) message;
+            BaseMessageFields cast = copy((BaseMessageFields) message);
             MessageId key = MessageId.create(cast);
 
             savePeer(cast.peerId(), cast);
@@ -359,7 +356,7 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> onChatParticipant(UpdateChatParticipant payload) {
         return Mono.fromRunnable(() -> {
-            if (selfId == payload.userId() &&
+            if (selfId() == payload.userId() &&
                     payload.prevParticipant() != null &&
                     payload.newParticipant() == null) {
 
@@ -376,7 +373,7 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> onChannelParticipant(UpdateChannelParticipant payload) {
         return Mono.fromRunnable(() -> {
-            if (selfId == payload.userId() &&
+            if (selfId() == payload.userId() &&
                     payload.prevParticipant() != null &&
                     payload.newParticipant() == null) {
 
@@ -521,6 +518,8 @@ public class StoreLayoutImpl implements StoreLayout {
             case Channel.ID: return (T) ImmutableChannel.copyOf((Channel) object);
             case BaseChatFull.ID: return (T) ImmutableBaseChatFull.copyOf((BaseChatFull) object);
             case ChannelFull.ID: return (T) ImmutableChannelFull.copyOf((ChannelFull) object);
+            case BaseMessage.ID: return (T) ImmutableBaseMessage.copyOf((BaseMessage) object);
+            case MessageService.ID: return (T) ImmutableMessageService.copyOf((MessageService) object);
             default: throw new IllegalArgumentException("Unknown entity type: " + object);
         }
     }
