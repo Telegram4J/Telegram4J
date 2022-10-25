@@ -1,8 +1,12 @@
 package telegram4j.core.event.domain.message;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.chat.Chat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 
 import java.util.List;
@@ -34,6 +38,26 @@ public class DeleteMessagesEvent extends MessageEvent {
      */
     public Optional<Id> getChatId() {
         return Optional.ofNullable(chatId);
+    }
+
+    /**
+     * Requests to retrieve chat where event was triggered.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat() {
+        return getChat(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve chat where event was triggered using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(chatId)
+                .flatMap(client.withRetrievalStrategy(strategy)::getChatById);
     }
 
     /**

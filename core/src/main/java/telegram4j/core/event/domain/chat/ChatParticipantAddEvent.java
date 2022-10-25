@@ -23,6 +23,7 @@ public class ChatParticipantAddEvent extends ChatEvent {
         this.version = version;
     }
 
+    @Override
     public GroupChat getChat() {
         return chat;
     }

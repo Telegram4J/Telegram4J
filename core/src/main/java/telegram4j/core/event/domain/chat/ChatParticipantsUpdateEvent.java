@@ -43,12 +43,13 @@ public class ChatParticipantsUpdateEvent extends ChatEvent {
      *
      * @return The {@link GroupChat} where participants were updated.
      */
+    @Override
     public GroupChat getChat() {
         return chat;
     }
 
     /**
-     * Gets self participant if {@link #isForbidden()} and <i>current</i> user is chat participant.
+     * Gets self participant if {@link #isForbidden()} and <i>current</i> user is a chat participant.
      *
      * @return The {@link ChatParticipant} of self user, if present.
      */
@@ -66,7 +67,7 @@ public class ChatParticipantsUpdateEvent extends ChatEvent {
     }
 
     /**
-     * Gets list of {@link ChatParticipant}s of this group chat, if {@link #isForbidden()} if {@code false}.
+     * Gets list of {@link ChatParticipant}s of this group chat, if {@link #isForbidden()} is {@code false}.
      *
      * @return The {@link List} of {@link ChatParticipant}s of this group chat, if present.
      */

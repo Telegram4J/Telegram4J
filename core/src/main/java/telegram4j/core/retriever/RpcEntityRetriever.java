@@ -2,6 +2,7 @@ package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
@@ -123,23 +124,16 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return serviceHolder.getChatService().getMessages(messageIds)
-                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
-                .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
-    }
-
-    @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
-        if (channelId.getType() != Id.Type.CHANNEL) {
-            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: "
-                    + Id.Type.CHANNEL + ", but given: " + channelId.getType()));
-        }
-
-        return client.asInputChannel(channelId)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(channelId))
-                .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds))
-                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
-                .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
+    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return Mono.defer(() -> {
+            if (chatId == null || chatId.getType() != Id.Type.CHANNEL) {
+                return serviceHolder.getChatService().getMessages(messageIds);
+            }
+            return client.asInputChannel(chatId)
+                    .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                    .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds));
+        })
+        .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+        .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 }

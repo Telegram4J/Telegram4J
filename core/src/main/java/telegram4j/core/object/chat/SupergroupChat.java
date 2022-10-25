@@ -1,16 +1,22 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.ChannelLocation;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChannelLocation;
 import telegram4j.tl.ChannelFull;
+import telegram4j.tl.ImmutableInputMessageID;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -37,10 +43,10 @@ public final class SupergroupChat extends BaseChannel {
     // ChannelFull fields
 
     /**
-     * Gets id of the group chat from which this supergroup was migrated, if present.
+     * Gets id of the group chat from which this supergroup was migrated, if full data about chat is available and present.
      *
      * @see <a href="https://core.telegram.org/api/channel#migration">Chat Migration</a>
-     * @return The id of the group chat from which this supergroup was migrated, if present.
+     * @return The id of the group chat from which this supergroup was migrated, if full data about chat is available and present.
      */
     public Optional<Id> getMigratedFromChatId() {
         return Optional.ofNullable(fullData)
@@ -49,20 +55,61 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     /**
-     * Gets id of the latest message from which chat been migrated to the supergroup, if present.
+     * Requests to retrieve chat from which channel was migrated.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link GroupChat original chat}.
+     */
+    public Mono<GroupChat> getMigratedFrom() {
+        return getMigratedFrom(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve chat from which channel was migrated using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link GroupChat original chat}.
+     */
+    public Mono<GroupChat> getMigratedFrom(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getMigratedFromChatId())
+                .flatMap(client.withRetrievalStrategy(strategy)::getChatById)
+                .cast(GroupChat.class);
+    }
+
+    /**
+     * Gets id of the latest message from which chat been migrated to the supergroup, if full data about chat is available and present.
      *
      * @see <a href="https://core.telegram.org/api/channel#migration">Chat Migration</a>
-     * @return The id of the latest message from which chat been migrated to the supergroup, if present.
+     * @return The id of the latest message from which chat been migrated to the supergroup, if full data about chat is available and present.
      */
     public Optional<Integer> getMigratedFromMaxId() {
         return Optional.ofNullable(fullData).map(ChannelFull::migratedFromMaxId);
     }
 
     /**
-     * Gets geolocation of the supergroup, if present.
+     * Requests to retrieve the latest message from which channel was migrated.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMigratedFromMaxMessage() {
+        return getMigratedFromMaxMessage(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the latest message from which channel was migrated using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMigratedFromMaxMessage(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getMigratedFromMaxId())
+                .flatMap(id -> client.getMessagesById(List.of(ImmutableInputMessageID.of(id))));
+    }
+
+    /**
+     * Gets geolocation of the supergroup, if full data about chat available and present.
      *
      * @see <a href="https://telegram.org/blog/contacts-local-groups">Location-Based Chats</a>
-     * @return The {@link ChannelLocation geolocation} of the supergroup, if present.
+     * @return The {@link ChannelLocation geolocation} of the supergroup, if full data about chat available and present.
      */
     public Optional<ChannelLocation> getLocation() {
         return Optional.ofNullable(fullData)
@@ -71,9 +118,9 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     /**
-     * Gets send message interval for users in the supergroup, if present.
+     * Gets send message interval for users in the supergroup, if full data about chat is available and present.
      *
-     * @return The {@link Duration} with send message interval, if present.
+     * @return The {@link Duration} with send message interval, if full data about chat is available and present.
      */
     public Optional<Duration> getSlowmodeDuration() {
         return Optional.ofNullable(fullData)
@@ -82,9 +129,9 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     /**
-     * Gets next send message timestamp for <i>current</i> user, if present.
+     * Gets next send message timestamp for <i>current</i> user, if full data about chat is available and present.
      *
-     * @return The {@link Instant} of the next send message for <i>current</i> user, if present.
+     * @return The {@link Instant} of the next send message for <i>current</i> user, if full data about chat is available and present.
      */
     public Optional<Instant> getSlowmodeNextSendTimestamp() {
         return Optional.ofNullable(fullData)

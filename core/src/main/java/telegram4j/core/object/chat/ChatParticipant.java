@@ -1,19 +1,21 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.ChatBannedRightsSettings;
-import telegram4j.core.object.PeerEntity;
-import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.User;
+import telegram4j.core.object.*;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /** A {@link GroupChat chat}/{@link Channel channel} participant implementation. */
 public final class ChatParticipant implements TelegramObject {
@@ -67,6 +69,25 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Id getChatId() {
         return chatId;
+    }
+
+    /**
+     * Requests to retrieve chat.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat() {
+        return getChat(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve chat using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     */
+    public Mono<Chat> getChat(EntityRetrievalStrategy strategy) {
+        return client.withRetrievalStrategy(strategy).getChatById(chatId);
     }
 
     /**
@@ -131,6 +152,26 @@ public final class ChatParticipant implements TelegramObject {
     }
 
     /**
+     * Requests to retrieve the inviter user.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User inviter}.
+     */
+    public Mono<User> getInviter() {
+        return getInviter(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the inviter user using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User inviter}.
+     */
+    public Mono<User> getInviter(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getInviterId())
+                .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
+    }
+
+    /**
      * Gets whether this chat participant is <i>current</i> user.
      *
      * @return {@literal true} if participant is <i>current</i> user, {@literal false} otherwise.
@@ -162,11 +203,11 @@ public final class ChatParticipant implements TelegramObject {
     }
 
     /**
-     * Gets {@link EnumSet} of permissions this participant, if it's admin or present
+     * Gets {@link Set} of permissions this participant, if it's admin or present
      *
-     * @return The {@link EnumSet} of permissions this participant, if it's admin or present.
+     * @return The {@link Set} of permissions this participant, if it's admin or present.
      */
-    public Optional<EnumSet<ChatAdminRights>> getAdminRights() {
+    public Optional<Set<ChatAdminRights>> getAdminRights() {
         switch (data.identifier()) {
             case ChannelParticipantCreator.ID: return Optional.of(ChatAdminRights.of(((ChannelParticipantCreator) data).adminRights()));
             case ChannelParticipantAdmin.ID: return Optional.of(ChatAdminRights.of(((ChannelParticipantAdmin) data).adminRights()));
@@ -221,6 +262,26 @@ public final class ChatParticipant implements TelegramObject {
         return data.identifier() == ChannelParticipantBanned.ID
                 ? Optional.of(((ChannelParticipantBanned) data).kickedBy()).map(l -> Id.ofUser(l, null))
                 : Optional.empty();
+    }
+
+    /**
+     * Requests to retrieve admin which kicks participant.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User admin}.
+     */
+    public Mono<User> getKicker() {
+        return getKicker(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve admin which kicks participant using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User admin}.
+     */
+    public Mono<User> getKicker(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getKickerId())
+                .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
     }
 
     /**

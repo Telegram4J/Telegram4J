@@ -56,8 +56,7 @@ class ChannelUpdateHandlers {
                 .orElse(null);
 
         return Flux.just(new ChatParticipantUpdateEvent(context.getClient(),
-                timestamp, oldParticipant, currentParticipant,
-                invite, upd.qts(), channel, actor));
+                timestamp, oldParticipant, currentParticipant, invite, channel, actor));
     }
 
 }

@@ -103,7 +103,7 @@ class MessageUpdateHandlers {
     }
 
     static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
-        var chatId = Optional.ofNullable(context.getOld())
+        Id chatId = Optional.ofNullable(context.getOld())
                 .map(r -> Id.of(r.getPeer(), context.getClient().getSelfId()))
                 .orElse(null);
 
@@ -128,7 +128,6 @@ class MessageUpdateHandlers {
                 ? Id.of(((UpdatePinnedMessages) upd).peer())
                 : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId(), null);
 
-        return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId,
-                upd.messages(), upd.pts(), upd.ptsCount()));
+        return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
     }
 }

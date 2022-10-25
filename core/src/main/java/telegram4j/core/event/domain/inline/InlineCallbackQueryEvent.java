@@ -60,7 +60,7 @@ public class InlineCallbackQueryEvent extends CallbackEvent {
                             .message(txt.isEmpty() ? null : txt)
                             .entities(ent.isEmpty() ? null : ent)
                             .noWebpage(spec.noWebpage())
-                            .id(getMessageId().asData())))
+                            .id(messageId.asData())))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))

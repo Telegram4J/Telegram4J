@@ -91,7 +91,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(ChannelFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
+                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override

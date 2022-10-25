@@ -1,6 +1,7 @@
 package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -70,13 +71,8 @@ public class PreferredEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return delegate.getMessagesById(messageIds);
-    }
-
-    @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
-        return delegate.getMessagesById(channelId, messageIds);
+    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return delegate.getMessagesById(chatId, messageIds);
     }
 
     /** Types of volumes of returned information. */

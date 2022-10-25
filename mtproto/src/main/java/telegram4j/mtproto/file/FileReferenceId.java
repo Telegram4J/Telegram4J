@@ -26,6 +26,7 @@ import java.util.Optional;
  * and groups, as well as other privacy factors.
  */
 public class FileReferenceId {
+    // TODO: Support stickers and emojis from getStickerSet()
 
     static final String PREFIX = "x74JF1D";
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;

@@ -21,21 +21,19 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     private final ChatParticipant currentParticipant;
     @Nullable
     private final ExportedChatInvite invite;
-    private final int qts;
     private final Chat chat;
     private final User actor;
 
     public ChatParticipantUpdateEvent(MTProtoTelegramClient client, Instant timestamp,
                                       @Nullable ChatParticipant oldParticipant,
                                       @Nullable ChatParticipant currentParticipant,
-                                      @Nullable ExportedChatInvite invite, int qts,
+                                      @Nullable ExportedChatInvite invite,
                                       Chat chat, User actor) {
         super(client);
         this.timestamp = timestamp;
         this.oldParticipant = oldParticipant;
         this.currentParticipant = currentParticipant;
         this.invite = invite;
-        this.qts = qts;
         this.chat = chat;
         this.actor = actor;
     }
@@ -95,19 +93,11 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     }
 
     /**
-     * Gets qts number of event.
-     *
-     * @return The qts number of event.
-     */
-    public int getQts() {
-        return qts;
-    }
-
-    /**
      * Gets chat where participant was updated.
      *
      * @return The {@link GroupChat} or {@link Channel} where participant was updated.
      */
+    @Override
     public Chat getChat() {
         return chat;
     }
@@ -128,7 +118,6 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
                 ", oldParticipant=" + oldParticipant +
                 ", currentParticipant=" + currentParticipant +
                 ", invite=" + invite +
-                ", qts=" + qts +
                 ", chat=" + chat +
                 ", actor=" + actor +
                 '}';

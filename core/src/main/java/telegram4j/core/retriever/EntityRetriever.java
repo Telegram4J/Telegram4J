@@ -1,6 +1,7 @@
 package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -88,27 +89,16 @@ public interface EntityRetriever {
     Mono<Chat> getChatFullById(Id chatId);
 
     /**
-     * Retrieve messages from user/group chats with auxiliary data by the specified message ids.
-     * Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
+     * Retrieve messages from channel or chat with auxiliary data by the specified chat id and message ids.
+     * <p>Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
      * used for user/group chats.
      *
-     * @implSpec Auxiliary data must contain chat and author if available.
+     * @implSpec Auxiliary data must contain chat and authors of message if available.
      *
+     * @param chatId The id of chat, can be optional for messages from DMs and group chats.
      * @param messageIds An iterable of message id elements.
      * @return A {@link Mono} emitting on successful completion
      * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
      */
-    Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds);
-
-    /**
-     * Retrieve messages from channel with auxiliary data by the specified channel id and message ids.
-     *
-     * @implSpec Auxiliary data must contain chat and author if available.
-     *
-     * @param channelId The id of chat.
-     * @param messageIds An iterable of message id elements.
-     * @return A {@link Mono} emitting on successful completion
-     * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
-     */
-    Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds);
+    Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds);
 }

@@ -96,8 +96,7 @@ public final class GroupChat extends BaseChat {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(BaseChatFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        // since the data may be outdated, we can't use InputMessagePinned
-                        .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
+                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override

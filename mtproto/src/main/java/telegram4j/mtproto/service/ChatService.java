@@ -976,6 +976,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableToggleJoinRequest.of(channel, enabled));
     }
 
+    @BotCompatible
     public Mono<AffectedHistory> deleteParticipantHistory(InputChannel channel, InputPeer participant) {
         return client.sendAwait(ImmutableDeleteParticipantHistory.of(channel, participant));
     }

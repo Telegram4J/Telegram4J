@@ -1,6 +1,7 @@
 package telegram4j.core.retriever;
 
 import reactor.core.publisher.Mono;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -64,14 +65,8 @@ public class FallbackEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return first.getMessagesById(messageIds)
-                .switchIfEmpty(second.getMessagesById(messageIds));
-    }
-
-    @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
-        return first.getMessagesById(channelId, messageIds)
-                .switchIfEmpty(second.getMessagesById(channelId, messageIds));
+    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return first.getMessagesById(chatId, messageIds)
+                .switchIfEmpty(second.getMessagesById(chatId, messageIds));
     }
 }

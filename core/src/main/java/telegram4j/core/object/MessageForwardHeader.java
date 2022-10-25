@@ -7,7 +7,6 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.ImmutableInputMessageID;
@@ -174,16 +173,8 @@ public class MessageForwardHeader implements TelegramObject {
     public Mono<AuxiliaryMessages> getSavedFrom(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(data.savedFromMsgId())
                 .map(id -> List.of(ImmutableInputMessageID.of(id)))
-                .flatMap(messageId -> {
-                    EntityRetriever retriever = client.withRetrievalStrategy(strategy);
-                    Id peerId = getSavedFromPeerId().orElseThrow();
-                    switch (peerId.getType()) {
-                        case USER:
-                        case CHAT: return retriever.getMessagesById(messageId);
-                        case CHANNEL: return retriever.getMessagesById(peerId, messageId);
-                        default: return Mono.error(new IllegalStateException());
-                    }
-                });
+                .flatMap(messageId -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(getSavedFromPeerId().orElseThrow(), messageId));
     }
 
     // TODO: docs

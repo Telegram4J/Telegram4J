@@ -131,18 +131,21 @@ class ChatUpdateHandlers {
                 .orElse(null);
 
         return Flux.just(new ChatParticipantUpdateEvent(context.getClient(), timestamp,
-                oldParticipant, currentParticipant, exportedChatInvite, upd.qts(),
-                chat, actor));
+                oldParticipant, currentParticipant, exportedChatInvite, chat, actor));
     }
 
     static Flux<ChatEvent> handleUpdateChatParticipants(StatefulUpdateContext<UpdateChatParticipants, Void> context) {
         ChatParticipants chatParticipants = context.getUpdate().participants();
         Id chatId = Id.ofChat(chatParticipants.chatId());
+        if (!context.getChats().containsKey(chatId)) {
+            return Flux.empty();
+        }
+
+        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
                 ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
 
-                GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
                         .map(d -> new ChatParticipant(context.getClient(),
                                 context.getUsers().get(Id.ofUser(d.userId(), null)), d, chat.getId()))
@@ -154,7 +157,6 @@ class ChatUpdateHandlers {
             case BaseChatParticipants.ID: {
                 BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
 
-                GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
                 var participants = upd.participants().stream()
                         .map(d -> new ChatParticipant(context.getClient(),
                                 context.getUsers().get(Id.ofUser(d.userId(), null)), d, chat.getId()))

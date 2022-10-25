@@ -13,9 +13,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Markup text entity.
- * <p>
- * For parsing entities use {@link EntityParserSupport} utility.
+ * Representation of markup text entity.
+ *
+ * <p>For parsing entities use {@link EntityParserSupport} utility.
  */
 public final class MessageEntity implements TelegramObject {
 
@@ -75,7 +75,7 @@ public final class MessageEntity implements TelegramObject {
      * Gets programming language for code block, if {@code getType() == Type.PRE}.
      * Might be empty string if language isn't specified.
      *
-     * @return The programming language name for code block, if {@code getType() == Type.PRE}.
+     * @return The programming language name for code block.
      */
     public Optional<String> getLanguage() {
         return data.identifier() == MessageEntityPre.ID
@@ -86,7 +86,7 @@ public final class MessageEntity implements TelegramObject {
     /**
      * Gets url for <a href="https://www.google.com">text url</a>, if {@code getType() == Type.TEXT_URL}.
      *
-     * @return The url for in-text url, if {@code getType() == Type.TEXT_URL}.
+     * @return The url for in-text url.
      */
     public Optional<String> getUrl() {
         return data.identifier() == MessageEntityTextUrl.ID
@@ -97,10 +97,9 @@ public final class MessageEntity implements TelegramObject {
     /**
      * Gets id of the mentioned user, if {@code getType() == Type.MENTION_NAME}.
      *
-     * @return The id of the mentioned user, if {@code getType() == Type.MENTION_NAME}.
+     * @return The id of the mentioned user.
      */
     public Optional<Id> getUserId() {
-        // InputMessageEntityMentionName doesn't handle because it's an input entity, that maps into the MessageEntityMentionName
         return data.identifier() == MessageEntityMentionName.ID
                 ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId(), null))
                 : Optional.empty();
@@ -123,13 +122,13 @@ public final class MessageEntity implements TelegramObject {
      */
     public Mono<User> getUser(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getUserId())
-                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
+                .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
     }
 
     /**
-     * Gets id of the custom emoji.
+     * Gets id of the custom emoji, if {@code getType() == Type.CUSTOM_EMOJI}.
      *
-     * @return The id of custom emoji, if {@code getType() == Type.CUSTOM_EMOJI}.
+     * @return The id of custom emoji.
      */
     public Optional<Long> getDocumentId() {
         return data.identifier() == MessageEntityCustomEmoji.ID
@@ -159,7 +158,7 @@ public final class MessageEntity implements TelegramObject {
     }
 
     public enum Type {
-        /** Message entity mentioning the current user. */
+        /** Message entity mentioning the channel or user through <i>@username</i>. */
         MENTION,
 
         /** <i>#hashtag</i> message entity. */
@@ -189,7 +188,7 @@ public final class MessageEntity implements TelegramObject {
          */
         PRE,
 
-        /** Message entity representing a text url: <i>[text](url)</i>. */
+        /** Message entity representing a text url in a format like this: <i>[text](url)</i>. */
         TEXT_URL,
 
         /** Message entity representing a <a href="https://t.me/test">user mention</a>. */
@@ -242,7 +241,7 @@ public final class MessageEntity implements TelegramObject {
                 case MessageEntityPre.ID: return PRE;
                 case MessageEntityTextUrl.ID: return TEXT_URL;
                 case MessageEntityMentionName.ID:
-                case InputMessageEntityMentionName.ID: return MENTION_NAME;
+                case InputMessageEntityMentionName.ID: return MENTION_NAME; // for compatibility
                 case MessageEntityPhone.ID: return PHONE_NUMBER;
                 case MessageEntityCashtag.ID: return CASHTAG;
                 case MessageEntityUnderline.ID: return UNDERLINE;

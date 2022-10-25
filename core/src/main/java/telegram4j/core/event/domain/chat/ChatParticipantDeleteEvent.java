@@ -16,6 +16,7 @@ public class ChatParticipantDeleteEvent extends ChatEvent {
         this.version = version;
     }
 
+    @Override
     public GroupChat getChat() {
         return chat;
     }

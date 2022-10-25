@@ -9,7 +9,6 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.tl.ImmutableInputMessageID;
 
 import java.util.List;
@@ -52,17 +51,8 @@ public class CallbackQueryEvent extends CallbackEvent {
      * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
      */
     public Mono<AuxiliaryMessages> getMessage(EntityRetrievalStrategy strategy) {
-        return Mono.defer(() -> {
-            EntityRetriever retriever = strategy.apply(client);
-            switch (chat.getId().getType()) {
-                case CHANNEL:
-                    return retriever.getMessagesById(chat.getId(), List.of(ImmutableInputMessageID.of(messageId)));
-                case USER:
-                case CHAT:
-                    return retriever.getMessagesById(List.of(ImmutableInputMessageID.of(messageId)));
-                default: throw new IllegalStateException();
-            }
-        });
+        return client.withRetrievalStrategy(strategy)
+                .getMessagesById(chat.getId(), List.of(ImmutableInputMessageID.of(messageId)));
     }
 
     /**

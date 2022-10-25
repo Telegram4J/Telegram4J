@@ -2,6 +2,7 @@ package telegram4j.core.event.domain.chat;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.object.chat.Chat;
 
 /**
  * Subtype of chat/channel related events.
@@ -20,4 +21,6 @@ public abstract class ChatEvent extends Event {
     protected ChatEvent(MTProtoTelegramClient client) {
         super(client);
     }
+
+    public abstract Chat getChat();
 }

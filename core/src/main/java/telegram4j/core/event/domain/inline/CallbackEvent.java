@@ -80,7 +80,7 @@ public abstract class CallbackEvent extends BotEvent {
     public Mono<Boolean> answer(AnswerCallbackQuerySpec spec) {
         return Mono.defer(() -> client.getServiceHolder().getChatService()
                 .setBotCallbackAnswer(SetBotCallbackAnswer.builder()
-                        .queryId(getQueryId())
+                        .queryId(queryId)
                         .alert(spec.alert())
                         .message(spec.message().orElse(null))
                         .url(spec.url().orElse(null))

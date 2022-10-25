@@ -278,7 +278,7 @@ public class User implements PeerEntity {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(UserFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(List.of(ImmutableInputMessageID.of(id))));
+                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     /**

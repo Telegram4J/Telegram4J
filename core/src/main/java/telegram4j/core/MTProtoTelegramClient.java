@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufFlux;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
@@ -517,6 +518,21 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return strategy.apply(this);
     }
 
+    /**
+     * Retrieve messages from group chat or DM with auxiliary data by the specified message ids.
+     * <p>Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
+     * used for user/group chats.
+     *
+     * @implSpec Auxiliary data must contain chat and authors of message if available.
+     *
+     * @param messageIds An iterable of message id elements.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
+     */
+    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
+        return entityRetriever.getMessagesById(null, messageIds);
+    }
+
     // EntityRetriever methods
     // ===========================
 
@@ -556,13 +572,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return entityRetriever.getMessagesById(messageIds);
-    }
-
-    @Override
-    public Mono<AuxiliaryMessages> getMessagesById(Id channelId, Iterable<? extends InputMessage> messageIds) {
-        return entityRetriever.getMessagesById(channelId, messageIds);
+    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return entityRetriever.getMessagesById(chatId, messageIds);
     }
 
     // Internal methods
