@@ -22,9 +22,9 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.ResettableInterval;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.ChatFull;
-import telegram4j.tl.messages.ImmutableChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
@@ -382,9 +382,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
                 .flatMap(TupleUtils.function((u, cpts) -> {
                     var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId(), null)))
-                            .map(ch -> (Channel) ch)
-                            .map(ch -> ImmutableBaseInputChannel.of(ch.id(),
-                                    Objects.requireNonNull(ch.accessHash())))
+                            .map(c -> TlEntityUtil.toInputChannel(client.asResolvedInputPeer(c.getId()))) // must be present
                             .orElseThrow();
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
@@ -448,13 +446,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         Id channelId = Id.of(request.channel(), client.getSelfId());
         Mono<Void> updatePts = client.getMtProtoResources()
-                .getStoreLayout().getChannelFullById(channelId.asLong())
-                .map(c -> ImmutableChatFull.copyOf(c)
-                        .withFullChat(ImmutableChannelFull.copyOf((ChannelFull) c.fullChat())
-                                .withPts(newPts)))
-                .flatMap(c -> client.getMtProtoResources()
-                        .getStoreLayout().onChatUpdate(c))
-                .then();
+                .getStoreLayout().updateChannelPts(channelId.asLong(), newPts);
 
         Flux<Event> refetchDifference = Flux.defer(() -> {
             if (diff.isFinal()) {
@@ -510,7 +502,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 Mono<Void> saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
-                return saveContacts.and(updatePts)
+                return updatePts.and(saveContacts)
                         .thenMany(Flux.fromIterable(diff0.otherUpdates()))
                         .flatMap(update -> UpdatesMapper.instance.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
@@ -612,8 +604,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
             }
 
-            Flux<Event> preApply = Flux.empty();
             if (channelId == -1) { // common pts
+                Flux<Event> preApply = Flux.empty();
                 int pts = this.pts;
                 if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
@@ -643,8 +635,11 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     .cast(ChannelFull.class)
                     .map(ChannelFull::pts)
                     .flatMapMany(pts -> {
+                        Mono<Void> updatePts = client.getMtProtoResources()
+                                .getStoreLayout().updateChannelPts(id, ptsUpdate.pts());
+
                         if (justApplied.get()) {
-                            return mapUpdate;
+                            return updatePts.thenMany(mapUpdate);
                         }
 
                         if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
@@ -657,7 +652,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                             return Flux.empty();
                         }
-                        return mapUpdate;
+                        return updatePts.thenMany(mapUpdate);
                     });
         }
 

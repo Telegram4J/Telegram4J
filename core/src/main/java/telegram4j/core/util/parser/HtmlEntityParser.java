@@ -71,7 +71,7 @@ class HtmlEntityParser extends BaseEntityParser {
             }
 
             int length = 3;
-            MessageEntity.Type type = MessageEntity.Type.UNKNOWN;
+            MessageEntity.Type type = null;
             String arg = null;
 
             int endPos = -1;
@@ -144,13 +144,13 @@ class HtmlEntityParser extends BaseEntityParser {
 
                             length += href.length();
                         } else {
-                            type = MessageEntity.Type.UNKNOWN;
+                            type = null;
                         }
                     } else { // end of url/mention
                         if (prev.type() != MessageEntity.Type.TEXT_URL &&
                             prev.type() != MessageEntity.Type.MENTION_NAME) {
                             // incorrect tag markup
-                            type = MessageEntity.Type.UNKNOWN;
+                            type = null;
                         } else {
                             type = prev.type();
                         }
@@ -172,7 +172,7 @@ class HtmlEntityParser extends BaseEntityParser {
                                 arg = unqoute(parts[1]);
                                 length += language.length();
                             } else {
-                                type = MessageEntity.Type.UNKNOWN;
+                                type = null;
                             }
                         }
                     }
@@ -188,7 +188,7 @@ class HtmlEntityParser extends BaseEntityParser {
                     break;
             }
 
-            if (type == MessageEntity.Type.UNKNOWN) {
+            if (type == null) {
                 striped.append(c);
             } else {
                 EntityTokenImpl t = new EntityTokenImpl(type, cursor - offset, arg);

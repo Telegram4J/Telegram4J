@@ -62,6 +62,11 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateChannelPts(long channelId, int pts) {
+        return delegate.updateChannelPts(channelId, pts);
+    }
+
+    @Override
     public Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
         return delegate.onContacts(chats, users);
     }
@@ -148,13 +153,13 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onNewMessage(Message message) {
-        return delegate.onNewMessage(message);
+    public Mono<Void> onNewMessage(Message update) {
+        return delegate.onNewMessage(update);
     }
 
     @Override
-    public Mono<Message> onEditMessage(Message message) {
-        return delegate.onEditMessage(message);
+    public Mono<Message> onEditMessage(Message update) {
+        return delegate.onEditMessage(update);
     }
 
     @Override

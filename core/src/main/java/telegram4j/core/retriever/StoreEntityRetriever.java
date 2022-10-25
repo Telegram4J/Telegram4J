@@ -47,9 +47,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                 .flatMap(storeLayout::resolvePeer)
                 .flatMap(p -> {
                     switch (p.peer().identifier()) {
-                        case PeerChannel.ID: return getUserFullById(client.getSelfId())
-                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId()))
-                                .mapNotNull(selfUser -> EntityFactory.createChat(client, p.chats().get(0), selfUser));
+                        case PeerChannel.ID: return Mono.justOrEmpty(EntityFactory.createChat(client, p.chats().get(0), null));
                         case PeerUser.ID: return Mono.justOrEmpty(EntityFactory.createUser(client, p.users().get(0)));
                         default: return Mono.error(new IllegalStateException("Unknown Peer type: " + p.peer()));
                     }

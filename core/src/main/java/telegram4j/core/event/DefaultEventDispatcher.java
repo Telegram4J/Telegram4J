@@ -27,18 +27,15 @@ public class DefaultEventDispatcher implements EventDispatcher {
     public <E extends Event> Flux<E> on(Class<E> type) {
         return sink.asFlux()
                 .publishOn(eventScheduler)
-                .ofType(type)
-                .handle((e, sink) -> {
-                    if (log.isTraceEnabled()) {
-                        log.trace(e.toString());
-                    }
-
-                    sink.next(e);
-                });
+                .ofType(type);
     }
 
     @Override
     public void publish(Event event) {
+        if (log.isTraceEnabled()) {
+            log.trace(event.toString());
+        }
+
         sink.emitNext(event, emissionHandler);
     }
 

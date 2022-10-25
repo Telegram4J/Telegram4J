@@ -328,7 +328,7 @@ public class EntityFactory {
             case telegram4j.tl.MessageMediaGeoLive.ID:
                 return new MessageMedia.GeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
             case telegram4j.tl.MessageMediaPoll.ID:
-                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data);
+                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data, messageId, peer);
             case telegram4j.tl.MessageMediaDice.ID:
                 return new MessageMedia.Dice(client, (telegram4j.tl.MessageMediaDice) data);
             default:

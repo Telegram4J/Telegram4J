@@ -132,6 +132,7 @@ public class ChatService extends RpcService {
         return client.sendAwait(ImmutableRateTranscribedAudio.of(peer, messageId, transcriptionId, good));
     }
 
+    @BotCompatible
     public Mono<List<Document>> getCustomEmojiDocuments(Iterable<Long> documentIds) {
         return Mono.defer(() -> client.sendAwait(ImmutableGetCustomEmojiDocuments.of(documentIds)));
     }

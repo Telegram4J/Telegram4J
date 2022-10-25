@@ -186,9 +186,9 @@ public interface StoreLayout {
 
     // message updates
 
-    Mono<Void> onNewMessage(Message message);
+    Mono<Void> onNewMessage(Message update);
 
-    Mono<Message> onEditMessage(Message message);
+    Mono<Message> onEditMessage(Message update);
 
     Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update);
 
@@ -215,6 +215,8 @@ public interface StoreLayout {
     Mono<Void> updateState(State state);
 
     Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey);
+
+    Mono<Void> updateChannelPts(long channelId, int pts);
 
     // common request methods
 

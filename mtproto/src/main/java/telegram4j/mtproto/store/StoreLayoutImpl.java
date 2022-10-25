@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -30,8 +31,8 @@ import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 public class StoreLayoutImpl implements StoreLayout {
 
     private final Cache<MessageId, BaseMessageFields> messages;
-    private final ConcurrentMap<Long, PartialFields<BaseChat, BaseChatFull>> chats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, PartialFields<Channel, ChannelFull>> channels = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, PartialFields<ImmutableBaseChat, ImmutableBaseChatFull>> chats = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, PartialFields<ImmutableChannel, ImmutableChannelFull>> channels = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
@@ -233,9 +234,9 @@ public class StoreLayoutImpl implements StoreLayout {
     // ==================
 
     @Override
-    public Mono<Void> onNewMessage(Message message) {
+    public Mono<Void> onNewMessage(Message update) {
         return Mono.fromRunnable(() -> {
-            BaseMessageFields copy = copy((BaseMessageFields) message);
+            BaseMessageFields copy = copy((BaseMessageFields) update);
             MessageId key = MessageId.create(copy);
 
             messages.put(key, copy);
@@ -249,9 +250,9 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Message> onEditMessage(Message message) {
+    public Mono<Message> onEditMessage(Message update) {
         return Mono.fromSupplier(() -> {
-            BaseMessageFields cast = copy((BaseMessageFields) message);
+            BaseMessageFields cast = copy((BaseMessageFields) update);
             MessageId key = MessageId.create(cast);
 
             savePeer(cast.peerId(), cast);
@@ -400,6 +401,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> updateChannelPts(long channelId, int pts) {
+        return Mono.fromRunnable(() -> channels.computeIfPresent(channelId, (k, v) -> v.withFull(m -> m.withPts(pts))));
+    }
+
+    @Override
     public Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
         return Mono.fromRunnable(() -> saveContacts(chats, users));
     }
@@ -437,9 +443,9 @@ public class StoreLayoutImpl implements StoreLayout {
         }
 
         if (chat1.identifier() == BaseChat.ID) {
-            chats.put(chat0.id(), new PartialFields<>((BaseChat) chat1, (BaseChatFull) chat0));
+            chats.put(chat0.id(), new PartialFields<>((ImmutableBaseChat) chat1, (ImmutableBaseChatFull) chat0));
         } else { // Channel
-            channels.put(chat0.id(), new PartialFields<>((Channel) chat1, (ChannelFull) chat0));
+            channels.put(chat0.id(), new PartialFields<>((ImmutableChannel) chat1, (ImmutableChannelFull) chat0));
             saveUsernamePeer(chat0);
         }
 
@@ -496,11 +502,11 @@ public class StoreLayoutImpl implements StoreLayout {
 
         Chat cpy = copy(chat);
         if (chat.identifier() == BaseChat.ID) {
-            BaseChat c = (BaseChat) cpy;
+            var c = ImmutableBaseChat.copyOf((BaseChat) cpy);
             savePeer(ImmutablePeerChat.of(c.id()), null);
             chats.compute(cpy.id(), (k, v) -> v == null ? new PartialFields<>(c) : v.withMin(c));
         } else { // Channel
-            Channel c =  (Channel) cpy;
+            var c =  ImmutableChannel.copyOf((Channel) cpy);
             Long acch = c.accessHash();
             if (acch != null) {
                 peers.put(ImmutablePeerChannel.of(c.id()), ImmutableInputPeerChannel.of(c.id(), acch));
@@ -745,6 +751,12 @@ public class StoreLayoutImpl implements StoreLayout {
 
         public PartialFields<M, F> withMin(M min) {
             if (this.min == min) return this;
+            return new PartialFields<>(min, full);
+        }
+
+        public PartialFields<M, F> withFull(UnaryOperator<F> mapper) {
+            var full = mapper.apply(this.full);
+            if (this.full == full) return this;
             return new PartialFields<>(min, full);
         }
 

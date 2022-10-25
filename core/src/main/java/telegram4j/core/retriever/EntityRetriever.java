@@ -16,6 +16,7 @@ public interface EntityRetriever {
 
     /**
      * Search peer entity by the specified {@link PeerId id}.
+     * This method will not return a {@link PrivateChat}.
      *
      * @implSpec the implementation must support <b>me</b> and <b>self</b>
      * aliases to retrieve information about itself.

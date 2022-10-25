@@ -64,7 +64,7 @@ class MarkdownV2EntityParser extends BaseEntityParser {
             }
 
             int length = 1;
-            MessageEntity.Type type = MessageEntity.Type.UNKNOWN;
+            MessageEntity.Type type = null;
             String arg = null;
             switch (c) {
                 case '*':
@@ -168,7 +168,7 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                     break;
             }
 
-            if (type == MessageEntity.Type.UNKNOWN) {
+            if (type == null) {
                 striped.append(c);
             } else {
                 // skip identity tokens chars

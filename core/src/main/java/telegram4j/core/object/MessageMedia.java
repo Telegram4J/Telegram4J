@@ -418,10 +418,14 @@ public class MessageMedia implements TelegramObject {
     public static class Poll extends MessageMedia {
 
         private final MessageMediaPoll data;
+        private final int messageId;
+        private final InputPeer peer;
 
-        public Poll(MTProtoTelegramClient client, MessageMediaPoll data) {
+        public Poll(MTProtoTelegramClient client, MessageMediaPoll data, int messageId, InputPeer peer) {
             super(client, Type.POLL);
             this.data = Objects.requireNonNull(data);
+            this.messageId = messageId;
+            this.peer = Objects.requireNonNull(peer);
         }
 
         /**
@@ -439,7 +443,7 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link PollResults} object.
          */
         public PollResults getResults() {
-            return new PollResults(client, data.results());
+            return new PollResults(client, data.results(), messageId, peer);
         }
 
         @Override

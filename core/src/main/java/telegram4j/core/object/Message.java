@@ -6,6 +6,7 @@ import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -105,7 +106,7 @@ public final class Message implements TelegramObject {
     /**
      * Requests to retrieve author of this message.
      *
-     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     * @return An {@link Mono} emitting on successful completion the {@link User} or {@link Channel}.
      */
     public Mono<PeerEntity> getAuthor() {
         return getAuthor(MappingUtil.IDENTITY_RETRIEVER);
@@ -115,7 +116,7 @@ public final class Message implements TelegramObject {
      * Requests to retrieve author of this message using specified retrieval strategy.
      *
      * @param strategy The strategy to apply.
-     * @return An {@link Mono} emitting on successful completion the {@link User user}.
+     * @return An {@link Mono} emitting on successful completion the {@link User} or {@link Channel}.
      */
     public Mono<PeerEntity> getAuthor(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getAuthorId())
@@ -271,9 +272,12 @@ public final class Message implements TelegramObject {
     public List<MessageEntity> getEntities() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::entities)
-                .map(list -> list.stream()
-                        .map(e -> new MessageEntity(client, e, baseData.message()))
-                        .collect(Collectors.toList()))
+                .map(list -> {
+                    var peer = client.asResolvedInputPeer(resolvedChatId);
+                    return list.stream()
+                            .map(e -> new MessageEntity(client, e, baseData.message(), getId(), peer))
+                            .collect(Collectors.toList());
+                })
                 .orElse(List.of());
     }
 
