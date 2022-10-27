@@ -41,6 +41,7 @@ public class BotButtonExample {
         String botAuthToken = System.getenv("T4J_TOKEN");
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
+                .setDefaultEntityParserFactory(EntityParserFactory.MARKDOWN_V2)
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
                 .withConnection(client -> {
 
@@ -66,7 +67,7 @@ public class BotButtonExample {
                             .then();
 
                     Mono<Void> listenCallbackQuery = client.on(CallbackQueryEvent.class)
-                            .flatMap(e -> e.getChat().sendMessage("Callback data: " + e.getData()
+                            .flatMap(e -> e.getChat().sendMessage("**Callback data:** " + e.getData()
                                     .map(ByteBufUtil::hexDump)
                                     .orElseThrow()))
                             .then();
@@ -83,8 +84,9 @@ public class BotButtonExample {
 
                     Mono<Void> listenInlineCallbackQuery = client.on(InlineCallbackQueryEvent.class)
                             .flatMap(e -> e.edit(EditMessageSpec.of()
-                                    .withMessage("`[ Updated message. ]`")
-                                    .withParser(EntityParserFactory.MARKDOWN_V2)))
+                                    .withMessage("**Inline callback data:** " + e.getData()
+                                            .map(ByteBufUtil::hexDump)
+                                            .orElseThrow())))
                             .then();
 
                     return Mono.when(updateCommands, listenMessages,

@@ -1,5 +1,6 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
@@ -7,6 +8,7 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.SupergroupChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.PeerId;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -65,12 +67,38 @@ public class MessageReplies implements TelegramObject {
      *
      * @return The mutable {@link Set} of the last few comment posters ids, if present.
      */
-    public Set<Id> getRecentRepliers() {
+    public Set<Id> getRecentRepliersIds() {
         return Optional.ofNullable(data.recentRepliers())
                 .map(list -> list.stream()
                         .map(Id::of)
                         .collect(Collectors.toSet()))
                 .orElse(Set.of());
+    }
+
+    /**
+     * Requests to retrieve the recent comment's posters.
+     *
+     * @return A {@link Flux} which emits the {@link PeerEntity peer entities}.
+     */
+    public Flux<PeerEntity> getRecentRepliers() {
+        return getRecentRepliers(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the recent comment's posters using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return A {@link Flux} which emits the {@link PeerEntity peer entities}.
+     */
+    public Flux<PeerEntity> getRecentRepliers(EntityRetrievalStrategy strategy) {
+        var recentRepliers = data.recentRepliers();
+        if (recentRepliers == null) {
+            return Flux.empty();
+        }
+        var retriever = client.withRetrievalStrategy(strategy);
+        return Flux.fromIterable(recentRepliers)
+                .map(p -> PeerId.of(Id.of(p)))
+                .flatMap(retriever::resolvePeer);
     }
 
     /**

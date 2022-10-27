@@ -5,18 +5,21 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.ChannelLocation;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChannelLocation;
+import telegram4j.tl.BaseGeoPoint;
 import telegram4j.tl.ChannelFull;
 import telegram4j.tl.ImmutableInputMessageID;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -102,19 +105,21 @@ public final class SupergroupChat extends BaseChannel {
      */
     public Mono<AuxiliaryMessages> getMigratedFromMaxMessage(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getMigratedFromMaxId())
-                .flatMap(id -> client.getMessagesById(List.of(ImmutableInputMessageID.of(id))));
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(getMigratedFromChatId().orElseThrow(),
+                                List.of(ImmutableInputMessageID.of(id))));
     }
 
     /**
      * Gets geolocation of the supergroup, if full data about chat available and present.
      *
      * @see <a href="https://telegram.org/blog/contacts-local-groups">Location-Based Chats</a>
-     * @return The {@link ChannelLocation geolocation} of the supergroup, if full data about chat available and present.
+     * @return The {@link Location geolocation} of the supergroup, if full data about chat available and present.
      */
-    public Optional<ChannelLocation> getLocation() {
+    public Optional<Location> getLocation() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.location(), BaseChannelLocation.class))
-                .map(d -> new ChannelLocation(client, d));
+                .map(d -> new Location(client, d));
     }
 
     /**
@@ -146,4 +151,66 @@ public final class SupergroupChat extends BaseChannel {
                 ", fullData=" + fullData +
                 '}';
     }
+
+    /**
+     * Geolocation representation for supergroups
+     *
+     * @see <a href="https://telegram.org/blog/contacts-local-groups">Location-Based chats</a>
+     */
+    public static class Location implements TelegramObject {
+
+        private final MTProtoTelegramClient client;
+        private final telegram4j.tl.BaseChannelLocation data;
+
+        public Location(MTProtoTelegramClient client, BaseChannelLocation data) {
+            this.client = Objects.requireNonNull(client);
+            this.data = Objects.requireNonNull(data);
+        }
+
+        @Override
+        public MTProtoTelegramClient getClient() {
+            return client;
+        }
+
+        /**
+         * Gets geo-point of the address.
+         *
+         * @return The {@link GeoPoint} of the address.
+         */
+        public GeoPoint getGeoPoint() {
+            BaseGeoPoint geoPoint = TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class);
+            Objects.requireNonNull(geoPoint);
+            return new GeoPoint(geoPoint);
+        }
+
+        /**
+         * Gets display description of the address.
+         *
+         * @return The display description of the address.
+         */
+        public String getAddress() {
+            return data.address();
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Location that = (Location) o;
+            return data.equals(that.data);
+        }
+
+        @Override
+        public int hashCode() {
+            return data.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            return "Location{" +
+                    "data=" + data +
+                    '}';
+        }
+    }
+
 }

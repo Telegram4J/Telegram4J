@@ -1,13 +1,14 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chat;
 
 import telegram4j.core.util.BitFlag;
 
 import java.util.EnumSet;
+import java.util.Set;
 
 import static telegram4j.tl.ChatAdminRights.*;
 
 /** Enumeration of {@link telegram4j.tl.ChatAdminRights} bit-flags, that can be used in {@link EnumSet} */
-public enum ChatAdminRights implements BitFlag {
+public enum AdminRight implements BitFlag {
 
     /** Allows to modify the description of the channel/supergroup. */
     CHANGE_INFO(CHANGE_INFO_POS),
@@ -44,7 +45,7 @@ public enum ChatAdminRights implements BitFlag {
 
     private final byte position;
 
-    ChatAdminRights(byte position) {
+    AdminRight(byte position) {
         this.position = position;
     }
 
@@ -59,8 +60,8 @@ public enum ChatAdminRights implements BitFlag {
      * @param chatAdminRights The chat admin rights data.
      * @return The {@link EnumSet} of the {@link telegram4j.tl.ChatAdminRights} flags.
      */
-    public static EnumSet<ChatAdminRights> of(telegram4j.tl.ChatAdminRights chatAdminRights) {
-        var set = EnumSet.allOf(ChatAdminRights.class);
+    public static Set<AdminRight> of(telegram4j.tl.ChatAdminRights chatAdminRights) {
+        var set = EnumSet.allOf(AdminRight.class);
         int flags = chatAdminRights.flags();
         set.removeIf(value -> (flags & value.mask()) == 0);
         return set;

@@ -7,6 +7,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
@@ -60,11 +61,11 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Computes {@link EnumSet} with user flags from full and min data.
+     * Computes {@link Set} with user flags from full and min data.
      *
-     * @return The {@link EnumSet} with user flags.
+     * @return The {@link Set} with user flags.
      */
-    public EnumSet<Flag> getFlags() {
+    public Set<Flag> getFlags() {
         return Flag.of(fullData, minData);
     }
 
@@ -110,8 +111,8 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets username of this user in format <b>@username</b>,
-     * if present can be used in the {@link EntityRetriever#resolvePeer(PeerId)}.
+     * Gets username of this user in format <b>username</b>, if present.
+     * Can be used in the {@link EntityRetriever#resolvePeer(PeerId)}
      *
      * @return The username of this user, if present.
      */
@@ -131,11 +132,11 @@ public class User implements PeerEntity {
     /**
      * Gets the low quality user photo, if present.
      *
-     * @return The {@link ChatPhoto photo} of user, if present.
+     * @return The {@link ProfilePhoto photo} of user, if present.
      */
-    public Optional<ChatPhoto> getMinPhoto() {
+    public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
-                .map(c -> new ChatPhoto(client, c, client.asResolvedInputPeer(getId()), -1));
+                .map(c -> new ProfilePhoto(client, c, client.asResolvedInputPeer(getId()), -1));
     }
 
     /**
@@ -318,16 +319,16 @@ public class User implements PeerEntity {
         return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
     }
 
-    public Optional<EnumSet<ChatAdminRights>> getBotGroupAdminRights() {
+    public Optional<Set<AdminRight>> getBotGroupAdminRights() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botGroupAdminRights)
-                .map(ChatAdminRights::of);
+                .map(AdminRight::of);
     }
 
-    public Optional<EnumSet<ChatAdminRights>> getBotBroadcastAdminRights() {
+    public Optional<Set<AdminRight>> getBotBroadcastAdminRights() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botBroadcastAdminRights)
-                .map(ChatAdminRights::of);
+                .map(AdminRight::of);
     }
 
     // TODO: implement
@@ -464,7 +465,7 @@ public class User implements PeerEntity {
             return position;
         }
 
-        private static EnumSet<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
+        private static Set<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
             var minFlags = of(userMin);
             if (userFull != null) {
                 var set = EnumSet.allOf(Flag.class);
@@ -476,7 +477,7 @@ public class User implements PeerEntity {
             return minFlags;
         }
 
-        private static EnumSet<Flag> of(telegram4j.tl.BaseUser user) {
+        private static Set<Flag> of(telegram4j.tl.BaseUser user) {
             var set = EnumSet.allOf(Flag.class);
             int flags = user.flags();
             set.removeIf(value -> value.ordinal() < SELF.ordinal() || (flags & value.mask()) == 0);

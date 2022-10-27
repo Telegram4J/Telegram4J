@@ -74,11 +74,11 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Computes {@link EnumSet} of the message flags.
+     * Computes a mutable {@link Set} of the message flags.
      *
-     * @return The {@link EnumSet} of the message flags.
+     * @return The mutable {@link Set} of the message flags.
      */
-    public EnumSet<Flag> getFlags() {
+    public Set<Flag> getFlags() {
         return Flag.of0(getBaseData());
     }
 
@@ -172,20 +172,22 @@ public final class Message implements TelegramObject {
 
     /**
      * Gets {@link Duration} of the message Time-To-Live, if present.
-     * <p>
-     * For getting auto-delete timestamp you can use following pattern:
-     * <pre>
-     *   Message message = ...;
-     *
-     *   Instant deleteTimestamp = message.getAutoDeleteDuration()
-     *     .map(message.createTimestamp()::plus)
-     *     .orElse(Instant.MIN);
-     * </pre>
      *
      * @return The {@link Duration} of the message Time-To-Live, if present.
      */
     public Optional<Duration> getAutoDeleteDuration() {
         return Optional.ofNullable(getBaseData().ttlPeriod()).map(Duration::ofSeconds);
+    }
+
+    /**
+     * Gets timestamp of the message auto-deletion, if present.
+     *
+     * @see #getAutoDeleteDuration()
+     * @return The timestamp of the message auto-deletion, if present.
+     */
+    public Optional<Instant> getAutoDeleteTimestamp() {
+        return getAutoDeleteDuration()
+                .map(getCreateTimestamp()::plus);
     }
 
     // BaseMessage fields
@@ -202,7 +204,7 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets id of an inline bot that generated this message, if message it's not service and id present.
+     * Gets id of an inline bot that generated this message, if present.
      *
      * @return The {@link Id} of an inline bot that generated this message, if present.
      */
@@ -254,7 +256,7 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets bot reply markup (e.g. keyboard), if message is not service and data present.
+     * Gets bot reply markup (e.g. keyboard), if present.
      *
      * @return The bot reply markup, if present.
      */
@@ -527,26 +529,26 @@ public final class Message implements TelegramObject {
         }
 
         /**
-         * Computes {@link EnumSet} from raw message service data.
+         * Computes {@link Set} from raw message service data.
          *
          * @param data The message data.
-         * @return The {@link EnumSet} of the message service flags.
+         * @return The {@link Set} of the message service flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.MessageService data) {
+        public static Set<Flag> of(telegram4j.tl.MessageService data) {
             return of0(data);
         }
 
         /**
-         * Computes {@link EnumSet} from raw message data.
+         * Computes {@link Set} from raw message data.
          *
          * @param data The message service data.
-         * @return The {@link EnumSet} of the message flags.
+         * @return The {@link Set} of the message flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.BaseMessage data) {
+        public static Set<Flag> of(telegram4j.tl.BaseMessage data) {
             return of0(data);
         }
 
-        private static EnumSet<Flag> of0(telegram4j.tl.BaseMessageFields data) {
+        private static Set<Flag> of0(telegram4j.tl.BaseMessageFields data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
             set.removeIf(value -> (flags & value.mask()) == 0);

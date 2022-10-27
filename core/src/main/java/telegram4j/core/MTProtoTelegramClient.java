@@ -170,7 +170,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Mono.fromCallable(() -> Files.size(path))
                 .publishOn(Schedulers.boundedElastic())
                 .map(Math::toIntExact)
-                .flatMap(size -> uploadFile(ByteBufFlux.fromPath(path, partSize), filename, size, partSize));
+                .flatMap(size -> {
+                    int ps = UploadService.suggestPartSize(size, partSize);
+                    return serviceHolder.getUploadService()
+                            .saveFile(ByteBufFlux.fromPath(path, ps), size, ps, filename);
+                });
     }
 
     /**
@@ -202,9 +206,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
     /**
      * Request to download file by their reference from Telegram Media DC or
-     * if file is {@link Document#isWeb() web} and haven't telegram-proxying emit {@link IllegalStateException} exception.
-     *
-     * <p>Method will return {@link Flux#empty()} when proxied web-file id passed on bot accounts.
+     * if file is {@link Document#isWeb() web} and haven't telegram-proxying or download is invoked on bot account
+     * emit {@link IllegalStateException} exception.
      *
      * @param loc The location of file.
      * @return A {@link Flux} emitting full or parts of downloading file.
@@ -217,7 +220,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 }
 
                 if (authResources.isBot()) {
-                    return Flux.empty();
+                    return Flux.error(new IllegalStateException("Bot accounts can't download web files"));
                 }
                 return serviceHolder.getUploadService()
                         .getWebFile(loc.asWebLocation().orElseThrow())

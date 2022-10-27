@@ -47,6 +47,7 @@ public class Sticker extends Document {
         return Type.fromMimeType(getMimeType());
     }
 
+    // ???
     public boolean isFree() {
         return stickerData.map(d -> false, DocumentAttributeCustomEmoji::free);
     }
@@ -117,7 +118,7 @@ public class Sticker extends Document {
 
     /** Types of sticker set elements. */
     public enum Type {
-        /** Represents static image sticker and emoji. */
+        /** Represents static image sticker and emoji or mask. */
         STATIC,
 
         /** Represents vector-animated sticker and emoji. */

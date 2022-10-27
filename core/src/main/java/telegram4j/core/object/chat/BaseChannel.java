@@ -8,8 +8,6 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
@@ -26,7 +24,10 @@ import telegram4j.tl.channels.BaseChannelParticipants;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -62,7 +63,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public EnumSet<Flag> getFlags() {
+    public Set<Flag> getFlags() {
         return Flag.of(fullData, minData);
     }
 
@@ -95,9 +96,9 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<ChatPhoto> getMinPhoto() {
+    public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, client.asResolvedInputPeer(getId()), -1));
+                .map(d -> new ProfilePhoto(client, d, client.asResolvedInputPeer(getId()), -1));
     }
 
     @Override
@@ -156,18 +157,18 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<EnumSet<ChatAdminRights>> getAdminRights() {
-        return Optional.ofNullable(minData.adminRights()).map(ChatAdminRights::of);
+    public Optional<Set<AdminRight>> getAdminRights() {
+        return Optional.ofNullable(minData.adminRights()).map(AdminRight::of);
     }
 
     @Override
-    public Optional<ChatBannedRightsSettings> getBannedRights() {
-        return Optional.ofNullable(minData.bannedRights()).map(ChatBannedRightsSettings::new);
+    public Optional<ChatRestrictions> getRestrictions() {
+        return Optional.ofNullable(minData.bannedRights()).map(ChatRestrictions::new);
     }
 
     @Override
-    public Optional<ChatBannedRightsSettings> getDefaultBannedRights() {
-        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatBannedRightsSettings::new);
+    public Optional<ChatRestrictions> getDefaultRestrictions() {
+        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatRestrictions::new);
     }
 
     @Override
@@ -301,7 +302,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Channel> editAdmin(Id userId, Set<ChatAdminRights> rights, String rank) {
+    public Mono<Channel> editAdmin(Id userId, Iterable<AdminRight> rights, String rank) {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
 
         return client.asInputUser(userId)
@@ -313,14 +314,14 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Channel> editBanned(Id peerId, Set<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp) {
+    public Mono<Channel> editBanned(Id peerId, Iterable<ChatRestrictions.Right> rights, @Nullable Instant untilTimestamp) {
         InputChannel channel = toInputChannel(client.asResolvedInputPeer(getId()));
+        int untilDate = untilTimestamp != null ? Math.toIntExact(untilTimestamp.getEpochSecond()) : 0;
 
         return client.asInputPeer(peerId)
                 .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
                 .flatMap(target -> client.getServiceHolder().getChatService()
-                        .editBanned(channel, target, ImmutableChatBannedRights.of(MappingUtil.getMaskValue(rights),
-                                Math.toIntExact(untilTimestamp.getEpochSecond()))))
+                        .editBanned(channel, target, ImmutableChatBannedRights.of(MappingUtil.getMaskValue(rights), untilDate)))
                 .mapNotNull(c -> EntityFactory.createChat(client, c, null))
                 .cast(Channel.class);
     }

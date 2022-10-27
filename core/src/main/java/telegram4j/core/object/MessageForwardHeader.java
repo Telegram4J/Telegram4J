@@ -107,8 +107,8 @@ public class MessageForwardHeader implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the
      * {@link AuxiliaryMessages} message container, otherwise empty signals.
      */
-    public Mono<AuxiliaryMessages> getOriginalMessage() {
-        return getOriginalMessage(MappingUtil.IDENTITY_RETRIEVER);
+    public Mono<AuxiliaryMessages> getChannelPost() {
+        return getChannelPost(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -118,7 +118,7 @@ public class MessageForwardHeader implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the
      * {@link AuxiliaryMessages} message container, otherwise empty signals.
      */
-    public Mono<AuxiliaryMessages> getOriginalMessage(EntityRetrievalStrategy strategy) {
+    public Mono<AuxiliaryMessages> getChannelPost(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(data.channelPost())
                 .map(id -> List.of(ImmutableInputMessageID.of(id)))
                 .zipWith(Mono.justOrEmpty(getFromId()))

@@ -36,9 +36,9 @@ public interface Chat extends PeerEntity {
     /**
      * Gets the low quality chat photo, if present.
      *
-     * @return The {@link ChatPhoto photo} of chat, if present.
+     * @return The {@link ProfilePhoto photo} of chat, if present.
      */
-    Optional<ChatPhoto> getMinPhoto();
+    Optional<ProfilePhoto> getMinPhoto();
 
     /**
      * Gets the normal chat photo, if present
@@ -107,9 +107,9 @@ public interface Chat extends PeerEntity {
     Optional<Integer> getFolderId();
 
     /**
-     * Gets unicode emoji representation a specific channel theme.
+     * Gets unicode emoji representation of a specific channel theme.
      *
-     * @return The unicode emoji representation a specific channel theme.
+     * @return The unicode emoji representation of a specific channel theme.
      */
     Optional<String> getThemeEmoticon();
 

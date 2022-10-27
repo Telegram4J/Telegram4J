@@ -4,9 +4,9 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.ChatAdminRights;
+import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
-import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.tl.*;
@@ -32,7 +32,8 @@ public final class ChatParticipant implements TelegramObject {
         this.chatId = Objects.requireNonNull(chatId);
     }
 
-    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, telegram4j.tl.ChatParticipant data, Id chatId) {
+    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer,
+                           telegram4j.tl.ChatParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client);
         this.peer = peer;
         this.data = Objects.requireNonNull(data);
@@ -74,7 +75,7 @@ public final class ChatParticipant implements TelegramObject {
     /**
      * Requests to retrieve chat.
      *
-     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     * @return An {@link Mono} emitting on successful completion the {@link GroupChat group chat} or {@link Channel channel}.
      */
     public Mono<Chat> getChat() {
         return getChat(MappingUtil.IDENTITY_RETRIEVER);
@@ -84,7 +85,7 @@ public final class ChatParticipant implements TelegramObject {
      * Requests to retrieve chat using specified retrieval strategy.
      *
      * @param strategy The strategy to apply.
-     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
+     * @return An {@link Mono} emitting on successful completion the {@link GroupChat group chat} or {@link Channel channel}.
      */
     public Mono<Chat> getChat(EntityRetrievalStrategy strategy) {
         return client.withRetrievalStrategy(strategy).getChatById(chatId);
@@ -171,21 +172,12 @@ public final class ChatParticipant implements TelegramObject {
                 .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
     }
 
-    /**
-     * Gets whether this chat participant is <i>current</i> user.
-     *
-     * @return {@literal true} if participant is <i>current</i> user, {@literal false} otherwise.
-     */
-    public boolean isSelf() {
-        return data.identifier() == ChannelParticipantSelf.ID ||
-                (data.identifier() == ChannelParticipantAdmin.ID &&
-                ((ChannelParticipantAdmin) data).self());
-    }
+    // ChannelParticipantAdmin#self() flag is ignored
 
     /**
      * Gets whether this <i>current</i> user can edit this participant.
      *
-     * @return {@literal true} if <i>current</i> user can edit this participant, {@literal false} otherwise.
+     * @return {@code true} if <i>current</i> user can edit this participant.
      */
     public boolean isCanEdit() {
         return data.identifier() == ChannelParticipantAdmin.ID
@@ -195,7 +187,7 @@ public final class ChatParticipant implements TelegramObject {
     /**
      * Gets whether this participant is <i>current</i> user and invited via request.
      *
-     * @return {@literal true} if participant is <i>current</i> user and invited via request, {@literal false} otherwise.
+     * @return {@code true} if participant is <i>current</i> user and invited via request.
      */
     public boolean isInvitedViaRequest() {
         return data.identifier() == ChannelParticipantSelf.ID
@@ -203,47 +195,35 @@ public final class ChatParticipant implements TelegramObject {
     }
 
     /**
-     * Gets {@link Set} of permissions this participant, if it's admin or present
+     * Gets {@link Set} of permissions this participant, if it's admin and present
      *
-     * @return The {@link Set} of permissions this participant, if it's admin or present.
+     * @return The {@link Set} of permissions this participant, if it's admin and present.
      */
-    public Optional<Set<ChatAdminRights>> getAdminRights() {
+    public Optional<Set<AdminRight>> getAdminRights() {
         switch (data.identifier()) {
-            case ChannelParticipantCreator.ID: return Optional.of(ChatAdminRights.of(((ChannelParticipantCreator) data).adminRights()));
-            case ChannelParticipantAdmin.ID: return Optional.of(ChatAdminRights.of(((ChannelParticipantAdmin) data).adminRights()));
-            case ChatParticipantAdmin.ID:
-            case BaseChatParticipant.ID:
-            case ChannelParticipantSelf.ID:
-            case BaseChannelParticipant.ID:
-            case ChannelParticipantBanned.ID:
-            case ChannelParticipantLeft.ID:
-            case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
+            case ChannelParticipantCreator.ID: return Optional.of(AdminRight.of(((ChannelParticipantCreator) data).adminRights()));
+            case ChannelParticipantAdmin.ID: return Optional.of(AdminRight.of(((ChannelParticipantAdmin) data).adminRights()));
+            default: return Optional.empty();
         }
     }
 
     /**
-     * Gets rank of participant, if it's admin or present.
+     * Gets rank of participant, if it's admin and present.
      *
-     * @return The rank of participant, if it's admin or present.
+     * @return The rank of participant, if it's admin and present.
      */
     public Optional<String> getRank() {
         switch (data.identifier()) {
             case ChannelParticipantCreator.ID: return Optional.ofNullable(((ChannelParticipantCreator) data).rank());
             case ChannelParticipantAdmin.ID: return Optional.ofNullable(((ChannelParticipantAdmin) data).rank());
-            case ChatParticipantAdmin.ID:
-            case BaseChatParticipant.ID:
-            case ChannelParticipantSelf.ID:
-            case BaseChannelParticipant.ID:
-            case ChannelParticipantBanned.ID:
-            case ChannelParticipantLeft.ID:
-            case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
+            default: return Optional.empty();
         }
     }
 
     /**
      * Gets whether this participant is banned or left chat/channel.
+     * <p>This method more accurate than comparison on {@link Status#LEFT}
+     * because considers the exited banned participants.
      *
      * @return {@literal true} if participant is banned or left chat/channel, {@literal false} otherwise.
      */
@@ -289,10 +269,41 @@ public final class ChatParticipant implements TelegramObject {
      *
      * @return The permissions overwrite for this participant, if participant was banned.
      */
-    public Optional<ChatBannedRightsSettings> getBannedRights() {
+    public Optional<ChatRestrictions> getRestrictions() {
         return data.identifier() == ChannelParticipantBanned.ID
-                ? Optional.of(new ChatBannedRightsSettings(((ChannelParticipantBanned) data).bannedRights()))
+                ? Optional.of(new ChatRestrictions(((ChannelParticipantBanned) data).bannedRights()))
                 : Optional.empty();
+    }
+
+    /**
+     * Gets id of user which promoted this participant to admins, if present.
+     *
+     * @return The id of user which promoted this participant to admins, if present.
+     */
+    public Optional<Id> getPromoterId() {
+        return data.identifier() == ChannelParticipantAdmin.ID
+                ? Optional.of((ChannelParticipantAdmin) data).map(d -> Id.ofUser(d.promotedBy(), null))
+                : Optional.empty();
+    }
+
+    /**
+     * Requests to retrieve admin which promoted this participant to admins.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link User admin}.
+     */
+    public Mono<User> getPromoter() {
+        return getPromoter(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve admin which promoted this participant to admins using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link User admin}.
+     */
+    public Mono<User> getPromoter(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getPromoterId())
+                .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
     }
 
     @Override
@@ -300,12 +311,13 @@ public final class ChatParticipant implements TelegramObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ChatParticipant that = (ChatParticipant) o;
-        return data.equals(that.data);
+        return chatId.equals(that.chatId) &&
+                getId().equals(that.getId());
     }
 
     @Override
     public int hashCode() {
-        return data.hashCode();
+        return chatId.hashCode() + 51 * getId().hashCode();
     }
 
     @Override
@@ -326,7 +338,7 @@ public final class ChatParticipant implements TelegramObject {
         /** Status of chat/channel admin or user with rank. */
         ADMIN,
 
-        /** Status which indicates a banned participant. */
+        /** Status which indicates a restricted participant. */
         BANNED,
 
         /** Status which indicated a left from chat/channel participant. */

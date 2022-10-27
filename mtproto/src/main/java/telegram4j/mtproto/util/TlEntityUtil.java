@@ -35,6 +35,20 @@ public class TlEntityUtil {
         }
     }
 
+    public static String toMimeType(FileType type) {
+        switch (type) {
+            case JPEG: return "image/jpeg";
+            case GIF: return "image/gif";
+            case PNG: return "image/png";
+            case PDF: return "application/pdf";
+            case MP3: return "audio/mpeg";
+            case MOV: return "video/quicktime";
+            case MP4: return "audio/mp4";
+            case WEBP: return "image/webp";
+            default: throw new IllegalArgumentException("Unexpected file type: " + type);
+        }
+    }
+
     public static ByteBuf expandInlineThumb(ByteBuf bytes) {
         if (!bytes.isReadable(3) || bytes.getByte(0) != 0x01) {
             throw new IllegalArgumentException();

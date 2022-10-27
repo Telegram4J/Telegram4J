@@ -14,7 +14,7 @@ import telegram4j.tl.InputPeer;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Game implements TelegramObject {
+public final class Game implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.Game data;

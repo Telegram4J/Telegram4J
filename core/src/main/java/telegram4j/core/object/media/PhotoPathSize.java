@@ -13,6 +13,11 @@ public class PhotoPathSize implements PhotoSize {
         this.data = Objects.requireNonNull(data);
     }
 
+    /**
+     * Gets a single-char <a href="https://core.telegram.org/api/files#image-thumbnail-types">type</a> of thumbnail.
+     *
+     * @return The type of thumbnail, always is {@code 'j'}.
+     */
     @Override
     public char getType() {
         return data.type().charAt(0);

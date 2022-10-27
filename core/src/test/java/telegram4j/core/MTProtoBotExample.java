@@ -78,7 +78,7 @@ public class MTProtoBotExample {
                             .flatMap(e -> Mono.just(e.getMessage().getEntities())
                                     .filter(list -> !list.isEmpty() && list.get(0).getType() == MessageEntity.Type.BOT_COMMAND)
                                     .map(list -> list.get(0))
-                                    .map(ent -> {
+                                    .flatMap(ent -> {
                                         String str = ent.getContent();
                                         int et = str.indexOf('@');
                                         String command = str.substring(str.indexOf('/') + 1, et != -1 ? et : str.length())

@@ -131,7 +131,7 @@ public class FileReferenceId {
                 .map(d -> asChar(d.get(0).type()))
                 .or(() -> Optional.ofNullable(document.thumbs())
                         .map(d -> asChar(d.get(0).type())))
-                .orElseThrow();
+                .orElse('\0');
 
         return ofDocument(document, thumbSizeType, messageId, peer);
     }

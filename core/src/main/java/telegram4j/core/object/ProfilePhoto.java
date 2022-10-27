@@ -14,17 +14,17 @@ import java.util.Optional;
 /**
  * Low-quality chat profile photo.
  *
- * <p>There are 2 versions available for download: small ({@link ChatPhoto#getSmallFileReferenceId()})
- * and big ({@link ChatPhoto#getBigFileReferenceId()}).
+ * <p>There are 2 versions available for download: small ({@link ProfilePhoto#getSmallFileReferenceId()})
+ * and big ({@link ProfilePhoto#getBigFileReferenceId()}).
  */
-public class ChatPhoto implements TelegramObject {
+public class ProfilePhoto implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final ChatPhotoFields data;
 
     private final FileReferenceId smallFileReferenceId;
     private final FileReferenceId bigFileReferenceId;
 
-    public ChatPhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
+    public ProfilePhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
@@ -104,8 +104,8 @@ public class ChatPhoto implements TelegramObject {
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatPhoto chatPhoto = (ChatPhoto) o;
-        return data.equals(chatPhoto.data);
+        ProfilePhoto profilePhoto = (ProfilePhoto) o;
+        return data.equals(profilePhoto.data);
     }
 
     @Override

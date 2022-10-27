@@ -1,35 +1,58 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.util.BitFlag;
 import telegram4j.tl.ChatBannedRights;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 
 import static telegram4j.tl.ChatBannedRights.*;
 
-public class ChatBannedRightsSettings {
+public final class ChatRestrictions {
     private final ChatBannedRights data;
 
-    public ChatBannedRightsSettings(ChatBannedRights data) {
+    public ChatRestrictions(ChatBannedRights data) {
         this.data = Objects.requireNonNull(data);
     }
 
-    public EnumSet<Right> getRights() {
+    /**
+     * Gets set with disallowed actions.
+     *
+     * @return The enum set with disallowed actions.
+     */
+    public Set<Right> getRights() {
         return Right.of(data);
     }
 
-    public Instant getUntilTimestamp() {
-        return Instant.ofEpochSecond(data.untilDate());
+    /**
+     * Gets timestamp until which restriction is active, if present otherwise restriction is active forever.
+     *
+     * @return The timestamp until which restriction is active, if present otherwise restriction is active forever.
+     */
+    public Optional<Instant> getUntilTimestamp() {
+        // TD:
+        // https://github.com/tdlib/td/blob/92f8093486f19c049de5446cc20950e641c6ade0/td/telegram/DialogParticipant.cpp#L581-#L587
+        //   if user is restricted for more than 366 days or less than 30 seconds from the current time,
+        //   they are considered to be restricted forever
+        Instant until = Instant.ofEpochSecond(data.untilDate());
+        Instant now = Instant.now();
+        if (until.isBefore(now.plusSeconds(30)) ||
+                until.isAfter(now.plus(366, ChronoUnit.DAYS))) {
+            return Optional.empty();
+        }
+        return Optional.of(until);
     }
 
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ChatBannedRightsSettings that = (ChatBannedRightsSettings) o;
+        ChatRestrictions that = (ChatRestrictions) o;
         return data.equals(that.data);
     }
 
@@ -40,7 +63,7 @@ public class ChatBannedRightsSettings {
 
     @Override
     public String toString() {
-        return "ChatBannedRightsSettings{" +
+        return "ChatRestrictions{" +
                 "data=" + data +
                 '}';
     }
@@ -96,12 +119,12 @@ public class ChatBannedRightsSettings {
         }
 
         /**
-         * Computes {@link EnumSet} from raw {@link ChatBannedRights} data.
+         * Computes mutable {@link Set} from raw {@link ChatBannedRights} data.
          *
          * @param data The raw chat banned rights data.
-         * @return The {@link EnumSet} of the mapped {@link ChatBannedRights} flags.
+         * @return The mutable {@link Set} of the mapped {@link ChatBannedRights} flags.
          */
-        public static EnumSet<Right> of(ChatBannedRights data) {
+        public static Set<Right> of(ChatBannedRights data) {
             var set = EnumSet.allOf(Right.class);
             int flags = data.flags();
             set.removeIf(value -> (flags & value.mask()) == 0);

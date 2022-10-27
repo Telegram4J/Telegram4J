@@ -5,11 +5,9 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ChatAdminRights;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.StickerSet;
-import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.BitFlag;
@@ -38,9 +36,9 @@ public interface Channel extends Chat {
     /**
      * Gets enum set of enabled channel flags.
      *
-     * @return The {@link EnumSet} of enabled channel flags.
+     * @return The {@link Set} of enabled channel flags.
      */
-    EnumSet<Flag> getFlags();
+    Set<Flag> getFlags();
 
     /**
      * Gets username of channel, if present. This username can be used to retrieve channel
@@ -98,7 +96,7 @@ public interface Channel extends Chat {
      * @see <a href="https://core.telegram.org/api/rights">Channel Rights</a>
      * @return The admin rights for admins in the channel, if present.
      */
-    Optional<EnumSet<ChatAdminRights>> getAdminRights();
+    Optional<Set<AdminRight>> getAdminRights();
 
     /**
      * Gets banned rights for users in the channel, if present.
@@ -106,15 +104,15 @@ public interface Channel extends Chat {
      * @see <a href="https://core.telegram.org/api/rights">Channel Rights</a>
      * @return The banned rights for users in the channel, if present.
      */
-    Optional<ChatBannedRightsSettings> getBannedRights();
+    Optional<ChatRestrictions> getRestrictions();
 
     /**
-     * Gets default rights for users in the channel, if present.
+     * Gets default settings with disallowed rights for users in the channel, if present.
      *
      * @see <a href="https://core.telegram.org/api/rights">Channel Rights</a>
-     * @return The default rights for users in the channel, if present.
+     * @return The settings with disallowed rights for users in the channel, if present.
      */
-    Optional<ChatBannedRightsSettings> getDefaultBannedRights();
+    Optional<ChatRestrictions> getDefaultRestrictions();
 
     /**
      * Get minimal id of available (not hidden by invite) message, if present
@@ -315,21 +313,21 @@ public interface Channel extends Chat {
      * Requests to edit admin rights for specified user.
      *
      * @param userId The id of user to edit.
-     * @param rights The {@link Set} with allowed admin rights.
+     * @param rights The {@link Iterable} with allowed admin rights.
      * @param rank The new display rank.
      * @return A {@link Mono} emitting on successful completion updated channel.
      */
-    Mono<Channel> editAdmin(Id userId, Set<ChatAdminRights> rights, String rank);
+    Mono<Channel> editAdmin(Id userId, Iterable<AdminRight> rights, String rank);
 
     /**
      * Requests to edit banned rights for specified peer.
      *
      * @param peerId The id of user/channel to edit.
-     * @param rights The {@link Set} with disallowed rights.
-     * @param untilTimestamp The timestamp before which this overwrite active.
+     * @param rights The {@link Iterable} with disallowed rights.
+     * @param untilTimestamp The timestamp before which this overwrite active, if absent - forever active.
      * @return A {@link Mono} emitting on successful completion updated channel.
      */
-    Mono<Channel> editBanned(Id peerId, Set<ChatBannedRightsSettings.Right> rights, Instant untilTimestamp);
+    Mono<Channel> editBanned(Id peerId, Iterable<ChatRestrictions.Right> rights, @Nullable Instant untilTimestamp);
 
     /**
      * Requests to edit current channel photo.
@@ -496,7 +494,7 @@ public interface Channel extends Chat {
          * @param minData The min channel data.
          * @return The {@link EnumSet} with channel flags.
          */
-        public static EnumSet<Flag> of(@Nullable telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
+        public static Set<Flag> of(@Nullable telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
             var minFlags = of(minData);
             if (fullData != null) {
                 var set = EnumSet.allOf(Flag.class);
@@ -522,7 +520,7 @@ public interface Channel extends Chat {
          * @param data The min channel data.
          * @return The {@link EnumSet} with channel flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.Channel data) {
+        public static Set<Flag> of(telegram4j.tl.Channel data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
             set.removeIf(value -> value.ordinal() >= CAN_VIEW_PARTICIPANTS.ordinal() || (flags & value.mask()) == 0);

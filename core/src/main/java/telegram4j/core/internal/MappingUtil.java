@@ -7,17 +7,17 @@ import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.ImmutableEnumSet;
 
-import java.util.Set;
+import java.util.stream.StreamSupport;
 
 public class MappingUtil {
     private MappingUtil() {}
 
     public static final EntityRetrievalStrategy IDENTITY_RETRIEVER = client -> client;
 
-    public static <E extends Enum<E> & BitFlag> int getMaskValue(Set<E> values) {
+    public static <E extends Enum<E> & BitFlag> int getMaskValue(Iterable<E> values) {
         if (values.getClass() == ImmutableEnumSet.class)
             return ((ImmutableEnumSet<E>) values).getValue();
-        return values.stream()
+        return StreamSupport.stream(values.spliterator(), false)
                 .map(E::mask)
                 .reduce(0, (l, r) -> l | r);
     }

@@ -8,8 +8,6 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ChatAdminRights;
-import telegram4j.core.object.ChatPhoto;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
@@ -24,10 +22,7 @@ import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static telegram4j.tl.BaseChat.*;
@@ -74,9 +69,9 @@ public final class GroupChat extends BaseChat {
     }
 
     @Override
-    public Optional<ChatPhoto> getMinPhoto() {
+    public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ChatPhoto(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
+                .map(d -> new ProfilePhoto(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
     }
 
     @Override
@@ -144,6 +139,27 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
+     * Requests to retrieve channel to which this chat was migrated.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link SupergroupChat supergroup}.
+     */
+    public Mono<SupergroupChat> getMigratedToChannel() {
+        return getMigratedToChannel(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve channel to which this chat was migrated using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link SupergroupChat supergroup}.
+     */
+    public Mono<SupergroupChat> getMigratedToChannel(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getMigratedToChannelId())
+                .flatMap(client.withRetrievalStrategy(strategy)::getChatById)
+                .cast(SupergroupChat.class);
+    }
+
+    /**
      * Gets current participants count in this chat.
      *
      * @return The current participants count in this chat.
@@ -171,29 +187,29 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets {@link EnumSet} with admin rights of the user in this chat, if present.
+     * Gets {@link Set} with admin rights of the user in this chat, if present.
      *
-     * @return The {@link EnumSet} of admin rights for users in this chat, if present.
+     * @return The {@link Set} of admin rights for users in this chat, if present.
      */
-    public Optional<EnumSet<ChatAdminRights>> getAdminRights() {
-        return Optional.ofNullable(minData.adminRights()).map(ChatAdminRights::of);
+    public Optional<Set<AdminRight>> getAdminRights() {
+        return Optional.ofNullable(minData.adminRights()).map(AdminRight::of);
     }
 
     /**
-     * Gets {@link EnumSet} with disallowed rights for users in this chat, if present.
+     * Gets default settings with disallowed rights for users in this chat, if present.
      *
-     * @return The {@link EnumSet} of disallowed rights for users in this chat, if present.
+     * @return The default settings of disallowed rights for users in this chat, if present.
      */
-    public Optional<ChatBannedRightsSettings> getDefaultBannedRights() {
-        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatBannedRightsSettings::new);
+    public Optional<ChatRestrictions> getDefaultRestrictions() {
+        return Optional.ofNullable(minData.defaultBannedRights()).map(ChatRestrictions::new);
     }
 
     /**
-     * Gets {@link EnumSet} with chat flags from full and min data.
+     * Gets mutable {@link Set} of chat flags from full and min data.
      *
-     * @return The {@link EnumSet} with chat flags.
+     * @return The mutable {@link Set} of chat flags.
      */
-    public EnumSet<Flag> getFlags() {
+    public Set<Flag> getFlags() {
         return Flag.of(fullData, minData);
     }
 
@@ -231,7 +247,7 @@ public final class GroupChat extends BaseChat {
      * @return The list of {@link ChatParticipant participants} in this chat, if present.
      */
     public Optional<ChatParticipant> getParticipant(Id userId) {
-        Preconditions.requireArgument(userId.getType() == Id.Type.USER, () -> "userId must be of the USER type, but has: " + userId);
+        Preconditions.requireArgument(userId.getType() == Id.Type.USER, () -> "Unexpected type of id: " + userId);
         return Optional.ofNullable(chatParticipants)
                 .flatMap(l -> l.stream()
                         .filter(c -> c.getId().equals(userId))
@@ -441,7 +457,7 @@ public final class GroupChat extends BaseChat {
 
         // non-existent in chat object flags
 
-        /** Whether current user can view list or participants. */
+        /** Whether current user can view list of participants. */
         CAN_VIEW_PARTICIPANTS((byte) 31);
 
         private final byte position;
@@ -456,13 +472,13 @@ public final class GroupChat extends BaseChat {
         }
 
         /**
-         * Computes {@link EnumSet} with chat flags from given min and full data.
+         * Computes {@link Set} of chat flags from given min and full data.
          *
          * @param fullData The full chat data.
          * @param minData The min chat data.
-         * @return The {@link EnumSet} with channel flags.
+         * @return The {@link Set} of channel flags.
          */
-        public static EnumSet<Flag> of(@Nullable telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
+        public static Set<Flag> of(@Nullable telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
             var minFlags = of(minData);
             if (fullData != null) {
                 var set = EnumSet.allOf(Flag.class);
@@ -480,12 +496,12 @@ public final class GroupChat extends BaseChat {
         }
 
         /**
-         * Computes {@link EnumSet} with chat flags from given min data.
+         * Computes {@link Set} of chat flags from given min data.
          *
          * @param data The min chat data.
-         * @return The {@link EnumSet} with chat flags.
+         * @return The {@link Set} of chat flags.
          */
-        public static EnumSet<Flag> of(telegram4j.tl.BaseChat data) {
+        public static Set<Flag> of(telegram4j.tl.BaseChat data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
             set.removeIf(value -> value.compareTo(CAN_SET_USERNAME) >= 0 || (flags & value.mask()) == 0);
