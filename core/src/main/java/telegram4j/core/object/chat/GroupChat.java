@@ -38,24 +38,24 @@ public final class GroupChat extends BaseChat {
     @Nullable
     private final ExportedChatInvite exportedChatInvite;
     @Nullable
-    private final List<ChatParticipant> chatParticipants;
+    private final List<ChatParticipant> participants;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = null;
         this.exportedChatInvite = null;
-        this.chatParticipants = null;
+        this.participants = null;
     }
 
     public GroupChat(MTProtoTelegramClient client, BaseChatFull fullData,
                      telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite,
-                     @Nullable List<ChatParticipant> chatParticipants) {
+                     @Nullable List<ChatParticipant> participants) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = Objects.requireNonNull(fullData);
         this.exportedChatInvite = exportedChatInvite;
-        this.chatParticipants = chatParticipants;
+        this.participants = participants;
     }
 
     @Override
@@ -235,7 +235,7 @@ public final class GroupChat extends BaseChat {
      * @return The list of {@link ChatParticipant participants} in this chat, if present.
      */
     public Optional<List<ChatParticipant>> getParticipants() {
-        return Optional.ofNullable(chatParticipants);
+        return Optional.ofNullable(participants);
     }
 
     /**
@@ -248,7 +248,7 @@ public final class GroupChat extends BaseChat {
      */
     public Optional<ChatParticipant> getParticipant(Id userId) {
         Preconditions.requireArgument(userId.getType() == Id.Type.USER, () -> "Unexpected type of id: " + userId);
-        return Optional.ofNullable(chatParticipants)
+        return Optional.ofNullable(participants)
                 .flatMap(l -> l.stream()
                         .filter(c -> c.getId().equals(userId))
                         .findFirst());

@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 class ChannelUpdateHandlers {
+    // Bots can receive UpdateChannel and maybe we should handle them
 
     // State handler
     // =====================

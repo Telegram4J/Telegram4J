@@ -1,9 +1,15 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
+import telegram4j.tl.ImmutableInputMessageID;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -16,10 +22,12 @@ public class MessageReplyHeader implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.MessageReplyHeader data;
+    private final Id chatId;
 
-    public MessageReplyHeader(MTProtoTelegramClient client, telegram4j.tl.MessageReplyHeader data) {
+    public MessageReplyHeader(MTProtoTelegramClient client, telegram4j.tl.MessageReplyHeader data, Id chatId) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
+        this.chatId = Objects.requireNonNull(chatId);
     }
 
     @Override
@@ -38,6 +46,26 @@ public class MessageReplyHeader implements TelegramObject {
      */
     public int getReplyToMessageId() {
         return data.replyToMsgId();
+    }
+
+    /**
+     * Requests to retrieve message to which message was replied.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMessage() {
+        return getMessage(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve message to which message was replied using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    public Mono<AuxiliaryMessages> getMessage(EntityRetrievalStrategy strategy) {
+        return client.withRetrievalStrategy(strategy).getMessagesById(chatId,
+                List.of(ImmutableInputMessageID.of(data.replyToMsgId())));
     }
 
     /**

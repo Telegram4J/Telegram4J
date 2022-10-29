@@ -39,7 +39,7 @@ public class RpcException extends MTProtoException {
     /**
      * Create {@link Predicate} for throwable which matches on flood wait.
      *
-     * @return A {@link Predicate} for throwable which matches flood wait errors.
+     * @return A {@link Predicate} for throwable which matches on flood wait errors.
      */
     public static Predicate<Throwable> isFloodWait() {
         return t -> {
@@ -48,6 +48,22 @@ public class RpcException extends MTProtoException {
 
                 return t0.error.errorCode() == 420 &&
                         t0.error.errorMessage().startsWith("FLOOD_WAIT_");
+            }
+            return false;
+        };
+    }
+
+    /**
+     * Create {@link Predicate} for throwable which matches on specified error message.
+     *
+     * @param message The error message to match.
+     * @return A {@link Predicate} for throwable which matches on specified error message.
+     */
+    public static Predicate<Throwable> isErrorMessage(String message) {
+        return t -> {
+            if (t instanceof RpcException) {
+                RpcException t0 = (RpcException) t;
+                return t0.error.errorMessage().equals(message);
             }
             return false;
         };

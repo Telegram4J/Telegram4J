@@ -2,7 +2,9 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import telegram4j.core.event.domain.chat.*;
+import telegram4j.core.event.domain.chat.ChatEvent;
+import telegram4j.core.event.domain.chat.ChatParticipantUpdateEvent;
+import telegram4j.core.event.domain.chat.ChatParticipantsUpdateEvent;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.ChatParticipant;
@@ -21,24 +23,6 @@ class ChatUpdateHandlers {
     // State handler
     // =====================
 
-    static Mono<Void> handleStateUpdateChatParticipantAdd(UpdateContext<UpdateChatParticipantAdd> context) {
-        return context.getClient()
-                .getMtProtoResources().getStoreLayout()
-                .onChatParticipantAdd(context.getUpdate());
-    }
-
-    static Mono<Void> handleStateUpdateChatParticipantAdmin(UpdateContext<UpdateChatParticipantAdmin> context) {
-        return context.getClient()
-                .getMtProtoResources().getStoreLayout()
-                .onChatParticipantAdmin(context.getUpdate());
-    }
-
-    static Mono<Void> handleStateUpdateChatParticipantDelete(UpdateContext<UpdateChatParticipantDelete> context) {
-        return context.getClient()
-                .getMtProtoResources().getStoreLayout()
-                .onChatParticipantDelete(context.getUpdate());
-    }
-
     static Mono<Void> handleStateUpdateChatParticipant(UpdateContext<UpdateChatParticipant> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
@@ -53,58 +37,6 @@ class ChatUpdateHandlers {
 
     // Update handler
     // =====================
-
-    // I couldn't figure out when the following events are called,
-    // so I haven't tested them and can't be sure about mapping:
-    // - UpdateChatParticipantAdd
-    // - UpdateChatParticipantAdmin
-    // - UpdateChatParticipantDelete
-
-    static Flux<ChatParticipantAddEvent> handleUpdateChatParticipantAdd(StatefulUpdateContext<UpdateChatParticipantAdd, Void> context) {
-        UpdateChatParticipantAdd upd = context.getUpdate();
-
-        Id chatId = Id.ofChat(upd.chatId());
-        if (!context.getChats().containsKey(chatId)) {
-            return Flux.empty();
-        }
-
-        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
-        User inviter = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.inviterId(), null)));
-        Instant timestamp = Instant.ofEpochSecond(upd.date());
-
-        return Flux.just(new ChatParticipantAddEvent(context.getClient(),
-                chat, user, inviter, timestamp, upd.version()));
-    }
-
-    static Flux<ChatParticipantAdminEvent> handleUpdateChatParticipantAdmin(StatefulUpdateContext<UpdateChatParticipantAdmin, Void> context) {
-        UpdateChatParticipantAdmin upd = context.getUpdate();
-
-        Id chatId = Id.ofChat(upd.chatId());
-        if (!context.getChats().containsKey(chatId)) {
-            return Flux.empty();
-        }
-
-        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
-
-        return Flux.just(new ChatParticipantAdminEvent(context.getClient(), chat, user,
-                upd.isAdmin(), upd.version()));
-    }
-
-    static Flux<ChatParticipantDeleteEvent> handleUpdateChatParticipantDelete(StatefulUpdateContext<UpdateChatParticipantDelete, Void> context) {
-        UpdateChatParticipantDelete upd = context.getUpdate();
-
-        Id chatId = Id.ofChat(upd.chatId());
-        if (!context.getChats().containsKey(chatId)) {
-            return Flux.empty();
-        }
-
-        GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
-
-        return Flux.just(new ChatParticipantDeleteEvent(context.getClient(), chat, user, upd.version()));
-    }
 
     static Flux<ChatParticipantUpdateEvent> handleUpdateChatParticipant(StatefulUpdateContext<UpdateChatParticipant, Void> context) {
         UpdateChatParticipant upd = context.getUpdate();

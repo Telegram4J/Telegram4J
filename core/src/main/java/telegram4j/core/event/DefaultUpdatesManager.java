@@ -16,11 +16,13 @@ import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -75,8 +77,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
             if (date == -1 || pts == -1 || seq == -1 || qts == -1) {
                 return client.getMtProtoResources().getStoreLayout()
                         .getCurrentState()
-                        .filter(s -> s.qts() != -1 && s.seq() != -1
-                                && s.pts() != -1 && s.date() != -1)
                         .defaultIfEmpty(state)
                         .doOnNext(this::applyStateLocal);
             }
@@ -96,6 +96,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case UpdateShort.ID: {
                 UpdateShort data = (UpdateShort) updates;
 
+                if (log.isDebugEnabled()) {
+                    log.debug("Updating state, date: {}->{}", Instant.ofEpochSecond(date), Instant.ofEpochSecond(data.date()));
+                }
                 date = data.date();
 
                 return applyUpdate(UpdateContext.create(client, data.update()));
@@ -104,19 +107,28 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 BaseUpdates data = (BaseUpdates) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                int updSeq = data.seq();
-                int seq = this.seq;
-                if (updSeq != 0 && seq + 1 < updSeq) {
-                    log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", updSeq, updSeq + 1, seq);
-                    preApply = getDifference();
-                } else if (updSeq != 0 && seq + 1 > updSeq) {
-                    return Flux.empty();
+                int seqBegin = data.seq();
+                int seqEnd = seqBegin + 1;
+                StringJoiner j = new StringJoiner(", ");
+                if (seqBegin != 0 && seqEnd != 0) {
+                    int seq = this.seq;
+
+                    if (seq + 1 < seqBegin) {
+                        log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
+
+                        preApply = getDifference();
+                    } else if (seq + 1 > seqBegin) {
+                        return Flux.empty();
+                    }
+
+                    j.add("seq: " + seq + "->" + seqEnd);
+                    this.seq = seqEnd;
                 }
 
-                if (updSeq != 0) {
-                    this.seq = updSeq;
+                if (log.isDebugEnabled()) {
+                    j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(data.date()));
+                    log.debug("Updating state, " + j);
                 }
-
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
@@ -127,19 +139,28 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                 Flux<Event> preApply = Flux.empty();
                 int seqBegin = data.seqStart();
-                int seq = this.seq;
-                if (seqBegin != 0 && seq + 1 < seqBegin) {
-                    log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, data.seq(), seq);
+                int seqEnd = data.seq();
+                Preconditions.requireState(seqEnd - seqBegin == 1);
+                StringJoiner j = new StringJoiner(", ");
+                if (seqBegin != 0 && seqEnd != 0) {
+                    int seq = this.seq;
 
-                    preApply = getDifference();
-                } else if (seqBegin != 0 && seq + 1 > seqBegin) {
-                    return Flux.empty();
+                    if (seq + 1 < seqBegin) {
+                        log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
+
+                        preApply = getDifference();
+                    } else if (seq + 1 > seqBegin) {
+                        return Flux.empty();
+                    }
+
+                    j.add("seq: " + seq + "->" + seqEnd);
+                    this.seq = seqEnd;
                 }
 
-                if (data.seq() != 0) {
-                    this.seq = data.seq();
+                if (log.isDebugEnabled()) {
+                    j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(data.date()));
+                    log.debug("Updating state, " + j);
                 }
-
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
@@ -158,6 +179,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     return Flux.empty();
                 }
 
+                log.debug("Updating state, pts: {}->{}", pts, data.pts());
                 this.pts = data.pts();
 
                 var message = BaseMessage.builder()
@@ -194,6 +216,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     return Flux.empty();
                 }
 
+                log.debug("Updating state, pts: {}->{}", pts, data.pts());
                 this.pts = data.pts();
 
                 var message = BaseMessage.builder()
@@ -240,6 +263,44 @@ public class DefaultUpdatesManager implements UpdatesManager {
         seq = state.seq();
     }
 
+    protected void applyIntermediateState(State state) {
+        if (log.isDebugEnabled()) {
+            StringJoiner j = new StringJoiner(", ");
+            int pts = this.pts;
+            if (pts != state.pts()) {
+                j.add("pts: " + pts + "->" + state.pts());
+                this.pts = state.pts();
+            }
+            int qts = this.qts;
+            if (qts != state.qts()) {
+                j.add("qts: " + qts + "->" + state.qts());
+                this.qts = state.qts();
+            }
+            int seq = this.seq;
+            if (seq != state.seq()) {
+                j.add("seq: " + seq + "->" + state.seq());
+                this.seq = state.seq();
+            }
+            int date = this.date;
+            if (date != state.date()) {
+                j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(state.date()));
+                this.date = state.date();
+            }
+
+            String str = j.toString();
+            if (str.isEmpty()) {
+                return;
+            }
+
+            log.debug("Updating state to intermediate, " + j);
+        } else {
+            pts = state.pts();
+            qts = state.qts();
+            date = state.date();
+            seq = state.seq();
+        }
+    }
+
     protected Mono<Void> applyState(State state) {
         return Mono.defer(() -> {
             if (log.isDebugEnabled()) {
@@ -282,7 +343,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     protected Flux<Event> getDifference(int pts, int qts, int date) {
         if (pts == -1 || qts == -1 || date == -1) {
-            log.debug("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+            if (log.isWarnEnabled()) {
+                log.warn("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+            }
             return Flux.empty();
         }
 
@@ -303,8 +366,27 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         case DifferenceEmpty.ID: {
                             DifferenceEmpty diff = (DifferenceEmpty) difference;
 
-                            this.seq = diff.seq();
-                            this.date = diff.date();
+                            if (log.isDebugEnabled()) {
+                                StringJoiner j = new StringJoiner(", ");
+                                int seq = this.seq;
+                                if (seq != diff.seq()) {
+                                    j.add("seq: " + seq + "->" + diff.seq());
+                                }
+                                int currDate = this.date;
+                                if (currDate != diff.date()) {
+                                    j.add("date: " + Instant.ofEpochSecond(currDate) + "->" + Instant.ofEpochSecond(diff.date()));
+                                }
+
+                                String str = j.toString();
+                                if (str.isEmpty()) {
+                                    return Mono.empty();
+                                }
+
+                                log.debug("Updating state, " + j);
+                            } else {
+                                this.seq = diff.seq();
+                                this.date = diff.date();
+                            }
 
                             return Mono.empty();
                         }
@@ -318,7 +400,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         case DifferenceSlice.ID: {
                             DifferenceSlice diff = (DifferenceSlice) difference;
 
-                            applyStateLocal(diff.intermediateState());
+                            applyIntermediateState(diff.intermediateState());
 
                             return handleUpdates0(diff.newMessages(), diff.otherUpdates(), diff.chats(), diff.users())
                                     .concatWith(getDifference());
@@ -639,6 +721,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .getStoreLayout().updateChannelPts(id, ptsUpdate.pts());
 
                         if (justApplied.get()) {
+                            log.debug("Updating channel state, pts: {}->{}", pts, ptsUpdate.pts());
                             return updatePts.thenMany(mapUpdate);
                         }
 
@@ -652,6 +735,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                             return Flux.empty();
                         }
+
+                        log.debug("Updating channel state, pts: {}->{}", pts, ptsUpdate.pts());
                         return updatePts.thenMany(mapUpdate);
                     });
         }
@@ -695,7 +780,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
         return client.getServiceHolder()
                 .getUpdatesService()
                 .getChannelDifference(request)
-                .flatMapMany(diff -> handleChannelDifference(request, diff));
+                .flatMapMany(diff -> handleChannelDifference(request, diff))
+                .onErrorResume(RpcException.isErrorMessage("CHANNEL_PRIVATE"), e -> Mono.empty());
     }
 
     @Nullable

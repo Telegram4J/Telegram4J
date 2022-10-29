@@ -88,7 +88,7 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
-     * Create new id from {@link Peer} object with zero access hash.
+     * Create new id from {@link Peer} object without access hash.
      *
      * @throws IllegalArgumentException If specified peer identifier is unknown.
      * @param peer The {@link Peer} identifier.
@@ -256,6 +256,20 @@ public final class Id implements Comparable<Id> {
      */
     public boolean isWithAccessInfo() {
         return context != null;
+    }
+
+    /**
+     * Creates {@link Peer} identifier from this id.
+     *
+     * @return The {@code Peer} identifier from this id.
+     */
+    public Peer asPeer() {
+        switch (type) {
+            case CHANNEL: return ImmutablePeerChannel.of(value);
+            case USER: return ImmutablePeerUser.of(value);
+            case CHAT: return ImmutablePeerChat.of(value);
+            default: throw new IllegalStateException();
+        }
     }
 
     /**

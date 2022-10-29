@@ -158,7 +158,8 @@ public final class Message implements TelegramObject {
      * @return The header of the reply information, if present.
      */
     public Optional<MessageReplyHeader> getReplyTo() {
-        return Optional.ofNullable(getBaseData().replyTo()).map(d -> new MessageReplyHeader(client, d));
+        return Optional.ofNullable(getBaseData().replyTo())
+                .map(d -> new MessageReplyHeader(client, d, resolvedChatId));
     }
 
     /**
