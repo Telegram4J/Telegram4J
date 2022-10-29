@@ -11,12 +11,11 @@ import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ExportedChatInvite;
 import telegram4j.tl.*;
-import telegram4j.tl.channels.AdminLogResults;
 import telegram4j.tl.channels.ChannelParticipant;
-import telegram4j.tl.channels.ChannelParticipants;
-import telegram4j.tl.channels.SendAsPeers;
+import telegram4j.tl.channels.*;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.MessageViews;
 import telegram4j.tl.messages.PeerSettings;
@@ -36,6 +35,7 @@ import telegram4j.tl.request.messages.UpdateDialogFilter;
 import telegram4j.tl.request.messages.*;
 
 import java.util.List;
+import java.util.Objects;
 
 import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 
@@ -91,7 +91,6 @@ public class ChatService extends RpcService {
     // setChatAvailableReactions#14050ea6 peer:InputPeer available_reactions:Vector<string> = Updates;
     // getAvailableReactions#18dea0ac hash:int = messages.AvailableReactions;
     // setDefaultReaction#d960c4d4 reaction:string = Bool;
-    // translateText#24ce6dee flags:# peer:flags.0?InputPeer msg_id:flags.0?int text:flags.1?string from_lang:flags.2?string to_lang:string = messages.TranslatedText;
     // getUnreadReactions#e85bae1a peer:InputPeer offset_id:int add_offset:int limit:int max_id:int min_id:int = messages.Messages;
     // readReactions#82e251d7 peer:InputPeer = messages.AffectedHistory;
     // searchSentMedia#107e31a0 q:string filter:MessagesFilter limit:int = messages.Messages;
@@ -135,6 +134,27 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<List<Document>> getCustomEmojiDocuments(Iterable<Long> documentIds) {
         return Mono.defer(() -> client.sendAwait(ImmutableGetCustomEmojiDocuments.of(documentIds)));
+    }
+
+    public Mono<String> translateText(InputPeer peer, Integer messageId,
+                                      @Nullable String fromLang, String toLang) {
+        Objects.requireNonNull(peer);
+        Objects.requireNonNull(messageId);
+        return client.sendAwait(ImmutableTranslateText.of(toLang)
+                .withPeer(peer)
+                .withMsgId(messageId)
+                .withFromLang(fromLang))
+                .ofType(TranslateResultText.class)
+                .map(TranslateResultText::text);
+    }
+
+    public Mono<String> translateText(String text, @Nullable String fromLang, String toLang) {
+        Objects.requireNonNull(text);
+        return client.sendAwait(ImmutableTranslateText.of(toLang)
+                        .withText(text)
+                        .withFromLang(fromLang))
+                .ofType(TranslateResultText.class)
+                .map(TranslateResultText::text);
     }
 
     public Mono<AllStickers> getEmojiStickers(long hash) {
@@ -889,14 +909,17 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
-                                                     int offset, int limit, long hash) {
-        return client.sendAwait(ImmutableGetParticipants.of(channel, filter, offset, limit, hash));
+    public Mono<BaseChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
+                                                         int offset, int limit, long hash) {
+        return client.sendAwait(ImmutableGetParticipants.of(channel, filter, offset, limit, hash))
+                .ofType(BaseChannelParticipants.class)
+                .flatMap(p -> storeLayout.onChannelParticipants(TlEntityUtil.getRawPeerId(channel), p).thenReturn(p));
     }
 
     @BotCompatible
     public Mono<ChannelParticipant> getParticipant(InputChannel channel, InputPeer peer) {
-        return client.sendAwait(ImmutableGetParticipant.of(channel, peer));
+        return client.sendAwait(ImmutableGetParticipant.of(channel, peer))
+                .flatMap(p -> storeLayout.onChannelParticipant(TlEntityUtil.getRawPeerId(channel), p).thenReturn(p));
     }
 
     /**

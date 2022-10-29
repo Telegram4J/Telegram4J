@@ -1,9 +1,12 @@
 package telegram4j.mtproto.store;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
+import telegram4j.tl.channels.BaseChannelParticipants;
+import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
@@ -176,6 +179,44 @@ public interface StoreLayout {
     Mono<UserFull> getUserFullById(long userId);
 
     /**
+     * Retrieve channel participant by specified channel id and peer id.
+     *
+     * @param channelId The id of channel.
+     * @param peerId The id of participant.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChannelParticipant} container with channel participant and peer info.
+     */
+    Mono<ChannelParticipant> getChannelParticipantById(long channelId, Peer peerId);
+
+    /**
+     * Retrieve channel participants by specified channel id.
+     *
+     * @param channelId The id of channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChannelParticipant} containers with channel participant and peer info.
+     */
+    Flux<ChannelParticipant> getChannelParticipants(long channelId);
+
+    /**
+     * Retrieve group chat participant by specified chat id and user id.
+     *
+     * @param chatId The id of group chat.
+     * @param userId The id of participant.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ResolvedChatParticipant participant} with optional user info.
+     */
+    Mono<ResolvedChatParticipant> getChatParticipantById(long chatId, long userId);
+
+    /**
+     * Retrieve group chat participants by specified chat id.
+     *
+     * @param chatId The id of group chat.
+     * @return A {@link Flux} which continually emits
+     * the {@link ResolvedChatParticipant} containers with chat participant and their user info.
+     */
+    Flux<ResolvedChatParticipant> getChatParticipants(long chatId);
+
+    /**
      * Retrieve auth key holder, associated with specified dc.
      *
      * @param dc The id of datacenter.
@@ -194,13 +235,7 @@ public interface StoreLayout {
 
     Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload);
 
-    // bot updates
-
-    Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload);
-
-    Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin payload);
-
-    Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete payload);
+    // chat updates
 
     Mono<Void> onChatParticipant(UpdateChatParticipant payload);
 
@@ -225,4 +260,8 @@ public interface StoreLayout {
     Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
 
     Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
+
+    Mono<Void> onChannelParticipants(long channelId, BaseChannelParticipants payload);
+
+    Mono<Void> onChannelParticipant(long channelId, ChannelParticipant payload);
 }

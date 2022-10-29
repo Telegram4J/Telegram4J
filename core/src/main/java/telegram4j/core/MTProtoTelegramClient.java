@@ -15,6 +15,7 @@ import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
@@ -572,6 +573,16 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
         return entityRetriever.getChatFullById(chatId);
+    }
+
+    @Override
+    public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
+        return entityRetriever.getParticipantById(chatId, peerId);
+    }
+
+    @Override
+    public Flux<ChatParticipant> getParticipants(Id chatId) {
+        return entityRetriever.getParticipants(chatId);
     }
 
     @Override

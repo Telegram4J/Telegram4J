@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
@@ -12,9 +13,12 @@ import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.store.ResolvedChatParticipant;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
+import telegram4j.tl.channels.BaseChannelParticipants;
+import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.messages.Messages;
@@ -173,21 +177,6 @@ public class TestFileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> onChatParticipantAdd(UpdateChatParticipantAdd payload) {
-        return delegate.onChatParticipantAdd(payload);
-    }
-
-    @Override
-    public Mono<Void> onChatParticipantAdmin(UpdateChatParticipantAdmin payload) {
-        return delegate.onChatParticipantAdmin(payload);
-    }
-
-    @Override
-    public Mono<Void> onChatParticipantDelete(UpdateChatParticipantDelete payload) {
-        return delegate.onChatParticipantDelete(payload);
-    }
-
-    @Override
     public Mono<Void> onChatParticipant(UpdateChatParticipant payload) {
         return delegate.onChatParticipant(payload);
     }
@@ -229,6 +218,36 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
         return delegate.onChatUpdate(payload);
+    }
+
+    @Override
+    public Mono<ChannelParticipant> getChannelParticipantById(long channelId, Peer peerId) {
+        return delegate.getChannelParticipantById(channelId, peerId);
+    }
+
+    @Override
+    public Mono<ResolvedChatParticipant> getChatParticipantById(long chatId, long userId) {
+        return delegate.getChatParticipantById(chatId, userId);
+    }
+
+    @Override
+    public Flux<ChannelParticipant> getChannelParticipants(long channelId) {
+        return delegate.getChannelParticipants(channelId);
+    }
+
+    @Override
+    public Flux<ResolvedChatParticipant> getChatParticipants(long chatId) {
+        return delegate.getChatParticipants(chatId);
+    }
+
+    @Override
+    public Mono<Void> onChannelParticipants(long channelId, BaseChannelParticipants payload) {
+        return delegate.onChannelParticipants(channelId, payload);
+    }
+
+    @Override
+    public Mono<Void> onChannelParticipant(long channelId, ChannelParticipant payload) {
+        return delegate.onChannelParticipant(channelId, payload);
     }
 
     private Mono<Void> save(DataCenter dc, AuthorizationKeyHolder authKey, @Nullable State state) {

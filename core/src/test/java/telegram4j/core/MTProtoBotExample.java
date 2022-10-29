@@ -51,7 +51,6 @@ public class MTProtoBotExample {
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
-                .addResponseTransformer(ResponseTransformer.emptyOnErrorCodes(MethodPredicate.all(), 400))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all()))
                 .withConnection(client -> {
 

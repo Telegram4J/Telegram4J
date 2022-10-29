@@ -1,5 +1,6 @@
 package telegram4j.core.retriever;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
@@ -11,9 +12,11 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.InputMessage;
 import telegram4j.tl.PeerChannel;
 import telegram4j.tl.PeerUser;
@@ -119,6 +122,50 @@ public class StoreEntityRetriever implements EntityRetriever {
                         default: return Mono.error(new IllegalStateException());
                     }
                 });
+    }
+
+    @Override
+    public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
+        return Mono.defer(() -> {
+            switch (chatId.getType()) {
+                case CHAT:
+                    if (peerId.getType() != Id.Type.USER) {
+                        return Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
+                                "but given: " + chatId.getType()));
+                    }
+
+                    return storeLayout.getChatParticipantById(chatId.asLong(), peerId.asLong())
+                            .map(r -> new ChatParticipant(client, r.getUser()
+                                    .map(u -> EntityFactory.createUser(client, u))
+                                    .orElse(null), r.getParticipant(), chatId));
+                case CHANNEL:
+                    return storeLayout.getChannelParticipantById(chatId.asLong(), peerId.asPeer())
+                            .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
+                default:
+                    return Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
+                            "CHAT, but given: " + chatId.getType()));
+            }
+        });
+    }
+
+    @Override
+    public Flux<ChatParticipant> getParticipants(Id chatId) {
+        return Flux.defer(() -> {
+            switch (chatId.getType()) {
+                case CHAT:
+                    return storeLayout.getChatParticipants(chatId.asLong())
+                            .map(r -> new ChatParticipant(client, r.getUser()
+                                    .map(u -> EntityFactory.createUser(client, u))
+                                    .orElse(null), r.getParticipant(), chatId));
+                case CHANNEL:
+                    return storeLayout.getChannelParticipants(chatId.asLong())
+                            .map(p -> EntityFactory.createChannelParticipant(client, p, chatId,
+                                    Id.of(TlEntityUtil.getUserId(p.participant()))));
+                default:
+                    return Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
+                            "CHAT, but given: " + chatId.getType()));
+            }
+        });
     }
 
     @Override

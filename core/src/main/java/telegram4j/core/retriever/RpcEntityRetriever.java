@@ -1,5 +1,6 @@
 package telegram4j.core.retriever;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
@@ -11,15 +12,20 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.PaginationSupport;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.service.ServiceHolder;
-import telegram4j.tl.InputMessage;
-import telegram4j.tl.PeerChannel;
-import telegram4j.tl.PeerUser;
+import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.*;
+import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.messages.MessagesNotModified;
 
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Implementation of {@code EntityRetriever} which uses Telegram RPC API. */
 public class RpcEntityRetriever implements EntityRetriever {
@@ -121,16 +127,136 @@ public class RpcEntityRetriever implements EntityRetriever {
     }
 
     @Override
+    public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
+        return Mono.defer(() -> {
+            switch (chatId.getType()) {
+                // telegram api doest provide normal way to retrieve specified chat participant,
+                // and therefore we retrieve full chat info and looking up participant
+                case CHAT:
+                    if (peerId.getType() != Id.Type.USER) {
+                        return Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
+                                "but given: " + chatId.getType()));
+                    }
+
+                    return serviceHolder.getChatService().getFullChat(chatId.asLong())
+                            .mapNotNull(c -> {
+                                var chatFull = (BaseChatFull) c.fullChat();
+                                telegram4j.tl.ChatParticipant member;
+                                if (chatFull.participants() instanceof BaseChatParticipants) {
+                                    var base = (BaseChatParticipants) chatFull.participants();
+                                    member = base.participants().stream()
+                                            .filter(p -> p.userId() == peerId.asLong())
+                                            .findFirst()
+                                            .orElse(null);
+
+                                } else {
+                                    var forbidden = (ChatParticipantsForbidden) chatFull.participants();
+                                    member = Optional.ofNullable(forbidden.selfParticipant())
+                                            .filter(p -> p.userId() == peerId.asLong())
+                                            .orElse(null);
+                                }
+
+                                if (member == null) {
+                                    return null;
+                                }
+                                var user = c.users().stream()
+                                        .filter(u -> u.id() == peerId.asLong())
+                                        .findFirst()
+                                        .map(u -> EntityFactory.createUser(client, u))
+                                        .orElse(null);
+                                return new ChatParticipant(client, user, member, chatId);
+                            });
+                case CHANNEL:
+                    return client.asInputChannel(chatId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                            .zipWith(client.asInputPeer(peerId)
+                                    .switchIfEmpty(MappingUtil.unresolvedPeer(peerId)))
+                            .flatMap(TupleUtils.function(serviceHolder.getChatService()::getParticipant))
+                            .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
+                default:
+                    return Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
+                            "CHAT, but given: " + chatId.getType()));
+            }
+        });
+    }
+
+    @Override
+    public Flux<ChatParticipant> getParticipants(Id chatId) {
+        return Flux.defer(() -> {
+            switch (chatId.getType()) {
+                case CHAT:
+                    return serviceHolder.getChatService().getFullChat(chatId.asLong())
+                            .flatMapMany(c -> {
+                                var chatFull = (BaseChatFull) c.fullChat();
+                                if (!(chatFull.participants() instanceof BaseChatParticipants)) {
+                                    return Flux.empty();
+                                }
+                                var base = (BaseChatParticipants) chatFull.participants();
+                                var participants = base.participants();
+
+                                var users = c.users().stream()
+                                        .map(u -> EntityFactory.createUser(client, u))
+                                        .filter(Objects::nonNull)
+                                        .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+
+                                return Flux.fromIterable(participants)
+                                        .map(p -> new ChatParticipant(client,
+                                                users.get(Id.ofUser(p.userId(), null)), p, chatId));
+                            });
+                case CHANNEL:
+                    return client.asInputChannel(chatId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                            .flatMapMany(channel -> PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
+                                            .getParticipants(channel, ImmutableChannelParticipantsSearch.of(""), o, 200, 0),
+                                            BaseChannelParticipants::count, 0, 200)
+                                    .flatMap(data -> {
+                                        var chats = data.chats().stream()
+                                                .map(c -> EntityFactory.createChat(client, c, null))
+                                                .filter(Objects::nonNull)
+                                                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+                                        var users = data.users().stream()
+                                                .map(u -> EntityFactory.createUser(client, u))
+                                                .filter(Objects::nonNull)
+                                                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+
+                                        return Flux.fromIterable(data.participants())
+                                                .map(c -> {
+                                                    Id peerId = Id.of(TlEntityUtil.getUserId(c));
+                                                    PeerEntity peerEntity;
+                                                    switch (peerId.getType()) {
+                                                        case USER:
+                                                            peerEntity = users.get(peerId);
+                                                            break;
+                                                        case CHAT:
+                                                        case CHANNEL:
+                                                            peerEntity = chats.get(peerId);
+                                                            break;
+                                                        default:
+                                                            throw new IllegalStateException();
+                                                    }
+
+                                                    return new ChatParticipant(client, peerEntity, c,
+                                                            Id.of(channel, client.getSelfId()));
+                                                });
+                                    }));
+                default:
+                    return Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
+                            "CHAT, but given: " + chatId.getType()));
+            }
+        });
+    }
+
+    @Override
     public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
         return Mono.defer(() -> {
-            if (chatId == null || chatId.getType() != Id.Type.CHANNEL) {
-                return serviceHolder.getChatService().getMessages(messageIds);
-            }
-            return client.asInputChannel(chatId)
-                    .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
-                    .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds));
-        })
-        .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
-        .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
+                    if (chatId == null || chatId.getType() != Id.Type.CHANNEL) {
+                        return serviceHolder.getChatService().getMessages(messageIds);
+                    }
+                    return client.asInputChannel(chatId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                            .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds));
+                })
+                .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore
+                .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 }

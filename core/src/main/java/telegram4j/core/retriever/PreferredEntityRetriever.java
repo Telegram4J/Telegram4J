@@ -1,11 +1,13 @@
 package telegram4j.core.retriever;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.InputMessage;
@@ -68,6 +70,16 @@ public class PreferredEntityRetriever implements EntityRetriever {
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
         return delegate.getChatFullById(chatId);
+    }
+
+    @Override
+    public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
+        return delegate.getParticipantById(chatId, peerId);
+    }
+
+    @Override
+    public Flux<ChatParticipant> getParticipants(Id chatId) {
+        return delegate.getParticipants(chatId);
     }
 
     @Override

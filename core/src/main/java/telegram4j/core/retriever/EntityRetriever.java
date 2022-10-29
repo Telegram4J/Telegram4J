@@ -1,11 +1,13 @@
 package telegram4j.core.retriever;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
+import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
@@ -88,6 +90,25 @@ public interface EntityRetriever {
      * the {@link Chat} with detailed information.
      */
     Mono<Chat> getChatFullById(Id chatId);
+
+    /**
+     * Retrieve chat participant with optional peer information by the specified chat id and peer id.
+     *
+     * @param chatId The id of chat.
+     * @param peerId The id of peer.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatParticipant} with optional peer information.
+     */
+    Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId);
+
+    /**
+     * Retrieve chat participants with optional peer information by the specified chat id.
+     *
+     * @param chatId The id of chat.
+     * @return A {@link Flux} which continually emits
+     * the {@link ChatParticipant} with optional peer information.
+     */
+    Flux<ChatParticipant> getParticipants(Id chatId);
 
     /**
      * Retrieve messages from channel or chat with auxiliary data by the specified chat id and message ids.

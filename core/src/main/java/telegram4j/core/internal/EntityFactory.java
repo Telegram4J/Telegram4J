@@ -35,6 +35,7 @@ import telegram4j.tl.BaseChat;
 import telegram4j.tl.Channel;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.users.UserFull;
 
@@ -592,6 +593,30 @@ public class EntityFactory {
             case ChatReactionsNone.ID: return null;
             default: throw new IllegalStateException("Unknown ChatReactions type: " + data);
         }
+    }
+
+    public static ChatParticipant createChannelParticipant(MTProtoTelegramClient client, ChannelParticipant p,
+                                                           Id chatId, Id peerId) {
+        PeerEntity peer;
+        switch (peerId.getType()) {
+            case CHAT:
+            case CHANNEL:
+                peer = p.chats().stream()
+                        .filter(u -> u.id() == peerId.asLong())
+                        .findFirst()
+                        .map(u -> EntityFactory.createChat(client, u, null))
+                        .orElse(null);
+                break;
+            case USER:
+                peer = p.users().stream()
+                        .filter(u -> u.id() == peerId.asLong())
+                        .findFirst()
+                        .map(u -> EntityFactory.createUser(client, u))
+                        .orElse(null);
+                break;
+            default: throw new IllegalStateException();
+        }
+        return new ChatParticipant(client, peer, p.participant(), chatId);
     }
 
     // Internal utility methods

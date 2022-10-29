@@ -333,10 +333,10 @@ public interface Channel extends Chat {
      * Requests to edit current channel photo.
      *
      * @see FileReferenceId#asInputPhoto()
-     * @param photo A new photo for channel, {@code null} value indicates removing.
+     * @param spec A new spec for channel photo, {@code null} value indicates removing.
      * @return A {@link Mono} emitting on successful completion nothing.
      */
-    Mono<Void> editPhoto(@Nullable BaseInputPhoto photo);
+    Mono<Void> editPhoto(@Nullable BaseInputPhoto spec);
 
     /**
      * Requests to edit current channel photo.
@@ -364,10 +364,21 @@ public interface Channel extends Chat {
     /**
      * Retrieve channel participant by user id.
      *
-     * @param participantId The id of user.
+     * @param peerId The id of peer.
      * @return A {@link Mono} emitting on successful completion channel participant with user data.
      */
-    Mono<ChatParticipant> getParticipant(Id participantId);
+    default Mono<ChatParticipant> getParticipantById(Id peerId) {
+        return getParticipantById(MappingUtil.IDENTITY_RETRIEVER, peerId);
+    }
+
+    /**
+     * Retrieve channel participant by user id using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @param peerId The id of peer.
+     * @return A {@link Mono} emitting on successful completion channel participant with user data.
+     */
+    Mono<ChatParticipant> getParticipantById(EntityRetrievalStrategy strategy, Id peerId);
 
     /**
      * Retrieve and paginate channel participants by filter.
