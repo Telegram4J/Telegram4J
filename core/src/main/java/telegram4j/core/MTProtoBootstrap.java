@@ -460,8 +460,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (dataCenter != null) {
             return dataCenter;
         }
-        return DataCenter.list.stream()
-                .filter(dc -> dc.getType() == DataCenter.Type.PRODUCTION && dc.getId() == 2)
+        return DataCenter.production.stream()
+                .filter(dc -> dc.getType() == DataCenter.Type.REGULAR && dc.getId() == 2)
                 .findFirst()
                 .orElseThrow();
     }

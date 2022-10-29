@@ -189,7 +189,7 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets the user's language in OS ISO 639-1 format, if present.
+     * Gets the user's language in ISO 639-1 format, if present.
      *
      * @return The ISO 639-1 lang code of the user locale, if present.
      */

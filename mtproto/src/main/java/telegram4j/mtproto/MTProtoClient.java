@@ -61,13 +61,6 @@ public interface MTProtoClient {
      */
     DataCenter getDatacenter();
 
-    /**
-     * Gets the client type.
-     *
-     * @return The {@link Type} of client.
-     */
-    Type getType();
-
     // TODO: It shouldn't be in a public api
     /**
      * Update time offset which is used in message id generation.
@@ -125,26 +118,5 @@ public interface MTProtoClient {
 
         /** The intermediate state indicating reconnection of the client to the dc. */
         RECONNECT
-    }
-
-    // TODO: maybe remove and use DataCenter#getType()?
-    /** Available client types and modes. */
-    enum Type {
-        /** The regular mtproto client. */
-        DEFAULT,
-
-        /**
-         * The client mode in which client
-         * must apply auth key from parent and upload/download
-         * parts of the file from media dcs.
-         */
-        MEDIA,
-
-        /**
-         * The client mode in which client
-         * must generate auth key for cdn dcs
-         * and downloads files from cdn dcs.
-         */
-        CDN
     }
 }

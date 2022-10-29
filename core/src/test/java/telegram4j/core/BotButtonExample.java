@@ -46,7 +46,7 @@ public class BotButtonExample {
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.setCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.USERS),
-                            "ru", commands.stream()
+                            "en", commands.stream()
                                     .map(Command::getInfo)
                                     .collect(Collectors.toUnmodifiableList()))
                             .then();

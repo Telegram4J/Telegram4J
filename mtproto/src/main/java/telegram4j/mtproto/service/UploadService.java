@@ -89,7 +89,7 @@ public class UploadService extends RpcService {
                 AtomicInteger suc = new AtomicInteger();
 
                 List<MTProtoClient> clients = new ArrayList<>(PARALLELISM);
-                DataCenter mediaDc = DataCenter.list.stream()
+                DataCenter mediaDc = DataCenter.production.stream()
                         .filter(dc -> dc.getType() == DataCenter.Type.MEDIA &&
                                 dc.getId() == client.getDatacenter().getId())
                         .findFirst()

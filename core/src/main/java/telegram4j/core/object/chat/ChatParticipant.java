@@ -324,6 +324,7 @@ public final class ChatParticipant implements TelegramObject {
     public String toString() {
         return "ChatParticipant{" +
                 "data=" + data +
+                ", peer=" + peer +
                 '}';
     }
 

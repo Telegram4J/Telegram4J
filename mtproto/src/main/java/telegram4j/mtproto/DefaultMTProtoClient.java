@@ -80,7 +80,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final DataCenter dataCenter;
     private final TcpClient tcpClient;
     private final Transport transport;
-    private final Type type;
 
     private final AuthorizationContext authContext = new AuthorizationContext();
     private final Sinks.Many<Updates> updates;
@@ -110,8 +109,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     private final ConcurrentHashMap<Long, PendingRequest> requests = new ConcurrentHashMap<>();
     private final Cache<Integer, Long> quickAckTokens;
 
-    DefaultMTProtoClient(Type type, DataCenter dataCenter, MTProtoOptions options) {
-        this.type = type;
+    DefaultMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
         this.dataCenter = dataCenter;
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
@@ -143,7 +141,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
     }
 
     public DefaultMTProtoClient(MTProtoOptions options) {
-        this(Type.DEFAULT, options.getDatacenter(), options);
+        this(options.getDatacenter(), options);
     }
 
     @Override
@@ -628,12 +626,12 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
     @Override
     public MTProtoClient createMediaClient(DataCenter dc) {
-        if (type != Type.DEFAULT)
-            throw new IllegalStateException("Not default client can't create media clients");
+        if (dataCenter.getType() != DataCenter.Type.REGULAR)
+            throw new IllegalStateException("Not default client can't create media clients: " + dataCenter);
         if (dc.getType() != DataCenter.Type.MEDIA)
             throw new IllegalStateException("Invalid datacenter type: " + dc);
 
-        DefaultMTProtoClient client = new DefaultMTProtoClient(Type.MEDIA, dc, options);
+        DefaultMTProtoClient client = new DefaultMTProtoClient(dc, options);
 
         client.authKey = authKey;
         client.lastMessageId = lastMessageId;
@@ -641,11 +639,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
         client.serverSalt = serverSalt;
 
         return client;
-    }
-
-    @Override
-    public Type getType() {
-        return type;
     }
 
     @Override
