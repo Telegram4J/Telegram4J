@@ -8,14 +8,14 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.ChatFull;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.channels.ImmutableChannelParticipant;
 import telegram4j.tl.contacts.ImmutableResolvedPeer;
 import telegram4j.tl.contacts.ResolvedPeer;
-import telegram4j.tl.messages.ImmutableBaseMessages;
-import telegram4j.tl.messages.Messages;
+import telegram4j.tl.messages.*;
 import telegram4j.tl.updates.ImmutableState;
 import telegram4j.tl.updates.State;
 
@@ -298,18 +298,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onNewMessage(Message update) {
-        return Mono.fromRunnable(() -> {
-            BaseMessageFields copy = copy((BaseMessageFields) update);
-            MessageId key = MessageId.create(copy);
-
-            messages.put(key, copy);
-
-            savePeer(copy.peerId(), copy);
-            Peer p = copy.fromId();
-            if (p != null) {
-                savePeer(p, copy);
-            }
-        });
+        return Mono.fromRunnable(() -> saveMessage(update));
     }
 
     @Override
@@ -542,6 +531,38 @@ public class StoreLayoutImpl implements StoreLayout {
                 map.put(TlEntityUtil.getUserId(copy), copy);
                 return v.withParticipants(map);
             });
+        });
+    }
+
+    @Override
+    public Mono<Void> onMessages(Messages payload) {
+        return Mono.fromRunnable(() -> {
+            switch (payload.identifier()) {
+                case BaseMessages.ID:
+                    BaseMessages base = (BaseMessages) payload;
+
+                    saveContacts(base.chats(), base.users());
+                    for (var msg : base.messages()) {
+                        saveMessage(msg);
+                    }
+                    break;
+                case ChannelMessages.ID:
+                    ChannelMessages channel = (ChannelMessages) payload;
+
+                    saveContacts(channel.chats(), channel.users());
+                    for (var msg : channel.messages()) {
+                        saveMessage(msg);
+                    }
+                    break;
+                case MessagesSlice.ID:
+                    MessagesSlice slice = (MessagesSlice) payload;
+
+                    saveContacts(slice.chats(), slice.users());
+                    for (var msg : slice.messages()) {
+                        saveMessage(msg);
+                    }
+                    break;
+            }
         });
     }
 
@@ -871,6 +892,21 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private void addContact(Peer peer, Collection<Chat> chats, Collection<User> users) {
         addContact(peer, chats::add, users::add);
+    }
+
+    private void saveMessage(Message message) {
+        if (message.identifier() == MessageEmpty.ID) return;
+
+        BaseMessageFields copy = copy((BaseMessageFields) message);
+        MessageId key = MessageId.create(copy);
+
+        messages.put(key, copy);
+
+        savePeer(copy.peerId(), copy);
+        Peer p = copy.fromId();
+        if (p != null) {
+            savePeer(p, copy);
+        }
     }
 
     static class ChannelInfo {

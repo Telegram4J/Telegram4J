@@ -1,13 +1,12 @@
 package telegram4j.core.object.media;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.util.BitFlag;
 import telegram4j.tl.PollAnswer;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /** <a href="https://core.telegram.org/api/poll">Poll</a> object, which represents active or closed poll. */
 public class Poll {
@@ -28,39 +27,12 @@ public class Poll {
     }
 
     /**
-     * Gets whether the poll is closed.
+     * Gets set of poll flags.
      *
-     * @return Whether the poll is closed.
+     * @return The set of poll flags.
      */
-    public boolean isClosed() {
-        return data.closed();
-    }
-
-    /**
-     * Gets whether cast votes are publicly visible to all users (non-anonymous poll)
-     *
-     * @return Whether cast votes are publicly visible to all users.
-     */
-    public boolean isPublicVoters() {
-        return data.publicVoters();
-    }
-
-    /**
-     * Gets whether multiple options can be chosen as answer.
-     *
-     * @return Whether multiple options can be chosen as answer.
-     */
-    public boolean isMultipleChoice() {
-        return data.multipleChoice();
-    }
-
-    /**
-     * Gets whether poll is the quiz.
-     *
-     * @return Whether poll is the quiz.
-     */
-    public boolean isQuiz() {
-        return data.quiz();
+    public Set<Flag> getFlags() {
+        return Flag.of(data);
     }
 
     /**
@@ -115,5 +87,37 @@ public class Poll {
     @Override
     public String toString() {
         return "Poll{data=" + data + '}';
+    }
+
+    /** An enumeration of {@link telegram4j.tl.Poll} bit-flags. */
+    public enum Flag implements BitFlag {
+        /** Whether poll is closed. */
+        CLOSED(telegram4j.tl.Poll.CLOSED_POS),
+
+        /** Whether cast votes are publicly visible to all users (non-anonymous poll). */
+        PUBLIC_VOTERS(telegram4j.tl.Poll.PUBLIC_VOTERS_POS),
+
+        MULTIPLE_CHOICE(telegram4j.tl.Poll.MULTIPLE_CHOICE_POS),
+
+        /** Whether poll is quiz. This flag can't be set with {@link #MULTIPLE_CHOICE}. */
+        QUIZ(telegram4j.tl.Poll.QUIZ_POS);
+
+        private final byte position;
+
+        Flag(byte position) {
+            this.position = position;
+        }
+
+        public static Set<Flag> of(telegram4j.tl.Poll data) {
+            var set = EnumSet.allOf(Flag.class);
+            int flags = data.flags();
+            set.removeIf(f -> (flags & f.mask()) == 0);
+            return set;
+        }
+
+        @Override
+        public byte position() {
+            return position;
+        }
     }
 }

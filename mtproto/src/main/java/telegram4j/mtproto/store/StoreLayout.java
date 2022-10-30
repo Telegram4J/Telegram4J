@@ -264,4 +264,6 @@ public interface StoreLayout {
     Mono<Void> onChannelParticipants(long channelId, BaseChannelParticipants payload);
 
     Mono<Void> onChannelParticipant(long channelId, ChannelParticipant payload);
+
+    Mono<Void> onMessages(Messages payload);
 }

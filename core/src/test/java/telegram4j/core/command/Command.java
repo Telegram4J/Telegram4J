@@ -13,7 +13,7 @@ public interface Command {
 
     default BotCommand getInfo() {
         TelegramCommand info = getClass().getDeclaredAnnotation(TelegramCommand.class);
-        Objects.requireNonNull(info);
+        Objects.requireNonNull(info, () -> "No @TelegramCommand annotation present on " + getClass().getCanonicalName());
         return ImmutableBotCommand.of(info.command(), info.description());
     }
 }

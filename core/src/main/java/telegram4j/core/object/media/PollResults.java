@@ -1,9 +1,14 @@
 package telegram4j.core.object.media;
 
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.User;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.tl.InputPeer;
 import telegram4j.tl.PollAnswerVoters;
@@ -11,9 +16,11 @@ import telegram4j.tl.PollAnswerVoters;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class PollResults implements TelegramObject {
+public final class PollResults implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.PollResults data;
@@ -62,16 +69,38 @@ public class PollResults implements TelegramObject {
     }
 
     /**
-     * Gets list of the last users that recently voted in the poll, if present.
+     * Gets set of the last users that recently voted in the poll, if present.
      *
-     * @return List of the last users that recently voted in the poll, if present empty list.
+     * @return The set of the last users that recently voted in the poll, if present empty list.
      */
-    public List<Id> getRecentVoters() {
+    public Set<Id> getRecentVotersIds() {
         return Optional.ofNullable(data.recentVoters())
                 .map(l -> l.stream()
                         .map(i -> Id.ofUser(i, null))
-                        .collect(Collectors.toList()))
-                .orElse(List.of());
+                        .collect(Collectors.toSet()))
+                .orElse(Set.of());
+    }
+
+    /**
+     * Requests to retrieve the recent poll voters.
+     *
+     * @return A {@link Flux} which emits the {@link User voters}.
+     */
+    public Flux<User> getRecentVoters() {
+        return getRecentVoters(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the recent poll voters using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return A {@link Flux} which emits the {@link User voters}.
+     */
+    public Flux<User> getRecentVoters(EntityRetrievalStrategy strategy) {
+        var retriever = client.withRetrievalStrategy(strategy);
+        return Mono.justOrEmpty(data.recentVoters())
+                .flatMapIterable(Function.identity())
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
     }
 
     /**

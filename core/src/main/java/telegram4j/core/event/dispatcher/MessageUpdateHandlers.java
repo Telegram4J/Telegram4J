@@ -3,15 +3,14 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.event.domain.message.DeleteMessagesEvent;
-import telegram4j.core.event.domain.message.EditMessageEvent;
-import telegram4j.core.event.domain.message.SendMessageEvent;
-import telegram4j.core.event.domain.message.UpdatePinnedMessagesEvent;
+import telegram4j.core.event.domain.message.*;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.object.media.Poll;
+import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
@@ -129,5 +128,25 @@ class MessageUpdateHandlers {
                 : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId(), null);
 
         return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
+    }
+
+    static Flux<MessagePollResultsEvent> handleUpdateMessagePoll(StatefulUpdateContext<UpdateMessagePoll, Void> context) {
+        var upd = context.getUpdate();
+
+        Poll poll = Optional.ofNullable(upd.poll())
+                .map(Poll::new)
+                .orElse(null);
+        PollResults results = new PollResults(context.getClient(), upd.results(),
+                -1, InputPeerEmpty.instance()); // TODO: support this type of context
+
+        return Flux.just(new MessagePollResultsEvent(context.getClient(), upd.pollId(), poll, results));
+    }
+
+    static Flux<MessagePollVoteEvent> handleUpdateMessagePollVote(StatefulUpdateContext<UpdateMessagePollVote, Void> context) {
+        var upd = context.getUpdate();
+
+        var user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+
+        return Flux.just(new MessagePollVoteEvent(context.getClient(), upd.pollId(), user, upd.options()));
     }
 }

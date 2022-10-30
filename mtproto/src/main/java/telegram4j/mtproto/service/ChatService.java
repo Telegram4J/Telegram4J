@@ -102,7 +102,8 @@ public class ChatService extends RpcService {
 
     @BotCompatible
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
-        return Mono.defer(() -> client.sendAwait(telegram4j.tl.request.messages.ImmutableGetMessages.of(ids)));
+        return Mono.defer(() -> client.sendAwait(telegram4j.tl.request.messages.ImmutableGetMessages.of(ids)))
+                .flatMap(m -> storeLayout.onMessages(m).thenReturn(m));
     }
 
     public Mono<SentEncryptedMessage> sendEncryptedService(InputEncryptedChat peer, long randomId, ByteBuf data) {
@@ -759,7 +760,6 @@ public class ChatService extends RpcService {
         return client.sendAwait(request);
     }
 
-    // Docs lie - bots can't use method
     public Mono<Updates> getMessagesReactions(InputPeer peer, Iterable<Integer> messageIds) {
         return Mono.defer(() -> client.sendAwait(ImmutableGetMessagesReactions.of(peer, messageIds)));
     }
@@ -795,21 +795,24 @@ public class ChatService extends RpcService {
     @BotCompatible
     public Mono<BaseMessageFields> editMessage(EditMessage request) {
         return client.sendAwait(request)
-                .map(updates -> {
+                .flatMap(updates -> {
                     if (updates.identifier() == BaseUpdates.ID) {
                         BaseUpdates casted = (BaseUpdates) updates;
 
-                        UpdateEditMessageFields update = casted.updates().stream()
-                                .filter(upd -> upd instanceof UpdateEditMessageFields)
-                                .map(upd -> (UpdateEditMessageFields) upd)
-                                .findFirst()
-                                .orElseThrow();
+                        // also can receive UpdateMessagePoll
+                        UpdateEditMessageFields newMessage = null;
+                        for (Update update : casted.updates()) {
+                            if (update instanceof UpdateEditMessageFields) {
+                                newMessage = (UpdateEditMessageFields) update;
+                            }
+                        }
 
                         client.updates().emitNext(updates, DEFAULT_PARKING);
-
-                        return (BaseMessageFields) update.message();
+                        return Mono.justOrEmpty(newMessage)
+                                .map(UpdateEditMessageFields::message)
+                                .cast(BaseMessageFields.class);
                     }
-                    throw new IllegalArgumentException("Unknown updates type: " + updates);
+                    return Mono.error(new IllegalArgumentException("Unknown updates type: " + updates));
                 });
     }
 
@@ -884,7 +887,8 @@ public class ChatService extends RpcService {
 
     @BotCompatible
     public Mono<SendAsPeers> getSendAs(InputPeer peer) {
-        return client.sendAwait(ImmutableGetSendAs.of(peer));
+        return client.sendAwait(ImmutableGetSendAs.of(peer))
+                .doOnNext(s -> storeLayout.onContacts(s.chats(), s.users()));
     }
 
     @BotCompatible
@@ -899,7 +903,8 @@ public class ChatService extends RpcService {
 
     @BotCompatible
     public Mono<Messages> getMessages(InputChannel channel, Iterable<? extends InputMessage> ids) {
-        return Mono.defer(() -> client.sendAwait(ImmutableGetMessages.of(channel, ids)));
+        return Mono.defer(() -> client.sendAwait(ImmutableGetMessages.of(channel, ids)))
+                .flatMap(m -> storeLayout.onMessages(m).thenReturn(m));
     }
 
     @BotCompatible

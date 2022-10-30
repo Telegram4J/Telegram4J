@@ -250,6 +250,11 @@ public class TestFileStoreLayout implements StoreLayout {
         return delegate.onChannelParticipant(channelId, payload);
     }
 
+    @Override
+    public Mono<Void> onMessages(Messages payload) {
+        return delegate.onMessages(payload);
+    }
+
     private Mono<Void> save(DataCenter dc, AuthorizationKeyHolder authKey, @Nullable State state) {
         return Mono.fromCallable(() -> {
             log.debug("Saving session information to file store for dc №{}.", dc.getId());

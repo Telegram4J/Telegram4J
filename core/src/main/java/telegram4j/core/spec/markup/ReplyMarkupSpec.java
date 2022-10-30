@@ -89,9 +89,9 @@ public final class ReplyMarkupSpec {
                     return Flux.fromIterable(rows().orElseThrow())
                             .flatMap(list -> Flux.fromIterable(list)
                                     .flatMap(s -> s.asData(client))
-                                    .collectList()
+                                    .collect(Collectors.toUnmodifiableList())
                                     .map(ImmutableKeyboardButtonRow::of))
-                            .collectList()
+                            .collect(Collectors.toUnmodifiableList())
                             .map(rows -> ReplyKeyboardMarkup.builder()
                                     .flags(flags.getValue())
                                     .placeholder(placeholder)
@@ -108,9 +108,9 @@ public final class ReplyMarkupSpec {
                     return Flux.fromIterable(rows().orElseThrow())
                             .flatMap(list -> Flux.fromIterable(list)
                                     .flatMap(s -> s.asData(client))
-                                    .collectList()
+                                    .collect(Collectors.toUnmodifiableList())
                                     .map(ImmutableKeyboardButtonRow::of))
-                            .collectList()
+                            .collect(Collectors.toUnmodifiableList())
                             .map(ImmutableReplyInlineMarkup::of);
                 default:
                     return Mono.error(new IllegalStateException());

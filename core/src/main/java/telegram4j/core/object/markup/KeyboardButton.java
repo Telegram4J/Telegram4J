@@ -7,6 +7,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.markup.KeyboardButtonSpec;
 import telegram4j.core.util.Id;
@@ -268,7 +269,7 @@ public final class KeyboardButton implements TelegramObject {
 
         /**
          * A button that allows the user to create and
-         * send a poll when pressed; available only in private.
+         * send a poll when pressed; Available only in {@link PrivateChat DMs}.
          */
         REQUEST_POLL,
 

@@ -371,10 +371,12 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 int seq = this.seq;
                                 if (seq != diff.seq()) {
                                     j.add("seq: " + seq + "->" + diff.seq());
+                                    this.seq = diff.seq();
                                 }
                                 int currDate = this.date;
                                 if (currDate != diff.date()) {
                                     j.add("date: " + Instant.ofEpochSecond(currDate) + "->" + Instant.ofEpochSecond(diff.date()));
+                                    this.date = diff.date();
                                 }
 
                                 String str = j.toString();
@@ -721,7 +723,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .getStoreLayout().updateChannelPts(id, ptsUpdate.pts());
 
                         if (justApplied.get()) {
-                            log.debug("Updating channel state, pts: {}->{}", pts, ptsUpdate.pts());
+                            log.debug("Updating state for channel: {}, pts: {}->{}", id, pts, ptsUpdate.pts());
                             return updatePts.thenMany(mapUpdate);
                         }
 
@@ -736,7 +738,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             return Flux.empty();
                         }
 
-                        log.debug("Updating channel state, pts: {}->{}", pts, ptsUpdate.pts());
+                        log.debug("Updating state for channel: {}, pts: {}->{}", id, pts, ptsUpdate.pts());
                         return updatePts.thenMany(mapUpdate);
                     });
         }

@@ -49,8 +49,10 @@ public class ExampleReplyBot {
         client.on(SendMessageEvent.class)
                 .filter(e -> e.getMessage().getContent().equals("!ping"))
                 .flatMap(e -> Mono.justOrEmpty(e.getChat())
+                        // telegram api may not deliver chat info and in this situation it's necessary to retrieve chat
+                        .switchIfEmpty(event.getMessage().getChat())
                         .flatMap(c -> c.sendMessage(SendMessageSpec.of("pong!")
-                                .withReplyToMessageId(e.getMessage().getId()))))
+                                .withReplyTo(e.getMessage()))))
                 .subscribe();
 
         client.onDisconnect().block();

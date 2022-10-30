@@ -1,6 +1,7 @@
 package telegram4j.core.spec;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.object.Message;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.spec.media.InputMediaSpec;
 import telegram4j.core.util.BitFlag;
@@ -20,9 +21,13 @@ public final class SendMessageSpec {
     @Nullable
     private final InputMediaSpec media;
     private final String message;
+    @Nullable
     private final EntityParserFactory parser;
+    @Nullable
     private final ReplyMarkupSpec replyMarkup;
+    @Nullable
     private final Instant scheduleTimestamp;
+    @Nullable
     private final PeerId sendAs;
 
     private SendMessageSpec(String message) {
@@ -99,6 +104,10 @@ public final class SendMessageSpec {
         var newValue = ImmutableEnumSet.of(Flag.class, value);
         return new SendMessageSpec(newValue, replyToMessageId, message, parser,
                 replyMarkup, scheduleTimestamp, sendAs, media);
+    }
+
+    public SendMessageSpec withReplyTo(@Nullable Message value) {
+        return withReplyToMessageId(value != null ? value.getId() : null);
     }
 
     public SendMessageSpec withReplyToMessageId(@Nullable Integer value) {
@@ -271,6 +280,11 @@ public final class SendMessageSpec {
             for (Flag flag : flags) {
                 this.flags.add(flag);
             }
+            return this;
+        }
+
+        public Builder replyTo(@Nullable Message message) {
+            this.replyToMessageId = message != null ? message.getId() : null;
             return this;
         }
 

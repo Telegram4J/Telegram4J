@@ -21,6 +21,10 @@ public final class UpdatesMapper {
                 MessageUpdateHandlers::handleUpdateDeleteMessages);
         addHandler(UpdatePinnedMessagesFields.class, MessageUpdateHandlers::handleStateUpdatePinnedMessages,
                 MessageUpdateHandlers::handleUpdatePinnedMessages);
+        addHandler(UpdateMessagePoll.class, StateUpdateHandler.noOp(),
+                MessageUpdateHandlers::handleUpdateMessagePoll);
+        addHandler(UpdateMessagePollVote.class, StateUpdateHandler.noOp(),
+                MessageUpdateHandlers::handleUpdateMessagePollVote);
         // chat updates
         addHandler(UpdateChatParticipant.class, ChatUpdateHandlers::handleStateUpdateChatParticipant,
                 ChatUpdateHandlers::handleUpdateChatParticipant);
