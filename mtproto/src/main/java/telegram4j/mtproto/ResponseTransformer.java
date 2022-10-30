@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.tl.api.TlMethod;
 
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /** Interface for mapping rpc responses. */
 @FunctionalInterface
@@ -11,18 +12,18 @@ public interface ResponseTransformer {
 
     /**
      * Create new {@code ResponseTransformer} which returns
-     * on specified error codes {@link Mono#empty()} as response for given methods scope.
+     * on matched exceptions {@link Mono#empty()} as response for given methods scope.
      *
      * @param methodPredicate The method scope.
-     * @param codes The array of method error codes.
+     * @param predicate The predicate for exceptions.
      * @return The new {@code ResponseTransformer} which returns {@link Mono#empty()} on matched errors.
      */
-    static ResponseTransformer emptyOnErrorCodes(MethodPredicate methodPredicate, int... codes) {
+    static ResponseTransformer empty(MethodPredicate methodPredicate, Predicate<? super Throwable> predicate) {
         return new ResponseTransformer() {
             @Override
             public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
                 if (methodPredicate.test(method)) {
-                    return mono -> mono.onErrorResume(RpcException.isErrorCode(codes), t -> Mono.empty());
+                    return mono -> mono.onErrorResume(predicate, t -> Mono.empty());
                 }
                 return Function.identity();
             }

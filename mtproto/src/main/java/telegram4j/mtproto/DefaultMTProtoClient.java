@@ -321,15 +321,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
 
             Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, payloadFlux)
                     .map(req -> {
-                        List<Long> pending;
+                        List<Long> sent;
                         // server returns -404 transport error when this packet placed in container
                         boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID;
                         int cnt = 1;
                         ByteBuf stateRequest = null;
-                        if (canContainerize && !(pending = collectPendingMessageIds()).isEmpty()) {
+                        if (canContainerize && !(sent = collectSentMessageIds()).isEmpty()) {
                             cnt++;
 
-                            var stpending = new PendingRequest(ImmutableMsgsStateReq.of(pending));
+                            var stpending = new PendingRequest(ImmutableMsgsStateReq.of(sent));
 
                             long messageId = getMessageId();
                             int seqNo = updateSeqNo(false);
@@ -563,13 +563,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
         .then(Mono.defer(() -> closeHook.asMono()));
     }
 
-    private List<Long> collectPendingMessageIds() {
-        return requests.entrySet().stream()
-                .filter(e -> (e.getValue().state & PENDING) != 1)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toUnmodifiableList());
-    }
-
     @Override
     public Sinks.Many<Updates> updates() {
         return updates;
@@ -647,6 +640,13 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected")))
                 .doOnNext(con -> state.emitNext(State.CLOSED, options.getEmissionHandler()))
                 .then();
+    }
+
+    private List<Long> collectSentMessageIds() {
+        return requests.entrySet().stream()
+                .filter(e -> (e.getValue().state & PENDING) == 0)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toUnmodifiableList());
     }
 
     private TcpClient initTcpClient(TcpClient tcpClient) {
@@ -931,8 +931,8 @@ public class DefaultMTProtoClient implements MTProtoClient {
                         case 1:
                         case 2:
                         case 3:
-                            requests.remove(msgId);
                             sub.state = PENDING;
+                            requests.remove(msgId);
                             outbound.emitNext(sub, options.getEmissionHandler());
                             break;
                         case 0:
@@ -942,6 +942,30 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     }
                 }
             }
+            return Mono.empty();
+        }
+
+        if (obj instanceof MsgDetailedInfo) {
+            MsgDetailedInfo info = (MsgDetailedInfo) obj;
+
+            if (info instanceof BaseMsgDetailedInfo) {
+                BaseMsgDetailedInfo base = (BaseMsgDetailedInfo) info;
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.debug("[C:0x{}] Handling message info. msgId: 0x{}, answerId: 0x{}", id,
+                            Long.toHexString(base.msgId()), Long.toHexString(base.answerMsgId()));
+                }
+
+                var req = requests.get(base.msgId());
+                if (req != null) {
+                    req.markState(s -> s | ACKNOWLEDGED);
+                }
+            } else {
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.debug("[C:0x{}] Handling message info. answerId: 0x{}", id, Long.toHexString(info.answerMsgId()));
+                }
+            }
+
+            // TODO
             return Mono.empty();
         }
 
