@@ -28,7 +28,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
+import static telegram4j.mtproto.util.TlEntityUtil.getUserId;
 import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 
 /** Default in-memory store implementation. */
@@ -38,6 +38,7 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
+    // TODO: make weak or limit by size?
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
     private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
@@ -216,11 +217,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<telegram4j.tl.messages.ChatFull> getChannelFullById(long channelId) {
         return Mono.fromSupplier(() -> channels.get(channelId))
-                .filter(userInfo -> userInfo.full != null)
-                .map(userInfo -> telegram4j.tl.messages.ChatFull.builder()
-                        .chats(List.of(userInfo.min))
+                .filter(channelInfo -> channelInfo.full != null)
+                .map(channelInfo -> telegram4j.tl.messages.ChatFull.builder()
+                        .chats(List.of(channelInfo.min))
                         .users(List.of())
-                        .fullChat(Objects.requireNonNull(userInfo.full))
+                        .fullChat(Objects.requireNonNull(channelInfo.full))
                         .build());
     }
 
@@ -349,8 +350,12 @@ public class StoreLayoutImpl implements StoreLayout {
                 case InputPeerEmpty.ID:
                     return null;
                 case InputPeerChannel.ID:
+                    var channel = (InputPeerChannel) peer;
+                    rawPeerId = channel.channelId();
+                    break;
                 case InputPeerChannelFromMessage.ID:
-                    rawPeerId = getRawInputPeerId(peer);
+                    var minChannel = (InputPeerChannelFromMessage) peer;
+                    rawPeerId = minChannel.channelId();
                     break;
                 case InputPeerChat.ID:
                 case InputPeerSelf.ID:
@@ -404,7 +409,6 @@ public class StoreLayoutImpl implements StoreLayout {
                 map = new ConcurrentHashMap<>();
                 map.put(curr.userId(), copy(curr));
             }
-
 
             return v.withParticipants(map);
         }));
@@ -462,9 +466,22 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onChannelParticipant(UpdateChannelParticipant payload) {
-        return Mono.fromRunnable(() -> {
+        return Mono.fromRunnable(() -> channels.computeIfPresent(payload.channelId(), (k, v) -> {
+            var prev = payload.prevParticipant();
+            var curr = payload.prevParticipant();
+            var map = v.participants;
+            if (curr == null) {
+                if (map != null) {
+                    Objects.requireNonNull(prev); // TODO: test it
+                    map.remove(getUserId(prev));
+                }
+            } else {
+                map = new ConcurrentHashMap<>();
+                map.put(getUserId(curr), copy(curr));
+            }
 
-        });
+            return v;
+        }));
     }
 
     @Override
@@ -481,6 +498,8 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
+        Objects.requireNonNull(dc);
+        Objects.requireNonNull(authKey);
         return Mono.fromRunnable(() -> authKeys.put(dc, authKey));
     }
 
@@ -496,12 +515,27 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload) {
-        return Mono.fromRunnable(() -> saveUserFull(payload));
+        return Mono.fromRunnable(() -> {
+            var userFull = ImmutableUserFull.copyOf(payload.fullUser());
+            var anyUser = payload.users().stream()
+                    .filter(u -> u.id() == userFull.id())
+                    .findFirst()
+                    .orElseThrow();
+
+            saveUser(userFull, anyUser);
+        });
     }
 
     @Override
     public Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload) {
-        return Mono.fromRunnable(() -> saveChatFull(payload));
+        return Mono.fromRunnable(() -> {
+            var anyChat = payload.chats().stream()
+                    .filter(c -> c.id() == payload.fullChat().id())
+                    .findFirst()
+                    .orElseThrow();
+            saveContacts(List.of(), payload.users());
+            saveChat(payload.fullChat(), anyChat);
+        });
     }
 
     @Override
@@ -568,138 +602,143 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
         for (Chat chat : chats) {
-            saveChatMin(chat);
+            saveChat(null, chat);
         }
 
         for (User user : users) {
-            saveUserMin(user);
+            saveUser(null, user);
         }
     }
 
-    private void saveChatFull(telegram4j.tl.messages.ChatFull chatf) {
-        ChatFull chat0 = copy(chatf.fullChat());
-        var chat1 = chatf.chats().stream()
-                .filter(c -> isAccessible(c) && c.id() == chat0.id())
-                .findFirst()
-                .map(StoreLayoutImpl::copy)
-                .orElse(null);
-
-        if (chat1 == null) {
+    private void saveUser(@Nullable ImmutableUserFull anyUserFull, User anyUser) {
+        if (!(anyUser instanceof BaseUser)) {
             return;
         }
 
-        Peer peer;
-        if (chat1 instanceof BaseChat) {
-            var chat = (ImmutableBaseChat) chat1;
-            var chatFull = (ImmutableBaseChatFull) chat0;
-            chats.compute(chat.id(), (k, v) -> {
-                ChatInfo updated = v == null
-                        ? new ChatInfo(chat, chatFull)
-                        : v.withData(chat, chatFull);
+        BaseUser user = (BaseUser) anyUser;
+        var userInfo = users.get(user.id());
 
-                if (chatFull.participants() instanceof BaseChatParticipants) {
-                    var base = (BaseChatParticipants) chatFull.participants();
+        saveUsernamePeer(user);
 
-                    var map = updated.participants();
-                    map.clear();
-                    for (var p : base.participants()) {
-                        var copy = copy(p);
-                        map.put(copy.userId(), copy);
-                    }
-
-                    updated = updated.withParticipants(map);
-                } else {
-                    ChatParticipant selfParticipant;
-                    if (chatFull.participants() instanceof ChatParticipantsForbidden &&
-                            (selfParticipant = ((ChatParticipantsForbidden) chatFull.participants()).selfParticipant()) != null) {
-                        var copy = copy(selfParticipant);
-                        var map = updated.participants();
-                        map.put(copy.userId(), copy);
-                        updated = updated.withParticipants(map);
-                    } else {
-                        updated = updated.withParticipants(null);
-                    }
-                }
-
-                return updated;
-            });
-
-            peer = ImmutablePeerChat.of(chat.id());
-            saveContacts(List.of(), chatf.users());
-        } else if (chat1 instanceof Channel) {
-            var channel = (ImmutableChannel) chat1;
-            var channelFull = (ImmutableChannelFull) chat0;
-            channels.compute(channel.id(), (k, v) -> v == null
-                    ? new ChannelInfo(channel, channelFull)
-                    : v.withData(channel, channelFull));
-            saveUsernamePeer(channel);
-
-            peer = ImmutablePeerChannel.of(channel.id());
-        } else {
-            throw new IllegalArgumentException("Unexpected ChatFull type: " + chat1);
-        }
-
-        savePeer(peer, null);
-    }
-
-    private void saveUserFull(telegram4j.tl.users.UserFull user) {
-        var user0 = ImmutableUserFull.copyOf(user.fullUser());
-        var user1 = user.users().stream()
-                .filter(u -> isAccessible(u) && u.id() == user0.id())
-                .findFirst()
-                .map(u -> (BaseUser) u)
-                .map(ImmutableBaseUser::copyOf)
-                .orElse(null);
-
-        if (user1 == null) {
+        // received user is min, and we have non-min user, just ignore received.
+        if (user.min() && userInfo != null && !userInfo.min.min() && userInfo.min.accessHash() != null) {
             return;
         }
 
-        // Updating self info on first getUserFull for self user
-        if (user1.self()) {
-            selfId = user0.id();
+        var userCopy = ImmutableBaseUser.copyOf(user);
+        users.compute(userCopy.id(), (k, v) -> {
+            var userFull = Optional.ofNullable(anyUserFull)
+                    .map(ImmutableUserFull::copyOf)
+                    .or(() -> Optional.ofNullable(v).map(u -> u.full))
+                    .orElse(null);
+            return new PartialFields<>(userCopy, userFull);
+        });
+        Long acch = userCopy.accessHash();
+        if (userCopy.self()) {
+            selfId = userCopy.id();
+
+            var self = ImmutablePeerUser.of(userCopy.id());
 
             // add special tags for indexing
-            var self = ImmutablePeerUser.of(selfId);
-            usernames.put("me", self);
-            usernames.put("self", self);
-        }
+            usernames.putIfAbsent("me", self);
+            usernames.putIfAbsent("self", self);
 
-        users.put(user0.id(), new PartialFields<>(user1, user0));
-        savePeer(ImmutablePeerUser.of(user0.id()), null);
-        saveUsernamePeer(user1);
+            peers.put(self, InputPeerSelf.instance());
+
+        // BaseUser#accessHash() or Channel#accessHash() can be _min_ hash which
+        // allows to download profile photos, but can't be used as parameter
+        // of getFullChat or getChannels
+        // https://core.telegram.org/api/min
+        } else if (acch != null && !userCopy.min()) {
+            peers.put(ImmutablePeerUser.of(userCopy.id()), ImmutableInputPeerUser.of(userCopy.id(), acch));
+        }
+        // if user is min and received from message update,
+        // then the *FromMessage peer would be saved in savePeer()
     }
 
-    private void saveUserMin(User user) {
-        if (user.identifier() != BaseUser.ID || !isAccessible(user)) {
-            return;
-        }
+    private void saveChat(@Nullable ChatFull anyChatFull, Chat anyChat) {
+        switch (anyChat.identifier()) {
+            case ChannelForbidden.ID:
+                ChannelForbidden channelForbidden = (ChannelForbidden) anyChat;
+                var inputPeer = ImmutableInputPeerChannel.of(channelForbidden.id(), channelForbidden.accessHash());
+                peers.put(ImmutablePeerChannel.of(channelForbidden.id()), inputPeer);
+                channels.remove(channelForbidden.id());
+                return;
+            case ChatForbidden.ID:
+                peers.putIfAbsent(ImmutablePeerChat.of(anyChat.id()), ImmutableInputPeerChat.of(anyChat.id()));
+                chats.remove(anyChat.id());
+                return;
+            case BaseChat.ID:
+                var chat = ImmutableBaseChat.copyOf((BaseChat) anyChat);
 
-        ImmutableBaseUser user0 = ImmutableBaseUser.copyOf((BaseUser) user);
-        users.compute(user0.id(), (k, v) -> v == null ? new PartialFields<>(user0) : v.withMin(user0));
-        savePeer(ImmutablePeerUser.of(user0.id()), null);
-        saveUsernamePeer(user0);
-    }
+                peers.putIfAbsent(ImmutablePeerChat.of(chat.id()), ImmutableInputPeerChat.of(chat.id()));
+                chats.compute(chat.id(), (k, v) -> {
+                    var chatFull = Optional.ofNullable(anyChatFull)
+                            .map(c -> ImmutableBaseChatFull.copyOf((BaseChatFull) c))
+                            .or(() -> Optional.ofNullable(v).map(c -> c.full))
+                            .orElse(null);
 
-    private void saveChatMin(Chat chat) {
-        if (!isAccessible(chat)) {
-            return;
-        }
+                    ChatInfo updated = v == null
+                            ? new ChatInfo(chat, chatFull)
+                            : v.withData(chat, chatFull);
 
-        Chat cpy = copy(chat);
-        if (chat instanceof BaseChat) {
-            var c = ImmutableBaseChat.copyOf((BaseChat) cpy);
-            savePeer(ImmutablePeerChat.of(c.id()), null);
-            chats.compute(cpy.id(), (k, v) -> v == null ? new ChatInfo(c) : v.withMin(c));
-        } else if (chat instanceof Channel) {
-            var c =  ImmutableChannel.copyOf((Channel) cpy);
-            Long acch = c.accessHash();
-            if (acch != null) {
-                peers.put(ImmutablePeerChannel.of(c.id()), ImmutableInputPeerChannel.of(c.id(), acch));
-            }
+                    if (anyChatFull != null) { // was updated
+                        if (chatFull.participants() instanceof BaseChatParticipants) {
+                            var base = (BaseChatParticipants) chatFull.participants();
 
-            channels.compute(cpy.id(), (k, v) -> v == null ? new ChannelInfo(c) : v.withMin(c));
-            saveUsernamePeer(cpy);
+                            var map = updated.participants();
+                            map.clear();
+                            for (var p : base.participants()) {
+                                var copy = copy(p);
+                                map.put(copy.userId(), copy);
+                            }
+
+                            updated = updated.withParticipants(map);
+                        } else {
+                            ChatParticipant selfParticipant;
+                            if (chatFull.participants() instanceof ChatParticipantsForbidden &&
+                                    (selfParticipant = ((ChatParticipantsForbidden) chatFull.participants()).selfParticipant()) != null) {
+                                var copy = copy(selfParticipant);
+                                var map = updated.participants();
+                                map.put(copy.userId(), copy);
+                                updated = updated.withParticipants(map);
+                            } else {
+                                updated = updated.withParticipants(null);
+                            }
+                        }
+                    }
+
+                    return updated;
+                });
+                return;
+            case Channel.ID:
+                var channel = (Channel) anyChat;
+                var channelInfo = channels.get(channel.id());
+
+                saveUsernamePeer(channel);
+
+                // received channel is min, and we have non-min channel, just ignore received.
+                if (channel.min() && channelInfo != null && !channelInfo.min.min() && channelInfo.min.accessHash() != null) {
+                    return;
+                }
+
+                var channelCopy = ImmutableChannel.copyOf(channel);
+                channels.compute(channelCopy.id(), (k, v) -> {
+                    var channelFull = Optional.ofNullable(anyChatFull)
+                            .map(c -> ImmutableChannelFull.copyOf((ChannelFull) c))
+                            .or(() -> Optional.ofNullable(v).map(c -> c.full))
+                            .orElse(null);
+
+                    return v == null
+                            ? new ChannelInfo(channelCopy, channelFull)
+                            : v.withData(channelCopy, channelFull);
+                });
+                Long acch = channelCopy.accessHash();
+                if (acch != null && !channelCopy.min()) { // see saveUser()
+                    peers.put(ImmutablePeerChannel.of(channelCopy.id()), ImmutableInputPeerChannel.of(channelCopy.id(), acch));
+                }
+                // if channel is min and received from message update,
+                // then the *FromMessage peer would be saved in savePeer()
         }
     }
 
@@ -725,37 +764,6 @@ public class StoreLayoutImpl implements StoreLayout {
             case ChannelParticipantLeft.ID: return (T) ImmutableChannelParticipantLeft.copyOf((ChannelParticipantLeft) object);
             case ChannelParticipantSelf.ID: return (T) ImmutableChannelParticipantSelf.copyOf((ChannelParticipantSelf) object);
             default: throw new IllegalArgumentException("Unknown entity type: " + object);
-        }
-    }
-
-    private boolean isAccessible(BaseUser obj) {
-        return !obj.min() || obj.accessHash() != null;
-    }
-
-    private boolean isAccessible(Channel obj) {
-        return !obj.min() || obj.accessHash() != null;
-    }
-
-    private boolean isAccessible(TlObject obj) {
-        switch (obj.identifier()) {
-            case ChannelForbidden.ID:
-            case ChatForbidden.ID: return false;
-            case Channel.ID:
-                Channel channel = (Channel) obj;
-                var channelInfo = channels.get(channel.id());
-
-                return !channel.min() && channelInfo != null && !channelInfo.min.min()
-                        && channelInfo.min.accessHash() != null
-                        || channel.accessHash() != null;
-            case BaseUser.ID:
-                BaseUser user = (BaseUser) obj;
-                var userInfo = users.get(user.id());
-
-                return !user.min() && userInfo != null && !userInfo.min.min()
-                        && userInfo.min.accessHash() != null
-                        || user.accessHash() != null;
-            default:
-                return true;
         }
     }
 
@@ -790,103 +798,79 @@ public class StoreLayoutImpl implements StoreLayout {
                 if (username != null) {
                     usernames.put(stripUsername(username), ImmutablePeerChannel.of(channel.id()));
                 }
+                break;
             }
+            default: throw new IllegalStateException("Unexpected peer type: " + object);
         }
     }
 
-    private void savePeer(Peer p, @Nullable BaseMessageFields message) {
-        if (peers.containsKey(p)) {
-            return;
-        }
-
-        long peerId = getRawPeerId(p);
-        InputPeer in;
+    private void savePeer(Peer p, BaseMessageFields message) {
         switch (p.identifier()) {
             case PeerChat.ID:
-                in = ImmutableInputPeerChat.of(peerId);
+                var cp = ImmutablePeerChat.copyOf((PeerChat) p);
+                peers.putIfAbsent(cp, ImmutableInputPeerChat.of(cp.chatId()));
                 break;
+            // Here only handling for min objects
             case PeerChannel.ID: {
-                var chatInfo = channels.get(peerId);
-                if ((chatInfo == null || !isAccessible(chatInfo.min))) {
-                    if (message != null && !isBot()) {
-                        InputPeer chatPeer = peers.get(message.peerId());
-                        if (chatPeer == null) {
-                            return;
-                        }
+                var chp = ImmutablePeerChannel.copyOf((PeerChannel) p);
+                var channelInfo = channels.get(chp.channelId());
 
-                        in = ImmutableInputPeerChannelFromMessage.of(chatPeer, message.id(), peerId);
+                if ((channelInfo == null || channelInfo.min.min()) && !isBot()) {
+                    var chatPeer = peers.get(message.peerId());
+                    if (chatPeer == null) {
                         break;
                     }
 
-                    return;
+                    var minChannel = ImmutableInputPeerChannelFromMessage.of(
+                            chatPeer, message.id(), chp.channelId());
+                    peers.put(chp, minChannel);
                 }
-
-                long accessHash = Objects.requireNonNull(chatInfo.min.accessHash());
-                in = ImmutableInputPeerChannel.of(peerId, accessHash);
-
                 break;
             }
             case PeerUser.ID:
-                if (selfId == peerId) {
-                    in = InputPeerSelf.instance();
-                    break;
-                }
-
-                var userInfo = users.get(peerId);
-                if ((userInfo == null || !isAccessible(userInfo.min))) {
-                    if (message != null && !isBot()) {
-                        InputPeer chatPeer = peers.get(message.peerId());
-                        if (chatPeer == null) {
-                            return;
-                        }
-
-                        in = ImmutableInputPeerUserFromMessage.of(chatPeer, message.id(), peerId);
+                var up = ImmutablePeerUser.copyOf((PeerUser) p);
+                var userInfo = users.get(up.userId());
+                if ((userInfo == null || userInfo.min.min()) && !isBot()) {
+                    InputPeer chatPeer = peers.get(message.peerId());
+                    if (chatPeer == null) {
                         break;
                     }
 
-                    return;
+                    var minUser = ImmutableInputPeerUserFromMessage.of(
+                            chatPeer, message.id(), up.userId());
+                    peers.put(up, minUser);
                 }
-
-                long accessHash = Objects.requireNonNull(userInfo.min.accessHash());
-                in = ImmutableInputPeerUser.of(peerId, accessHash);
                 break;
             default:
-                return;
-        }
-
-        peers.put(p, in);
-    }
-
-    private long getRawInputPeerId(InputPeer peer) {
-        switch (peer.identifier()) {
-            case InputPeerChat.ID: return ((InputPeerChat) peer).chatId();
-            case InputPeerChannel.ID: return ((InputPeerChannel) peer).channelId();
-            case InputPeerUser.ID: return ((InputPeerUser) peer).userId();
-            case InputPeerChannelFromMessage.ID: return ((InputPeerChannelFromMessage) peer).channelId();
-            case InputPeerUserFromMessage.ID: return ((InputPeerUserFromMessage) peer).userId();
-            case InputPeerSelf.ID: return selfId();
-            default: throw new IllegalStateException();
+                throw new IllegalStateException("Unexpected Peer type: " + p);
         }
     }
 
-    private void addContact(Peer peer, Consumer<Chat> chats, Consumer<User> users) {
-        long rawPeerId = getRawPeerId(peer);
-        switch (peer.identifier()) {
+    private void addContact(Peer p, Consumer<Chat> chats, Consumer<User> users) {
+        switch (p.identifier()) {
             case PeerChat.ID:
-            case PeerChannel.ID:
-                var chatInfo = this.channels.get(rawPeerId);
+                var cp = (PeerChat) p;
+                var chatInfo = this.chats.get(cp.chatId());
                 if (chatInfo != null) {
                     chats.accept(chatInfo.min);
                 }
                 break;
+            case PeerChannel.ID:
+                var chp = (PeerChannel) p;
+                var channelInfo = this.channels.get(chp.channelId());
+                if (channelInfo != null) {
+                    chats.accept(channelInfo.min);
+                }
+                break;
             case PeerUser.ID:
-                var userInfo = this.users.get(rawPeerId);
+                var up = (PeerUser) p;
+                var userInfo = this.users.get(up.userId());
                 if (userInfo != null) {
                     users.accept(userInfo.min);
                 }
                 break;
             default:
-                throw new IllegalArgumentException("Unknown Peer type: " + peer);
+                throw new IllegalArgumentException("Unknown Peer type: " + p);
         }
     }
 
@@ -895,13 +879,14 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     private void saveMessage(Message message) {
-        if (message.identifier() == MessageEmpty.ID) return;
+        if (!(message instanceof BaseMessageFields)) return;
 
         BaseMessageFields copy = copy((BaseMessageFields) message);
         MessageId key = MessageId.create(copy);
 
         messages.put(key, copy);
 
+        // TODO: extract all possible peers from message?
         savePeer(copy.peerId(), copy);
         Peer p = copy.fromId();
         if (p != null) {
@@ -915,10 +900,6 @@ public class StoreLayoutImpl implements StoreLayout {
         final ImmutableChannelFull full;
         @Nullable // initialize on demand
         final ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants;
-
-        ChannelInfo(ImmutableChannel min) {
-            this(min, null, null);
-        }
 
         ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
             this(min, full, null);
@@ -941,11 +922,6 @@ public class StoreLayoutImpl implements StoreLayout {
             return participants != null ? participants : new ConcurrentHashMap<>();
         }
 
-        ChannelInfo withMin(ImmutableChannel min) {
-            if (this.min == min) return this;
-            return new ChannelInfo(min, full, participants);
-        }
-
         ChannelInfo withFull(UnaryOperator<ImmutableChannelFull> mapper) {
             if (this.full == null) return this;
             var full = mapper.apply(this.full);
@@ -953,9 +929,18 @@ public class StoreLayoutImpl implements StoreLayout {
             return new ChannelInfo(min, full, participants);
         }
 
-        ChannelInfo withData(ImmutableChannel min, ImmutableChannelFull full) {
+        ChannelInfo withData(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
             if (this.min == min && this.full == full) return this;
             return new ChannelInfo(min, full, participants);
+        }
+
+        @Override
+        public String toString() {
+            return "ChannelInfo{" +
+                    "min=" + min +
+                    ", full=" + full +
+                    ", participants=" + participants +
+                    '}';
         }
     }
 
@@ -966,10 +951,6 @@ public class StoreLayoutImpl implements StoreLayout {
         @Nullable // initialize on demand
         final ConcurrentMap<Long, ChatParticipant> participants;
 
-        ChatInfo(ImmutableBaseChat min) {
-            this(min, null, null);
-        }
-
         ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
             this(min, full, null);
         }
@@ -979,11 +960,6 @@ public class StoreLayoutImpl implements StoreLayout {
             this.min = Objects.requireNonNull(min);
             this.full = full;
             this.participants = participants;
-        }
-
-        ChatInfo withMin(ImmutableBaseChat min) {
-            if (this.min == min) return this;
-            return new ChatInfo(min, full, participants);
         }
 
         ChatInfo withFull(UnaryOperator<ImmutableBaseChatFull> mapper) {
@@ -1002,7 +978,7 @@ public class StoreLayoutImpl implements StoreLayout {
             return participants != null ? participants : new ConcurrentHashMap<>();
         }
 
-        public ChatInfo withData(ImmutableBaseChat min, ImmutableBaseChatFull full) {
+        public ChatInfo withData(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
             if (this.min == min && this.full == full) return this;
             return new ChatInfo(min, full, participants);
         }
@@ -1043,22 +1019,13 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     static class PartialFields<M, F> {
-        private final M min;
+        final M min;
         @Nullable
-        private final F full;
-
-        PartialFields(M min) {
-            this(min, null);
-        }
+        final F full;
 
         PartialFields(M min, @Nullable F full) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
-        }
-
-        PartialFields<M, F> withMin(M min) {
-            if (this.min == min) return this;
-            return new PartialFields<>(min, full);
         }
     }
 }

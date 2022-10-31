@@ -40,7 +40,7 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<User> getUser(InputUser userId) {
-        return getUsers(List.of(userId)).map(u -> u.get(0));
+        return getUsers(List.of(userId)).mapNotNull(u -> u.isEmpty() ? null : u.get(0));
     }
 
     // user namespace

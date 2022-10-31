@@ -41,8 +41,9 @@ public class AuthService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<Authorization> importBotAuthorization(int flags, int apiId, String apiHash, String botAuthToken) {
-        return client.sendAwait(ImmutableImportBotAuthorization.of(flags, apiId, apiHash, botAuthToken));
+    public Mono<BaseAuthorization> importBotAuthorization(int flags, int apiId, String apiHash, String botAuthToken) {
+        return client.sendAwait(ImmutableImportBotAuthorization.of(flags, apiId, apiHash, botAuthToken))
+                .cast(BaseAuthorization.class);
     }
 
     public Mono<SentCode> sendCode(String phoneNumber, int apiId, String apiHash, CodeSettings settings) {

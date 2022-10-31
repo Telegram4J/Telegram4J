@@ -60,7 +60,7 @@ public class ChatService extends RpcService {
     public Mono<Chat> getChat(long id) {
         return getChats(List.of(id))
                 .cast(BaseChats.class)
-                .map(c -> c.chats().get(0));
+                .mapNotNull(c -> c.chats().isEmpty() ? null : c.chats().get(0));
     }
 
     /**
@@ -74,7 +74,7 @@ public class ChatService extends RpcService {
     public Mono<Chat> getChannel(InputChannel id) {
         return getChannels(List.of(id))
                 .cast(BaseChats.class)
-                .map(c -> c.chats().get(0));
+                .mapNotNull(c -> c.chats().isEmpty() ? null : c.chats().get(0));
     }
 
     // messages namespace
