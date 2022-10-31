@@ -597,14 +597,13 @@ public class EntityFactory {
 
     public static ChatParticipant createChannelParticipant(MTProtoTelegramClient client, ChannelParticipant p,
                                                            Id chatId, Id peerId) {
-        PeerEntity peer;
+        MentionablePeer peer;
         switch (peerId.getType()) {
-            case CHAT:
             case CHANNEL:
                 peer = p.chats().stream()
                         .filter(u -> u.id() == peerId.asLong())
                         .findFirst()
-                        .map(u -> EntityFactory.createChat(client, u, null))
+                        .map(u -> (MentionablePeer) EntityFactory.createChat(client, u, null))
                         .orElse(null);
                 break;
             case USER:

@@ -86,7 +86,7 @@ public class BotInfo implements TelegramObject {
     // }
 
     /**
-     * Gets list of the bot commands, if present.
+     * Gets immutable list of the bot commands, if present.
      *
      * @return The immutable list of the bot commands, if present otherwise empty list.
      */

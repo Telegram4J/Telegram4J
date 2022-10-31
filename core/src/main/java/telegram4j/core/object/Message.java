@@ -14,12 +14,8 @@ import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.spec.PinMessageFlags;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserSupport;
-import telegram4j.tl.BaseMessage;
-import telegram4j.tl.BaseMessageFields;
-import telegram4j.tl.MessageService;
-import telegram4j.tl.RestrictionReason;
+import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
 import telegram4j.tl.request.messages.EditMessage;
 import telegram4j.tl.request.messages.UpdatePinnedMessage;
@@ -108,7 +104,7 @@ public final class Message implements TelegramObject {
      *
      * @return An {@link Mono} emitting on successful completion the {@link User} or {@link Channel}.
      */
-    public Mono<PeerEntity> getAuthor() {
+    public Mono<MentionablePeer> getAuthor() {
         return getAuthor(MappingUtil.IDENTITY_RETRIEVER);
     }
 
@@ -118,10 +114,17 @@ public final class Message implements TelegramObject {
      * @param strategy The strategy to apply.
      * @return An {@link Mono} emitting on successful completion the {@link User} or {@link Channel}.
      */
-    public Mono<PeerEntity> getAuthor(EntityRetrievalStrategy strategy) {
+    public Mono<MentionablePeer> getAuthor(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getAuthorId())
-                .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .resolvePeer(PeerId.of(id)));
+                .flatMap(id -> {
+                    var retriever = client.withRetrievalStrategy(strategy);
+                    switch (id.getType()) {
+                        case CHANNEL: return retriever.getChatById(id);
+                        case USER: return retriever.getUserById(id);
+                        default: return Mono.error(new IllegalStateException());
+                    }
+                })
+                .cast(MentionablePeer.class);
     }
 
     /**
@@ -401,6 +404,8 @@ public final class Message implements TelegramObject {
             var media = Mono.justOrEmpty(spec.media())
                     .flatMap(r -> r.asData(client));
 
+            var chatId = Id.of(peer, client.getSelfId());
+
             return parsed.map(function((txt, ent) -> EditMessage.builder()
                             .message(txt.isEmpty() ? null : txt)
                             .entities(ent.isEmpty() ? null : ent)
@@ -414,9 +419,13 @@ public final class Message implements TelegramObject {
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
                             .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(request -> client.getServiceHolder().getChatService().editMessage(request))
-                    .map(e -> EntityFactory.createMessage(client, e,
-                            Id.of(peer, client.getSelfId())));
+                    .flatMap(request -> client.getServiceHolder()
+                            .getChatService().editMessage(request))
+                    .map(e -> EntityFactory.createMessage(client, e, chatId))
+                    // maybe we edited the poll, so we need to request a fresh message
+                    .switchIfEmpty(client.withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                            .getMessagesById(chatId, List.of(ImmutableInputMessageID.of(getId())))
+                            .map(c -> c.getMessages().get(0)));
         });
     }
 

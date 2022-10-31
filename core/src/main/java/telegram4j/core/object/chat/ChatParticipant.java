@@ -4,7 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -21,18 +21,18 @@ import java.util.Set;
 public final class ChatParticipant implements TelegramObject {
     private final MTProtoTelegramClient client;
     @Nullable
-    private final PeerEntity peer;
+    private final MentionablePeer peer;
     private final TlObject data;
     private final Id chatId;
 
-    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer, ChannelParticipant data, Id chatId) {
+    public ChatParticipant(MTProtoTelegramClient client, @Nullable MentionablePeer peer, ChannelParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client);
         this.peer = peer;
         this.data = Objects.requireNonNull(data);
         this.chatId = Objects.requireNonNull(chatId);
     }
 
-    public ChatParticipant(MTProtoTelegramClient client, @Nullable PeerEntity peer,
+    public ChatParticipant(MTProtoTelegramClient client, @Nullable MentionablePeer peer,
                            telegram4j.tl.ChatParticipant data, Id chatId) {
         this.client = Objects.requireNonNull(client);
         this.peer = peer;
@@ -48,9 +48,9 @@ public final class ChatParticipant implements TelegramObject {
     /**
      * Gets minimal information about the user/chat to whom this {@code ChatParticipant} is associated, if present.
      *
-     * @return The {@link PeerEntity} object with minimal information, if present.
+     * @return The {@link MentionablePeer} object with minimal information, if present.
      */
-    private Optional<PeerEntity> getPeer() {
+    private Optional<MentionablePeer> getPeer() {
         return Optional.ofNullable(peer);
     }
 

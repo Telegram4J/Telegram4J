@@ -10,6 +10,7 @@ import telegram4j.tl.api.TlObject;
 import telegram4j.tl.storage.FileType;
 
 import java.util.Locale;
+import java.util.Objects;
 
 /** Utility class with frequently used methods for mapping TL objects. */
 public class TlEntityUtil {
@@ -49,6 +50,7 @@ public class TlEntityUtil {
         }
     }
 
+    // https://github.com/telegramdesktop/tdesktop/tree/17de379145684999eed826d22469503097516689/Telegram/SourceFiles/ui/image/image.cpp#L44-#L91
     public static ByteBuf expandInlineThumb(ByteBuf bytes) {
         if (!bytes.isReadable(3) || bytes.getByte(0) != 0x01) {
             throw new IllegalArgumentException();
@@ -181,5 +183,18 @@ public class TlEntityUtil {
             return null;
         }
         return obj;
+    }
+
+    public static InputPeer photoInputPeer(Channel channel) {
+        return ImmutableInputPeerChannel.of(channel.id(),
+                Objects.requireNonNull(channel.accessHash())); // TODO: verify this
+    }
+
+    public static InputPeer photoInputPeer(BaseUser user) {
+        if (user.self()) {
+            return InputPeerSelf.instance();
+        }
+        return ImmutableInputPeerUser.of(user.id(),
+                Objects.requireNonNull(user.accessHash())); // TODO: verify this
     }
 }

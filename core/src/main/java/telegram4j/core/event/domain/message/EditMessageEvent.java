@@ -2,8 +2,8 @@ package telegram4j.core.event.domain.message;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.chat.Chat;
 
 import java.util.Objects;
@@ -18,11 +18,11 @@ public class EditMessageEvent extends MessageEvent {
     @Nullable
     private final Chat chat;
     @Nullable
-    private final PeerEntity author;
+    private final MentionablePeer author;
 
     public EditMessageEvent(MTProtoTelegramClient client, Message newMessage,
                             @Nullable Message oldMessage, @Nullable Chat chat,
-                            @Nullable PeerEntity author) {
+                            @Nullable MentionablePeer author) {
         super(client);
         this.newMessage = Objects.requireNonNull(newMessage);
         this.oldMessage = oldMessage;
@@ -62,7 +62,7 @@ public class EditMessageEvent extends MessageEvent {
      *
      * @return The author entity of message, if present.
      */
-    public Optional<PeerEntity> getAuthor() {
+    public Optional<MentionablePeer> getAuthor() {
         return Optional.ofNullable(author);
     }
 

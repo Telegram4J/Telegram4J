@@ -1,8 +1,10 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 
 /**
  * Represents an unlimited channel with messages broadcasting.
@@ -23,6 +25,18 @@ public final class BroadcastChannel extends BaseChannel {
     @Override
     public Type getType() {
         return Type.CHANNEL;
+    }
+
+    @Override
+    public Mono<SupergroupChat> getLinkedChannel() {
+        return super.getLinkedChannel()
+                .cast(SupergroupChat.class);
+    }
+
+    @Override
+    public Mono<SupergroupChat> getLinkedChannel(EntityRetrievalStrategy strategy) {
+        return super.getLinkedChannel(strategy)
+                .cast(SupergroupChat.class);
     }
 
     @Override

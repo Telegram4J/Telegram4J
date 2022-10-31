@@ -522,21 +522,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return strategy.apply(this);
     }
 
-    /**
-     * Retrieve messages from group chat or DM with auxiliary data by the specified message ids.
-     * <p>Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
-     * used for user/group chats.
-     *
-     * @implSpec Auxiliary data must contain chat and authors of message if available.
-     *
-     * @param messageIds An iterable of message id elements.
-     * @return A {@link Mono} emitting on successful completion
-     * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
-     */
-    public Mono<AuxiliaryMessages> getMessagesById(Iterable<? extends InputMessage> messageIds) {
-        return entityRetriever.getMessagesById(null, messageIds);
-    }
-
     // EntityRetriever methods
     // ===========================
 

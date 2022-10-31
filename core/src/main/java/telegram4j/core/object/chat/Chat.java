@@ -3,7 +3,6 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
-import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -141,14 +140,6 @@ public interface Chat extends PeerEntity {
      * @return A {@link Flux} emitting created messages.
      */
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
-
-    /**
-     * Retrieves {@link AuxiliarySendAs} container with available peers,
-     * which can be used as {@link SendMessageSpec#sendAs()} parameter.
-     *
-     * @return A {@link Mono} emitting on successful completion {@link AuxiliarySendAs} container.
-     */
-    Mono<AuxiliarySendAs> getSendAs();
 
     /**
      * Requests tp unpin all messages in chat.

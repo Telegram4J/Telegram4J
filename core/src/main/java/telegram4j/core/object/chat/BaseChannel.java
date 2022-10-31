@@ -8,12 +8,11 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
-import telegram4j.core.object.StickerSet;
+import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
@@ -58,7 +57,8 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Id getId() {
-        return Id.ofChannel(minData.id(), minData.accessHash());
+        Long acc = minData.min() ? null : minData.accessHash();
+        return Id.ofChannel(minData.id(), acc);
     }
 
     @Override
@@ -97,14 +97,14 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ProfilePhoto(client, d, client.asResolvedInputPeer(getId()), -1));
+                .map(d -> new ProfilePhoto(client, d, TlEntityUtil.photoInputPeer(minData), -1));
     }
 
     @Override
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, -1, client.asResolvedInputPeer(getId())));
+                .map(d -> new Photo(client, d, -1, TlEntityUtil.photoInputPeer(minData)));
     }
 
     @Override
@@ -125,22 +125,6 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<List<BotInfo>> getBotInfo() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::botInfo)
-                .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d))
-                        .collect(Collectors.toList()));
-    }
-
-    @Override
-    public Optional<StickerSet> getStickerSet() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::stickerset)
-                .map(d -> new StickerSet(client, d));
-    }
-
-    @Override
     public Optional<PeerNotifySettings> getNotifySettings() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::notifySettings)
@@ -151,7 +135,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Optional<Integer> getParticipantsCount() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::participantsCount)
-                // So far, I have not met such a thing that ChannelMin had a non-null participantsCount
+                // So far, I have not met such a thing that minData had a non-null participantsCount
                 .or(() -> Optional.ofNullable(minData.participantsCount()));
     }
 
@@ -176,6 +160,13 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
+    public Mono<AuxiliaryMessages> getAvailableMinMessage(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getAvailableMinId())
+                .flatMap(id -> client.withRetrievalStrategy(strategy)
+                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
+    }
+
+    @Override
     public Optional<Integer> getFolderId() {
         return Optional.ofNullable(fullData).map(ChannelFull::folderId);
     }
@@ -186,7 +177,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<Integer> getRequestsPending() {
+    public Optional<Integer> getPendingRequests() {
         return Optional.ofNullable(fullData).map(ChannelFull::requestsPending);
     }
 
@@ -196,12 +187,21 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<List<Id>> getRecentRequesters() {
+    public Optional<Set<Id>> getRecentRequestersIds() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::recentRequesters)
                 .map(list -> list.stream()
                         .map(l -> Id.ofUser(l, null))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toSet()));
+    }
+
+    @Override
+    public Flux<User> getRecentRequesters(EntityRetrievalStrategy strategy) {
+        var retriever = client.withRetrievalStrategy(strategy);
+        return Mono.justOrEmpty(fullData)
+                .mapNotNull(ChannelFull::recentRequesters)
+                .flatMapIterable(Function.identity())
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
     }
 
     @Override
@@ -259,7 +259,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Channel> getLinkedChannel(EntityRetrievalStrategy strategy) {
+    public Mono<? extends Channel> getLinkedChannel(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getLinkedChannelId())
                 .flatMap(id -> client.withRetrievalStrategy(strategy).getChatById(id))
                 .cast(Channel.class);
@@ -276,7 +276,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<Id> getGroupCallDefaultJoinAs() {
+    public Optional<Id> getGroupCallDefaultJoinAsId() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::groupcallDefaultJoinAs)
                 .map(Id::of);
@@ -359,15 +359,6 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Mono<Boolean> setStickers(InputStickerSet stickerSetId) {
-        Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
-                .flatMap(channel -> client.getServiceHolder().getChatService()
-                        .setStickers(channel, stickerSetId));
-    }
-
-    @Override
     public Mono<ChatParticipant> getParticipantById(EntityRetrievalStrategy strategy, Id peerId) {
         return client.withRetrievalStrategy(strategy).getParticipantById(getId(), peerId);
     }
@@ -392,20 +383,19 @@ abstract class BaseChannel extends BaseChat implements Channel {
                             return Flux.fromIterable(data.participants())
                                     .map(c -> {
                                         Id peerId = Id.of(TlEntityUtil.getUserId(c));
-                                        PeerEntity peerEntity;
+                                        MentionablePeer peer;
                                         switch (peerId.getType()) {
                                             case USER:
-                                                peerEntity = users.get(peerId);
+                                                peer = users.get(peerId);
                                                 break;
-                                            case CHAT:
                                             case CHANNEL:
-                                                peerEntity = chats.get(peerId);
+                                                peer = (MentionablePeer) chats.get(peerId);
                                                 break;
                                             default:
                                                 throw new IllegalStateException();
                                         }
 
-                                        return new ChatParticipant(client, peerEntity, c,
+                                        return new ChatParticipant(client, peer, c,
                                                 Id.of(channel, client.getSelfId()));
                                     });
                         }));

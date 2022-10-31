@@ -8,7 +8,6 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.SupergroupChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.PeerId;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -78,9 +77,9 @@ public class MessageReplies implements TelegramObject {
     /**
      * Requests to retrieve the recent comment's posters.
      *
-     * @return A {@link Flux} which emits the {@link PeerEntity peer entities}.
+     * @return A {@link Flux} which emits the {@link MentionablePeer peer} entities.
      */
-    public Flux<PeerEntity> getRecentRepliers() {
+    public Flux<MentionablePeer> getRecentRepliers() {
         return getRecentRepliers(MappingUtil.IDENTITY_RETRIEVER);
     }
 
@@ -88,17 +87,24 @@ public class MessageReplies implements TelegramObject {
      * Requests to retrieve the recent comment's posters using specified retrieval strategy.
      *
      * @param strategy The strategy to apply.
-     * @return A {@link Flux} which emits the {@link PeerEntity peer entities}.
+     * @return A {@link Flux} which emits the {@link MentionablePeer peer} entities.
      */
-    public Flux<PeerEntity> getRecentRepliers(EntityRetrievalStrategy strategy) {
+    public Flux<MentionablePeer> getRecentRepliers(EntityRetrievalStrategy strategy) {
         var recentRepliers = data.recentRepliers();
         if (recentRepliers == null) {
             return Flux.empty();
         }
         var retriever = client.withRetrievalStrategy(strategy);
         return Flux.fromIterable(recentRepliers)
-                .map(p -> PeerId.of(Id.of(p)))
-                .flatMap(retriever::resolvePeer);
+                .map(Id::of)
+                .flatMap(id -> {
+                    switch (id.getType()) {
+                        case USER: return retriever.getUserById(id);
+                        case CHANNEL: return retriever.getChatById(id);
+                        default: return Flux.error(new IllegalStateException());
+                    }
+                })
+                .cast(MentionablePeer.class);
     }
 
     /**

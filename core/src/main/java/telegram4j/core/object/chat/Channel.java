@@ -3,11 +3,12 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Reaction;
-import telegram4j.core.object.StickerSet;
+import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.BitFlag;
@@ -31,7 +32,7 @@ import static telegram4j.tl.ChannelFull.*;
  *
  * @see <a href="https://core.telegram.org/api/channel">Telegram Channels</a>
  */
-public interface Channel extends Chat {
+public interface Channel extends Chat, MentionablePeer {
 
     /**
      * Gets enum set of enabled channel flags.
@@ -47,16 +48,8 @@ public interface Channel extends Chat {
      *
      * @return The username of channel, if present.
      */
+    @Override
     Optional<String> getUsername();
-
-    /**
-     * Gets list of information about chat bots, if present
-     * and if detailed information about channel is available.
-     *
-     * @return The list of information about chat bots, if present
-     * and if detailed information about channel is available.
-     */
-    Optional<List<BotInfo>> getBotInfo();
 
     /**
      * Gets timestamp when <i>current</i> user joined, or if the user isn't a member, channel created.
@@ -64,15 +57,6 @@ public interface Channel extends Chat {
      * @return The timestamp when <i>current</i> user joined, or if the user isn't a member, channel created.
      */
     Instant getCreateTimestamp();
-
-    /**
-     * Gets associated with this channel sticker set, if present
-     * and if detailed information about channel is available.
-     *
-     * @return The associated sticker set, if present
-     * and if detailed information about channel is available.
-     */
-    Optional<StickerSet> getStickerSet();
 
     /**
      * Gets list of reasons for why access to this channel must be restricted, if present.
@@ -124,6 +108,23 @@ public interface Channel extends Chat {
     Optional<Integer> getAvailableMinId();
 
     /**
+     * Requests to retrieve the oldest available message.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    default Mono<AuxiliaryMessages> getAvailableMinMessage() {
+        return getAvailableMinMessage(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the oldest available message using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
+     */
+    Mono<AuxiliaryMessages> getAvailableMinMessage(EntityRetrievalStrategy strategy);
+
+    /**
      * Gets list of pending api suggestions for channel, if present
      * and if detailed information about channel is available.
      *
@@ -141,7 +142,7 @@ public interface Channel extends Chat {
      * @return The count of pending join requests, if present
      * and if detailed information about channel is available.
      */
-    Optional<Integer> getRequestsPending();
+    Optional<Integer> getPendingRequests();
 
     /**
      * Gets id of peer for sending messages, if present.
@@ -152,13 +153,32 @@ public interface Channel extends Chat {
     Optional<Id> getDefaultSendAs();
 
     /**
-     * Gets list of user ids, who requested to join recently, if present.
+     * Gets mutable set of user ids, who requested to join recently, if present.
      *
      * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
-     * @return The list of user ids, who requested to join recently, if present
+     * @return The set of user ids, who requested to join recently, if present
      * and if detailed information about channel is available.
      */
-    Optional<List<Id>> getRecentRequesters();
+    Optional<Set<Id>> getRecentRequestersIds();
+
+    /**
+     * Requests to retrieve the user who requested to join.
+     *
+     * @see #getRecentRequestersIds()
+     * @return A {@link Flux} which emits the {@link User requesters}.
+     */
+    default Flux<User> getRecentRequesters() {
+        return getRecentRequesters(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the user who requested to join using specified retrieval strategy.
+     *
+     * @see #getRecentRequestersIds()
+     * @param strategy The strategy to apply.
+     * @return A {@link Flux} which emits the {@link User requesters}.
+     */
+    Flux<User> getRecentRequesters(EntityRetrievalStrategy strategy);
 
     /**
      * Gets {@code boolean} which indicates the availability of any emojis in the channel
@@ -251,7 +271,7 @@ public interface Channel extends Chat {
      *
      * @return An {@link Mono} emitting on successful completion the {@link Channel channel}.
      */
-    default Mono<Channel> getLinkedChannel() {
+    default Mono<? extends Channel> getLinkedChannel() {
         return getLinkedChannel(MappingUtil.IDENTITY_RETRIEVER);
     }
 
@@ -261,7 +281,7 @@ public interface Channel extends Chat {
      * @param strategy The strategy to apply.
      * @return An {@link Mono} emitting on successful completion the {@link Channel channel}.
      */
-    Mono<Channel> getLinkedChannel(EntityRetrievalStrategy strategy);
+    Mono<? extends Channel> getLinkedChannel(EntityRetrievalStrategy strategy);
 
     /**
      * Gets current group call/livestream in the channel, if present
@@ -279,7 +299,7 @@ public interface Channel extends Chat {
      * @return The id of peer, that selects by default on group call, if present
      * and if detailed information about channel is available.
      */
-    Optional<Id> getGroupCallDefaultJoinAs();
+    Optional<Id> getGroupCallDefaultJoinAsId();
 
     /**
      * Gets current invite link of channel, if present
@@ -352,14 +372,6 @@ public interface Channel extends Chat {
      * @return A {@link Mono} emitting on successful completion nothing.
      */
     Mono<Void> leave();
-
-    /**
-     * Requests to associate new stickerset with this channel.
-     *
-     * @param stickerSetId The id of sticker set to associate.
-     * @return A {@link Mono} emitting on successful completion boolean, indicates result.
-     */
-    Mono<Boolean> setStickers(InputStickerSet stickerSetId);
 
     /**
      * Retrieve channel participant by user id.
@@ -461,7 +473,7 @@ public interface Channel extends Chat {
         /** Can we set the channel's username? */
         CAN_SET_USERNAME(CAN_SET_USERNAME_POS),
 
-        /** Can we associate a stickerpack to the supergroup via {@link Channel#setStickers(InputStickerSet)}? */
+        /** Can we associate a stickerpack to the supergroup via {@link SupergroupChat#setStickerSet(InputStickerSet)}? */
         CAN_SET_STICKERS(CAN_SET_STICKERS_POS),
 
         /** Is the history before we joined hidden to us? */

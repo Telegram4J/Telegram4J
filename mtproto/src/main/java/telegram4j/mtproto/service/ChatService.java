@@ -885,10 +885,8 @@ public class ChatService extends RpcService {
     // channels namespace
     // =========================
 
-    @BotCompatible
     public Mono<SendAsPeers> getSendAs(InputPeer peer) {
-        return client.sendAwait(ImmutableGetSendAs.of(peer))
-                .doOnNext(s -> storeLayout.onContacts(s.chats(), s.users()));
+        return client.sendAwait(ImmutableGetSendAs.of(peer));
     }
 
     @BotCompatible

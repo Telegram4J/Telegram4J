@@ -3,7 +3,6 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
-import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.handler.codec.base64.Base64;
 import io.netty.handler.codec.base64.Base64Dialect;
 import reactor.util.annotation.Nullable;
@@ -30,6 +29,7 @@ public class FileReferenceId {
 
     static final String PREFIX = "x74JF1D";
     static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
+    static final int MAX_DC_ID = 0xffff;
 
     static final byte SIZE_TYPE_ABSENT = -1;
     static final byte SIZE_TYPE_SMALL = 4;
@@ -46,7 +46,7 @@ public class FileReferenceId {
     @Nullable
     private final DocumentType documentType;
     private final byte sizeType;
-    private final int dcId;
+    private final short dcId;
     private final long documentId;
     private final long accessHash;
     @Nullable
@@ -62,7 +62,7 @@ public class FileReferenceId {
     private final InputPeer peer;
 
     FileReferenceId(Type fileType, @Nullable DocumentType documentType, byte sizeType,
-                    int dcId, long documentId, long accessHash,
+                    short dcId, long documentId, long accessHash,
                     @Nullable ByteBuf fileReference, char thumbSizeType,
                     @Nullable String url, @Nullable InputStickerSet stickerSet, int thumbVersion,
                     int messageId, @Nullable InputPeer peer) {
@@ -112,7 +112,7 @@ public class FileReferenceId {
         DocumentType documentType = DocumentType.fromAttributes(document.attributes());
 
         return new FileReferenceId(Type.WEB_DOCUMENT, documentType, SIZE_TYPE_ABSENT,
-                -1, -1, accessHash, null, '\0', document.url(),
+                (short) -1, -1, accessHash, null, '\0', document.url(),
                 null, -1, messageId, peer);
     }
 
@@ -153,11 +153,14 @@ public class FileReferenceId {
         if (messageId < 0) {
             throw new IllegalArgumentException("Message id must be positive.");
         }
+        if (document.dcId() > MAX_DC_ID) {
+            throw new IllegalArgumentException("Unexpected dcId: " + document.dcId() + " > " + MAX_DC_ID);
+        }
 
         DocumentType documentType = DocumentType.fromAttributes(document.attributes());
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(document.fileReference());
         return new FileReferenceId(Type.DOCUMENT, documentType, SIZE_TYPE_ABSENT,
-                document.dcId(), document.id(), document.accessHash(), fileReference, thumbSizeType, null,
+                (short) document.dcId(), document.id(), document.accessHash(), fileReference, thumbSizeType, null,
                 null, -1, messageId, peer);
     }
 
@@ -193,10 +196,13 @@ public class FileReferenceId {
         if (peer.identifier() == InputPeerEmpty.ID) {
             throw new IllegalArgumentException("Unexpected peer type: " + peer);
         }
+        if (chatPhoto.dcId() > MAX_DC_ID) {
+            throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
+        }
 
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(chatPhoto.fileReference());
         return new FileReferenceId(Type.CHAT_PHOTO, null, SIZE_TYPE_ABSENT,
-                chatPhoto.dcId(), chatPhoto.id(), chatPhoto.accessHash(),
+                (short) chatPhoto.dcId(), chatPhoto.id(), chatPhoto.accessHash(),
                 fileReference, thumbSizeType, null, null, -1, messageId, peer);
     }
 
@@ -213,10 +219,13 @@ public class FileReferenceId {
         if (peer.identifier() == InputPeerEmpty.ID) {
             throw new IllegalArgumentException("Unexpected peer type: " + peer);
         }
+        if (chatPhoto.dcId() > MAX_DC_ID) {
+            throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
+        }
 
         byte sizeType = big ? SIZE_TYPE_BIG : SIZE_TYPE_SMALL;
         return new FileReferenceId(Type.CHAT_PHOTO, null, sizeType,
-                chatPhoto.dcId(), chatPhoto.photoId(), -1,
+                (short) chatPhoto.dcId(), chatPhoto.photoId(), -1,
                 null, '\0', null,
                 null, -1, messageId, peer);
     }
@@ -256,10 +265,13 @@ public class FileReferenceId {
         if (messageId < 0) {
             throw new IllegalArgumentException("Message id must be positive.");
         }
+        if (photo.dcId() > MAX_DC_ID) {
+            throw new IllegalArgumentException("Unexpected dcId: " + photo.dcId() + " > " + MAX_DC_ID);
+        }
 
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(photo.fileReference());
         return new FileReferenceId(Type.PHOTO, null,
-                SIZE_TYPE_ABSENT, photo.dcId(), photo.id(), photo.accessHash(),
+                SIZE_TYPE_ABSENT, (short) photo.dcId(), photo.id(), photo.accessHash(),
                 fileReference, thumbSizeType,
                 null, null, -1, messageId, peer);
     }
@@ -281,7 +293,7 @@ public class FileReferenceId {
         }
 
         return new FileReferenceId(Type.STICKER_SET_THUMB, null,
-                SIZE_TYPE_ABSENT, -1, -1, -1,
+                SIZE_TYPE_ABSENT, (short) -1, -1, -1,
                 null, '\0', null, stickerSet,
                 version, -1, null);
     }
@@ -323,7 +335,7 @@ public class FileReferenceId {
 
         String url = null;
         long accessHash = -1;
-        int dcId = -1;
+        short dcId = -1;
         long documentId = -1;
         DocumentType documentType = null;
         ByteBuf fileReference = null;
@@ -345,7 +357,7 @@ public class FileReferenceId {
                 documentType = DocumentType.ALL[buf.readByte()];
 
             case PHOTO:
-                dcId = buf.readUnsignedByte();
+                dcId = buf.readShortLE();
                 documentId = buf.readLongLE();
                 accessHash = buf.readLongLE();
 
@@ -356,7 +368,7 @@ public class FileReferenceId {
 
                 break;
             case CHAT_PHOTO:
-                dcId = buf.readUnsignedByte();
+                dcId = buf.readShortLE();
                 documentId = buf.readLongLE();
 
                 if (sizeType == SIZE_TYPE_ABSENT) {
@@ -433,8 +445,7 @@ public class FileReferenceId {
      * @return The serialized base 64 url identifier string of file reference.
      */
     public String serialize() {
-        UnpooledByteBufAllocator alloc = UnpooledByteBufAllocator.DEFAULT;
-        ByteBuf buf = Unpooled.buffer();
+        ByteBuf buf = Unpooled.buffer(); // TODO: presize
         buf.writeByte((byte) fileType.ordinal());
 
         byte flags = 0;
@@ -463,9 +474,7 @@ public class FileReferenceId {
 
         if ((flags & PEER_MASK) != 0) {
             Objects.requireNonNull(peer);
-            ByteBuf peerIdBuf = TlSerializer.serialize(alloc, peer);
-            buf.writeBytes(peerIdBuf);
-            peerIdBuf.release();
+            TlSerializer.serialize(buf, peer);
         }
 
         switch (fileType) {
@@ -474,9 +483,7 @@ public class FileReferenceId {
                 buf.writeByte((byte) documentType.ordinal());
 
                 Objects.requireNonNull(url);
-                ByteBuf urlBuf = TlSerialUtil.serializeString(alloc, url);
-                buf.writeBytes(urlBuf);
-                urlBuf.release();
+                TlSerialUtil.serializeString(buf, url);
 
                 if ((flags & ACCESS_HASH_MASK) != 0) {
                     buf.writeLongLE(accessHash);
@@ -487,14 +494,12 @@ public class FileReferenceId {
                 buf.writeByte((byte) documentType.ordinal());
 
             case PHOTO: {
-                buf.writeByte((byte) dcId);
+                buf.writeShortLE(dcId);
                 buf.writeLongLE(documentId);
                 buf.writeLongLE(accessHash);
 
                 Objects.requireNonNull(fileReference);
-                ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
-                buf.writeBytes(fileReferenceBuf);
-                fileReferenceBuf.release();
+                TlSerialUtil.serializeBytes(buf, fileReference);
 
                 if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
                     buf.writeByte(thumbSizeType);
@@ -503,16 +508,14 @@ public class FileReferenceId {
                 break;
             }
             case CHAT_PHOTO:
-                buf.writeByte((byte) dcId);
+                buf.writeShortLE(dcId);
                 buf.writeLongLE(documentId);
 
                 if (sizeType == SIZE_TYPE_ABSENT) {
                     buf.writeLongLE(accessHash);
 
                     Objects.requireNonNull(fileReference);
-                    ByteBuf fileReferenceBuf = TlSerialUtil.serializeBytes(alloc, fileReference);
-                    buf.writeBytes(fileReferenceBuf);
-                    fileReferenceBuf.release();
+                    TlSerialUtil.serializeBytes(buf, fileReference);
 
                     if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
                         buf.writeByte(thumbSizeType);
@@ -525,9 +528,7 @@ public class FileReferenceId {
                 buf.writeIntLE(thumbVersion);
 
                 Objects.requireNonNull(stickerSet);
-                ByteBuf stickerSetBuf = TlSerializer.serialize(alloc, stickerSet);
-                buf.writeBytes(stickerSetBuf);
-                stickerSetBuf.release();
+                TlSerializer.serialize(buf, stickerSet);
 
                 break;
             default: throw new IllegalStateException();
@@ -566,7 +567,7 @@ public class FileReferenceId {
      *
      * @return The id of media dc, if applicable, otherwise {@code -1}.
      */
-    public int getDcId() {
+    public short getDcId() {
         return dcId;
     }
 
@@ -771,7 +772,7 @@ public class FileReferenceId {
         h += (h << 5) + fileType.hashCode();
         h += (h << 5) + Objects.hashCode(documentType);
         h += (h << 5) + sizeType;
-        h += (h << 5) + dcId;
+        h += (h << 5) + Short.hashCode(dcId);
         h += (h << 5) + Long.hashCode(documentId);
         h += (h << 5) + Long.hashCode(accessHash);
         h += (h << 5) + Objects.hashCode(fileReference);

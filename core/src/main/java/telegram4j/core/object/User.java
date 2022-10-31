@@ -24,14 +24,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-import static telegram4j.mtproto.util.TlEntityUtil.toInputUser;
 import static telegram4j.tl.BaseUser.*;
 import static telegram4j.tl.UserFull.*;
 
 /**
  * Representation for available min/full users.
  */
-public class User implements PeerEntity {
+public class User implements MentionablePeer {
 
     private final MTProtoTelegramClient client;
     private final BaseUser minData;
@@ -57,7 +56,8 @@ public class User implements PeerEntity {
 
     @Override
     public Id getId() {
-        return Id.ofUser(minData.id(), minData.accessHash());
+        Long acc = minData.min() ? null : minData.accessHash();
+        return Id.ofUser(minData.id(), acc);
     }
 
     /**
@@ -99,7 +99,7 @@ public class User implements PeerEntity {
     }
 
     /**
-     * Gets full name of user in format <b>first name last name</b>, or empty string if first and last name don't present.
+     * Gets full name of user in format <b>first name last name</b>, or empty string if first and last name are not present.
      *
      * @return The full name of user.
      */
@@ -116,6 +116,7 @@ public class User implements PeerEntity {
      *
      * @return The username of this user, if present.
      */
+    @Override
     public Optional<String> getUsername() {
         return Optional.ofNullable(minData.username());
     }
@@ -136,7 +137,7 @@ public class User implements PeerEntity {
      */
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
-                .map(c -> new ProfilePhoto(client, c, client.asResolvedInputPeer(getId()), -1));
+                .map(c -> new ProfilePhoto(client, c, TlEntityUtil.photoInputPeer(minData), -1));
     }
 
     /**
@@ -148,7 +149,7 @@ public class User implements PeerEntity {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, -1, client.asResolvedInputPeer(getId())));
+                .map(d -> new Photo(client, d, -1, TlEntityUtil.photoInputPeer(minData)));
     }
 
     /**
@@ -347,15 +348,16 @@ public class User implements PeerEntity {
      * @return A {@link Flux} emitting {@link Photo} objects.
      */
     public Flux<Photo> getPhotos(int offset, long maxId, int limit) {
-        InputPeer p = client.asResolvedInputPeer(getId());
-        InputUser user = toInputUser(p);
-
-        return PaginationSupport.paginate(o -> client.getServiceHolder().getUserService()
-                .getUserPhotos(user, o, maxId, limit), c -> c instanceof PhotosSlice
-                        ? ((PhotosSlice) c).count() : c.photos().size(), offset, limit)
-                .flatMapIterable(Photos::photos)
-                .cast(BasePhoto.class)
-                .map(c -> new Photo(client, c, -1, p));
+        return client.asInputUser(getId())
+                .flatMapMany(u -> {
+                    var inputPeer = TlEntityUtil.toInputPeer(u);
+                    return PaginationSupport.paginate(o -> client.getServiceHolder().getUserService()
+                                    .getUserPhotos(u, o, maxId, limit), c -> c instanceof PhotosSlice
+                                    ? ((PhotosSlice) c).count() : c.photos().size(), offset, limit)
+                            .flatMapIterable(Photos::photos)
+                            .cast(BasePhoto.class)
+                            .map(c -> new Photo(client, c, -1, inputPeer));
+                });
     }
 
     @Override
@@ -363,7 +365,7 @@ public class User implements PeerEntity {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         User that = (User) o;
-        return getId().equals(that.getId());
+        return minData.id() == that.minData.id();
     }
 
     @Override

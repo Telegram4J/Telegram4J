@@ -1,11 +1,9 @@
 package telegram4j.core.internal;
 
-import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessagesSlice;
-import telegram4j.core.auxiliary.AuxiliarySendAs;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -13,7 +11,6 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseMessageFields;
-import telegram4j.tl.channels.SendAsPeers;
 import telegram4j.tl.messages.BaseMessages;
 import telegram4j.tl.messages.ChannelMessages;
 import telegram4j.tl.messages.Messages;
@@ -93,24 +90,6 @@ public class AuxiliaryEntityFactory {
             default:
                 throw new IllegalArgumentException("Unknown Messages type: " + data);
         }
-    }
-
-    public static AuxiliarySendAs createSendAs(MTProtoTelegramClient client, SendAsPeers data) {
-        var peerIds = data.peers().stream()
-                .map(s -> Tuples.of(s.premiumRequired(), Id.of(s.peer())))
-                .collect(Collectors.toUnmodifiableList());
-
-        var users = data.users().stream()
-                .map(u -> EntityFactory.createUser(client, u))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toUnmodifiableList());
-
-        var chats = data.chats().stream()
-                .map(c -> EntityFactory.createChat(client, c, null))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toUnmodifiableList());
-
-        return new AuxiliarySendAs(client, peerIds, users, chats);
     }
 
     private static Message createMessage(MTProtoTelegramClient client, BaseMessageFields message,

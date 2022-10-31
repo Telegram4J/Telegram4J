@@ -5,8 +5,6 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.auxiliary.AuxiliarySendAs;
-import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.Message;
@@ -16,7 +14,6 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.mtproto.util.CryptoUtil;
-import telegram4j.tl.InputPeer;
 import telegram4j.tl.InputPeerEmpty;
 import telegram4j.tl.messages.AffectedHistory;
 import telegram4j.tl.request.messages.ForwardMessages;
@@ -59,7 +56,8 @@ abstract class BaseChat implements Chat {
 
     @Override
     public Mono<Message> sendMessage(SendMessageSpec spec) {
-        return Mono.defer(() -> {
+        Id id = getId();
+        return client.asInputPeer(id).switchIfEmpty(MappingUtil.unresolvedPeer(id)).flatMap(peer -> {
             var parser = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                     .map(m -> EntityParserSupport.parse(client, m.apply(spec.message().trim())))
@@ -73,6 +71,11 @@ abstract class BaseChat implements Chat {
                     .flatMap(p -> client.asInputPeer(p.getId())
                             .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())));
 
+            Integer scheduleDate = spec.scheduleTimestamp()
+                    .map(Instant::getEpochSecond)
+                    .map(Math::toIntExact)
+                    .orElse(null);
+
             return Mono.justOrEmpty(spec.media())
                     .flatMap(d -> d.asData(client))
                     .flatMap(media -> parser.map(function((txt, ent) -> SendMedia.builder()
@@ -82,11 +85,8 @@ abstract class BaseChat implements Chat {
                                     .flags(spec.flags().getValue())
                                     .replyToMsgId(spec.replyToMessageId().orElse(null))
                                     .message(txt)
-                                    .entities(ent)
-                                    .scheduleDate(spec.scheduleTimestamp()
-                                            .map(Instant::getEpochSecond)
-                                            .map(Math::toIntExact)
-                                            .orElse(null))))
+                                    .entities(ent.isEmpty() ? null : ent)
+                                    .scheduleDate(scheduleDate)))
                             .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                     .then(sendAs.doOnNext(builder::sendAs))
                                     .then(Mono.fromSupplier(builder::build)))
@@ -97,11 +97,8 @@ abstract class BaseChat implements Chat {
                                     .flags(spec.flags().getValue())
                                     .replyToMsgId(spec.replyToMessageId().orElse(null))
                                     .message(txt)
-                                    .entities(ent)
-                                    .scheduleDate(spec.scheduleTimestamp()
-                                            .map(Instant::getEpochSecond)
-                                            .map(Math::toIntExact)
-                                            .orElse(null))))
+                                    .entities(ent.isEmpty() ? null : ent)
+                                    .scheduleDate(scheduleDate)))
                             .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                     .then(sendAs.doOnNext(builder::sendAs))
                                     .then(Mono.fromSupplier(builder::build)))
@@ -112,46 +109,49 @@ abstract class BaseChat implements Chat {
 
     @Override
     public Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer) {
-        return client.resolvePeer(toPeer)
-                .flatMap(p -> client.asInputPeer(p.getId())
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())))
-                .zipWith(Mono.justOrEmpty(spec.sendAs())
-                        .flatMap(client::resolvePeer)
-                        .flatMap(p -> client.asInputPeer(p.getId())
-                                .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())))
-                        .defaultIfEmpty(InputPeerEmpty.instance()))
-                .flatMapMany(function((toPeerResend, sendAs) -> client.getServiceHolder().getChatService()
-                        .forwardMessages(ForwardMessages.builder()
-                                .id(spec.ids())
-                                .randomId(CryptoUtil.random.longs(spec.ids().size())
-                                        .boxed()
-                                        .collect(Collectors.toList()))
-                                .flags(spec.flags().getValue())
-                                .fromPeer(client.asResolvedInputPeer(getId()))
-                                .toPeer(toPeerResend)
-                                .sendAs(unmapEmpty(sendAs))
-                                .scheduleDate(spec.scheduleTimestamp()
-                                        .map(Instant::getEpochSecond)
-                                        .map(Math::toIntExact)
-                                        .orElse(null))
-                                .build())
-                        .map(e -> EntityFactory.createMessage(client, e,
-                                Id.of(toPeerResend, client.getSelfId())))));
-    }
+        return Flux.defer(() -> {
+            Id id = getId();
+            var fromPeerMono = client.asInputPeer(id)
+                    .switchIfEmpty(MappingUtil.unresolvedPeer(id));
 
-    @Override
-    public Mono<AuxiliarySendAs> getSendAs() {
-        InputPeer peer = client.asResolvedInputPeer(getId());
+            var sendAsMono = Mono.justOrEmpty(spec.sendAs())
+                    .flatMap(client::resolvePeer)
+                    .flatMap(p -> client.asInputPeer(p.getId())
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())))
+                    .defaultIfEmpty(InputPeerEmpty.instance());
 
-        return client.getServiceHolder().getChatService().getSendAs(peer)
-                .map(s -> AuxiliaryEntityFactory.createSendAs(client, s));
+            var toPeerMono = client.resolvePeer(toPeer)
+                    .flatMap(p -> client.asInputPeer(p.getId())
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(p.getId())));
+
+            return Mono.zip(fromPeerMono, toPeerMono, sendAsMono)
+                    .flatMapMany(function((fromPeer, toPeerResend, sendAs) -> {
+                        Id resolvedChatId = Id.of(toPeerResend, client.getSelfId());
+                        return client.getServiceHolder().getChatService()
+                                .forwardMessages(ForwardMessages.builder()
+                                        .id(spec.ids())
+                                        .randomId(CryptoUtil.random.longs(spec.ids().size())
+                                                .boxed()
+                                                .collect(Collectors.toList()))
+                                        .flags(spec.flags().getValue())
+                                        .fromPeer(fromPeer)
+                                        .toPeer(toPeerResend)
+                                        .sendAs(unmapEmpty(sendAs))
+                                        .scheduleDate(spec.scheduleTimestamp()
+                                                .map(Instant::getEpochSecond)
+                                                .map(Math::toIntExact)
+                                                .orElse(null))
+                                        .build())
+                                .map(e -> EntityFactory.createMessage(client, e, resolvedChatId));
+                    }));
+        });
     }
 
     @Override
     public Mono<AffectedHistory> unpinAllMessages() {
-        InputPeer peer = client.asResolvedInputPeer(getId());
-
-        return client.getServiceHolder().getChatService().unpinAllMessages(peer);
+        return client.asInputPeer(getId())
+                .flatMap(client.getServiceHolder()
+                        .getChatService()::unpinAllMessages);
     }
 
     @Override

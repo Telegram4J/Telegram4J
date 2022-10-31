@@ -1,5 +1,6 @@
 package telegram4j.core.object.chat;
 
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
@@ -12,6 +13,7 @@ import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
+import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
@@ -23,6 +25,7 @@ import telegram4j.tl.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static telegram4j.tl.BaseChat.*;
@@ -290,7 +293,7 @@ public final class GroupChat extends BaseChat {
      *
      * @return The id of peer, that selects by default on group call, if present.
      */
-    public Optional<Id> getGroupCallDefaultJoinAs() {
+    public Optional<Id> getGroupCallDefaultJoinAsId() {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::groupcallDefaultJoinAs)
                 .map(Id::of);
@@ -302,22 +305,47 @@ public final class GroupChat extends BaseChat {
      * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
      * @return The count of pending join requests, if present.
      */
-    public Optional<Integer> getRequestsPending() {
+    public Optional<Integer> getPendingRequests() {
         return Optional.ofNullable(fullData).map(BaseChatFull::requestsPending);
     }
 
     /**
-     * Gets mutable list of user ids, who requested to join recently, if present.
+     * Gets mutable set of user ids, who requested to join recently, if present.
      *
      * @see <a href="https://core.telegram.org/api/invites#join-requests">Join Requests</a>
-     * @return The mutable list of user ids, who requested to join recently, if present.
+     * @return The mutable set of user ids, who requested to join recently, if present.
      */
-    public Optional<List<Id>> getRecentRequesters() {
+    public Optional<Set<Id>> getRecentRequestersIds() {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::recentRequesters)
                 .map(list -> list.stream()
                         .map(l -> Id.ofUser(l, null))
-                        .collect(Collectors.toList()));
+                        .collect(Collectors.toSet()));
+    }
+
+    /**
+     * Requests to retrieve the user who requested to join.
+     *
+     * @see #getRecentRequestersIds()
+     * @return A {@link Flux} which emits the {@link User requesters}.
+     */
+    public Flux<User> getRecentRequesters() {
+        return getRecentRequesters(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve the user who requested to join using specified retrieval strategy.
+     *
+     * @see #getRecentRequestersIds()
+     * @param strategy The strategy to apply.
+     * @return A {@link Flux} which emits the {@link User requesters}.
+     */
+    public Flux<User> getRecentRequesters(EntityRetrievalStrategy strategy) {
+        var retriever = client.withRetrievalStrategy(strategy);
+        return Mono.justOrEmpty(fullData)
+                .mapNotNull(ChatFull::recentRequesters)
+                .flatMapIterable(Function.identity())
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
     }
 
     /**

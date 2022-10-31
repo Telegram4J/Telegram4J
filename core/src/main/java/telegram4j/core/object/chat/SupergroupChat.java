@@ -5,22 +5,22 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.BaseChannelLocation;
-import telegram4j.tl.BaseGeoPoint;
-import telegram4j.tl.ChannelFull;
-import telegram4j.tl.ImmutableInputMessageID;
+import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Subtype of channel, which represents a large group of 0-200,000 users.
@@ -43,7 +43,34 @@ public final class SupergroupChat extends BaseChannel {
         return Type.SUPERGROUP;
     }
 
+    @Override
+    public Mono<BroadcastChannel> getLinkedChannel() {
+        return super.getLinkedChannel()
+                .cast(BroadcastChannel.class);
+    }
+
+    @Override
+    public Mono<BroadcastChannel> getLinkedChannel(EntityRetrievalStrategy strategy) {
+        return super.getLinkedChannel(strategy)
+                .cast(BroadcastChannel.class);
+    }
+
     // ChannelFull fields
+
+    /**
+     * Gets list of information about chat bots, if present
+     * and if detailed information about channel is available.
+     *
+     * @return The list of information about chat bots, if present
+     * and if detailed information about channel is available.
+     */
+    public Optional<List<BotInfo>> getBotInfo() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::botInfo)
+                .map(list -> list.stream()
+                        .map(d -> new BotInfo(client, d))
+                        .collect(Collectors.toList()));
+    }
 
     /**
      * Gets id of the group chat from which this supergroup was migrated, if full data about chat is available and present.
@@ -144,6 +171,33 @@ public final class SupergroupChat extends BaseChannel {
                 .map(Instant::ofEpochSecond);
     }
 
+    /**
+     * Gets associated with this supergroup sticker set, if present
+     * and if detailed information about supergroup is available.
+     *
+     * @return The associated sticker set, if present
+     * and if detailed information about supergroup is available.
+     */
+    public Optional<StickerSet> getStickerSet() {
+        return Optional.ofNullable(fullData)
+                .map(ChannelFull::stickerset)
+                .map(d -> new StickerSet(client, d));
+    }
+
+    /**
+     * Requests to associate new stickerset with this channel.
+     *
+     * @param stickerSetId The id of sticker set to associate.
+     * @return A {@link Mono} emitting on successful completion boolean, indicates result.
+     */
+    public Mono<Boolean> setStickerSet(InputStickerSet stickerSetId) {
+        Id id = getId();
+        return client.asInputChannel(id)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+                .flatMap(channel -> client.getServiceHolder().getChatService()
+                        .setStickers(channel, stickerSetId));
+    }
+
     @Override
     public String toString() {
         return "SupergroupChat{" +
@@ -212,5 +266,4 @@ public final class SupergroupChat extends BaseChannel {
                     '}';
         }
     }
-
 }
