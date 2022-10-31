@@ -11,6 +11,7 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
@@ -425,10 +426,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     .map(p -> ImmutableInputChannelFromMessage.of(p, min.getMessageId(), channelId.asLong()));
         }
 
-        if (channelId.getAccessHash().isEmpty()) {
-            return mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong());
-        }
-        return Mono.just(ImmutableBaseInputChannel.of(channelId.asLong(), channelId.getAccessHash().orElseThrow()));
+        return Mono.justOrEmpty(channelId.getAccessHash())
+                .<InputChannel>map(acc -> ImmutableBaseInputChannel.of(channelId.asLong(), acc))
+                .switchIfEmpty(mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong()));
     }
 
     /**
@@ -458,10 +458,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     .map(p -> ImmutableInputUserFromMessage.of(p, min.getMessageId(), userId.asLong()));
         }
 
-        if (userId.getAccessHash().isEmpty()) {
-            return mtProtoResources.getStoreLayout().resolveUser(userId.asLong());
-        }
-        return Mono.just(ImmutableBaseInputUser.of(userId.asLong(), userId.getAccessHash().orElseThrow()));
+        return Mono.justOrEmpty(userId.getAccessHash())
+                .<InputUser>map(acc -> ImmutableBaseInputUser.of(userId.asLong(), acc))
+                .switchIfEmpty(mtProtoResources.getStoreLayout().resolveUser(userId.asLong()));
     }
 
     /**
@@ -474,42 +473,79 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public InputPeer asResolvedInputPeer(Id peerId) {
         switch (peerId.getType()) {
-            case USER: {
+            case USER:
                 if (getSelfId().equals(peerId)) {
                     return InputPeerSelf.instance();
                 }
 
-                var min = peerId.getMinInformation().orElse(null);
-                if (min != null) {
-                    if (authResources.isBot()) {
-                        throw new IllegalArgumentException("Min ids can not be used for bots");
-                    }
+                return peerId.getMinInformation()
+                        .<InputPeer>map(min -> {
+                            Preconditions.requireArgument(!authResources.isBot(), "Min ids can not be used for bots");
 
-                    InputPeer p = asResolvedInputPeer(min.getPeerId());
-                    return ImmutableInputPeerUserFromMessage.of(p, min.getMessageId(), peerId.asLong());
-                }
-
-                return ImmutableInputPeerUser.of(peerId.asLong(), peerId.getAccessHash()
-                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId)));
-            }
+                            InputPeer p = asResolvedInputPeer(min.getPeerId());
+                            return ImmutableInputPeerUserFromMessage.of(p, min.getMessageId(), peerId.asLong());
+                        })
+                        .or(() -> peerId.getAccessHash().map(acc -> ImmutableInputPeerUser.of(peerId.asLong(), acc)))
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId));
             case CHAT: return ImmutableInputPeerChat.of(peerId.asLong());
-            case CHANNEL: {
+            case CHANNEL:
+                return peerId.getMinInformation()
+                        .<InputPeer>map(min -> {
+                            Preconditions.requireArgument(!authResources.isBot(), "Min ids can not be used for bots");
 
-                var min = peerId.getMinInformation().orElse(null);
-                if (min != null) {
-                    if (authResources.isBot()) {
-                        throw new IllegalArgumentException("Min ids can not be used for bots");
-                    }
-
-                    InputPeer p = asResolvedInputPeer(min.getPeerId());
-                    return ImmutableInputPeerChannelFromMessage.of(p, min.getMessageId(), peerId.asLong());
-                }
-
-                return ImmutableInputPeerChannel.of(peerId.asLong(), peerId.getAccessHash()
-                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId)));
-            }
+                            InputPeer p = asResolvedInputPeer(min.getPeerId());
+                            return ImmutableInputPeerChannelFromMessage.of(p, min.getMessageId(), peerId.asLong());
+                        })
+                        .or(() -> peerId.getAccessHash().map(acc -> ImmutableInputPeerChannel.of(peerId.asLong(), acc)))
+                        .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + peerId));
             default: throw new IllegalStateException();
         }
+    }
+
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputUser} object without access hash resolving.
+     *
+     * @throws NoSuchElementException If access hash is needed and absent.
+     * @param userId The id of user to converting.
+     * @return The new {@link InputPeer} from specified {@link Id}.
+     */
+    public InputUser asResolvedInputUser(Id userId) {
+        Preconditions.requireArgument(userId.getType() == Id.Type.USER, () ->
+                "Unexpected type of userId: " + userId);
+        if (userId.equals(getSelfId())) {
+            return InputUserSelf.instance();
+        }
+
+        return userId.getMinInformation()
+                .<InputUser>map(min -> {
+                    Preconditions.requireArgument(!authResources.isBot(), "Min ids can not be used for bots");
+
+                    InputPeer p = asResolvedInputPeer(min.getPeerId());
+                    return ImmutableInputUserFromMessage.of(p, min.getMessageId(), userId.asLong());
+                })
+                .or(() -> userId.getAccessHash().map(acc -> ImmutableBaseInputUser.of(userId.asLong(), acc)))
+                .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + userId));
+    }
+
+    /**
+     * Converts specified {@link Id} into the low-leveled {@link InputChannel} object without access hash resolving.
+     *
+     * @throws NoSuchElementException If access hash is needed and absent.
+     * @param channelId The id of channel to converting.
+     * @return The new {@link InputChannel} from specified {@link Id}.
+     */
+    public InputChannel asResolvedInputChannel(Id channelId) {
+        Preconditions.requireArgument(channelId.getType() == Id.Type.CHANNEL, () -> "Unexpected type of userId: " + channelId);
+
+        return channelId.getMinInformation()
+                .<InputChannel>map(min -> {
+                    Preconditions.requireArgument(!authResources.isBot(), "Min ids can not be used for bots");
+
+                    InputPeer p = asResolvedInputPeer(min.getPeerId());
+                    return ImmutableInputChannelFromMessage.of(p, min.getMessageId(), channelId.asLong());
+                })
+                .or(() -> channelId.getAccessHash().map(acc -> ImmutableBaseInputChannel.of(channelId.asLong(), acc)))
+                .orElseThrow(() -> new IllegalArgumentException("No access hash present for id: " + channelId));
     }
 
     /**

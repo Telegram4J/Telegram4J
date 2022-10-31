@@ -25,7 +25,6 @@ import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.util.ResettableInterval;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
@@ -115,7 +114,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     int seq = this.seq;
 
                     if (seq + 1 < seqBegin) {
-                        log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
+                        log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
 
                         preApply = getDifference();
                     } else if (seq + 1 > seqBegin) {
@@ -147,7 +146,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     int seq = this.seq;
 
                     if (seq + 1 < seqBegin) {
-                        log.debug("Updates seq gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
+                        log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
 
                         preApply = getDifference();
                     } else if (seq + 1 > seqBegin) {
@@ -462,7 +461,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
                 .flatMap(TupleUtils.function((u, cpts) -> {
                     var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId(), null)))
-                            .map(c -> TlEntityUtil.toInputChannel(client.asResolvedInputPeer(c.getId()))) // must be present
+                            .map(c -> client.asResolvedInputChannel(c.getId())) // must be present
                             .orElseThrow();
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
@@ -474,7 +473,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     }
 
                     var request = GetChannelDifference.builder()
-                            .force(true)
+                            .force(false)
                             .channel(id)
                             .pts(dpts)
                             .filter(ChannelMessagesFilterEmpty.instance())
@@ -524,8 +523,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     protected Flux<Event> handleChannelDifference(GetChannelDifference request, ChannelDifference diff) {
+        Id channelId = Id.of(request.channel(), client.getSelfId());
         if (log.isTraceEnabled()) {
-            log.trace("channel difference: {}", diff);
+            log.trace("channel difference for {}: {}", channelId.asString(), diff);
         }
 
         int newPts;
@@ -549,7 +549,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
             default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
         }
 
-        Id channelId = Id.of(request.channel(), client.getSelfId());
         Mono<Void> updatePts = client.getMtProtoResources()
                 .getStoreLayout().updateChannelPts(channelId.asLong(), newPts);
 
@@ -560,7 +559,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
             if (log.isDebugEnabled()) {
                 log.debug("Getting non-final channel difference, channel: {}, pts: {}, limit: {}",
-                        channelId.asLong(), newPts, request.limit());
+                        channelId.asString(), newPts, request.limit());
             }
 
             var updRequest = ImmutableGetChannelDifference.copyOf(request)
@@ -785,7 +784,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
 
         var request = GetChannelDifference.builder()
-                .force(true)
+                .force(false)
                 .channel(id)
                 .pts(pts)
                 .filter(ChannelMessagesFilterEmpty.instance())
@@ -821,7 +820,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     public static class Options {
         private static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
-        private static final int MAX_BOT_CHANNEL_DIFFERENCE  = 10000;
+        private static final int MAX_BOT_CHANNEL_DIFFERENCE  = 100000;
         private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
 
         public final Duration checkin;

@@ -15,10 +15,12 @@ import telegram4j.tl.users.UserFull;
 
 /**
  * Storage interface for interacting with tl entities and session information.
- * <p>Due to message ids specific differ from user to user,
- * the storage cannot be used by more than one user.
+ *
+ * @implSpec The implementation must be thread-safe and associated to one dc and user,
+ * because of relativity of the message ids from user to user.
  */
 public interface StoreLayout {
+    // region retrieve methods
 
     /**
      * Retrieve main dc to which store assigned.
@@ -36,6 +38,15 @@ public interface StoreLayout {
     Mono<State> getCurrentState();
 
     /**
+     * Retrieve auth key holder, associated with specified dc.
+     *
+     * @param dc The id of datacenter.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link AuthorizationKeyHolder} object with auth key and id.
+     */
+    Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
+
+    /**
      * Retrieve self user id.
      *
      * @return A {@link Mono} emitting on successful completion a self user id.
@@ -46,7 +57,7 @@ public interface StoreLayout {
      * Search channel or user by the specified username
      * and compute container with minimal found info.
      *
-     * @implSpec the implementation must support <b>me</b> and <b>self</b>
+     * @implSpec The implementation must support <b>me</b> and <b>self</b>
      * aliases to retrieve information about itself.
      *
      * @param username The username of channel or user.
@@ -216,16 +227,8 @@ public interface StoreLayout {
      */
     Flux<ResolvedChatParticipant> getChatParticipants(long chatId);
 
-    /**
-     * Retrieve auth key holder, associated with specified dc.
-     *
-     * @param dc The id of datacenter.
-     * @return A {@link Mono} emitting on successful completion
-     * the {@link AuthorizationKeyHolder} object with auth key and id.
-     */
-    Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
-
-    // message updates
+    // endregion
+    // region updates
 
     Mono<Void> onNewMessage(Message update);
 
@@ -235,35 +238,102 @@ public interface StoreLayout {
 
     Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload);
 
-    // chat updates
-
     Mono<Void> onChatParticipant(UpdateChatParticipant payload);
 
     Mono<Void> onChannelParticipant(UpdateChannelParticipant payload);
 
     Mono<Void> onChatParticipants(ChatParticipants payload);
 
-    // not an update-related methods
+    // endregion
+    // region state methods
 
+    /**
+     * Initializes the local main dc id of the store according to the given {@link DataCenter} id.
+     *
+     * @param dc The main dc id.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> updateDataCenter(DataCenter dc);
 
+    /**
+     * Updates the local updates state of the store according to the given {@link State} object.
+     *
+     * @param state The new updates state.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> updateState(State state);
 
+    /**
+     * Updates the local auth key state of the store according to the given {@link AuthorizationKeyHolder auth key}.
+     *
+     * @param dc The id of dc that the auth key is associated with.
+     * @param authKey The new auth key.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey);
 
+    /**
+     * Updates the local {@link ChannelFull#pts() channel pts} state of the store according to the given pts.
+     *
+     * @param channelId The id of channel.
+     * @param pts The new pts state.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> updateChannelPts(long channelId, int pts);
 
-    // common request methods
+    // endregion
+    // region requests hooks
 
+    /**
+     * Applies given peer entities to local store.
+     *
+     * @param chats An iterable with chats.
+     * @param users An iterable with users.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users);
 
+    /**
+     * Applies given full user to local store.
+     *
+     * @param payload The user full payload.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
 
+    /**
+     * Applies given full chat to local store.
+     *
+     * @param payload The user chat payload.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
 
+    /**
+     * Applies given channel participants list to local store.
+     *
+     * @param channelId The id of channel.
+     * @param payload The channel participants list.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onChannelParticipants(long channelId, BaseChannelParticipants payload);
 
+    /**
+     * Applies given channel participant to local store.
+     *
+     * @param channelId The id of channel.
+     * @param payload The channel participant.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onChannelParticipant(long channelId, ChannelParticipant payload);
 
+    /**
+     * Applies given messages list to local store.
+     *
+     * @param payload The messages list.
+     * @return A {@link Mono} completing the operation is done.
+     */
     Mono<Void> onMessages(Messages payload);
+
+    // endregion
 }

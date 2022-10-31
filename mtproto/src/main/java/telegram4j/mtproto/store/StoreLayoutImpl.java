@@ -898,7 +898,7 @@ public class StoreLayoutImpl implements StoreLayout {
         final ImmutableChannel min;
         @Nullable
         final ImmutableChannelFull full;
-        @Nullable // initialize on demand
+        @Nullable // initializes on demand
         final ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants;
 
         ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
@@ -911,7 +911,6 @@ public class StoreLayoutImpl implements StoreLayout {
             this.full = full;
             this.participants = participants;
         }
-
 
         ChannelInfo withParticipants(@Nullable ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants) {
             if (this.participants == participants) return this;
@@ -948,7 +947,7 @@ public class StoreLayoutImpl implements StoreLayout {
         final ImmutableBaseChat min;
         @Nullable
         final ImmutableBaseChatFull full;
-        @Nullable // initialize on demand
+        @Nullable // initializes on demand
         final ConcurrentMap<Long, ChatParticipant> participants;
 
         ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {

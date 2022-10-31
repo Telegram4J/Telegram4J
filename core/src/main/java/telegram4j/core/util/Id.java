@@ -10,7 +10,6 @@ import telegram4j.tl.*;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
 
 /**
  * The unsigned 64-bot identifier for {@link PeerEntity} objects which
@@ -230,11 +229,11 @@ public final class Id implements Comparable<Id> {
      *
      * @return The access hash of this id, if present and applicable.
      */
-    public OptionalLong getAccessHash() {
+    public Optional<Long> getAccessHash() {
         if (context instanceof Long) {
-            return OptionalLong.of((long) context);
+            return Optional.of((long) context);
         }
-        return OptionalLong.empty();
+        return Optional.empty();
     }
 
     /**

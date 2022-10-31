@@ -81,29 +81,29 @@ abstract class BaseChat implements Chat {
                     .flatMap(media -> parser.map(function((txt, ent) -> SendMedia.builder()
                                     .media(media)
                                     .randomId(CryptoUtil.random.nextLong())
-                                    .peer(client.asResolvedInputPeer(getId()))
+                                    .peer(peer)
                                     .flags(spec.flags().getValue())
                                     .replyToMsgId(spec.replyToMessageId().orElse(null))
                                     .message(txt)
                                     .entities(ent.isEmpty() ? null : ent)
                                     .scheduleDate(scheduleDate)))
-                            .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .<SendMedia>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                     .then(sendAs.doOnNext(builder::sendAs))
                                     .then(Mono.fromSupplier(builder::build)))
                             .flatMap(client.getServiceHolder().getChatService()::sendMedia))
                     .switchIfEmpty(parser.map(function((txt, ent) -> SendMessage.builder()
                                     .randomId(CryptoUtil.random.nextLong())
-                                    .peer(client.asResolvedInputPeer(getId()))
+                                    .peer(peer)
                                     .flags(spec.flags().getValue())
                                     .replyToMsgId(spec.replyToMessageId().orElse(null))
                                     .message(txt)
                                     .entities(ent.isEmpty() ? null : ent)
                                     .scheduleDate(scheduleDate)))
-                            .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .<SendMessage>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                     .then(sendAs.doOnNext(builder::sendAs))
                                     .then(Mono.fromSupplier(builder::build)))
                             .flatMap(client.getServiceHolder().getChatService()::sendMessage))
-                    .map(e -> EntityFactory.createMessage(client, e, getId()));
+                    .map(e -> EntityFactory.createMessage(client, e, Id.of(peer, client.getSelfId())));
         });
     }
 
@@ -149,7 +149,9 @@ abstract class BaseChat implements Chat {
 
     @Override
     public Mono<AffectedHistory> unpinAllMessages() {
-        return client.asInputPeer(getId())
+        Id id = getId();
+        return client.asInputPeer(id)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
                 .flatMap(client.getServiceHolder()
                         .getChatService()::unpinAllMessages);
     }
