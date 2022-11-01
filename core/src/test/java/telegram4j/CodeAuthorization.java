@@ -7,6 +7,7 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.util.retry.Retry;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.RpcException;
 import telegram4j.tl.ImmutableBaseInputCheckPasswordSRP;
@@ -44,6 +45,7 @@ public class CodeAuthorization {
 
     SentCode currentCode;
     String phoneNumber;
+    boolean first2fa = true;
 
     final MTProtoTelegramClient client;
     final Sinks.Many<State> state = Sinks.many().replay()
@@ -52,6 +54,7 @@ public class CodeAuthorization {
 
     enum State {
         SEND_CODE,
+        AWAIT_CODE,
         RESEND_CODE,
         CANCEL_CODE,
         SIGN_IN
@@ -86,6 +89,12 @@ public class CodeAuthorization {
                             return client.getServiceHolder().getAuthService()
                                     .resendCode(phoneNumber, currentCode.phoneCodeHash())
                                     .flatMapMany(this::applyCode);
+                        case AWAIT_CODE:
+                            synchronized (System.out) {
+                                System.out.println(delimiter);
+                                System.out.println("Invalid phone code, please write it again");
+                            }
+                            return applyCode(currentCode);
                         case CANCEL_CODE:
                             System.out.println("Good buy, " + System.getProperty("user.name"));
                             state.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
@@ -163,14 +172,11 @@ public class CodeAuthorization {
                         .phoneCode(code)
                         .phoneCodeHash(scode.phoneCodeHash())
                         .build())
-                .onErrorResume(RpcException.isErrorMessage("PHONE_CODE_INVALID"), e -> Mono.fromRunnable(() -> {
-                    synchronized (System.out) {
-                        System.out.println(delimiter);
-                        System.out.println("Invalid phone code, resending...");
-                    }
-                    state.emitNext(State.SEND_CODE, Sinks.EmitFailureHandler.FAIL_FAST);
-                }))
-                .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> begin2FA())
+                .onErrorResume(RpcException.isErrorMessage("PHONE_CODE_INVALID"), e -> Mono.fromRunnable(() ->
+                        state.emitNext(State.AWAIT_CODE, Sinks.EmitFailureHandler.FAIL_FAST)))
+                .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> begin2FA()
+                        .retryWhen(Retry.indefinitely()
+                                .filter(RpcException.isErrorMessage("PASSWORD_HASH_INVALID"))))
                 .cast(BaseAuthorization.class)
                 .doOnNext(a -> {
                     synchronized (System.out) {
@@ -197,7 +203,12 @@ public class CodeAuthorization {
 
             synchronized (System.out) {
                 System.out.println(delimiter);
-                System.out.print("The account is protected by 2FA, please write password");
+                if (first2fa) {
+                    first2fa = false;
+                    System.out.print("The account is protected by 2FA, please write password");
+                } else {
+                    System.out.print("Invalid password, please write it again");
+                }
                 String hint = pswrd.hint();
                 if (hint != null) {
                     System.out.print(" (Hint \"" + hint + "\")");
