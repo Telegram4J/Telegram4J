@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.Chat;
 
 import java.util.Objects;
@@ -59,6 +60,9 @@ public class EditMessageEvent extends MessageEvent {
 
     /**
      * Gets author of message, if present.
+     *
+     * <p> This peer may have different id rather than {@link Message#getAuthorId()} if
+     * real author of message is admin and have {@link AdminRight#ANONYMOUS} permission.
      *
      * @return The author entity of message, if present.
      */

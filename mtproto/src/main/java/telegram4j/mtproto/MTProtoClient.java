@@ -61,16 +61,6 @@ public interface MTProtoClient {
      */
     DataCenter getDatacenter();
 
-    // TODO: It shouldn't be in a public api
-    /**
-     * Update time offset which is used in message id generation.
-     * This method is included in the interface, since the
-     * authorization key generation apply primary time synchronization
-     *
-     * @param serverTime The server unix time in seconds.
-     */
-    void updateTimeOffset(int serverTime);
-
     /**
      * Gets current info about mtproto session.
      *

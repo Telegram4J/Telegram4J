@@ -17,7 +17,6 @@ import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
-import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -39,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static telegram4j.core.internal.MappingUtil.getAuthor;
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 /** Manager for correct and complete work with general and channel updates. */
@@ -434,7 +434,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .flatMap(data -> {
                     Id peerId = Id.of(data.peerId());
                     var chat = getChatEntity(peerId, chatsMap, usersMap, selfUser);
-                    var author = getMessageAuthor(data.fromId(), chat, chatsMap, usersMap);
+                    var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
 
                     // TODO: this is unnecessary but required for file contexts
                     return Mono.justOrEmpty(chat)
@@ -495,31 +495,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
         return client.getMtProtoResources()
                 .getStoreLayout().onContacts(chats, users)
                 .thenMany(concatedUpdates);
-    }
-
-    @Nullable
-    protected MentionablePeer getMessageAuthor(@Nullable Peer fromId, @Nullable Chat chat,
-                                               Map<Id, Chat> chatsMap, Map<Id, User> usersMap) {
-        MentionablePeer author = null;
-        if (fromId != null) {
-            Id id = Id.of(fromId);
-
-            switch (id.getType()) {
-                case USER:
-                    author = usersMap.get(id);
-                    break;
-                case CHANNEL:
-                    author = (MentionablePeer) chatsMap.get(id);
-                    break;
-                default: throw new IllegalStateException();
-            }
-        }
-
-        if (author == null && chat != null &&
-                chat.getType() == Chat.Type.PRIVATE) {
-            return ((PrivateChat) chat).getUser();
-        }
-        return author;
     }
 
     protected Flux<Event> handleChannelDifference(GetChannelDifference request, ChannelDifference diff) {
@@ -593,7 +568,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
                             var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
-                            var author = getMessageAuthor(data.fromId(), chat, chatsMap, usersMap);
+                            var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
                             var msg = EntityFactory.createMessage(client, data, channelId);
 
                             return new SendMessageEvent(client, msg, chat, author);
@@ -635,7 +610,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .getStoreLayout().existMessage(message)))
                         .map(data -> {
                             var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
-                            var author = getMessageAuthor(data.fromId(), chat, chatsMap, usersMap);
+                            var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
                             var msg = EntityFactory.createMessage(client, data, channelId);
 
                             return new SendMessageEvent(client, msg, chat, author);

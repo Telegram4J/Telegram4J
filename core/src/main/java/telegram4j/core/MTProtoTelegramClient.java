@@ -15,6 +15,7 @@ import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -556,6 +557,35 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public EntityRetriever withRetrievalStrategy(EntityRetrievalStrategy strategy) {
         return strategy.apply(this);
+    }
+
+    // copied from https://github.com/tdlib/td/blob/c1a3fa633fbce67b8b89fee93130498db8adc039/td/telegram/ContactsManager.cpp#L5273
+
+    /**
+     * Gets id of special bot that is used to anonymize admins in groups if {@link AdminRight#ANONYMOUS} right is set.
+     *
+     * @return The id of bot that used for anonymous admins.
+     */
+    public Id getGroupAnonymousBotId() {
+        return Id.ofUser(mtProtoClient.getDatacenter().isTest() ? 552888 : 1087968824, 0L);
+    }
+
+    /**
+     * Gets id of special bot that helps keep track of replies to your comments in channels.
+     *
+     * @return The id of bot that used to keep track of replies to your comments in channels.
+     */
+    public Id getRepliesBotId() {
+        return Id.ofUser(mtProtoClient.getDatacenter().isTest() ? 708513 : 1271266957, 0L);
+    }
+
+    /**
+     * Gets id of service user that used for system notifications.
+     *
+     * @return The id of service user that used for system notifications.
+     */
+    public Id getServiceNotificationId() {
+        return Id.ofUser(777000, 0L);
     }
 
     // EntityRetriever methods

@@ -8,7 +8,6 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.chat.Chat;
-import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
@@ -18,6 +17,8 @@ import telegram4j.tl.*;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static telegram4j.core.internal.MappingUtil.getAuthor;
 
 class MessageUpdateHandlers {
 
@@ -56,19 +57,7 @@ class MessageUpdateHandlers {
         BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
 
         Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
-        MentionablePeer author = Optional.ofNullable(message.fromId())
-                .map(p -> {
-                    Id id = Id.of(p);
-                    switch (id.getType()) {
-                        case CHANNEL: return (MentionablePeer) context.getChats().get(id);
-                        case USER: return context.getUsers().get(id);
-                        default: throw new IllegalStateException();
-                    }
-                })
-                // fromId is often not set if the message was sent to the DM, so we will have to process it for convenience
-                .or(() -> Optional.ofNullable(chat)
-                        .filter(c -> c.getType() == Chat.Type.PRIVATE)
-                        .map(c -> ((PrivateChat) c).getUser()))
+        MentionablePeer author = getAuthor(context, message, chat)
                 .orElse(null);
         Id resolvedChatId = Optional.ofNullable(chat)
                 .map(Chat::getId)
@@ -89,18 +78,7 @@ class MessageUpdateHandlers {
         }
 
         Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
-        MentionablePeer author = Optional.ofNullable(message.fromId())
-                .map(p -> {
-                    Id id = Id.of(p);
-                    switch (id.getType()) {
-                        case CHANNEL: return (MentionablePeer) context.getChats().get(id);
-                        case USER: return context.getUsers().get(id);
-                        default: throw new IllegalStateException();
-                    }
-                })
-                .or(() -> Optional.ofNullable(chat)
-                        .filter(c -> c.getType() == Chat.Type.PRIVATE)
-                        .map(c -> ((PrivateChat) c).getUser()))
+        MentionablePeer author = getAuthor(context, message, chat)
                 .orElse(null);
         Id resolvedId = Optional.ofNullable(chat)
                 .map(Chat::getId)

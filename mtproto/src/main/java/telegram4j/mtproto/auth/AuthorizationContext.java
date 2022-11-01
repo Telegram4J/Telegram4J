@@ -17,6 +17,7 @@ public final class AuthorizationContext {
     private volatile long serverSalt;
     private volatile ByteBuf authAuxHash;
     private volatile ServerDHParams serverDHParams;
+    private volatile int timeOffset;
     private final AtomicInteger retry = new AtomicInteger();
 
     public ByteBuf getNonce() {
@@ -79,6 +80,15 @@ public final class AuthorizationContext {
         return retry;
     }
 
+    public int getTimeOffset() {
+        return timeOffset;
+    }
+
+    public void setTimeOffset(int serverTime) {
+        int now = (int) (System.currentTimeMillis() / 1000);
+        timeOffset = serverTime - now;
+    }
+
     public void clear() {
         safeRelease(nonce);
         safeRelease(newNonce);
@@ -91,6 +101,7 @@ public final class AuthorizationContext {
         serverNonce = null;
         authKey = null;
         serverSalt = 0;
+        timeOffset = 0;
         authAuxHash = null;
         serverDHParams = null;
         retry.set(0);

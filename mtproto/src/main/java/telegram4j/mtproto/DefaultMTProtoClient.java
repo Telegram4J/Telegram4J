@@ -506,6 +506,7 @@ public class DefaultMTProtoClient implements MTProtoClient {
                     .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
                     .doOnNext(auth -> {
                         serverSalt = authContext.getServerSalt(); // apply temporal salt
+                        updateTimeOffset(authContext.getTimeOffset());
                         authContext.clear();
                         state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                     })
@@ -566,16 +567,6 @@ public class DefaultMTProtoClient implements MTProtoClient {
     @Override
     public Sinks.Many<Updates> updates() {
         return updates;
-    }
-
-    @Override
-    public void updateTimeOffset(int serverTime) {
-        int now = (int) (System.currentTimeMillis() / 1000);
-        int updated = serverTime - now;
-        if (Math.abs(timeOffset - updated) > 3) {
-            lastMessageId = 0;
-            timeOffset = updated;
-        }
     }
 
     @Override
@@ -640,6 +631,15 @@ public class DefaultMTProtoClient implements MTProtoClient {
                 .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected")))
                 .doOnNext(con -> state.emitNext(State.CLOSED, options.getEmissionHandler()))
                 .then();
+    }
+
+    public void updateTimeOffset(int serverTime) {
+        int now = (int) (System.currentTimeMillis() / 1000);
+        int updated = serverTime - now;
+        if (Math.abs(timeOffset - updated) > 3) {
+            lastMessageId = 0;
+            timeOffset = updated;
+        }
     }
 
     private List<Long> collectSentMessageIds() {
