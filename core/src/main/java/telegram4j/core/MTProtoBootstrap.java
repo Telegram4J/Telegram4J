@@ -5,7 +5,6 @@ import reactor.core.Disposable;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 import reactor.core.publisher.Sinks;
 import reactor.netty.tcp.TcpClient;
 import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
@@ -46,12 +45,13 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
-    private static final boolean parseBotIdFromToken = Boolean.getBoolean("telegram4j.core.MTProtoBootstrap.parseBotIdFromToken");
+    private static final boolean parseBotIdFromToken = Boolean.getBoolean("telegram4j.core.parseBotIdFromToken");
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
@@ -345,6 +345,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     t -> log.error("Updates manager terminated with an error", t),
                     () -> log.debug("Updates manager completed")));
 
+            AtomicBoolean emit = new AtomicBoolean(true);
+
             composite.add(mtProtoClient.state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
@@ -378,17 +380,16 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                 return mtProtoClient.sendAwait(invokeWithLayout)
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
-                                                .filter(e -> !authResources.isBot() &&
-                                                        e instanceof RpcException &&
-                                                        ((RpcException) e).getError().errorCode() == 401)
+                                                .filter(RpcException.isErrorCode(401)
+                                                        .and(t -> !authResources.isBot()))
                                                 .doBeforeRetryAsync(signal -> userAuth))
                                         // startup errors must close client
                                         .onErrorResume(e -> mtProtoClient.close()
                                                 .then(onDisconnect.asMono())
                                                 .then(Mono.fromRunnable(() -> sink.error(e))))
                                         .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
-                                        .doFinally(signal -> {
-                                            if (signal == SignalType.ON_COMPLETE) {
+                                        .doOnSuccess(any -> {
+                                            if (emit.compareAndSet(true, false)) {
                                                 sink.success(telegramClient);
                                             }
                                         });
