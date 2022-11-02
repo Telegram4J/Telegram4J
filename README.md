@@ -1,6 +1,6 @@
 # Telegram4J
 
-[![Telegram Group](https://img.shields.io/endpoint?color=neon&style=flat-square&label=Telegram%20Channel&url=https%3A%2F%2Ftelegram-badge-4mbpu8e0fit4.runkit.sh%2F%3Furl%3Dhttps%3A%2F%2Ft.me%2Fdiscussion_t4j)](https://t.me/discussion_t4j)
+[![Telegram Group](https://img.shields.io/endpoint?color=neon&style=flat-square&label=Telegram%20Channel&url=https%3A%2F%2Ftg.sumanjay.workers.dev%2Fdiscussion_t4j)](https://t.me/discussion_t4j)
 [![Javadoc](https://javadoc.io/badge2/com.telegram4j/telegram4j-core/0.1.0/javadoc.svg)](https://javadoc.io/doc/com.telegram4j/telegram4j-core/0.1.0)
 ![Build Status](https://github.com/Telegram4J/Telegram4J/actions/workflows/build.yml/badge.svg?branch=master)
 
@@ -50,7 +50,7 @@ public class ExampleReplyBot {
                 .filter(e -> e.getMessage().getContent().equals("!ping"))
                 .flatMap(e -> Mono.justOrEmpty(e.getChat())
                         // telegram api may not deliver chat info and in this situation it's necessary to retrieve chat
-                        .switchIfEmpty(event.getMessage().getChat())
+                        .switchIfEmpty(e.getMessage().getChat())
                         .flatMap(c -> c.sendMessage(SendMessageSpec.of("pong!")
                                 .withReplyTo(e.getMessage()))))
                 .subscribe();

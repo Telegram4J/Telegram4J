@@ -96,7 +96,7 @@ public class CodeAuthorization {
                             }
                             return applyCode(currentCode);
                         case CANCEL_CODE:
-                            System.out.println("Good buy, " + System.getProperty("user.name"));
+                            System.out.println("Goodbye, " + System.getProperty("user.name"));
                             state.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
                             return client.disconnect();
                         case SIGN_IN:
