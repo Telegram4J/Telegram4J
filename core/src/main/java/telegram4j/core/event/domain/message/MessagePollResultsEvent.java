@@ -10,24 +10,13 @@ import java.util.Optional;
 /** Event of poll results. */
 public class MessagePollResultsEvent extends MessageEvent{
 
-    private final long pollId;
     private final @Nullable Poll poll;
     private final PollResults results;
 
-    public MessagePollResultsEvent(MTProtoTelegramClient client, long pollId, @Nullable Poll poll, PollResults results) {
+    public MessagePollResultsEvent(MTProtoTelegramClient client, @Nullable Poll poll, PollResults results) {
         super(client);
-        this.pollId = pollId;
         this.poll = poll;
         this.results = results;
-    }
-
-    /**
-     * Gets id of poll.
-     *
-     * @return The id of poll.
-     */
-    public long getPollId() {
-        return pollId;
     }
 
     /**
@@ -51,8 +40,7 @@ public class MessagePollResultsEvent extends MessageEvent{
     @Override
     public String toString() {
         return "MessagePollResultsEvent{" +
-                "pollId=" + pollId +
-                ", poll=" + poll +
+                "poll=" + poll +
                 ", results=" + results +
                 '}';
     }

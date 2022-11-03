@@ -6,10 +6,10 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.Video;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
-import telegram4j.tl.InputPeer;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -18,15 +18,12 @@ public final class Game implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.Game data;
-    private final int messageId;
-    private final InputPeer peer;
+    private final Context context;
 
-    public Game(MTProtoTelegramClient client, telegram4j.tl.Game data, int messageId, InputPeer peer) {
+    public Game(MTProtoTelegramClient client, telegram4j.tl.Game data, Context context) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
-
-        this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer);
+        this.context = Objects.requireNonNull(context);
     }
 
     @Override
@@ -87,7 +84,7 @@ public final class Game implements TelegramObject {
     public Photo getPhoto() {
         BasePhoto p = TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class);
         Objects.requireNonNull(p);
-        return new Photo(client, p, peer, messageId);
+        return new Photo(client, p, context);
     }
 
     /**
@@ -97,7 +94,7 @@ public final class Game implements TelegramObject {
      */
     public Optional<Video> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                .map(d -> (Video) EntityFactory.createDocument(client, d, messageId, peer));
+                .map(d -> (Video) EntityFactory.createDocument(client, d, context));
     }
 
     @Override

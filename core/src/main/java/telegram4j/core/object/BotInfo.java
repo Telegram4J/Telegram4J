@@ -7,15 +7,16 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
-import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.mtproto.file.Context;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
 import telegram4j.tl.BotCommand;
-import telegram4j.tl.InputPeerEmpty;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
+import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
 /**
  * Chat bot information.
@@ -24,10 +25,12 @@ public class BotInfo implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.BotInfo data;
+    private final Id peer;
 
-    public BotInfo(MTProtoTelegramClient client, telegram4j.tl.BotInfo data) {
+    public BotInfo(MTProtoTelegramClient client, telegram4j.tl.BotInfo data, Id peer) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
+        this.peer = Objects.requireNonNull(peer);
     }
 
     @Override
@@ -40,8 +43,13 @@ public class BotInfo implements TelegramObject {
      *
      * @return The id of the bot, if present.
      */
-    public Optional<Id> getBotId() {
-        return Optional.ofNullable(data.userId()).map(i -> Id.ofUser(i, null));
+    public Id getBotId() {
+        return Optional.ofNullable(data.userId())
+                .map(i -> Id.ofUser(i, null))
+                .or(() -> peer.getType() == Id.Type.USER
+                        ? Optional.of(peer)
+                        : Optional.empty())
+                .orElseThrow(() -> new IllegalStateException("Peer: " + peer)); // need to verify
     }
 
     /**
@@ -60,8 +68,7 @@ public class BotInfo implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link User user}.
      */
     public Mono<User> getBot(EntityRetrievalStrategy strategy) {
-        return Mono.justOrEmpty(getBotId())
-                .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
+        return client.withRetrievalStrategy(strategy).getUserById(getBotId());
     }
 
     /**
@@ -74,10 +81,12 @@ public class BotInfo implements TelegramObject {
     }
 
     public Optional<Document> getDescriptionDocument() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.descriptionDocument(), BaseDocument.class))
-                .map(d -> EntityFactory.createDocument(client, d, -1, InputPeerEmpty.instance()))
-                .or(() -> Optional.ofNullable(TlEntityUtil.unmapEmpty(data.descriptionPhoto(), BasePhoto.class))
-                        .map(e -> new Photo(client, e, InputPeerEmpty.instance(), -1)));
+        return Optional.ofNullable(unmapEmpty(data.descriptionDocument(), BaseDocument.class))
+                .map(d -> EntityFactory.createDocument(client, d,
+                        Context.createBotInfoContext(peer.asPeer(), getBotId().asLong())))
+                .or(() -> Optional.ofNullable(unmapEmpty(data.descriptionPhoto(), BasePhoto.class))
+                        .map(e -> new Photo(client, e, Context.createBotInfoContext(peer.asPeer(),
+                                getBotId().asLong()))));
     }
 
     // TODO:

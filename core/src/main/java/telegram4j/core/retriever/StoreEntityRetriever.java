@@ -169,7 +169,7 @@ public class StoreEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+    public Mono<AuxiliaryMessages> getMessages(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
         return Mono.defer(() -> {
             if (chatId == null || chatId.getType() != Id.Type.CHANNEL) {
                 return storeLayout.getMessages(messageIds);

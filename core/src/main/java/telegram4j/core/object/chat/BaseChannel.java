@@ -18,6 +18,7 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
 import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.BaseChannelParticipants;
@@ -30,6 +31,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static telegram4j.mtproto.util.TlEntityUtil.photoInputPeer;
 
 abstract class BaseChannel extends BaseChat implements Channel {
 
@@ -91,20 +94,20 @@ abstract class BaseChannel extends BaseChat implements Channel {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(ChannelFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
+                        .getMessages(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ProfilePhoto(client, d, TlEntityUtil.photoInputPeer(minData), -1));
+                .map(d -> new ProfilePhoto(client, d, photoInputPeer(minData)));
     }
 
     @Override
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, -1, TlEntityUtil.photoInputPeer(minData)));
+                .map(d -> new Photo(client, d, Context.createChatPhotoContext(photoInputPeer(minData), -1)));
     }
 
     @Override
@@ -163,7 +166,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Mono<AuxiliaryMessages> getAvailableMinMessage(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getAvailableMinId())
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
+                        .getMessages(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override

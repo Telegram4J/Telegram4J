@@ -122,5 +122,5 @@ public interface EntityRetriever {
      * @return A {@link Mono} emitting on successful completion
      * the {@link AuxiliaryMessages} with resolved messages and auxiliary data.
      */
-    Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds);
+    Mono<AuxiliaryMessages> getMessages(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds);
 }

@@ -40,7 +40,7 @@ public class MTProtoRetrySpec extends Retry {
                     rpcExc.getError().errorMessage().startsWith("FLOOD_WAIT_")) {
                 String arg = rpcExc.getError().errorMessage().substring(
                         rpcExc.getError().errorMessage().lastIndexOf('_') + 1);
-                Duration delay = Duration.ofSeconds(Long.parseLong(arg));
+                Duration delay = Duration.ofSeconds(Integer.parseInt(arg));
                 return Mono.delay(delay);
             }
             return Mono.error(currentFailure);

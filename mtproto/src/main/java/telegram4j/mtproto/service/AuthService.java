@@ -2,7 +2,6 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.CodeSettings;

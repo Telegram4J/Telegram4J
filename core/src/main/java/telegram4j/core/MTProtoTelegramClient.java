@@ -10,14 +10,17 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.Document;
-import telegram4j.core.object.PeerEntity;
+import telegram4j.core.object.MessageAction;
+import telegram4j.core.object.MessageMedia;
 import telegram4j.core.object.User;
-import telegram4j.core.object.chat.AdminRight;
+import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.object.chat.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
@@ -25,16 +28,12 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoOptions;
-import telegram4j.mtproto.file.FilePart;
-import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.file.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
-import telegram4j.tl.messages.BaseMessages;
-import telegram4j.tl.messages.ChannelMessages;
-import telegram4j.tl.messages.Messages;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -310,65 +309,101 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      *
      * @apiNote File ref ids with type {@link FileReferenceId.Type#STICKER_SET_THUMB} don't require refreshing.
      *
-     * @param fileReferenceId The {@link FileReferenceId}.
+     * @param fileRefId The {@link FileReferenceId}.
      * @return A {@link Mono} that emitting on successful completion refreshed {@link FileReferenceId}.
      */
-    public Mono<FileReferenceId> refresh(FileReferenceId fileReferenceId) {
+    public Mono<FileReferenceId> refresh(FileReferenceId fileRefId) {
         return Mono.defer(() -> {
-            switch (fileReferenceId.getFileType()) {
+            switch (fileRefId.getFileType()) {
                 case CHAT_PHOTO: {
-                    InputPeer peer = fileReferenceId.getPeer().orElseThrow();
-                    switch (peer.identifier()) {
-                        case InputPeerChannel.ID:
-                        case InputPeerChannelFromMessage.ID:
-                            InputChannel channel = TlEntityUtil.toInputChannel(peer);
-                            return serviceHolder.getChatService()
-                                    .getMessages(channel, List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
-                                    .ofType(ChannelMessages.class)
-                                    .flatMap(b -> findMessageAction(b, fileReferenceId));
-                        case InputPeerChat.ID:
-                            return serviceHolder.getChatService()
-                                    .getMessages(List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
-                                    .ofType(BaseMessages.class)
-                                    .flatMap(b -> findMessageAction(b, fileReferenceId));
-                        case InputPeerSelf.ID:
-                        case InputPeerUser.ID:
-                        case InputPeerUserFromMessage.ID:
-                            return serviceHolder.getUserService()
-                                    .getUserPhotos(TlEntityUtil.toInputUser(peer),
-                                            0, -fileReferenceId.getDocumentId(), 1)
-                                    .map(p -> p.photos().get(0))
-                                    .ofType(BasePhoto.class)
-                                    .map(p -> FileReferenceId.ofChatPhoto(p, -1, peer));
-                        default:
-                            return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
-                    }
+                    var chatCtx = (ProfilePhotoContext) fileRefId.getContext();
+
+                    Id peerId = Id.of(chatCtx.getPeer(), getSelfId());
+                    return asInputPeer(peerId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                            .flatMap(peer -> {
+                                switch (peerId.getType()) {
+                                    case USER:
+                                        return serviceHolder.getUserService()
+                                                .getUserPhotos(TlEntityUtil.toInputUser(peer),
+                                                        0, -fileRefId.getDocumentId(), 1)
+                                                .mapNotNull(p -> p.photos().isEmpty() ? null : p.photos().get(0))
+                                                .ofType(BasePhoto.class)
+                                                .map(p -> FileReferenceId.ofChatPhoto(p,
+                                                        Context.createUserPhotoContext(peer)));
+                                    case CHANNEL:
+                                    case CHAT:
+                                        var messageChatCtx = (ChatPhotoContext) chatCtx;
+
+                                        var msgId = messageChatCtx.getMessageId()
+                                                .map(i -> List.of(ImmutableInputMessageID.of(i)))
+                                                .orElse(null);
+
+                                        // TODO: check this
+                                        if (msgId == null) { // e.g. from GroupChat#getPhoto()
+                                            return Mono.just(fileRefId.withContext(
+                                                    Context.createChatPhotoContext(peer, -1)));
+                                        }
+
+                                        return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                                                .getMessages(Id.of(peer, getSelfId()), msgId)
+                                                .flatMap(c -> findChatPhoto(c, peer, messageChatCtx.getMessageId().orElseThrow()));
+                                    default: return Mono.error(new IllegalStateException());
+                                }
+                            });
                 }
                 case WEB_DOCUMENT:
                 case DOCUMENT:
-                case PHOTO: // message id must be present
-                    InputPeer peer = fileReferenceId.getPeer().orElseThrow();
-                    switch (peer.identifier()) {
-                        case InputPeerChannel.ID:
-                        case InputPeerChannelFromMessage.ID:
-                            InputChannel channel = TlEntityUtil.toInputChannel(peer);
-                            return serviceHolder.getChatService()
-                                    .getMessages(channel, List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
-                                    .ofType(ChannelMessages.class)
-                                    .flatMap(b -> findMessageMedia(b, fileReferenceId));
-                        case InputPeerSelf.ID:
-                        case InputPeerUser.ID:
-                        case InputPeerUserFromMessage.ID:
-                        case InputPeerChat.ID:
-                            return serviceHolder.getChatService()
-                                    .getMessages(List.of(ImmutableInputMessageID.of(fileReferenceId.getMessageId())))
-                                    .ofType(BaseMessages.class)
-                                    .flatMap(b -> findMessageMedia(b, fileReferenceId));
-                        default:
-                            return Mono.error(new IllegalArgumentException("Unknown input peer type: " + peer));
+                    var docType = fileRefId.getDocumentType().orElseThrow();
+                    if (docType == FileReferenceId.DocumentType.STICKER) {
+                        return getCustomEmoji(fileRefId.getDocumentId())
+                                .map(Sticker::getFileReferenceId);
                     }
-                    // No need refresh
-                case STICKER_SET_THUMB: return Mono.just(fileReferenceId);
+
+                case PHOTO: // message id must be present
+                    switch (fileRefId.getContext().getType()) {
+                        case MESSAGE_MEDIA: {
+                            var ctx = (MessageMediaContext) fileRefId.getContext();
+                            Id chatPeer = Id.of(ctx.getChatPeer());
+                            return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                                    .getMessages(chatPeer, List.of(ImmutableInputMessageID.of(ctx.getMessageId())))
+                                    .flatMap(b -> findMessageMedia(b, ctx));
+                        }
+                        case BOT_INFO:
+                            var ctx = (BotInfoContext) fileRefId.getContext();
+                            Id chatPeer = Id.of(ctx.getChatPeer());
+                            switch (chatPeer.getType()) {
+                                case CHANNEL:
+                                case CHAT:
+                                    Id botId = Id.ofUser(ctx.getBotId(), null);
+                                    return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                                            .getChatFullById(chatPeer)
+                                            .map(c -> {
+                                                if (c instanceof SupergroupChat) { // TODO: common interface
+                                                    var sg = (SupergroupChat) c;
+                                                    return sg.getBotInfo();
+                                                }
+                                                return ((GroupChat) c).getBotInfo();
+                                            })
+                                            .flatMap(u -> Mono.justOrEmpty(u.flatMap(list -> list.stream()
+                                                    .filter(b -> botId.equals(b.getBotId()))
+                                                    .findFirst())))
+                                            .flatMap(b -> Mono.justOrEmpty(b.getDescriptionDocument()))
+                                            .map(Document::getFileReferenceId);
+                                case USER:
+                                    return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                                            .getUserFullById(chatPeer)
+                                            .flatMap(u -> Mono.justOrEmpty(u.getBotInfo()))
+                                            .flatMap(b -> Mono.justOrEmpty(b.getDescriptionDocument()))
+                                            .map(Document::getFileReferenceId);
+                                default: return Mono.error(new IllegalStateException());
+                            }
+                        case PROFILE_PHOTO:
+                        case CHAT_PHOTO:
+                            return Mono.error(new IllegalStateException()); // handled above
+                    }
+                // No need refresh
+                case STICKER_SET_THUMB: return Mono.just(fileRefId);
                 default: return Mono.error(new IllegalStateException());
             }
         });
@@ -588,6 +623,20 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Id.ofUser(777000, 0L);
     }
 
+    public Mono<Sticker> getCustomEmoji(long id) {
+        return serviceHolder.getChatService().getCustomEmojiDocuments(List.of(id))
+                .mapNotNull(d -> d.isEmpty() ? null : d.get(0))
+                .ofType(BaseDocument.class)
+                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
+    }
+
+    public Flux<Sticker> getCustomEmojis(Iterable<Long> ids) {
+        return serviceHolder.getChatService().getCustomEmojiDocuments(ids)
+                .flatMapIterable(Function.identity())
+                .ofType(BaseDocument.class)
+                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
+    }
+
     // EntityRetriever methods
     // ===========================
 
@@ -637,63 +686,46 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
-        return entityRetriever.getMessagesById(chatId, messageIds);
+    public Mono<AuxiliaryMessages> getMessages(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return entityRetriever.getMessages(chatId, messageIds);
     }
 
     // Internal methods
     // ===========================
 
-    private Mono<FileReferenceId> findMessageAction(Messages messages, FileReferenceId orig) {
-        var list = messages.identifier() == BaseMessages.ID
-                ? ((BaseMessages) messages).messages()
-                : ((ChannelMessages) messages).messages();
-
-        var service = list.stream()
-                .filter(m -> m.id() == orig.getMessageId() &&
-                        m.identifier() == MessageService.ID)
-                .map(m -> (MessageService) m)
-                .findFirst()
-                .orElseThrow();
-
-        if (service.action().identifier() == MessageActionChatEditPhoto.ID) {
-            MessageActionChatEditPhoto a = (MessageActionChatEditPhoto) service.action();
-            return Mono.justOrEmpty(TlEntityUtil.unmapEmpty(a.photo(), BasePhoto.class))
-                    .map(p -> FileReferenceId.ofChatPhoto(p, orig.getMessageId(), orig.getPeer().orElseThrow()));
-        }
-        return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + service.action()));
+    private Mono<FileReferenceId> findChatPhoto(AuxiliaryMessages messages, InputPeer resolvedPeer, int messageId) {
+        return Mono.justOrEmpty(messages.getMessages().stream()
+                        .filter(msg -> msg.getId() == messageId)
+                        .findFirst())
+                .flatMap(msg -> Mono.justOrEmpty(msg.getAction()))
+                .flatMap(action -> {
+                    if (action instanceof MessageAction.UpdateChatPhoto) {
+                        var cast = (MessageAction.UpdateChatPhoto) action;
+                        return Mono.justOrEmpty(cast.getCurrentPhoto());
+                    } else {
+                        return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + action));
+                    }
+                })
+                .map(Document::getFileReferenceId)
+                .map(f -> f.withContext(Context.createChatPhotoContext(resolvedPeer, messageId)));
     }
 
-    private Mono<FileReferenceId> findMessageMedia(Messages messages, FileReferenceId orig) {
-        var list = messages.identifier() == BaseMessages.ID
-                ? ((BaseMessages) messages).messages()
-                : ((ChannelMessages) messages).messages();
-        var message = list.stream()
-                .filter(m -> m.id() == orig.getMessageId() &&
-                        m.identifier() != MessageEmpty.ID)
-                .map(m -> (BaseMessage) m)
-                .findFirst()
-                .orElseThrow();
-
-        var media = message.media();
-        if (media == null) {
-            return Mono.empty();
-        }
-
-        switch (media.identifier()) {
-            case MessageMediaDocument.ID:
-                return Mono.justOrEmpty(((MessageMediaDocument) media).document())
-                        .ofType(BaseDocument.class)
-                        .map(d -> FileReferenceId.ofDocument(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
-            case MessageMediaPhoto.ID:
-                return Mono.justOrEmpty(((MessageMediaPhoto) media).photo())
-                        .ofType(BasePhoto.class)
-                        .map(d -> FileReferenceId.ofPhoto(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
-            case MessageMediaInvoice.ID:
-                return Mono.justOrEmpty(((MessageMediaInvoice) media).photo())
-                        .map(d -> FileReferenceId.ofDocument(d, orig.getMessageId(), orig.getPeer().orElseThrow()));
-            default:
-                return Mono.error(new IllegalStateException("Unexpected MessageMedia type: " + media));
-        }
+    private Mono<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, MessageMediaContext context) {
+        return Mono.justOrEmpty(messages.getMessages().stream()
+                .filter(msg -> msg.getId() == context.getMessageId())
+                .findFirst())
+                .flatMap(msg -> Mono.justOrEmpty(msg.getMedia()))
+                .flatMap(media -> {
+                    if (media instanceof MessageMedia.Document) {
+                        var cast = (MessageMedia.Document) media;
+                        return Mono.justOrEmpty(cast.getDocument());
+                    } else if (media instanceof MessageMedia.Invoice) {
+                        var cast = (MessageMedia.Invoice) media;
+                        return Mono.justOrEmpty(cast.getPhoto());
+                    } else {
+                        return Mono.error(new IllegalStateException("Unexpected MessageMedia type: " + media));
+                    }
+                })
+                .map(Document::getFileReferenceId);
     }
 }

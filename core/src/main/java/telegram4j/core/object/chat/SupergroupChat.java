@@ -68,7 +68,7 @@ public final class SupergroupChat extends BaseChannel {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::botInfo)
                 .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d))
+                        .map(d -> new BotInfo(client, d, getId()))
                         .collect(Collectors.toList()));
     }
 
@@ -133,7 +133,7 @@ public final class SupergroupChat extends BaseChannel {
     public Mono<AuxiliaryMessages> getMigratedFromMaxMessage(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getMigratedFromMaxId())
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getMigratedFromChatId().orElseThrow(),
+                        .getMessages(getMigratedFromChatId().orElseThrow(),
                                 List.of(ImmutableInputMessageID.of(id))));
     }
 

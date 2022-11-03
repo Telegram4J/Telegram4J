@@ -64,7 +64,7 @@ public class MessageReplyHeader implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link AuxiliaryMessages message container}.
      */
     public Mono<AuxiliaryMessages> getMessage(EntityRetrievalStrategy strategy) {
-        return client.withRetrievalStrategy(strategy).getMessagesById(chatId,
+        return client.withRetrievalStrategy(strategy).getMessages(chatId,
                 List.of(ImmutableInputMessageID.of(data.replyToMsgId())));
     }
 

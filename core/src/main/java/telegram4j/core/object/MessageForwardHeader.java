@@ -123,7 +123,7 @@ public class MessageForwardHeader implements TelegramObject {
                 .map(id -> List.of(ImmutableInputMessageID.of(id)))
                 .zipWith(Mono.justOrEmpty(getFromId()))
                 .flatMap(TupleUtils.function((messageId, channelId) -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(channelId, messageId)));
+                        .getMessages(channelId, messageId)));
     }
 
     /**
@@ -174,7 +174,7 @@ public class MessageForwardHeader implements TelegramObject {
         return Mono.justOrEmpty(data.savedFromMsgId())
                 .map(id -> List.of(ImmutableInputMessageID.of(id)))
                 .flatMap(messageId -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getSavedFromPeerId().orElseThrow(), messageId));
+                        .getMessages(getSavedFromPeerId().orElseThrow(), messageId));
     }
 
     // TODO: docs

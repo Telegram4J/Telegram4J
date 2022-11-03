@@ -6,6 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.core.object.media.VideoSize;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
@@ -39,14 +40,14 @@ public class Document implements TelegramObject {
     }
 
     public Document(MTProtoTelegramClient client, BaseDocumentFields data,
-                    @Nullable String fileName, int messageId, InputPeer peer) {
+                    @Nullable String fileName, Context context) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
         this.fileName = fileName;
 
-        this.fileReferenceId = data.identifier() == BaseDocument.ID
-                ? FileReferenceId.ofDocument((BaseDocument) data, messageId, peer)
-                : FileReferenceId.ofDocument((WebDocument) data, messageId, peer);
+        this.fileReferenceId = data instanceof BaseDocument
+                ? FileReferenceId.ofDocument((BaseDocument) data, context)
+                : FileReferenceId.ofDocument((WebDocument) data, context);
     }
 
     @Override

@@ -126,6 +126,11 @@ public class StickerSet implements TelegramObject {
         return data.shortName();
     }
 
+    /**
+     * Gets mutable list of sticker set thumbnails, if present.
+     *
+     * @return The mutable list of sticker set thumbnails, if present.
+     */
     public Optional<List<PhotoSize>> getThumbs() {
         return Optional.ofNullable(data.thumbs())
                 .map(l -> l.stream()
@@ -133,14 +138,29 @@ public class StickerSet implements TelegramObject {
                         .collect(Collectors.toList()));
     }
 
+    /**
+     * Gets id of datacenter which store thumbnail for this sticker set, if present.
+     *
+     * @return The id of datacenter which store thumbnail for this sticker set, if present.
+     */
     public Optional<Integer> getThumbDcId() {
         return Optional.ofNullable(data.thumbDcId());
     }
 
+    /**
+     * Gets version of thumbnail for this sticker set, if present.
+     *
+     * @return The version of thumbnail for this sticker set, if present.
+     */
     public Optional<Integer> getThumbVersion() {
         return Optional.ofNullable(data.thumbVersion());
     }
 
+    /**
+     * Gets id of {@link Sticker custom emoji} which used as sticker set thumbnail, if present.
+     *
+     * @return The id of {@link Sticker custom emoji} which used as sticker set thumbnail, if present.
+     */
     public Optional<Long> getThumbDocumentId() {
         return Optional.ofNullable(data.thumbDocumentId());
     }

@@ -6,6 +6,7 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
@@ -125,14 +126,12 @@ public class MessageMedia implements TelegramObject {
     public static class Document extends MessageMedia {
 
         private final telegram4j.tl.MessageMedia data; // MessageMediaDocument/MessageMediaPhoto
-        private final int messageId;
-        private final InputPeer peer;
+        private final Context context;
 
-        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data, int messageId, InputPeer peer) {
+        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data, Context context) {
             super(client, Type.DOCUMENT);
             this.data = Objects.requireNonNull(data);
-            this.messageId = messageId;
-            this.peer = Objects.requireNonNull(peer);
+            this.context = Objects.requireNonNull(context);
         }
 
         public boolean isNoPremium() {
@@ -148,10 +147,10 @@ public class MessageMedia implements TelegramObject {
             switch (data.identifier()) {
                 case MessageMediaDocument.ID:
                     return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaDocument) data).document(), BaseDocument.class))
-                            .map(d -> EntityFactory.createDocument(client, d, messageId, peer));
+                            .map(d -> EntityFactory.createDocument(client, d, context));
                 case MessageMediaPhoto.ID:
                     return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaPhoto) data).photo(), BasePhoto.class))
-                            .map(d -> new telegram4j.core.object.Photo(client, d, peer, messageId));
+                            .map(d -> new telegram4j.core.object.Photo(client, d, context));
                 default: throw new IllegalStateException();
             }
         }
@@ -249,18 +248,16 @@ public class MessageMedia implements TelegramObject {
     public static class Game extends MessageMedia {
 
         private final MessageMediaGame data;
-        private final int messageId;
-        private final InputPeer peer;
+        private final Context context;
 
-        public Game(MTProtoTelegramClient client, MessageMediaGame data, int messageId, InputPeer peer) {
+        public Game(MTProtoTelegramClient client, MessageMediaGame data, Context context) {
             super(client, Type.GAME);
             this.data = Objects.requireNonNull(data);
-            this.messageId = messageId;
-            this.peer = Objects.requireNonNull(peer);
+            this.context = Objects.requireNonNull(context);
         }
 
         public telegram4j.core.object.media.Game getGame() {
-            return new telegram4j.core.object.media.Game(client, data.game(), messageId, peer);
+            return new telegram4j.core.object.media.Game(client, data.game(), context);
         }
 
         @Override
@@ -418,13 +415,11 @@ public class MessageMedia implements TelegramObject {
     public static class Poll extends MessageMedia {
 
         private final MessageMediaPoll data;
-        private final int messageId;
-        private final InputPeer peer;
+        private final Id peer;
 
-        public Poll(MTProtoTelegramClient client, MessageMediaPoll data, int messageId, InputPeer peer) {
+        public Poll(MTProtoTelegramClient client, MessageMediaPoll data, Id peer) {
             super(client, Type.POLL);
             this.data = Objects.requireNonNull(data);
-            this.messageId = messageId;
             this.peer = Objects.requireNonNull(peer);
         }
 
@@ -434,7 +429,7 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link telegram4j.core.object.media.Poll} object.
          */
         public telegram4j.core.object.media.Poll getPoll() {
-            return new telegram4j.core.object.media.Poll(data.poll());
+            return new telegram4j.core.object.media.Poll(client, data.poll(), peer);
         }
 
         /**
@@ -443,7 +438,7 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link PollResults} object.
          */
         public PollResults getResults() {
-            return new PollResults(client, data.results(), messageId, peer);
+            return new PollResults(client, data.results());
         }
 
         @Override
@@ -470,14 +465,12 @@ public class MessageMedia implements TelegramObject {
     public static class Invoice extends MessageMedia {
 
         private final MessageMediaInvoice data;
-        private final int messageId;
-        private final InputPeer peer;
+        private final Context context;
 
-        public Invoice(MTProtoTelegramClient client, MessageMediaInvoice data, int messageId, InputPeer peer) {
+        public Invoice(MTProtoTelegramClient client, MessageMediaInvoice data, Context context) {
             super(client, Type.INVOICE);
             this.data = Objects.requireNonNull(data);
-            this.messageId = messageId;
-            this.peer = Objects.requireNonNull(peer);
+            this.context = Objects.requireNonNull(context);
         }
 
         public boolean isShippingAddressRequested() {
@@ -498,7 +491,7 @@ public class MessageMedia implements TelegramObject {
 
         public Optional<telegram4j.core.object.Document> getPhoto() {
             return Optional.ofNullable(data.photo())
-                    .map(d -> EntityFactory.createDocument(client, (BaseDocumentFields) d, messageId, peer));
+                    .map(d -> EntityFactory.createDocument(client, (BaseDocumentFields) d, context));
         }
 
         public Optional<Integer> getReceiptMessageId() {

@@ -227,6 +227,15 @@ public interface StoreLayout {
      */
     Flux<ResolvedChatParticipant> getChatParticipants(long chatId);
 
+    /**
+     * Retrieve message poll by specified id.
+     *
+     * @param pollId The {@link Poll#id() id} of poll.
+     * @return A {@link Mono} emitting on successful completion
+     * the original {@link MessagePoll poll}.
+     */
+    Mono<MessagePoll> getPollById(long pollId);
+
     // endregion
     // region updates
 
@@ -280,6 +289,8 @@ public interface StoreLayout {
      * @return A {@link Mono} completing the operation is done.
      */
     Mono<Void> updateChannelPts(long channelId, int pts);
+
+    Mono<Void> registerPoll(Peer peerId, int messageId, InputMediaPoll poll);
 
     // endregion
     // region requests hooks

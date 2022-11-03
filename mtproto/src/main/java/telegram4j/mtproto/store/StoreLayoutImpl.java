@@ -38,6 +38,7 @@ public class StoreLayoutImpl implements StoreLayout {
     private final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, MessagePoll> polls = new ConcurrentHashMap<>();
     // TODO: make weak or limit by size?
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
@@ -290,6 +291,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<MessagePoll> getPollById(long pollId) {
+        return Mono.fromSupplier(() -> polls.get(pollId));
+    }
+
+    @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authKeys.get(dc));
     }
@@ -506,6 +512,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> updateChannelPts(long channelId, int pts) {
         return Mono.fromRunnable(() -> channels.computeIfPresent(channelId, (k, v) -> v.withFull(m -> m.withPts(pts))));
+    }
+
+    @Override
+    public Mono<Void> registerPoll(Peer peerId, int messageId, InputMediaPoll poll) {
+        return Mono.fromRunnable(() -> polls.put(poll.poll().id(), new MessagePoll(poll, peerId, messageId)));
     }
 
     @Override
@@ -891,6 +902,19 @@ public class StoreLayoutImpl implements StoreLayout {
         Peer p = copy.fromId();
         if (p != null) {
             savePeer(p, copy);
+        }
+
+        if (copy instanceof BaseMessage) {
+            var base = (BaseMessage) copy;
+            var media = base.media();
+            if (media != null) {
+                switch (media.identifier()) {
+                    case MessageMediaPoll.ID:
+                        var mmp = (MessageMediaPoll) media;
+                        polls.put(mmp.poll().id(), new MessagePoll(mmp.poll(), copy.peerId(), copy.id()));
+                        break;
+                }
+            }
         }
     }
 

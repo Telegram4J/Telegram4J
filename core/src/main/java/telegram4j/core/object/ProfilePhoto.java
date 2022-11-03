@@ -24,12 +24,12 @@ public class ProfilePhoto implements TelegramObject {
     private final FileReferenceId smallFileReferenceId;
     private final FileReferenceId bigFileReferenceId;
 
-    public ProfilePhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer peer, int messageId) {
+    public ProfilePhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer context) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
 
-        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, messageId, peer);
-        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, messageId, peer);
+        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, context);
+        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, context);
     }
 
     @Override

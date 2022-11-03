@@ -12,7 +12,7 @@ import java.util.Optional;
  *
  * @see <a href="https://core.telegram.org/api/files#animated-profile-pictures">Animated Profile Pictures</a>
  */
-public class VideoSize implements TelegramObject {
+public final class VideoSize implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.VideoSize data;

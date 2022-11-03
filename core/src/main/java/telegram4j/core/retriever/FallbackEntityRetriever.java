@@ -79,8 +79,8 @@ public class FallbackEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
-        return first.getMessagesById(chatId, messageIds)
-                .switchIfEmpty(second.getMessagesById(chatId, messageIds));
+    public Mono<AuxiliaryMessages> getMessages(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return first.getMessages(chatId, messageIds)
+                .switchIfEmpty(second.getMessages(chatId, messageIds));
     }
 }

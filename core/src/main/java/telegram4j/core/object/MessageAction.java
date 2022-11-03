@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.file.ChatPhotoContext;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
@@ -364,33 +365,29 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class ChatEditPhoto extends MessageAction {
+    public static class UpdateChatPhoto extends MessageAction {
 
         @Nullable
         private final MessageActionChatEditPhoto data;
-        private final InputPeer peer;
-        private final int messageId;
+        private final ChatPhotoContext context;
 
-        public ChatEditPhoto(MTProtoTelegramClient client) {
+        public UpdateChatPhoto(MTProtoTelegramClient client) {
             super(client, Type.DELETE_CHAT_PHOTO);
-
             this.data = null;
-            this.peer = InputPeerEmpty.instance();
-            this.messageId = -1;
+            this.context = null;
         }
 
-        public ChatEditPhoto(MTProtoTelegramClient client, MessageActionChatEditPhoto data,
-                             InputPeer peer, int messageId) {
+        public UpdateChatPhoto(MTProtoTelegramClient client, MessageActionChatEditPhoto data,
+                               ChatPhotoContext context) {
             super(client, Type.EDIT_CHAT_PHOTO);
             this.data = Objects.requireNonNull(data);
-            this.peer = Objects.requireNonNull(peer);
-            this.messageId = messageId;
+            this.context = Objects.requireNonNull(context);
         }
 
         public Optional<Photo> getCurrentPhoto() {
             return Optional.ofNullable(data)
                     .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BasePhoto.class))
-                    .map(d -> new Photo(client, d, messageId, peer));
+                    .map(d -> new Photo(client, d, Objects.requireNonNull(context)));
         }
 
         @Override
@@ -398,7 +395,7 @@ public class MessageAction implements TelegramObject {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             if (!super.equals(o)) return false;
-            ChatEditPhoto that = (ChatEditPhoto) o;
+            UpdateChatPhoto that = (UpdateChatPhoto) o;
             return Objects.equals(data, that.data);
         }
 

@@ -1,4 +1,6 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.service;
+
+import telegram4j.mtproto.RpcException;
 
 import java.lang.annotation.*;
 

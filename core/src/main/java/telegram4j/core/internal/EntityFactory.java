@@ -28,6 +28,7 @@ import telegram4j.core.spec.inline.*;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;
 import telegram4j.core.util.parser.EntityParserSupport;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -242,7 +243,7 @@ public class EntityFactory {
     }
 
     public static MessageAction createMessageAction(MTProtoTelegramClient client, telegram4j.tl.MessageAction data,
-                                                    InputPeer peer, int messageId) {
+                                                    Id peer, int messageId) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageActionBotAllowed.ID:
                 return new MessageAction.BotAllowed(client, (telegram4j.tl.MessageActionBotAllowed) data);
@@ -256,9 +257,10 @@ public class EntityFactory {
                 return new MessageAction.ChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
             case telegram4j.tl.MessageActionChatDeleteUser.ID:
                 return new MessageAction.ChatDeleteUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
-            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageAction.ChatEditPhoto(client);
+            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageAction.UpdateChatPhoto(client);
             case telegram4j.tl.MessageActionChatEditPhoto.ID:
-                return new MessageAction.ChatEditPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data, peer, messageId);
+                return new MessageAction.UpdateChatPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data,
+                        Context.createChatPhotoContext(client.asResolvedInputPeer(peer), messageId));
             case telegram4j.tl.MessageActionChatEditTitle.ID:
                 return new MessageAction.ChatEditTitle(client, (telegram4j.tl.MessageActionChatEditTitle) data);
             case telegram4j.tl.MessageActionChatJoinedByLink.ID:
@@ -307,7 +309,7 @@ public class EntityFactory {
     }
 
     public static MessageMedia createMessageMedia(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data,
-                                                  int messageId, InputPeer peer) {
+                                                  int messageId, Id peer) {
         switch (data.identifier()) {
             case telegram4j.tl.MessageMediaGeo.ID:
                 return new MessageMedia.Geo(client, (telegram4j.tl.MessageMediaGeo) data);
@@ -317,19 +319,21 @@ public class EntityFactory {
                 return new MessageMedia(client, MessageMedia.Type.UNSUPPORTED);
             case telegram4j.tl.MessageMediaPhoto.ID:
             case telegram4j.tl.MessageMediaDocument.ID:
-                return new MessageMedia.Document(client, data, messageId, peer);
+                return new MessageMedia.Document(client, data, Context.createMediaContext(peer.asPeer(), messageId));
             case telegram4j.tl.MessageMediaWebPage.ID:
                 return new MessageMedia.WebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
             case telegram4j.tl.MessageMediaVenue.ID:
                 return new MessageMedia.Venue(client, (telegram4j.tl.MessageMediaVenue) data);
             case telegram4j.tl.MessageMediaGame.ID:
-                return new MessageMedia.Game(client, (telegram4j.tl.MessageMediaGame) data, messageId, peer);
+                return new MessageMedia.Game(client, (telegram4j.tl.MessageMediaGame) data,
+                        Context.createMediaContext(peer.asPeer(), messageId));
             case telegram4j.tl.MessageMediaInvoice.ID:
-                return new MessageMedia.Invoice(client, (telegram4j.tl.MessageMediaInvoice) data, messageId, peer);
+                return new MessageMedia.Invoice(client, (telegram4j.tl.MessageMediaInvoice) data,
+                        Context.createMediaContext(peer.asPeer(), messageId));
             case telegram4j.tl.MessageMediaGeoLive.ID:
                 return new MessageMedia.GeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
             case telegram4j.tl.MessageMediaPoll.ID:
-                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data, messageId, peer);
+                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data, peer);
             case telegram4j.tl.MessageMediaDice.ID:
                 return new MessageMedia.Dice(client, (telegram4j.tl.MessageMediaDice) data);
             default:
@@ -349,7 +353,7 @@ public class EntityFactory {
     }
 
     public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocumentFields data,
-                                          int messageId, InputPeer peer) {
+                                          Context context) {
         boolean animated = false;
         boolean hasStickers = false;
         telegram4j.tl.DocumentAttributeVideo videoData = null;
@@ -390,25 +394,22 @@ public class EntityFactory {
         }
 
         if (stickerData != null || emojiData != null) {
-            return new Sticker(client, data, fileName, messageId, peer,
+            return new Sticker(client, data, fileName, context,
                     Variant2.of(stickerData, emojiData), Variant2.of(sizeData, videoData));
         }
 
         if (audioData != null) {
-            return new Audio(client, data, fileName, messageId, peer, audioData);
+            return new Audio(client, data, fileName, context, audioData);
         }
 
         if (videoData != null) {
-            return new Video(client, data, fileName, messageId, peer,
-                    videoData, hasStickers, animated);
+            return new Video(client, data, fileName, context, videoData, hasStickers, animated);
         }
 
         if (sizeData != null) {
-            return new Photo(client, data, fileName,
-                    messageId, peer, sizeData);
+            return new Photo(client, data, fileName, context, sizeData);
         }
-
-        return new Document(client, data, fileName, messageId, peer);
+        return new Document(client, data, fileName, context);
     }
 
     public static Mono<InputBotInlineResult> createInlineResult(MTProtoTelegramClient client, InlineResultSpec spec) {

@@ -252,8 +252,7 @@ public final class Message implements TelegramObject {
     public Optional<MessageMedia> getMedia() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::media)
-                .map(d -> EntityFactory.createMessageMedia(client, d,
-                        getId(), client.asResolvedInputPeer(resolvedChatId)));
+                .map(d -> EntityFactory.createMessageMedia(client, d, getId(), resolvedChatId));
     }
 
     /**
@@ -275,12 +274,9 @@ public final class Message implements TelegramObject {
     public List<MessageEntity> getEntities() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::entities)
-                .map(list -> {
-                    var peer = client.asResolvedInputPeer(resolvedChatId);
-                    return list.stream()
-                            .map(e -> new MessageEntity(client, e, baseData.message(), getId(), peer))
-                            .collect(Collectors.toList());
-                })
+                .map(list -> list.stream()
+                        .map(e -> new MessageEntity(client, e, baseData.message()))
+                        .collect(Collectors.toList()))
                 .orElse(List.of());
     }
 
@@ -375,9 +371,7 @@ public final class Message implements TelegramObject {
     public Optional<MessageAction> getAction() {
         return Optional.ofNullable(serviceData)
                 .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
-                .map(e -> EntityFactory.createMessageAction(client, e,
-                        // TODO: possible bug, access_hash can be absent
-                        client.asResolvedInputPeer(resolvedChatId), getId()));
+                .map(e -> EntityFactory.createMessageAction(client, e, resolvedChatId, getId()));
     }
 
     // Interaction methods
@@ -401,17 +395,19 @@ public final class Message implements TelegramObject {
             var media = Mono.justOrEmpty(spec.media())
                     .flatMap(r -> r.asData(client));
 
-            var chatId = Id.of(peer, client.getSelfId());
+            Id chatId = Id.of(peer, client.getSelfId());
+
+            Integer scheduleDate = spec.scheduleTimestamp()
+                    .map(Instant::getEpochSecond)
+                    .map(Math::toIntExact)
+                    .orElse(null);
 
             return parsed.map(function((txt, ent) -> EditMessage.builder()
                             .message(txt.isEmpty() ? null : txt)
                             .entities(ent.isEmpty() ? null : ent)
                             .noWebpage(spec.noWebpage())
                             .id(getId())
-                            .scheduleDate(spec.scheduleTimestamp()
-                                    .map(Instant::getEpochSecond)
-                                    .map(Math::toIntExact)
-                                    .orElse(null))
+                            .scheduleDate(scheduleDate)
                             .peer(peer)))
                     .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                             .then(media.doOnNext(builder::media))
@@ -421,7 +417,7 @@ public final class Message implements TelegramObject {
                     .map(e -> EntityFactory.createMessage(client, e, chatId))
                     // maybe we edited the poll, so we need to request a fresh message
                     .switchIfEmpty(client.withRetrievalStrategy(EntityRetrievalStrategy.RPC)
-                            .getMessagesById(chatId, List.of(ImmutableInputMessageID.of(getId())))
+                            .getMessages(chatId, List.of(ImmutableInputMessageID.of(getId())))
                             .map(c -> c.getMessages().get(0)));
         });
     }

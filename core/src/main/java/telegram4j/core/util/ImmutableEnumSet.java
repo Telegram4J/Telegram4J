@@ -1,6 +1,9 @@
 package telegram4j.core.util;
 
+import telegram4j.tl.api.TlEncodingUtil;
+
 import java.util.*;
+import java.util.function.IntBinaryOperator;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;
 
@@ -56,19 +59,31 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
     }
 
     public ImmutableEnumSet<E> and(ImmutableEnumSet<E> other) {
-        return new ImmutableEnumSet<>(elementType, other.value & value);
+        return with(other, (a, b) -> a & b);
     }
 
     public ImmutableEnumSet<E> andNot(ImmutableEnumSet<E> other) {
-        return new ImmutableEnumSet<>(elementType, ~other.value & value);
+        return with(other, (a, b) -> a & ~b);
     }
 
     public ImmutableEnumSet<E> or(ImmutableEnumSet<E> other) {
-        return new ImmutableEnumSet<>(elementType, other.value | value);
+        return with(other, (a, b) -> a | b);
     }
 
     public ImmutableEnumSet<E> xor(ImmutableEnumSet<E> other) {
-        return new ImmutableEnumSet<>(elementType, other.value ^ value);
+        return with(other, (a, b) -> a ^ b);
+    }
+
+    public ImmutableEnumSet<E> set(E flag, boolean state) {
+        int value = TlEncodingUtil.mask(this.value, flag.mask(), state);
+        if (value == this.value) return this;
+        return new ImmutableEnumSet<>(elementType, value);
+    }
+
+    public ImmutableEnumSet<E> with(ImmutableEnumSet<E> set, IntBinaryOperator op) {
+        int value = op.applyAsInt(this.value, set.value);
+        if (value == this.value) return this;
+        return new ImmutableEnumSet<>(elementType, value);
     }
 
     @Override

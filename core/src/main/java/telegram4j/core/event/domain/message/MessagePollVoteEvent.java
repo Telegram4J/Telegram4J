@@ -1,33 +1,37 @@
 package telegram4j.core.event.domain.message;
 
 import io.netty.buffer.ByteBuf;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.User;
+import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.Poll.Flag;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Event of a new vote in the poll. */
 public class MessagePollVoteEvent extends MessageEvent {
-    private final long pollId;
+    @Nullable
+    private final Poll poll;
     private final User user;
     private final List<ByteBuf> options;
 
-    public MessagePollVoteEvent(MTProtoTelegramClient client, long pollId, User user, List<ByteBuf> options) {
+    public MessagePollVoteEvent(MTProtoTelegramClient client, @Nullable Poll poll, User user, List<ByteBuf> options) {
         super(client);
-        this.pollId = pollId;
+        this.poll = poll;
         this.user = user;
         this.options = options;
     }
 
     /**
-     * Gets id of poll.
+     * Gets poll object, if present.
      *
-     * @return The id of poll.
+     * @return The poll object, if present.
      */
-    public long getPollId() {
-        return pollId;
+    public Optional<Poll> getPoll() {
+        return Optional.ofNullable(poll);
     }
 
     /**
@@ -54,7 +58,7 @@ public class MessagePollVoteEvent extends MessageEvent {
     @Override
     public String toString() {
         return "MessagePollVoteEvent{" +
-                "pollId=" + pollId +
+                "poll=" + poll +
                 ", user=" + user +
                 ", options=" + options +
                 '}';

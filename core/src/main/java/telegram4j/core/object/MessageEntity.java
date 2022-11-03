@@ -3,14 +3,12 @@ package telegram4j.core.object;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.*;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -24,14 +22,10 @@ public final class MessageEntity implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.MessageEntity data;
     private final String content;
-    private final int messageId;
-    private final InputPeer peer;
 
-    public MessageEntity(MTProtoTelegramClient client, telegram4j.tl.MessageEntity data, String text, int messageId, InputPeer peer) {
+    public MessageEntity(MTProtoTelegramClient client, telegram4j.tl.MessageEntity data, String text) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
-        this.messageId = messageId;
-        this.peer = peer;
 
         this.content = text.substring(data.offset(), data.offset() + data.length());
     }
@@ -148,13 +142,9 @@ public final class MessageEntity implements TelegramObject {
      *
      * @return An {@link Mono} emitting on successful completion the {@link Sticker custom emoji}.
      */
-    public Mono<Sticker> getSticker() {
+    public Mono<Sticker> getCustomEmoji() {
         return Mono.justOrEmpty(getDocumentId())
-                .flatMap(id -> client.getServiceHolder().getChatService()
-                        .getCustomEmojiDocuments(List.of(id)))
-                .mapNotNull(d -> d.isEmpty() ? null : d.get(0))
-                .ofType(BaseDocument.class)
-                .map(d -> (Sticker) EntityFactory.createDocument(client, d, messageId, peer));
+                .flatMap(client::getCustomEmoji);
     }
 
     @Override

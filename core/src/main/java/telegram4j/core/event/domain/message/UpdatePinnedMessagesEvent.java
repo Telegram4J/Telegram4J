@@ -89,7 +89,7 @@ public class UpdatePinnedMessagesEvent extends MessageEvent {
      */
     public Mono<AuxiliaryMessages> getMessages(EntityRetrievalStrategy strategy) {
         return Mono.defer(() -> client.withRetrievalStrategy(strategy)
-                .getMessagesById(chatId, messageIds.stream()
+                .getMessages(chatId, messageIds.stream()
                         .map(ImmutableInputMessageID::of)
                         .collect(Collectors.toUnmodifiableList())));
     }

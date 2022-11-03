@@ -7,7 +7,6 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
@@ -785,6 +784,19 @@ public class ChatService extends RpcService {
     public Mono<BaseMessageFields> sendMedia(SendMedia request) {
         return client.sendAwait(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
+                .flatMap(tuple -> {
+                    Mono<Void> pollSaving = Mono.empty();
+                    var media = request.media();
+                    if (media instanceof InputMediaPoll) {
+                        var message = (BaseMessage) tuple.getT1();
+                        var messageMediaPoll = (MessageMediaPoll) Objects.requireNonNull(message.media());
+                        pollSaving = storeLayout.registerPoll(message.peerId(), message.id(),
+                                ImmutableInputMediaPoll.copyOf((InputMediaPoll) media)
+                                        .withPoll(ImmutablePoll.copyOf(messageMediaPoll.poll())));
+                    }
+
+                    return pollSaving.thenReturn(tuple);
+                })
                 .map(updates -> {
                     client.updates().emitNext(updates.getT2(), DEFAULT_PARKING);
 

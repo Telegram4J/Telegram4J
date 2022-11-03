@@ -10,7 +10,6 @@ import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
-import telegram4j.tl.InputPeer;
 import telegram4j.tl.PollAnswerVoters;
 
 import java.util.List;
@@ -24,14 +23,10 @@ public final class PollResults implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.PollResults data;
-    private final int messageId;
-    private final InputPeer peer;
 
-    public PollResults(MTProtoTelegramClient client, telegram4j.tl.PollResults data, int messageId, InputPeer peer) {
+    public PollResults(MTProtoTelegramClient client, telegram4j.tl.PollResults data) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
-        this.messageId = messageId;
-        this.peer = Objects.requireNonNull(peer);
     }
 
     @Override
@@ -120,7 +115,7 @@ public final class PollResults implements TelegramObject {
     public List<MessageEntity> getSolutionEntities() {
         return Optional.ofNullable(data.solutionEntities())
                 .map(l -> l.stream()
-                        .map(d -> new MessageEntity(client, d, Objects.requireNonNull(data.solution()), messageId, peer))
+                        .map(d -> new MessageEntity(client, d, Objects.requireNonNull(data.solution())))
                         .collect(Collectors.toList()))
                 .orElse(List.of());
     }

@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.media.MaskCoordinates;
 import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.file.Context;
 import telegram4j.tl.*;
 
 import java.time.Duration;
@@ -20,10 +21,10 @@ public class Sticker extends Document {
     private final Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData;
     private final Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData;
 
-    public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName, int messageId,
-                   InputPeer peer, Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData,
+    public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName,
+                   Context context, Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData,
                    Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData) {
-        super(client, data, fileName, messageId, peer);
+        super(client, data, fileName, context);
         this.stickerData = Objects.requireNonNull(stickerData);
         this.optData = Objects.requireNonNull(optData);
     }

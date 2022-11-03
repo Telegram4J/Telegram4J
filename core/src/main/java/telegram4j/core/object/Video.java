@@ -1,9 +1,9 @@
 package telegram4j.core.object;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.file.Context;
 import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.DocumentAttributeVideo;
-import telegram4j.tl.InputPeer;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -16,9 +16,9 @@ public class Video extends Document {
     private final boolean gif;
 
     public Video(MTProtoTelegramClient client, BaseDocumentFields data,
-                 String fileName, int messageId, InputPeer peer,
-                 DocumentAttributeVideo videoData, boolean hasStickers, boolean gif) {
-        super(client, data, fileName, messageId, peer);
+                 String fileName, Context context, DocumentAttributeVideo videoData,
+                 boolean hasStickers, boolean gif) {
+        super(client, data, fileName, context);
         this.videoData = Objects.requireNonNull(videoData);
         this.hasStickers = hasStickers;
         this.gif = gif;

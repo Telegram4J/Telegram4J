@@ -52,7 +52,7 @@ public class CallbackQueryEvent extends CallbackEvent {
      */
     public Mono<AuxiliaryMessages> getMessage(EntityRetrievalStrategy strategy) {
         return client.withRetrievalStrategy(strategy)
-                .getMessagesById(chat.getId(), List.of(ImmutableInputMessageID.of(messageId)));
+                .getMessages(chat.getId(), List.of(ImmutableInputMessageID.of(messageId)));
     }
 
     /**

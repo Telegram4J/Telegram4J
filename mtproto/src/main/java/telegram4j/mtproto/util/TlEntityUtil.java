@@ -11,6 +11,7 @@ import telegram4j.tl.storage.FileType;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 
 /** Utility class with frequently used methods for mapping TL objects. */
 public class TlEntityUtil {
@@ -185,6 +186,19 @@ public class TlEntityUtil {
         return obj;
     }
 
+    public static <T> Function<Object, T> isInstance(Class<T> type) {
+        return o -> mapCast(o, type);
+    }
+
+    @Nullable
+    public static <T> T mapCast(@Nullable Object obj, Class<T> type) {
+        if (!type.isInstance(obj)) {
+            return null;
+        }
+        return type.cast(obj);
+    }
+
+    // These methods use access hashes even with min entities, just to get the profile's photo
     public static InputPeer photoInputPeer(Channel channel) {
         return ImmutableInputPeerChannel.of(channel.id(),
                 Objects.requireNonNull(channel.accessHash())); // TODO: verify this
@@ -196,5 +210,14 @@ public class TlEntityUtil {
         }
         return ImmutableInputPeerUser.of(user.id(),
                 Objects.requireNonNull(user.accessHash())); // TODO: verify this
+    }
+
+    public static boolean isUserPeer(InputPeer peer) {
+        switch (peer.identifier()) {
+            case InputPeerSelf.ID:
+            case InputPeerUser.ID:
+            case InputPeerUserFromMessage.ID: return true;
+            default: return false;
+        }
     }
 }

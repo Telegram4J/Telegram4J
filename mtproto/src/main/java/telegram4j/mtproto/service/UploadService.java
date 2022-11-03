@@ -12,7 +12,6 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufFlux;
 import reactor.util.concurrent.Queues;
-import telegram4j.mtproto.BotCompatible;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.store.StoreLayout;

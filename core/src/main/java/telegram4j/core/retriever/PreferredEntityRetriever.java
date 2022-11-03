@@ -83,8 +83,8 @@ public class PreferredEntityRetriever implements EntityRetriever {
     }
 
     @Override
-    public Mono<AuxiliaryMessages> getMessagesById(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
-        return delegate.getMessagesById(chatId, messageIds);
+    public Mono<AuxiliaryMessages> getMessages(@Nullable Id chatId, Iterable<? extends InputMessage> messageIds) {
+        return delegate.getMessages(chatId, messageIds);
     }
 
     /** Types of volumes of returned information. */

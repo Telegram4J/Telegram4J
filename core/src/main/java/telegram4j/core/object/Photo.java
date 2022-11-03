@@ -2,11 +2,12 @@ package telegram4j.core.object;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.file.ProfilePhotoContext;
 import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.BasePhoto;
 import telegram4j.tl.DocumentAttributeImageSize;
-import telegram4j.tl.InputPeer;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -22,20 +23,20 @@ public class Photo extends Document {
     private final DocumentAttributeImageSize sizeData;
 
     public Photo(MTProtoTelegramClient client, BaseDocumentFields data,
-                 @Nullable String fileName, int messageId, InputPeer peer,
+                 @Nullable String fileName, Context context,
                  DocumentAttributeImageSize sizeData) {
-        super(client, data, fileName, messageId, peer);
+        super(client, data, fileName, context);
         this.sizeData = Objects.requireNonNull(sizeData);
     }
 
-    public Photo(MTProtoTelegramClient client, BasePhoto data, InputPeer chatPeer, int messageId) {
-        super(client, data, FileReferenceId.ofPhoto(data, messageId, chatPeer), null);
+    public Photo(MTProtoTelegramClient client, BasePhoto data, Context context) {
+        super(client, data, FileReferenceId.ofPhoto(data, context), null);
 
         sizeData = null;
     }
 
-    public Photo(MTProtoTelegramClient client, BasePhoto data, int messageId, InputPeer peer) {
-        super(client, data, FileReferenceId.ofChatPhoto(data, messageId, peer), null);
+    public Photo(MTProtoTelegramClient client, BasePhoto data, ProfilePhotoContext context) {
+        super(client, data, FileReferenceId.ofChatPhoto(data, context), null);
 
         sizeData = null;
     }

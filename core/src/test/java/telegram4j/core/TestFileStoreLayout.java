@@ -13,6 +13,7 @@ import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.store.MessagePoll;
 import telegram4j.mtproto.store.ResolvedChatParticipant;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
@@ -68,6 +69,11 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateChannelPts(long channelId, int pts) {
         return delegate.updateChannelPts(channelId, pts);
+    }
+
+    @Override
+    public Mono<Void> registerPoll(Peer peerId, int messageId, InputMediaPoll poll) {
+        return delegate.registerPoll(peerId, messageId, poll);
     }
 
     @Override
@@ -238,6 +244,11 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Flux<ResolvedChatParticipant> getChatParticipants(long chatId) {
         return delegate.getChatParticipants(chatId);
+    }
+
+    @Override
+    public Mono<MessagePoll> getPollById(long pollId) {
+        return delegate.getPollById(pollId);
     }
 
     @Override

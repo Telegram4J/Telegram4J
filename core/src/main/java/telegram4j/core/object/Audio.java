@@ -2,9 +2,9 @@ package telegram4j.core.object;
 
 import io.netty.buffer.ByteBuf;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.file.Context;
 import telegram4j.tl.BaseDocumentFields;
 import telegram4j.tl.DocumentAttributeAudio;
-import telegram4j.tl.InputPeer;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -16,8 +16,8 @@ public class Audio extends Document {
     private final telegram4j.tl.DocumentAttributeAudio audioData;
 
     public Audio(MTProtoTelegramClient client, BaseDocumentFields data, String fileName,
-                 int messageId, InputPeer peer, DocumentAttributeAudio audioData) {
-        super(client, data, fileName, messageId, peer);
+                 Context context, DocumentAttributeAudio audioData) {
+        super(client, data, fileName, context);
         this.audioData = Objects.requireNonNull(audioData);
     }
 

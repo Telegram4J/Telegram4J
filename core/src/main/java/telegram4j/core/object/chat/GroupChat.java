@@ -19,6 +19,7 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
@@ -74,14 +75,15 @@ public final class GroupChat extends BaseChat {
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ProfilePhoto(client, d, ImmutableInputPeerChat.of(minData.id()), -1));
+                .map(d -> new ProfilePhoto(client, d, ImmutableInputPeerChat.of(minData.id())));
     }
 
     @Override
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, -1, ImmutableInputPeerChat.of(minData.id())));
+                .map(d -> new Photo(client, d, Context.createChatPhotoContext(
+                        ImmutableInputPeerChat.of(minData.id()), -1)));
     }
 
     @Override
@@ -94,7 +96,7 @@ public final class GroupChat extends BaseChat {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(BaseChatFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
+                        .getMessages(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     @Override
@@ -275,7 +277,7 @@ public final class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::botInfo)
                 .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d))
+                        .map(d -> new BotInfo(client, d, getId()))
                         .collect(Collectors.toList()));
     }
 
@@ -436,10 +438,8 @@ public final class GroupChat extends BaseChat {
      * @return A {@link Mono} emitting on successful completion completion status.
      */
     public Mono<Boolean> editAbout(String newAbout) {
-        InputPeer peer = client.asResolvedInputPeer(getId());
-
         return client.getServiceHolder().getChatService()
-                .editChatAbout(peer, newAbout);
+                .editChatAbout(ImmutableInputPeerChat.of(minData.id()), newAbout);
     }
 
     @Override

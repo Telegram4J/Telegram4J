@@ -2,15 +2,19 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.Logger;
+import reactor.util.Loggers;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.message.*;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Message;
+import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.store.MessagePoll;
 import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 
@@ -21,6 +25,7 @@ import java.util.stream.Collectors;
 import static telegram4j.core.internal.MappingUtil.getAuthor;
 
 class MessageUpdateHandlers {
+    private static final Logger log = Loggers.getLogger(MessageUpdateHandlers.class);
 
     // State handler
     // =====================
@@ -47,6 +52,18 @@ class MessageUpdateHandlers {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onUpdatePinnedMessages(context.getUpdate());
+    }
+
+    static Mono<MessagePoll> handleStateUpdateMessagePoll(UpdateContext<UpdateMessagePoll> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .getPollById(context.getUpdate().pollId());
+    }
+
+    static Mono<MessagePoll> handleStateUpdateMessagePollVote(UpdateContext<UpdateMessagePollVote> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .getPollById(context.getUpdate().pollId());
     }
 
     // Update handler
@@ -120,23 +137,27 @@ class MessageUpdateHandlers {
         return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
     }
 
-    static Flux<MessagePollResultsEvent> handleUpdateMessagePoll(StatefulUpdateContext<UpdateMessagePoll, Void> context) {
+    static Flux<MessagePollResultsEvent> handleUpdateMessagePoll(StatefulUpdateContext<UpdateMessagePoll, MessagePoll> context) {
         var upd = context.getUpdate();
 
-        Poll poll = Optional.ofNullable(upd.poll())
-                .map(Poll::new)
+        Poll poll = Optional.ofNullable(context.getOld())
+                .map(d -> new Poll(context.getClient(), d))
+                .or(() -> Optional.ofNullable(context.getUpdate().poll())
+                        .map(d -> new Poll(context.getClient(), d, null)))
                 .orElse(null);
-        PollResults results = new PollResults(context.getClient(), upd.results(),
-                -1, InputPeerEmpty.instance()); // TODO: support this type of context
+        PollResults results = new PollResults(context.getClient(), upd.results());
 
-        return Flux.just(new MessagePollResultsEvent(context.getClient(), upd.pollId(), poll, results));
+        return Flux.just(new MessagePollResultsEvent(context.getClient(), poll, results));
     }
 
-    static Flux<MessagePollVoteEvent> handleUpdateMessagePollVote(StatefulUpdateContext<UpdateMessagePollVote, Void> context) {
+    static Flux<MessagePollVoteEvent> handleUpdateMessagePollVote(StatefulUpdateContext<UpdateMessagePollVote, MessagePoll> context) {
         var upd = context.getUpdate();
 
-        var user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        Poll poll = Optional.ofNullable(context.getOld())
+                .map(d -> new Poll(context.getClient(), d))
+                .orElse(null);
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
 
-        return Flux.just(new MessagePollVoteEvent(context.getClient(), upd.pollId(), user, upd.options()));
+        return Flux.just(new MessagePollVoteEvent(context.getClient(), poll, user, upd.options()));
     }
 }

@@ -15,6 +15,7 @@ import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
 import telegram4j.core.util.PeerId;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.photos.Photos;
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
+import static telegram4j.mtproto.util.TlEntityUtil.photoInputPeer;
 import static telegram4j.tl.BaseUser.*;
 import static telegram4j.tl.UserFull.*;
 
@@ -137,7 +139,7 @@ public class User implements MentionablePeer {
      */
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
-                .map(c -> new ProfilePhoto(client, c, TlEntityUtil.photoInputPeer(minData), -1));
+                .map(c -> new ProfilePhoto(client, c, photoInputPeer(minData)));
     }
 
     /**
@@ -149,7 +151,7 @@ public class User implements MentionablePeer {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, -1, TlEntityUtil.photoInputPeer(minData)));
+                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
     }
 
     /**
@@ -249,7 +251,7 @@ public class User implements MentionablePeer {
     public Optional<BotInfo> getBotInfo() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botInfo)
-                .map(d -> new BotInfo(client, d));
+                .map(d -> new BotInfo(client, d, getId()));
     }
 
     /**
@@ -280,7 +282,7 @@ public class User implements MentionablePeer {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(UserFull::pinnedMsgId)
                 .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .getMessagesById(getId(), List.of(ImmutableInputMessageID.of(id))));
+                        .getMessages(getId(), List.of(ImmutableInputMessageID.of(id))));
     }
 
     /**
@@ -356,7 +358,7 @@ public class User implements MentionablePeer {
                                     ? ((PhotosSlice) c).count() : c.photos().size(), offset, limit)
                             .flatMapIterable(Photos::photos)
                             .cast(BasePhoto.class)
-                            .map(c -> new Photo(client, c, -1, inputPeer));
+                            .map(c -> new Photo(client, c, Context.createUserPhotoContext(inputPeer)));
                 });
     }
 

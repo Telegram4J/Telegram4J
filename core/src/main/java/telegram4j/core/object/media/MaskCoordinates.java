@@ -4,7 +4,7 @@ import reactor.util.annotation.Nullable;
 
 import java.util.Objects;
 
-public class MaskCoordinates {
+public final class MaskCoordinates {
     private final telegram4j.tl.MaskCoords data;
 
     public MaskCoordinates(telegram4j.tl.MaskCoords data) {

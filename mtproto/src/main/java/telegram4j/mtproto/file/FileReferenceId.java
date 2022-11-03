@@ -3,13 +3,13 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
-import io.netty.handler.codec.base64.Base64;
-import io.netty.handler.codec.base64.Base64Dialect;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
 
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -24,23 +24,20 @@ import java.util.Optional;
  * due to the relativity of message identifiers in private chats
  * and groups, as well as other privacy factors.
  */
-public class FileReferenceId {
+public final class FileReferenceId {
     // TODO: Support stickers and emojis from getStickerSet()
 
-    static final String PREFIX = "x74JF1D";
-    static final byte MAX_RLE_SEQ = Byte.MAX_VALUE;
+    static final String PREFIX = "x74JF1D0";
+
     static final int MAX_DC_ID = 0xffff;
 
     static final byte SIZE_TYPE_ABSENT = -1;
-    static final byte SIZE_TYPE_SMALL = 4;
-    static final byte SIZE_TYPE_BIG = 5;
+    static final byte SIZE_TYPE_SMALL = 1 << 2;
+    static final byte SIZE_TYPE_BIG = 1 << 3;
 
-    static final int MESSAGE_ID_MASK = 1;
-    static final int PEER_MASK = 1 << 1;
-    static final int ACCESS_HASH_MASK = 1 << 2;
-    static final int THUMB_SIZE_TYPE_MASK = 1 << 3;
-    static final int SIZE_TYPE_SMALL_MASK = 1 << 4;
-    static final int SIZE_TYPE_BIG_MASK = 1 << 5;
+    static final int ACCESS_HASH_MASK = 1;
+    static final int THUMB_SIZE_TYPE_MASK = 1 << 1;
+    static final int CONTEXT_TYPE_MASK = 1 << 4;
 
     private final Type fileType;
     @Nullable
@@ -57,15 +54,13 @@ public class FileReferenceId {
     private final InputStickerSet stickerSet;
     private final int thumbVersion;
 
-    private final int messageId;
-    @Nullable
-    private final InputPeer peer;
+    private final Context context;
 
     FileReferenceId(Type fileType, @Nullable DocumentType documentType, byte sizeType,
                     short dcId, long documentId, long accessHash,
                     @Nullable ByteBuf fileReference, char thumbSizeType,
                     @Nullable String url, @Nullable InputStickerSet stickerSet, int thumbVersion,
-                    int messageId, @Nullable InputPeer peer) {
+                    Context context) {
         this.fileType = Objects.requireNonNull(fileType);
         this.documentType = documentType;
         this.sizeType = sizeType;
@@ -77,91 +72,68 @@ public class FileReferenceId {
         this.thumbSizeType = thumbSizeType;
         this.stickerSet = stickerSet;
         this.thumbVersion = thumbVersion;
-
-        this.messageId = messageId;
-        this.peer = peer;
+        this.context = Objects.requireNonNull(context);
     }
 
     private static char asChar(String type) {
-        if (type.length() != 1) {
+        if (type.length() != 1)
             throw new IllegalArgumentException("unknown format of the photo size type: '" + type + "'");
-        }
         return type.charAt(0);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given web document and source context.
      *
-     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param document The document info.
-     * @param messageId The source message id.
-     * @param peer The message source peer.
+     * @param context The context of document.
      * @return The new {@code FileReferenceId} from given web document and source context.
      */
-    public static FileReferenceId ofDocument(WebDocument document, int messageId, InputPeer peer) {
-        if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
-        }
-        if (messageId < 0) {
-            throw new IllegalArgumentException("Message id must be positive.");
-        }
-
-        long accessHash = document.identifier() == BaseWebDocument.ID
+    public static FileReferenceId ofDocument(WebDocument document, Context context) {
+        long accessHash = document instanceof BaseWebDocument
                 ? ((BaseWebDocument) document).accessHash()
                 : -1;
         DocumentType documentType = DocumentType.fromAttributes(document.attributes());
 
         return new FileReferenceId(Type.WEB_DOCUMENT, documentType, SIZE_TYPE_ABSENT,
                 (short) -1, -1, accessHash, null, '\0', document.url(),
-                null, -1, messageId, peer);
+                null, -1, context);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given document and source context,
      * with <b>first</b> video or static thumbnail.
      *
-     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param document The document info.
-     * @param messageId The source message id.
-     * @param peer The message source peer.
+     * @param context The context of document.
      * @return The new {@code FileReferenceId} from given document and source context.
      */
-    public static FileReferenceId ofDocument(BaseDocument document, int messageId, InputPeer peer) {
+    public static FileReferenceId ofDocument(BaseDocument document, Context context) {
         char thumbSizeType = Optional.ofNullable(document.videoThumbs())
                 .map(d -> asChar(d.get(0).type()))
                 .or(() -> Optional.ofNullable(document.thumbs())
                         .map(d -> asChar(d.get(0).type())))
                 .orElse('\0');
 
-        return ofDocument(document, thumbSizeType, messageId, peer);
+        return ofDocument(document, thumbSizeType, context);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given document and source context.
      *
-     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param document The document info.
      * @param thumbSizeType The type of thumbnail used for downloading.
-     * @param messageId The source message id.
-     * @param peer The message source peer.
+     * @param context The context of document.
      * @return The new {@code FileReferenceId} from given document and source context.
      */
-    public static FileReferenceId ofDocument(BaseDocument document, char thumbSizeType, int messageId, InputPeer peer) {
-        if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
-        }
-        if (messageId < 0) {
-            throw new IllegalArgumentException("Message id must be positive.");
-        }
-        if (document.dcId() > MAX_DC_ID) {
+    public static FileReferenceId ofDocument(BaseDocument document, char thumbSizeType, Context context) {
+        if (document.dcId() > MAX_DC_ID)
             throw new IllegalArgumentException("Unexpected dcId: " + document.dcId() + " > " + MAX_DC_ID);
-        }
 
         DocumentType documentType = DocumentType.fromAttributes(document.attributes());
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(document.fileReference());
         return new FileReferenceId(Type.DOCUMENT, documentType, SIZE_TYPE_ABSENT,
                 (short) document.dcId(), document.id(), document.accessHash(), fileReference, thumbSizeType, null,
-                null, -1, messageId, peer);
+                null, -1, context);
     }
 
     /**
@@ -170,16 +142,15 @@ public class FileReferenceId {
      *
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
      * @param chatPhoto The chat photo info.
-     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The chat/channel peer where photo was sent.
+     * @param context The context of profile photo.
      * @return The new {@code FileReferenceId} from given <b>normal</b> photo and source context.
      */
-    public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, int messageId, InputPeer peer) {
+    public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, ProfilePhotoContext context) {
         char thumbSizeType = Optional.ofNullable(chatPhoto.videoSizes())
                 .map(d -> asChar(d.get(0).type()))
                 .orElseGet(() -> asChar(chatPhoto.sizes().get(0).type()));
 
-        return ofChatPhoto(chatPhoto, thumbSizeType, messageId, peer);
+        return ofChatPhoto(chatPhoto, thumbSizeType, context);
     }
 
     /**
@@ -188,92 +159,73 @@ public class FileReferenceId {
      * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
      * @param chatPhoto The chat photo info.
      * @param thumbSizeType The type of thumbnail used for downloading.
-     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The chat/channel peer where photo was sent.
+     * @param context The context of profile photo.
      * @return The new {@code FileReferenceId} from given <b>normal</b> photo and source context.
      */
-    public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, char thumbSizeType, int messageId, InputPeer peer) {
-        if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type: " + peer);
-        }
-        if (chatPhoto.dcId() > MAX_DC_ID) {
+    public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, char thumbSizeType, ProfilePhotoContext context) {
+        if (chatPhoto.dcId() > MAX_DC_ID)
             throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
-        }
 
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(chatPhoto.fileReference());
         return new FileReferenceId(Type.CHAT_PHOTO, null, SIZE_TYPE_ABSENT,
                 (short) chatPhoto.dcId(), chatPhoto.id(), chatPhoto.accessHash(),
-                fileReference, thumbSizeType, null, null, -1, messageId, peer);
+                fileReference, thumbSizeType, null, null, -1, context);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given minimal chat photo and source context.
      *
+     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty}.
      * @param chatPhoto The chat photo info.
      * @param big When chat photo is big.
-     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
      * @param peer The peer that's have this photo.
      * @return The new {@code FileReferenceId} from given minimal chat photo and source context.
      */
-    public static FileReferenceId ofChatPhoto(ChatPhotoFields chatPhoto, boolean big, int messageId, InputPeer peer) {
-        if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type: " + peer);
-        }
-        if (chatPhoto.dcId() > MAX_DC_ID) {
+    public static FileReferenceId ofChatPhoto(ChatPhotoFields chatPhoto, boolean big, InputPeer peer) {
+        if (chatPhoto.dcId() > MAX_DC_ID)
             throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
-        }
 
         byte sizeType = big ? SIZE_TYPE_BIG : SIZE_TYPE_SMALL;
+        var context = new ProfilePhotoContext(peer);
         return new FileReferenceId(Type.CHAT_PHOTO, null, sizeType,
                 (short) chatPhoto.dcId(), chatPhoto.photoId(), -1,
                 null, '\0', null,
-                null, -1, messageId, peer);
+                null, -1, context);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given <b>message</b> photo and source context,
      * with <b>first</b> video or static thumbnail.
      *
-     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param photo The photo object.
-     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The message source peer.
+     * @param context The context of message photo.
      * @return The new {@code FileReferenceId} from given photo and source context.
      */
-    public static FileReferenceId ofPhoto(BasePhoto photo, int messageId, InputPeer peer) {
+    public static FileReferenceId ofPhoto(BasePhoto photo, Context context) {
         char thumbSizeType = Optional.ofNullable(photo.videoSizes())
                 .map(d -> asChar(d.get(0).type()))
                 .orElseGet(() -> asChar(photo.sizes().get(0).type()));
 
-        return ofPhoto(photo, thumbSizeType, messageId, peer);
+        return ofPhoto(photo, thumbSizeType, context);
     }
 
     /**
      * Creates new {@code FileReferenceId} object from given <b>message</b> photo and source context.
      *
-     * @throws IllegalArgumentException If peer id is {@link InputPeerEmpty} or message id is negative.
      * @param photo The photo object.
      * @param thumbSizeType The type of thumbnail used for downloading.
-     * @param messageId The source message id, if photo from message, otherwise must be {@code -1}.
-     * @param peer The message source peer.
+     * @param context The context of message photo.
      * @return The new {@code FileReferenceId} from given photo and source context.
      */
-    public static FileReferenceId ofPhoto(BasePhoto photo, char thumbSizeType, int messageId, InputPeer peer) {
-        if (peer.identifier() == InputPeerEmpty.ID) {
-            throw new IllegalArgumentException("Unexpected peer type.");
-        }
-        if (messageId < 0) {
-            throw new IllegalArgumentException("Message id must be positive.");
-        }
-        if (photo.dcId() > MAX_DC_ID) {
+    public static FileReferenceId ofPhoto(BasePhoto photo, char thumbSizeType, Context context) {
+        if (photo.dcId() > MAX_DC_ID)
             throw new IllegalArgumentException("Unexpected dcId: " + photo.dcId() + " > " + MAX_DC_ID);
-        }
 
         ByteBuf fileReference = TlEncodingUtil.copyAsUnpooled(photo.fileReference());
         return new FileReferenceId(Type.PHOTO, null,
                 SIZE_TYPE_ABSENT, (short) photo.dcId(), photo.id(), photo.accessHash(),
                 fileReference, thumbSizeType,
-                null, null, -1, messageId, peer);
+                null, null, -1, context);
     }
 
     /**
@@ -285,17 +237,15 @@ public class FileReferenceId {
      * @return The new {@code FileReferenceId} with sticker set thumbnail from their id.
      */
     public static FileReferenceId ofStickerSet(InputStickerSet stickerSet, int version) {
-        if (stickerSet.identifier() == InputStickerSetEmpty.ID) {
+        if (stickerSet == InputStickerSetEmpty.instance())
             throw new IllegalArgumentException("Unexpected stickerSet type.");
-        }
-        if (version < 0) {
+        if (version < 0)
             throw new IllegalArgumentException("Invalid sticker set thumbnail version.");
-        }
 
         return new FileReferenceId(Type.STICKER_SET_THUMB, null,
                 SIZE_TYPE_ABSENT, (short) -1, -1, -1,
                 null, '\0', null, stickerSet,
-                version, -1, null);
+                version, Context.noOpContext());
     }
 
     /**
@@ -307,135 +257,16 @@ public class FileReferenceId {
      * @return The deserialized {@code FileReferenceId} with decoded information.
      */
     public static FileReferenceId deserialize(String str) {
-        if (!str.startsWith(PREFIX)) {
+        if (!str.startsWith(PREFIX))
             throw new IllegalArgumentException("Incorrect file reference id format: '" + str + "'");
-        }
 
-        ByteBuf data = Unpooled.wrappedBuffer(str.getBytes(StandardCharsets.UTF_8))
-                .skipBytes(PREFIX.length());
+        var buf = Unpooled.wrappedBuffer(Base64.getUrlDecoder().decode(
+                ByteBuffer.wrap(str.getBytes(StandardCharsets.US_ASCII))
+                        .position(PREFIX.length())));
 
-        ByteBuf buf = Base64.decode(data, Base64Dialect.URL_SAFE);
-        data.release();
-        buf = decodeZeroRle(buf);
-
-        Type fileType = Type.ALL[buf.readByte()];
-        byte flags = buf.readByte();
-        int messageId = -1;
-        if ((flags & MESSAGE_ID_MASK) != 0) {
-            messageId = buf.readIntLE();
-        }
-
-        InputPeer peer = null;
-        if ((flags & PEER_MASK) != 0) {
-            peer = TlDeserializer.deserialize(buf);
-        }
-
-        byte sizeType = (flags & SIZE_TYPE_BIG_MASK) != 0 ? SIZE_TYPE_BIG :
-                (flags & SIZE_TYPE_SMALL_MASK) != 0 ? SIZE_TYPE_SMALL : SIZE_TYPE_ABSENT;
-
-        String url = null;
-        long accessHash = -1;
-        short dcId = -1;
-        long documentId = -1;
-        DocumentType documentType = null;
-        ByteBuf fileReference = null;
-        char thumbSizeType = '\0';
-        InputStickerSet stickerSet = null;
-        int thumbVersion = -1;
-
-        switch (fileType) {
-            case WEB_DOCUMENT:
-                documentType = DocumentType.ALL[buf.readByte()];
-
-                url = TlSerialUtil.deserializeString(buf);
-
-                if ((flags & ACCESS_HASH_MASK) != 0) {
-                    accessHash = buf.readLongLE();
-                }
-                break;
-            case DOCUMENT:
-                documentType = DocumentType.ALL[buf.readByte()];
-
-            case PHOTO:
-                dcId = buf.readShortLE();
-                documentId = buf.readLongLE();
-                accessHash = buf.readLongLE();
-
-                fileReference = TlEncodingUtil.copyAsUnpooled(TlSerialUtil.deserializeBytes(buf));
-                if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                    thumbSizeType = (char) buf.readByte();
-                }
-
-                break;
-            case CHAT_PHOTO:
-                dcId = buf.readShortLE();
-                documentId = buf.readLongLE();
-
-                if (sizeType == SIZE_TYPE_ABSENT) {
-                    accessHash = buf.readLongLE();
-                    fileReference = TlEncodingUtil.copyAsUnpooled(TlSerialUtil.deserializeBytes(buf));
-                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                        thumbSizeType = (char) buf.readByte();
-                    }
-                }
-
-                break;
-            case STICKER_SET_THUMB:
-                thumbVersion = buf.readIntLE();
-                stickerSet = TlDeserializer.deserialize(buf);
-
-                break;
-        }
-
-        if (buf.isReadable()) {
-            buf.release();
-            throw new IllegalArgumentException("Malformed file reference id: " + str);
-        }
-
-        buf.release();
-        return new FileReferenceId(fileType, documentType, sizeType, dcId, documentId, accessHash,
-                fileReference, thumbSizeType, url, stickerSet,
-                thumbVersion, messageId, peer);
-    }
-
-    static ByteBuf encodeZeroRle(ByteBuf data) {
-        ByteBuf encoded = data.alloc().buffer(data.readableBytes());
-
-        for (int i = 0, n = data.readableBytes(); i < n; i++) {
-            byte b = data.getByte(i);
-            encoded.writeByte(b);
-
-            if (i + 1 < n && b == 0) {
-                byte c = 1;
-                while (c < MAX_RLE_SEQ && i + c < n && data.getByte(i + c) == 0) {
-                    c++;
-                }
-
-                encoded.writeByte(c);
-                i += c - 1;
-            }
-        }
-
-        data.release();
-        return encoded;
-    }
-
-    static ByteBuf decodeZeroRle(ByteBuf data) {
-        ByteBuf decoded = data.alloc().buffer(data.readableBytes());
-
-        for (int i = 0, n = data.readableBytes(); i < n; i++) {
-            byte b = data.getByte(i);
-            if (i + 1 < n && b == 0) {
-                decoded.writeZero(data.getByte(i + 1));
-                i++;
-                continue;
-            }
-
-            decoded.writeByte(b);
-        }
-
-        data.release();
-        return decoded;
+        short rev = buf.readShortLE();
+        Version ver = Version.of(rev);
+        return ver.handler.deserialize(buf, str);
     }
 
     /**
@@ -446,102 +277,13 @@ public class FileReferenceId {
      */
     public String serialize() {
         ByteBuf buf = Unpooled.buffer(); // TODO: presize
-        buf.writeByte((byte) fileType.ordinal());
 
-        byte flags = 0;
-        if (messageId != -1) {
-            flags |= MESSAGE_ID_MASK;
-        }
-        if (peer != null) {
-            flags |= PEER_MASK;
-        }
-        if (fileType == Type.WEB_DOCUMENT && accessHash != -1) {
-            flags |= ACCESS_HASH_MASK;
-        }
-        if (fileType == Type.CHAT_PHOTO && sizeType != SIZE_TYPE_ABSENT) {
-            flags |= 1 << sizeType;
-        }
-        if ((fileType == Type.DOCUMENT || fileType == Type.PHOTO ||
-                fileType == Type.CHAT_PHOTO && sizeType == SIZE_TYPE_ABSENT) &&
-                thumbSizeType != '\0') {
-            flags |= THUMB_SIZE_TYPE_MASK;
-        }
+        buf.writeShortLE(Version.CURRENT.rev);
+        Version.CURRENT.handler.serialize(this, buf);
 
-        buf.writeByte(flags);
-        if ((flags & MESSAGE_ID_MASK) != 0) {
-            buf.writeIntLE(messageId);
-        }
-
-        if ((flags & PEER_MASK) != 0) {
-            Objects.requireNonNull(peer);
-            TlSerializer.serialize(buf, peer);
-        }
-
-        switch (fileType) {
-            case WEB_DOCUMENT:
-                Objects.requireNonNull(documentType);
-                buf.writeByte((byte) documentType.ordinal());
-
-                Objects.requireNonNull(url);
-                TlSerialUtil.serializeString(buf, url);
-
-                if ((flags & ACCESS_HASH_MASK) != 0) {
-                    buf.writeLongLE(accessHash);
-                }
-                break;
-            case DOCUMENT:
-                Objects.requireNonNull(documentType);
-                buf.writeByte((byte) documentType.ordinal());
-
-            case PHOTO: {
-                buf.writeShortLE(dcId);
-                buf.writeLongLE(documentId);
-                buf.writeLongLE(accessHash);
-
-                Objects.requireNonNull(fileReference);
-                TlSerialUtil.serializeBytes(buf, fileReference);
-
-                if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                    buf.writeByte(thumbSizeType);
-                }
-
-                break;
-            }
-            case CHAT_PHOTO:
-                buf.writeShortLE(dcId);
-                buf.writeLongLE(documentId);
-
-                if (sizeType == SIZE_TYPE_ABSENT) {
-                    buf.writeLongLE(accessHash);
-
-                    Objects.requireNonNull(fileReference);
-                    TlSerialUtil.serializeBytes(buf, fileReference);
-
-                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                        buf.writeByte(thumbSizeType);
-                    }
-                }
-
-                break;
-            case STICKER_SET_THUMB:
-
-                buf.writeIntLE(thumbVersion);
-
-                Objects.requireNonNull(stickerSet);
-                TlSerializer.serialize(buf, stickerSet);
-
-                break;
-            default: throw new IllegalStateException();
-        }
-
-        buf = encodeZeroRle(buf);
-        ByteBuf base64 = Base64.encode(buf, Base64Dialect.URL_SAFE);
-        buf.release();
-        try {
-            return PREFIX + base64.toString(StandardCharsets.UTF_8);
-        } finally {
-            base64.release();
-        }
+        return PREFIX + new String(Base64.getUrlEncoder()
+                .encode(buf.nioBuffer())
+                .array(), StandardCharsets.US_ASCII);
     }
 
     /**
@@ -599,15 +341,6 @@ public class FileReferenceId {
     }
 
     /**
-     * Gets the source peer id, if applicable.
-     *
-     * @return The source peer id, if applicable.
-     */
-    public Optional<InputPeer> getPeer() {
-        return Optional.ofNullable(peer);
-    }
-
-    /**
      * Gets the thumbnail transformation type, if file has it.
      *
      * @return The thumbnail transformation type, if applicable, otherwise {@code '\0'}.
@@ -626,21 +359,16 @@ public class FileReferenceId {
     }
 
     /**
-     * Gets the source message id, if file from message.
-     *
-     * @return The source message id, if applicable, otherwise {@code -1}.
-     */
-    public int getMessageId() {
-        return messageId;
-    }
-
-    /**
      * Gets {@link DocumentType} of web or tg file, if file is document.
      *
      * @return The {@link DocumentType} of file, if applicable
      */
     public Optional<DocumentType> getDocumentType() {
         return Optional.ofNullable(documentType);
+    }
+
+    public Context getContext() {
+        return context;
     }
 
     /**
@@ -678,9 +406,9 @@ public class FileReferenceId {
                             .build());
                 }
 
-                Objects.requireNonNull(peer);
+                var ctx = (ProfilePhotoContext) context;
                 return Optional.of(InputPeerPhotoFileLocation.builder()
-                        .peer(peer)
+                        .peer(ctx.getPeer())
                         .photoId(documentId)
                         .big(sizeType == SIZE_TYPE_BIG)
                         .build());
@@ -747,7 +475,14 @@ public class FileReferenceId {
         }
         if (thumbSizeType == this.thumbSizeType) return this;
         return new FileReferenceId(fileType, documentType, sizeType, dcId, documentId, accessHash,
-                fileReference, thumbSizeType, url, stickerSet, thumbVersion, messageId, peer);
+                fileReference, thumbSizeType, url, stickerSet, thumbVersion, context);
+    }
+
+    public FileReferenceId withContext(Context value) {
+        if (context.equals(value)) return this;
+        return new FileReferenceId(fileType, documentType, sizeType,
+                dcId, documentId, accessHash, fileReference,
+                thumbSizeType, url, stickerSet, thumbVersion, context);
     }
 
     @Override
@@ -758,12 +493,12 @@ public class FileReferenceId {
         return sizeType == that.sizeType && dcId == that.dcId &&
                 documentId == that.documentId && accessHash == that.accessHash &&
                 thumbSizeType == that.thumbSizeType && thumbVersion == that.thumbVersion &&
-                messageId == that.messageId && fileType == that.fileType &&
+                fileType == that.fileType &&
                 documentType == that.documentType &&
                 Objects.equals(fileReference, that.fileReference) &&
                 Objects.equals(url, that.url) &&
                 Objects.equals(stickerSet, that.stickerSet) &&
-                Objects.equals(peer, that.peer);
+                context.equals(that.context);
     }
 
     @Override
@@ -780,8 +515,7 @@ public class FileReferenceId {
         h += (h << 5) + Objects.hashCode(url);
         h += (h << 5) + Objects.hashCode(stickerSet);
         h += (h << 5) + thumbVersion;
-        h += (h << 5) + messageId;
-        h += (h << 5) + Objects.hashCode(peer);
+        h += (h << 5) + context.hashCode();
         return h;
     }
 
@@ -797,8 +531,6 @@ public class FileReferenceId {
                 if (accessHash != -1) {
                     builder.append(", ").append("accessHash=").append(accessHash);
                 }
-                builder.append(", ").append("messageId=").append(messageId);
-                builder.append(", ").append("peer=").append(peer);
                 break;
             case DOCUMENT:
                 builder.append(", ").append("dcId=").append(dcId);
@@ -808,8 +540,6 @@ public class FileReferenceId {
                 builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
                 Objects.requireNonNull(fileReference);
                 builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
-                builder.append(", ").append("messageId=").append(messageId);
-                builder.append(", ").append("peer=").append(peer);
                 break;
             case STICKER_SET_THUMB:
                 builder.append(", ").append("stickerSet=").append(stickerSet);
@@ -827,9 +557,6 @@ public class FileReferenceId {
                 } else {
                     builder.append(", ").append("big=").append(sizeType == SIZE_TYPE_BIG);
                 }
-
-                builder.append(", ").append("messageId=").append(messageId);
-                builder.append(", ").append("peer=").append(peer);
                 break;
             case PHOTO:
                 builder.append(", ").append("dcId=").append(dcId);
@@ -838,13 +565,12 @@ public class FileReferenceId {
                 Objects.requireNonNull(fileReference);
                 builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
                 builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
-                builder.append(", ").append("messageId=").append(messageId);
-                builder.append(", ").append("peer=").append(peer);
                 break;
             default:
                 throw new IllegalStateException();
         }
 
+        builder.append("context=").append(context);
         builder.append('}');
 
         return builder.toString();
@@ -925,5 +651,208 @@ public class FileReferenceId {
         CHAT_PHOTO;
 
         static final Type[] ALL = values();
+    }
+
+    public enum Version {
+        REVISION_0(new Revision0Handler()),
+        CURRENT(REVISION_0);
+
+        final RevisionHandler handler;
+        final short rev;
+
+        Version(Version other) {
+            this.handler = other.handler;
+            this.rev = other.rev;
+        }
+
+        Version(RevisionHandler handler) {
+            this.handler = handler;
+            this.rev = (short) ordinal();
+        }
+
+        public short getRevision() {
+            return rev;
+        }
+
+        public static Version of(short version) {
+            switch (version) {
+                case 0: return REVISION_0;
+                default: throw new IllegalArgumentException("Unknown version: " + version);
+            }
+        }
+    }
+
+    static abstract class RevisionHandler {
+
+        abstract FileReferenceId deserialize(ByteBuf buf, String str);
+
+        abstract void serialize(FileReferenceId fileRefId, ByteBuf buf);
+    }
+
+    static class Revision0Handler extends RevisionHandler {
+
+        @Override
+        FileReferenceId deserialize(ByteBuf buf, String str) {
+            Type fileType = Type.ALL[buf.readByte()];
+            byte flags = buf.readByte();
+            var contextType = (flags & CONTEXT_TYPE_MASK) != 0
+                    ? Context.Type.ALL[buf.readByte()] : Context.Type.UNKNOWN;
+
+            byte sizeType = (flags & SIZE_TYPE_BIG) != 0 ? SIZE_TYPE_BIG :
+                    (flags & SIZE_TYPE_SMALL) != 0 ? SIZE_TYPE_SMALL : SIZE_TYPE_ABSENT;
+
+            String url = null;
+            long accessHash = -1;
+            short dcId = -1;
+            long documentId = -1;
+            DocumentType documentType = null;
+            ByteBuf fileReference = null;
+            char thumbSizeType = '\0';
+            InputStickerSet stickerSet = null;
+            int thumbVersion = -1;
+
+            switch (fileType) {
+                case WEB_DOCUMENT:
+                    documentType = DocumentType.ALL[buf.readByte()];
+
+                    url = TlSerialUtil.deserializeString(buf);
+
+                    if ((flags & ACCESS_HASH_MASK) != 0) {
+                        accessHash = buf.readLongLE();
+                    }
+                    break;
+                case DOCUMENT:
+                    documentType = DocumentType.ALL[buf.readByte()];
+
+                case PHOTO:
+                    dcId = buf.readShortLE();
+                    documentId = buf.readLongLE();
+                    accessHash = buf.readLongLE();
+
+                    fileReference = TlEncodingUtil.copyAsUnpooled(TlSerialUtil.deserializeBytes(buf));
+                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                        thumbSizeType = (char) buf.readByte();
+                    }
+
+                    break;
+                case CHAT_PHOTO:
+                    dcId = buf.readShortLE();
+                    documentId = buf.readLongLE();
+
+                    if (sizeType == SIZE_TYPE_ABSENT) {
+                        accessHash = buf.readLongLE();
+                        fileReference = TlEncodingUtil.copyAsUnpooled(TlSerialUtil.deserializeBytes(buf));
+                        if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                            thumbSizeType = (char) buf.readByte();
+                        }
+                    }
+
+                    break;
+                case STICKER_SET_THUMB:
+                    thumbVersion = buf.readIntLE();
+                    stickerSet = TlDeserializer.deserialize(buf);
+
+                    break;
+            }
+
+            Context ctx = contextType != Context.Type.UNKNOWN
+                    ? Context.deserialize(buf, contextType)
+                    : Context.noOpContext();
+
+            int remain = buf.readableBytes();
+            if (remain != 0) {
+                buf.release();
+                throw new IllegalArgumentException("Malformed file reference id: '" + str + "', remaining bytes: " + remain);
+            }
+
+            buf.release();
+            return new FileReferenceId(fileType, documentType, sizeType, dcId, documentId, accessHash,
+                    fileReference, thumbSizeType, url, stickerSet, thumbVersion, ctx);
+        }
+
+        @Override
+        void serialize(FileReferenceId fileRefId, ByteBuf buf) {
+            buf.writeByte((byte) fileRefId.fileType.ordinal());
+
+            byte flags = 0;
+            if (fileRefId.context.getType() != Context.Type.UNKNOWN) {
+                flags |= CONTEXT_TYPE_MASK;
+            }
+            if (fileRefId.fileType == Type.WEB_DOCUMENT && fileRefId.accessHash != -1) {
+                flags |= ACCESS_HASH_MASK;
+            }
+            if (fileRefId.sizeType != SIZE_TYPE_ABSENT) {
+                flags |= fileRefId.sizeType;
+            }
+            if (fileRefId.thumbSizeType != '\0') {
+                flags |= THUMB_SIZE_TYPE_MASK;
+            }
+
+            buf.writeByte(flags);
+
+            if ((flags & CONTEXT_TYPE_MASK) != 0) {
+                buf.writeByte(fileRefId.context.getType().ordinal());
+            }
+
+            switch (fileRefId.fileType) {
+                case WEB_DOCUMENT:
+                    Objects.requireNonNull(fileRefId.documentType);
+                    buf.writeByte((byte) fileRefId.documentType.ordinal());
+
+                    Objects.requireNonNull(fileRefId.url);
+                    TlSerialUtil.serializeString(buf, fileRefId.url);
+
+                    if ((flags & ACCESS_HASH_MASK) != 0) {
+                        buf.writeLongLE(fileRefId.accessHash);
+                    }
+                    break;
+                case DOCUMENT:
+                    Objects.requireNonNull(fileRefId.documentType);
+                    buf.writeByte((byte) fileRefId.documentType.ordinal());
+
+                case PHOTO: {
+                    buf.writeShortLE(fileRefId.dcId);
+                    buf.writeLongLE(fileRefId.documentId);
+                    buf.writeLongLE(fileRefId.accessHash);
+
+                    Objects.requireNonNull(fileRefId.fileReference);
+                    TlSerialUtil.serializeBytes(buf, fileRefId.fileReference);
+
+                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                        buf.writeByte(fileRefId.thumbSizeType);
+                    }
+
+                    break;
+                }
+                case CHAT_PHOTO:
+                    buf.writeShortLE(fileRefId.dcId);
+                    buf.writeLongLE(fileRefId.documentId);
+
+                    if (fileRefId.sizeType == SIZE_TYPE_ABSENT) {
+                        buf.writeLongLE(fileRefId.accessHash);
+
+                        Objects.requireNonNull(fileRefId.fileReference);
+                        TlSerialUtil.serializeBytes(buf, fileRefId.fileReference);
+
+                        if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                            buf.writeByte(fileRefId.thumbSizeType);
+                        }
+                    }
+
+                    break;
+                case STICKER_SET_THUMB:
+                    buf.writeIntLE(fileRefId.thumbVersion);
+
+                    Objects.requireNonNull(fileRefId.stickerSet);
+                    TlSerializer.serialize(buf, fileRefId.stickerSet);
+                    break;
+                default:
+                    throw new IllegalStateException();
+            }
+
+            if (fileRefId.context.getType() != Context.Type.UNKNOWN) {
+                fileRefId.context.serialize(buf);
+            }
+        }
     }
 }
