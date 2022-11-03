@@ -194,7 +194,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::recentRequesters)
                 .map(list -> list.stream()
-                        .map(l -> Id.ofUser(l, null))
+                        .map(Id::ofUser)
                         .collect(Collectors.toSet()));
     }
 
@@ -204,7 +204,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(ChannelFull::recentRequesters)
                 .flatMapIterable(Function.identity())
-                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id)));
     }
 
     @Override
@@ -258,7 +258,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     public Optional<Id> getLinkedChannelId() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::linkedChatId)
-                .map(id -> Id.ofChannel(id, null));
+                .map(Id::ofChannel);
     }
 
     @Override

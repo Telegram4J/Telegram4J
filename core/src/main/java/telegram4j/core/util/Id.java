@@ -1,6 +1,7 @@
 package telegram4j.core.util;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
@@ -39,6 +40,16 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
+     * Create new id with {@link Type#CHANNEL} type without access hash.
+     *
+     * @param value The id of channel.
+     * @return New {@link Id} of channel.
+     */
+    public static Id ofChannel(long value) {
+        return new Id(Type.CHANNEL, value, null);
+    }
+
+    /**
      * Create new id with {@link Type#CHANNEL} type and given access hash.
      *
      * @param value The id of channel.
@@ -59,7 +70,29 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} of min channel.
      */
     public static Id ofChannel(long value, Id peerId, int messageId) {
-        return new Id(Type.CHANNEL, value, new MinInformation(peerId, messageId));
+        return ofChannel(value, new MinInformation(peerId, messageId));
+    }
+
+    /**
+     * Create new id with {@link Type#CHANNEL} type and min information.
+     *
+     * @param value The id of channel.
+     * @param minInformation The min information for this channel.
+     * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
+     * @return New {@link Id} of min channel.
+     */
+    public static Id ofChannel(long value, @Nullable MinInformation minInformation) {
+        return new Id(Type.CHANNEL, value, minInformation);
+    }
+
+    /**
+     * Create new id with {@link Type#USER} type without access hash.
+     *
+     * @param value The id of user.
+     * @return New {@link Id} of user.
+     */
+    public static Id ofUser(long value) {
+        return new Id(Type.USER, value, null);
     }
 
     /**
@@ -83,7 +116,19 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} of min user.
      */
     public static Id ofUser(long value, Id peerId, int messageId) {
-        return new Id(Type.USER, value, new MinInformation(peerId, messageId));
+        return ofUser(value, new MinInformation(peerId, messageId));
+    }
+
+    /**
+     * Create new id with {@link Type#USER} type and min information.
+     *
+     * @param value The id of user.
+     * @param minInformation The min information for this user.
+     * @see <a href="https://core.telegram.org/api/min">Min Constructors</a>
+     * @return New {@link Id} of min user.
+     */
+    public static Id ofUser(long value, @Nullable MinInformation minInformation) {
+        return new Id(Type.USER, value, minInformation);
     }
 
     /**
@@ -342,7 +387,8 @@ public final class Id implements Comparable<Id> {
         private final Id peerId;
         private final int messageId;
 
-        private MinInformation(Id peerId, int messageId) {
+        public MinInformation(Id peerId, int messageId) {
+            Preconditions.requireState(messageId > 0);
             this.peerId = Objects.requireNonNull(peerId);
             this.messageId = messageId;
         }

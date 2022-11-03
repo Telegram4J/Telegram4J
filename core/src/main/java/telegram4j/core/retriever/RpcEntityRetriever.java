@@ -201,8 +201,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                                         .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                                 return Flux.fromIterable(participants)
-                                        .map(p -> new ChatParticipant(client,
-                                                users.get(Id.ofUser(p.userId(), null)), p, chatId));
+                                        .map(p -> new ChatParticipant(client, users.get(Id.ofUser(p.userId())), p, chatId));
                             });
                 case CHANNEL:
                     return client.asInputChannel(chatId)

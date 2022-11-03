@@ -342,7 +342,7 @@ public class MessageMedia implements TelegramObject {
         }
 
         public Id getUserId() {
-            return Id.ofUser(data.userId(), null);
+            return Id.ofUser(data.userId());
         }
 
         @Override

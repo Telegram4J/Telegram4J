@@ -50,11 +50,11 @@ class ChatUpdateHandlers {
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> new ExportedChatInvite(context.getClient(), d,
-                        context.getUsers().get(Id.ofUser(d.adminId(), null))))
+                        context.getUsers().get(Id.ofUser(d.adminId()))))
                 .orElse(null);
         GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
-        User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId(), null)));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
+        User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId())));
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
                 .map(d -> new ChatParticipant(context.getClient(), user, d, chat.getId()))
                 .orElse(null);
@@ -80,7 +80,7 @@ class ChatUpdateHandlers {
 
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
                         .map(d -> new ChatParticipant(context.getClient(),
-                                context.getUsers().get(Id.ofUser(d.userId(), null)), d, chat.getId()))
+                                context.getUsers().get(Id.ofUser(d.userId())), d, chat.getId()))
                         .orElse(null);
 
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(),
@@ -91,7 +91,7 @@ class ChatUpdateHandlers {
 
                 var participants = upd.participants().stream()
                         .map(d -> new ChatParticipant(context.getClient(),
-                                context.getUsers().get(Id.ofUser(d.userId(), null)), d, chat.getId()))
+                                context.getUsers().get(Id.ofUser(d.userId())), d, chat.getId()))
                         .collect(Collectors.toUnmodifiableList());
 
                 return Flux.just(new ChatParticipantsUpdateEvent(context.getClient(), chat,

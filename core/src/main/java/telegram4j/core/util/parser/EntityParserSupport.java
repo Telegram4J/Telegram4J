@@ -4,7 +4,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.MessageEntity.Type;
+import telegram4j.core.util.Id;
 import telegram4j.tl.*;
 
 import java.util.ArrayList;
@@ -135,6 +137,7 @@ public final class EntityParserSupport {
                         client.getMtProtoResources().getStoreLayout()
                                 .resolveUser(userId)
                                 .map(p -> ImmutableInputMessageEntityMentionName.of(offset, length, p))
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(Id.ofUser(userId)))
                                 .subscribe(sink::next, sink::error);
                         break;
                     }

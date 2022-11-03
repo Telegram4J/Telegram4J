@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class MessageAction implements TelegramObject {
@@ -266,7 +267,7 @@ public class MessageAction implements TelegramObject {
 
         public List<Id> getUserIds() {
             return data.users().stream()
-                    .map(l -> Id.ofUser(l, null))
+                    .map(Id::ofUser)
                     .collect(Collectors.toList());
         }
 
@@ -306,7 +307,7 @@ public class MessageAction implements TelegramObject {
 
         public List<Id> getUserIds() {
             return data.users().stream()
-                    .map(l -> Id.ofUser(l, null))
+                    .map(Id::ofUser)
                     .collect(Collectors.toList());
         }
 
@@ -341,7 +342,7 @@ public class MessageAction implements TelegramObject {
         }
 
         public Id getUserId() {
-            return Id.ofUser(data.userId(), null);
+            return Id.ofUser(data.userId());
         }
 
         @Override
@@ -457,7 +458,7 @@ public class MessageAction implements TelegramObject {
         }
 
         public Id getInviterId() {
-            return Id.ofUser(data.inviterId(), null);
+            return Id.ofUser(data.inviterId());
         }
 
         @Override
@@ -491,7 +492,7 @@ public class MessageAction implements TelegramObject {
         }
 
         public Id getChannelId() {
-            return Id.ofChannel(data.channelId(), null);
+            return Id.ofChannel(data.channelId());
         }
 
         @Override
@@ -718,10 +719,10 @@ public class MessageAction implements TelegramObject {
             return data.call();
         }
 
-        public List<Id> getUserIds() {
+        public Set<Id> getUserIds() {
             return data.users().stream()
-                    .map(l -> Id.ofUser(l, null))
-                    .collect(Collectors.toList());
+                    .map(Id::ofUser)
+                    .collect(Collectors.toSet());
         }
 
         @Override

@@ -34,19 +34,19 @@ class ChannelUpdateHandlers {
     static Flux<ChatParticipantUpdateEvent> handleUpdateChannelParticipant(StatefulUpdateContext<UpdateChannelParticipant, Void> context) {
         UpdateChannelParticipant upd = context.getUpdate();
 
-        Id channelId = Id.ofChannel(upd.channelId(), null);
+        Id channelId = Id.ofChannel(upd.channelId());
         if (!context.getChats().containsKey(channelId)) {
             return Flux.empty();
         }
 
         Channel channel = (Channel) Objects.requireNonNull(context.getChats().get(channelId));
         // I can't be sure that ChatParticipant have user information attached because that field named as userId :/
-        User peer = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
-        User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId(), null)));
+        User peer = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
+        User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId())));
         ExportedChatInvite invite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
                 .map(d -> new ExportedChatInvite(context.getClient(), d, context.getUsers()
-                        .get(Id.ofUser(d.adminId(), null))))
+                        .get(Id.ofUser(d.adminId()))))
                 .orElse(null);
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())

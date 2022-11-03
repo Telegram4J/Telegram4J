@@ -367,7 +367,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                             Id chatPeer = Id.of(ctx.getChatPeer());
                             return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                     .getMessages(chatPeer, List.of(ImmutableInputMessageID.of(ctx.getMessageId())))
-                                    .flatMap(b -> findMessageMedia(b, ctx));
+                                    .flatMap(b -> findMessageMedia(b, fileRefId, ctx));
                         }
                         case BOT_INFO:
                             var ctx = (BotInfoContext) fileRefId.getContext();
@@ -375,7 +375,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                             switch (chatPeer.getType()) {
                                 case CHANNEL:
                                 case CHAT:
-                                    Id botId = Id.ofUser(ctx.getBotId(), null);
+                                    Id botId = Id.ofUser(ctx.getBotId());
                                     return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                             .getChatFullById(chatPeer)
                                             .map(c -> {
@@ -623,6 +623,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Id.ofUser(777000, 0L);
     }
 
+    /**
+     * Requests to retrieve {@link Sticker custom emoji} by specified id.
+     *
+     * @param id The id of sticker.
+     * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+     */
     public Mono<Sticker> getCustomEmoji(long id) {
         return serviceHolder.getChatService().getCustomEmojiDocuments(List.of(id))
                 .mapNotNull(d -> d.isEmpty() ? null : d.get(0))
@@ -630,6 +636,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
     }
 
+    /**
+     * Requests to retrieve {@link Sticker custom emojis} by specified ids.
+     *
+     * @param ids An {@link Iterable} with ids.
+     * @return A {@link Flux} which continually emits a {@link Sticker custom emojis}.
+     */
     public Flux<Sticker> getCustomEmojis(Iterable<Long> ids) {
         return serviceHolder.getChatService().getCustomEmojiDocuments(ids)
                 .flatMapIterable(Function.identity())
@@ -710,7 +722,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .map(f -> f.withContext(Context.createChatPhotoContext(resolvedPeer, messageId)));
     }
 
-    private Mono<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, MessageMediaContext context) {
+    private Mono<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, FileReferenceId original,
+                                                   MessageMediaContext context) {
         return Mono.justOrEmpty(messages.getMessages().stream()
                 .filter(msg -> msg.getId() == context.getMessageId())
                 .findFirst())
@@ -722,6 +735,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     } else if (media instanceof MessageMedia.Invoice) {
                         var cast = (MessageMedia.Invoice) media;
                         return Mono.justOrEmpty(cast.getPhoto());
+                    } else if (media instanceof MessageMedia.Game) {
+                        var cast = (MessageMedia.Game) media;
+                        if (original.getFileType() == FileReferenceId.Type.PHOTO) {
+                            return Mono.just(cast.getGame().getPhoto());
+                        }
+                        return Mono.justOrEmpty(cast.getGame().getDocument());
                     } else {
                         return Mono.error(new IllegalStateException("Unexpected MessageMedia type: " + media));
                     }

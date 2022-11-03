@@ -321,7 +321,7 @@ public final class GroupChat extends BaseChat {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::recentRequesters)
                 .map(list -> list.stream()
-                        .map(l -> Id.ofUser(l, null))
+                        .map(Id::ofUser)
                         .collect(Collectors.toSet()));
     }
 
@@ -347,7 +347,7 @@ public final class GroupChat extends BaseChat {
         return Mono.justOrEmpty(fullData)
                 .mapNotNull(ChatFull::recentRequesters)
                 .flatMapIterable(Function.identity())
-                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id)));
     }
 
     /**

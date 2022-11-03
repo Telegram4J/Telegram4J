@@ -200,8 +200,7 @@ public final class KeyboardButton implements TelegramObject {
      */
     public Optional<Id> getUserId() {
         switch (data.identifier()) {
-            case KeyboardButtonUserProfile.ID: return Optional.of(Id.ofUser(
-                    ((KeyboardButtonUserProfile) data).userId(), null));
+            case KeyboardButtonUserProfile.ID: return Optional.of(Id.ofUser(((KeyboardButtonUserProfile) data).userId()));
             case InputKeyboardButtonUserProfile.ID: return Optional.of(Id.of(
                     ((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
             default: return Optional.empty();

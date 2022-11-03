@@ -45,7 +45,7 @@ public class BotInfo implements TelegramObject {
      */
     public Id getBotId() {
         return Optional.ofNullable(data.userId())
-                .map(i -> Id.ofUser(i, null))
+                .map(Id::ofUser)
                 .or(() -> peer.getType() == Id.Type.USER
                         ? Optional.of(peer)
                         : Optional.empty())

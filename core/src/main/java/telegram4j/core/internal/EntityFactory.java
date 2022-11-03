@@ -214,31 +214,30 @@ public class EntityFactory {
     }
 
     @Nullable
-    public static User createUser(MTProtoTelegramClient client, TlObject possibleUser) {
-        switch (possibleUser.identifier()) {
+    public static User createUser(MTProtoTelegramClient client, telegram4j.tl.users.UserFull userFull) {
+        var minData = userFull.users().stream()
+                .filter(u -> u.identifier() == BaseUser.ID &&
+                        u.id() == userFull.fullUser().id())
+                .map(u -> (BaseUser) u)
+                .findFirst()
+                .orElse(null);
+
+        if (minData == null) {
+            return null;
+        }
+        return new User(client, userFull.fullUser(), minData);
+    }
+
+    @Nullable
+    public static User createUser(MTProtoTelegramClient client, telegram4j.tl.User anyUser) {
+        switch (anyUser.identifier()) {
             case UserEmpty.ID: return null;
-            case UserFull.ID: {
-                UserFull userFull = (UserFull) possibleUser;
-
-                var minData = userFull.users().stream()
-                        .filter(u -> u.identifier() == BaseUser.ID &&
-                                u.id() == userFull.fullUser().id())
-                        .map(u -> (BaseUser) u)
-                        .findFirst()
-                        .orElse(null);
-
-                if (minData == null) {
-                    return null;
-                }
-
-                return new User(client, userFull.fullUser(), minData);
-            }
             case BaseUser.ID:
-                BaseUser baseUser = (BaseUser) possibleUser;
+                BaseUser baseUser = (BaseUser) anyUser;
 
                 return new User(client, baseUser);
             default:
-                throw new IllegalArgumentException("Unknown User type: " + possibleUser);
+                throw new IllegalArgumentException("Unknown User type: " + anyUser);
         }
     }
 

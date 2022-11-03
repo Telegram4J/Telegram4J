@@ -132,7 +132,7 @@ class MessageUpdateHandlers {
 
         Id chatId = upd.identifier() == UpdatePinnedMessages.ID
                 ? Id.of(((UpdatePinnedMessages) upd).peer())
-                : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId(), null);
+                : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId());
 
         return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
     }
@@ -156,7 +156,7 @@ class MessageUpdateHandlers {
         Poll poll = Optional.ofNullable(context.getOld())
                 .map(d -> new Poll(context.getClient(), d))
                 .orElse(null);
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
 
         return Flux.just(new MessagePollVoteEvent(context.getClient(), poll, user, upd.options()));
     }

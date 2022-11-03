@@ -71,7 +71,7 @@ public final class PollResults implements TelegramObject {
     public Set<Id> getRecentVotersIds() {
         return Optional.ofNullable(data.recentVoters())
                 .map(l -> l.stream()
-                        .map(i -> Id.ofUser(i, null))
+                        .map(Id::ofUser)
                         .collect(Collectors.toSet()))
                 .orElse(Set.of());
     }
@@ -95,7 +95,7 @@ public final class PollResults implements TelegramObject {
         var retriever = client.withRetrievalStrategy(strategy);
         return Mono.justOrEmpty(data.recentVoters())
                 .flatMapIterable(Function.identity())
-                .flatMap(id -> retriever.getUserById(Id.ofUser(id, null)));
+                .flatMap(id -> retriever.getUserById(Id.ofUser(id)));
     }
 
     /**

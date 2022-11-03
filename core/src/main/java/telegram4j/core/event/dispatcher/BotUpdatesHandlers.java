@@ -29,7 +29,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateInlineBotCallbackQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
         InlineMessageId msgId = InlineMessageId.from(upd.msgId());
 
         return Flux.just(new InlineCallbackQueryEvent(client, upd.queryId(),
@@ -41,7 +41,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateBotCallbackQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
         Chat chat = context.getChatEntity(Id.of(upd.peer())).orElseThrow();
 
         return Flux.just(new CallbackQueryEvent(client, upd.queryId(),
@@ -54,7 +54,7 @@ class BotUpdatesHandlers {
         MTProtoTelegramClient client = context.getClient();
         UpdateBotInlineQuery upd = context.getUpdate();
 
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId(), null)));
+        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
         GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(upd.geo(), BaseGeoPoint.class))
                 .map(GeoPoint::new)
                 .orElse(null);

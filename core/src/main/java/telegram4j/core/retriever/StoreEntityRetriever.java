@@ -99,7 +99,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                         case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserMinById(chatId.asLong())
-                                .zipWith(getUserFullById(client.getSelfId())
+                                .zipWith(getUserById(client.getSelfId())
                                         .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                                 .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());
@@ -116,7 +116,7 @@ public class StoreEntityRetriever implements EntityRetriever {
                         case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong())
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserFullById(chatId.asLong())
-                                .zipWith(getUserFullById(client.getSelfId())
+                                .zipWith(getUserById(client.getSelfId())
                                         .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
                                 .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
                         default: return Mono.error(new IllegalStateException());

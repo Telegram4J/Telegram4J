@@ -460,7 +460,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .map(i -> Tuples.of(u, i)))
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
                 .flatMap(TupleUtils.function((u, cpts) -> {
-                    var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId(), null)))
+                    var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId())))
                             .map(c -> client.asResolvedInputChannel(c.getId())) // must be present
                             .orElseThrow();
 

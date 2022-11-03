@@ -363,9 +363,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                             if (parseBotIdFromToken && authResources.isBot()) {
                                                 return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
                                                         .map(t -> Long.parseLong(t.split(":", 2)[0]))
-                                                        .orElseThrow(), null));
+                                                        .orElseThrow()));
                                             }
-                                            return storeLayout.getSelfId().map(l -> Id.ofUser(l, null));
+                                            return storeLayout.getSelfId().map(Id::ofUser);
                                         })
                                         .switchIfEmpty(serviceHolder.getUserService()
                                                 .getFullUser(InputUserSelf.instance())

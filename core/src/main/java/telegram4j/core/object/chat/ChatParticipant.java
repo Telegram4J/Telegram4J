@@ -98,13 +98,13 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Id getId() {
         switch (data.identifier()) {
-            case BaseChannelParticipant.ID: return Id.ofUser(((BaseChannelParticipant) data).userId(), null);
-            case ChannelParticipantSelf.ID: return Id.ofUser(((ChannelParticipantSelf) data).userId(), null);
-            case BaseChatParticipant.ID: return Id.ofUser(((BaseChatParticipant) data).userId(), null);
-            case ChannelParticipantCreator.ID: return Id.ofUser(((ChannelParticipantCreator) data).userId(), null);
-            case ChatParticipantCreator.ID: return Id.ofUser(((ChatParticipantCreator) data).userId(), null);
-            case ChannelParticipantAdmin.ID: return Id.ofUser(((ChannelParticipantAdmin) data).userId(), null);
-            case ChatParticipantAdmin.ID: return Id.ofUser(((ChatParticipantAdmin) data).userId(), null);
+            case BaseChannelParticipant.ID: return Id.ofUser(((BaseChannelParticipant) data).userId());
+            case ChannelParticipantSelf.ID: return Id.ofUser(((ChannelParticipantSelf) data).userId());
+            case BaseChatParticipant.ID: return Id.ofUser(((BaseChatParticipant) data).userId());
+            case ChannelParticipantCreator.ID: return Id.ofUser(((ChannelParticipantCreator) data).userId());
+            case ChatParticipantCreator.ID: return Id.ofUser(((ChatParticipantCreator) data).userId());
+            case ChannelParticipantAdmin.ID: return Id.ofUser(((ChannelParticipantAdmin) data).userId());
+            case ChatParticipantAdmin.ID: return Id.ofUser(((ChatParticipantAdmin) data).userId());
             case ChannelParticipantBanned.ID: return Id.of(((ChannelParticipantBanned) data).peer());
             case ChannelParticipantLeft.ID: return Id.of(((ChannelParticipantLeft) data).peer());
             default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
@@ -138,11 +138,11 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Optional<Id> getInviterId() {
         switch (data.identifier()) {
-            case ChannelParticipantSelf.ID: return Optional.of(Id.ofUser(((ChannelParticipantSelf) data).inviterId(), null));
-            case BaseChatParticipant.ID: return Optional.of(Id.ofUser(((BaseChatParticipant) data).inviterId(), null));
+            case ChannelParticipantSelf.ID: return Optional.of(Id.ofUser(((ChannelParticipantSelf) data).inviterId()));
+            case BaseChatParticipant.ID: return Optional.of(Id.ofUser(((BaseChatParticipant) data).inviterId()));
             case ChannelParticipantAdmin.ID: return Optional.ofNullable(((ChannelParticipantAdmin) data).inviterId())
-                    .map(l -> Id.ofUser(l, null));
-            case ChatParticipantAdmin.ID: return Optional.of(Id.ofUser(((ChatParticipantAdmin) data).inviterId(), null));
+                    .map(Id::ofUser);
+            case ChatParticipantAdmin.ID: return Optional.of(Id.ofUser(((ChatParticipantAdmin) data).inviterId()));
             case BaseChannelParticipant.ID:
             case ChannelParticipantBanned.ID:
             case ChannelParticipantLeft.ID:
@@ -240,7 +240,7 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Optional<Id> getKickerId() {
         return data.identifier() == ChannelParticipantBanned.ID
-                ? Optional.of(((ChannelParticipantBanned) data).kickedBy()).map(l -> Id.ofUser(l, null))
+                ? Optional.of(((ChannelParticipantBanned) data).kickedBy()).map(Id::ofUser)
                 : Optional.empty();
     }
 
@@ -282,7 +282,7 @@ public final class ChatParticipant implements TelegramObject {
      */
     public Optional<Id> getPromoterId() {
         return data.identifier() == ChannelParticipantAdmin.ID
-                ? Optional.of((ChannelParticipantAdmin) data).map(d -> Id.ofUser(d.promotedBy(), null))
+                ? Optional.of((ChannelParticipantAdmin) data).map(d -> Id.ofUser(d.promotedBy()))
                 : Optional.empty();
     }
 

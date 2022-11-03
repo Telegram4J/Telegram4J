@@ -114,7 +114,7 @@ public class MessageReplies implements TelegramObject {
      * @return The id of discussion supergroup, if present.
      */
     public Optional<Id> getDiscussionChannelId() {
-        return Optional.ofNullable(data.channelId()).map(c -> Id.ofChannel(c, null));
+        return Optional.ofNullable(data.channelId()).map(Id::ofChannel);
     }
 
     /**

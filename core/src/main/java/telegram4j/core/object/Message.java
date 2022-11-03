@@ -212,7 +212,7 @@ public final class Message implements TelegramObject {
     public Optional<Id> getViaBotId() {
         return Optional.ofNullable(baseData)
                 .map(BaseMessage::viaBotId)
-                .map(l -> Id.ofUser(l, null));
+                .map(Id::ofUser);
     }
 
     /**
