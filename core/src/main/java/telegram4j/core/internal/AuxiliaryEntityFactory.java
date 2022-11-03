@@ -4,17 +4,17 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryChannelMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryMessagesSlice;
-import telegram4j.core.object.Message;
-import telegram4j.core.object.PeerEntity;
-import telegram4j.core.object.User;
+import telegram4j.core.auxiliary.AuxiliaryStickerSet;
+import telegram4j.core.object.StickerSet;
+import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BaseMessageFields;
-import telegram4j.tl.messages.BaseMessages;
-import telegram4j.tl.messages.ChannelMessages;
-import telegram4j.tl.messages.Messages;
-import telegram4j.tl.messages.MessagesSlice;
+import telegram4j.tl.ImmutableInputStickerSetID;
+import telegram4j.tl.messages.*;
 
 import java.util.Map;
 import java.util.Objects;
@@ -24,6 +24,18 @@ import java.util.stream.Collectors;
 public class AuxiliaryEntityFactory {
 
     private AuxiliaryEntityFactory() {}
+
+    public static AuxiliaryStickerSet createStickerSet(MTProtoTelegramClient client, BaseStickerSet data) {
+        var stickerSet = new StickerSet(client, data.set());
+        var ctx = Context.createStickerSetContext(ImmutableInputStickerSetID.of(
+                stickerSet.getId(), stickerSet.getAccessHash()));
+        var stickers = data.documents().stream()
+                .map(TlEntityUtil.isInstance(BaseDocument.class))
+                .map(d -> (Sticker) EntityFactory.createDocument(client, d, ctx))
+                .collect(Collectors.toMap(s -> s.getId().orElseThrow(), Function.identity()));
+
+        return new AuxiliaryStickerSet(client, stickerSet, stickers, data.packs());
+    }
 
     public static AuxiliaryMessages createMessages(MTProtoTelegramClient client, Messages data) {
         switch (data.identifier()) {

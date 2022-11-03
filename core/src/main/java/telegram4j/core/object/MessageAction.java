@@ -265,10 +265,10 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
-        public List<Id> getUserIds() {
+        public Set<Id> getUserIds() {
             return data.users().stream()
                     .map(Id::ofUser)
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
         }
 
         @Override
@@ -305,10 +305,10 @@ public class MessageAction implements TelegramObject {
             return data.title();
         }
 
-        public List<Id> getUserIds() {
+        public Set<Id> getUserIds() {
             return data.users().stream()
                     .map(Id::ofUser)
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
         }
 
         @Override

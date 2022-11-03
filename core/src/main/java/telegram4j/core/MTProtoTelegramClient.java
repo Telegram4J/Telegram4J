@@ -8,8 +8,10 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufFlux;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
+import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
@@ -300,6 +302,54 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                         .setBotCommands(scope, langCode, commands));
     }
 
+    /**
+     * Requests to retrieve {@link Sticker custom emoji} by specified id.
+     *
+     * @param id The id of sticker.
+     * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+     */
+    public Mono<Sticker> getCustomEmoji(long id) {
+        return serviceHolder.getChatService().getCustomEmojiDocuments(List.of(id))
+                .mapNotNull(d -> d.isEmpty() ? null : d.get(0))
+                .ofType(BaseDocument.class)
+                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
+    }
+
+    /**
+     * Requests to retrieve {@link Sticker custom emojis} by specified ids.
+     *
+     * @param ids An {@link Iterable} with ids.
+     * @return A {@link Flux} which continually emits a {@link Sticker custom emojis}.
+     */
+    public Flux<Sticker> getCustomEmojis(Iterable<Long> ids) {
+        return serviceHolder.getChatService().getCustomEmojiDocuments(ids)
+                .flatMapIterable(Function.identity())
+                .ofType(BaseDocument.class)
+                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
+    }
+
+    /**
+     * Requests to retrieve full sticker set by specified id.
+     *
+     * @param id The id of sticker set.
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryStickerSet full sticker set info}.
+     */
+    public Mono<AuxiliaryStickerSet> getStickerSet(InputStickerSet id) {
+        return getStickerSet(id, 0);
+    }
+
+    /**
+     * Requests to retrieve full sticker set by specified id.
+     *
+     * @param id The id of sticker set.
+     * @param hash The pagination hash.
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryStickerSet full sticker set info}.
+     */
+    public Mono<AuxiliaryStickerSet> getStickerSet(InputStickerSet id, int hash) {
+        return serviceHolder.getChatService().getStickerSet(id, hash)
+                .map(data -> AuxiliaryEntityFactory.createStickerSet(this, data));
+    }
+
     // Utility methods
     // ===========================
 
@@ -348,14 +398,15 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                         return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                                 .getMessages(Id.of(peer, getSelfId()), msgId)
                                                 .flatMap(c -> findChatPhoto(c, peer, messageChatCtx.getMessageId().orElseThrow()));
-                                    default: return Mono.error(new IllegalStateException());
+                                    default:
+                                        return Mono.error(new IllegalStateException());
                                 }
                             });
                 }
                 case WEB_DOCUMENT:
                 case DOCUMENT:
                     var docType = fileRefId.getDocumentType().orElseThrow();
-                    if (docType == FileReferenceId.DocumentType.STICKER) {
+                    if (docType == FileReferenceId.DocumentType.EMOJI) {
                         return getCustomEmoji(fileRefId.getDocumentId())
                                 .map(Sticker::getFileReferenceId);
                     }
@@ -369,7 +420,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                     .getMessages(chatPeer, List.of(ImmutableInputMessageID.of(ctx.getMessageId())))
                                     .flatMap(b -> findMessageMedia(b, fileRefId, ctx));
                         }
-                        case BOT_INFO:
+                        case BOT_INFO: {
                             var ctx = (BotInfoContext) fileRefId.getContext();
                             Id chatPeer = Id.of(ctx.getChatPeer());
                             switch (chatPeer.getType()) {
@@ -396,8 +447,15 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                             .flatMap(u -> Mono.justOrEmpty(u.getBotInfo()))
                                             .flatMap(b -> Mono.justOrEmpty(b.getDescriptionDocument()))
                                             .map(Document::getFileReferenceId);
-                                default: return Mono.error(new IllegalStateException());
+                                default:
+                                    return Mono.error(new IllegalStateException());
                             }
+                        }
+                        case STICKER_SET:
+                            var ctx = (StickerSetContext) fileRefId.getContext();
+                            return getStickerSet(ctx.getStickerSet(), 0)
+                                    .flatMap(st -> Mono.justOrEmpty(st.getSticker(fileRefId.getDocumentId())))
+                                    .map(Document::getFileReferenceId);
                         case PROFILE_PHOTO:
                         case CHAT_PHOTO:
                             return Mono.error(new IllegalStateException()); // handled above
@@ -621,32 +679,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public Id getServiceNotificationId() {
         return Id.ofUser(777000, 0L);
-    }
-
-    /**
-     * Requests to retrieve {@link Sticker custom emoji} by specified id.
-     *
-     * @param id The id of sticker.
-     * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
-     */
-    public Mono<Sticker> getCustomEmoji(long id) {
-        return serviceHolder.getChatService().getCustomEmojiDocuments(List.of(id))
-                .mapNotNull(d -> d.isEmpty() ? null : d.get(0))
-                .ofType(BaseDocument.class)
-                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
-    }
-
-    /**
-     * Requests to retrieve {@link Sticker custom emojis} by specified ids.
-     *
-     * @param ids An {@link Iterable} with ids.
-     * @return A {@link Flux} which continually emits a {@link Sticker custom emojis}.
-     */
-    public Flux<Sticker> getCustomEmojis(Iterable<Long> ids) {
-        return serviceHolder.getChatService().getCustomEmojiDocuments(ids)
-                .flatMapIterable(Function.identity())
-                .ofType(BaseDocument.class)
-                .map(d -> (Sticker) EntityFactory.createDocument(this, d, Context.noOpContext()));
     }
 
     // EntityRetriever methods

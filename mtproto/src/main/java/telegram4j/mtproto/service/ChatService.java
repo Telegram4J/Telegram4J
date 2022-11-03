@@ -293,8 +293,9 @@ public class ChatService extends RpcService {
     }
 
     @BotCompatible
-    public Mono<telegram4j.tl.messages.StickerSet> getStickerSet(InputStickerSet stickerSet, int hash) {
-        return client.sendAwait(ImmutableGetStickerSet.of(stickerSet, hash));
+    public Mono<BaseStickerSet> getStickerSet(InputStickerSet stickerSet, int hash) {
+        return client.sendAwait(ImmutableGetStickerSet.of(stickerSet, hash))
+                .ofType(BaseStickerSet.class);
     }
 
     public Mono<StickerSetInstallResult> installStickerSet(InputStickerSet stickerSet, boolean archived) {

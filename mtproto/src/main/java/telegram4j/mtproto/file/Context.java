@@ -3,6 +3,7 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.messages.StickerSet;
 
 import java.util.Objects;
 
@@ -22,7 +23,8 @@ public abstract class Context {
         MESSAGE_MEDIA, // from any MessageMedia; detected by documentType
         BOT_INFO, // UserFull#botInfo() or ChatFull#botInfo()
         PROFILE_PHOTO, // BaseUser#photo() and other
-        CHAT_PHOTO; // UserFull#profilePhoto() and other
+        CHAT_PHOTO,  // UserFull#profilePhoto() and other
+        STICKER_SET;
 
         static final Type[] ALL = values();
     }
@@ -87,6 +89,18 @@ public abstract class Context {
     }
 
     /**
+     * Creates new context which corresponding to {@link StickerSet} object.
+     *
+     * @param stickerSet The id of sticker set where sticker was found.
+     * @return A new {@code StickerSetContext} context.
+     */
+    public static StickerSetContext createStickerSetContext(InputStickerSet stickerSet) {
+        if (stickerSet == InputStickerSetEmpty.instance())
+            throw new IllegalArgumentException();
+        return new StickerSetContext(stickerSet);
+    }
+
+    /**
      * Gets common instance for documents with empty context.
      *
      * @return The common instance for documents with empty context.
@@ -97,6 +111,9 @@ public abstract class Context {
 
     static Context deserialize(ByteBuf buf, Context.Type type) {
         switch (type) {
+            case STICKER_SET:
+                InputStickerSet stickerSet = TlDeserializer.deserialize(buf);
+                return new StickerSetContext(stickerSet);
             case MESSAGE_MEDIA: {
                 Peer peer = TlDeserializer.deserialize(buf);
                 int messageId = buf.readIntLE();

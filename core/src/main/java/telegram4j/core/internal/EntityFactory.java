@@ -31,6 +31,7 @@ import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
+import telegram4j.mtproto.file.StickerSetContext;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseChat;
 import telegram4j.tl.Channel;
@@ -393,6 +394,15 @@ public class EntityFactory {
         }
 
         if (stickerData != null || emojiData != null) {
+            var stickerInfo = Variant2.of(stickerData, emojiData);
+            if (emojiData != null) {
+                context = Context.noOpContext();
+            } else if (!(context instanceof StickerSetContext)) {
+                // This context is more reliable, because even after deleting
+                // the context message with sticker, sticker will remain available
+                context = Context.createStickerSetContext(stickerInfo
+                        .map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset));
+            }
             return new Sticker(client, data, fileName, context,
                     Variant2.of(stickerData, emojiData), Variant2.of(sizeData, videoData));
         }

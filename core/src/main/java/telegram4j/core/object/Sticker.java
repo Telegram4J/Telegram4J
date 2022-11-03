@@ -1,7 +1,9 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.object.media.MaskCoordinates;
 import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.Context;
@@ -94,8 +96,17 @@ public class Sticker extends Document {
      *
      * @return The {@link InputStickerSet} id of sticker set.
      */
-    public InputStickerSet getStickerSet() {
+    public InputStickerSet getStickerSetId() {
         return stickerData.map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset);
+    }
+
+    /**
+     * Requests to retrieve full sticker set of sticker.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryStickerSet full sticker set info}.
+     */
+    public Mono<AuxiliaryStickerSet> getStickerSet() {
+        return client.getStickerSet(getStickerSetId());
     }
 
     /**

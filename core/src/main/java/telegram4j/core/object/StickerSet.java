@@ -1,7 +1,9 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.media.PhotoSize;
 import telegram4j.mtproto.file.FileReferenceId;
@@ -176,6 +178,15 @@ public class StickerSet implements TelegramObject {
 
     public int getHash() {
         return data.hash();
+    }
+
+    /**
+     * Requests to retrieve full sticker set.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link AuxiliaryStickerSet full sticker set info}.
+     */
+    public Mono<AuxiliaryStickerSet> getStickers() {
+        return client.getStickerSet(ImmutableInputStickerSetID.of(data.id(), data.accessHash()), data.hash());
     }
 
     @Override
