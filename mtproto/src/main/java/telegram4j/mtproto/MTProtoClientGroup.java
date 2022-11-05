@@ -12,7 +12,7 @@ public interface MTProtoClientGroup {
      * Gets main MTProto client which can be used to received lifetime updates
      * and interact with methods.
      *
-     * @return The {@link MainMTProtoClient main MTProto client}.
+     * @return The {@link MainMTProtoClient main client}.
      */
     MainMTProtoClient main();
 

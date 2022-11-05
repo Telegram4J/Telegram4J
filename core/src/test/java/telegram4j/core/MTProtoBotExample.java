@@ -16,6 +16,7 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever.Setting;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.spec.BotCommandScopeSpec.Type;
+import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.StoreLayoutImpl;
@@ -51,7 +52,7 @@ public class MTProtoBotExample {
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
-                .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all()))
+                .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(), MTProtoRetrySpec.instance()))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(Type.CHATS), "en")
@@ -67,7 +68,7 @@ public class MTProtoBotExample {
                             })
                             .then();
 
-                    Mono<Void> sandbox = client.getMtProtoClient().updates().asFlux()
+                    Mono<Void> sandbox = client.getMtProtoClientGroup().main().updates().asFlux()
                             .publishOn(Schedulers.boundedElastic())
                             .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
                             .doOnNext(log::info)

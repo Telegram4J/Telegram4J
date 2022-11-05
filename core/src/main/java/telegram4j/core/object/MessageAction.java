@@ -8,6 +8,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.GroupChat;
+import telegram4j.core.object.chat.SupergroupChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.ChatPhotoContext;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/** Basic type of service messages. */
 public class MessageAction implements TelegramObject {
     protected final MTProtoTelegramClient client;
     protected final Type type;
@@ -619,6 +621,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service message representing the latest message in old {@link GroupChat}. */
     public static class ChatMigrateTo extends MessageAction {
 
         private final MessageActionChatMigrateTo data;
@@ -628,8 +631,34 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets id of new {@link SupergroupChat} to which group chat was migrated.
+         *
+         * @return The id of new {@link SupergroupChat} to which group chat was migrated.
+         */
         public Id getChannelId() {
             return Id.ofChannel(data.channelId());
+        }
+
+        /**
+         * Requests to retrieve {@link SupergroupChat} to which group chat was migrated.
+         *
+         * @return A {@link Mono} emitting on successful completion {@link SupergroupChat new supergroup}.
+         */
+        public Mono<SupergroupChat> getChannel() {
+            return getChannel(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve {@link SupergroupChat} to which group chat was migrated using
+         * specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply.
+         * @return A {@link Mono} emitting on successful completion {@link SupergroupChat new supergroup}.
+         */
+        public Mono<SupergroupChat> getChannel(EntityRetrievalStrategy strategy) {
+            return client.withRetrievalStrategy(strategy).getChatById(getChannelId())
+                    .cast(SupergroupChat.class);
         }
 
         @Override
@@ -1166,13 +1195,20 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service messages representing creation of new channel topic. */
     public static class TopicCreate extends MessageAction {
         // from https://github.com/telegramdesktop/tdesktop/blob/55fd9c50912b127bf782765f23a1b31569e53cbe/Telegram/SourceFiles/data/data_forum_topic.cpp#L47
+        /** Topic icon color in RGB format looking like this: <span style="color: #6FB9F0">\u25A0</span>. */
         public static final int BLUE = 0x6FB9F0;
+        /** Topic icon color in RGB format looking like this: <span style="color: #FFD67E">\u25A0</span>. */
         public static final int YELLOW = 0xFFD67E;
+        /** Topic icon color in RGB format looking like this: <span style="color: #CB86DB">\u25A0</span>. */
         public static final int VIOLET = 0xCB86DB;
+        /** Topic icon color in RGB format looking like this: <span style="color: #8EEE98">\u25A0</span>. */
         public static final int GREEN = 0x8EEE98;
+        /** Topic icon color in RGB format looking like this: <span style="color: #FF93B2">\u25A0</span>. */
         public static final int ROSE = 0xFF93B2;
+        /** Topic icon color in RGB format looking like this: <span style="color: #FB6F5F">\u25A0</span>. */
         public static final int RED = 0xFB6F5F;
 
         private final MessageActionTopicCreate data;
@@ -1182,6 +1218,11 @@ public class MessageAction implements TelegramObject {
             this.data = data;
         }
 
+        /**
+         * Gets title of topic.
+         *
+         * @return The title of topic.
+         */
         public String getTitle() {
             return data.title();
         }
@@ -1189,22 +1230,33 @@ public class MessageAction implements TelegramObject {
         /**
          * Gets color of the topic in RGB format, currently only one of constants in this type.
          *
-         * @return The color of the topic in RGB format, currently only one of constants in this type.
+         * @return The color of the topic in RGB format.
          */
         public int getIconColor() {
             return data.iconColor();
         }
 
+        /**
+         * Gets id of {@link Sticker custom emoji} which used as topic icon, if present.
+         *
+         * @return The id of {@link Sticker custom emoji} which used as topic icon, if present.
+         */
         public Optional<Long> getIconEmojiId() {
             return Optional.ofNullable(data.iconEmojiId());
         }
 
+        /**
+         * Requests to retrieve {@link Sticker custom emoji} which used as topic icon.
+         *
+         * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+         */
         public Mono<Sticker> getIconEmoji() {
             return Mono.justOrEmpty(getIconEmojiId())
                     .flatMap(client::getCustomEmoji);
         }
     }
 
+    /** Service messages representing edition of channel topic. */
     public static class TopicEdit extends MessageAction {
 
         private final MessageActionTopicEdit data;
@@ -1214,19 +1266,39 @@ public class MessageAction implements TelegramObject {
             this.data = data;
         }
 
+        /**
+         * Gets new title for topic, if changed.
+         *
+         * @return A new title for topic, if changed.
+         */
         public Optional<String> getTitle() {
             return Optional.ofNullable(data.title());
         }
 
+        /**
+         * Gets id of {@link Sticker custom emoji} which used as topic icon, if changed.
+         *
+         * @return The id of {@link Sticker custom emoji} which used as topic icon, if changed.
+         */
         public Optional<Long> getIconEmojiId() {
             return Optional.ofNullable(data.iconEmojiId());
         }
 
+        /**
+         * Requests to retrieve {@link Sticker custom emoji} which used as topic icon.
+         *
+         * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+         */
         public Mono<Sticker> getIconEmoji() {
             return Mono.justOrEmpty(getIconEmojiId())
                     .flatMap(client::getCustomEmoji);
         }
 
+        /**
+         * Gets whether topic is closed or reopened, if changed.
+         *
+         * @return {@code true} if closed, {@code false} if reopened and {@code null} if there is no changes.
+         */
         public Optional<Boolean> isClosed() {
             return Optional.ofNullable(data.closed());
         }

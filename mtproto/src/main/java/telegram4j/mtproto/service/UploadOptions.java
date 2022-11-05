@@ -98,6 +98,15 @@ public class UploadOptions {
         return partsCount;
     }
 
+    /**
+     * Creates new {@code UploadOptions} with specified mandatory parameters.
+     * All other attributes will initialize depends on specified values.
+     *
+     * @throws IllegalArgumentException if {@code size} is negative or more than {@link UploadService#MAX_FILE_SIZE}.
+     * @param data The publisher emitting data for uploading.
+     * @param size The exact size of file.
+     * @param name The name for uploaded file.
+     */
     public static UploadOptions create(Publisher<? extends ByteBuf> data, long size, String name) {
         if (size <= 0 || size > MAX_FILE_SIZE)
             throw new IllegalArgumentException("Invalid file size: " + size);

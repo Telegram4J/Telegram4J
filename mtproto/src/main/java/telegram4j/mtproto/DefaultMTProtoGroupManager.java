@@ -116,13 +116,12 @@ public class DefaultMTProtoGroupManager implements MTProtoClientGroupManager {
 
     private DcId nextId(DataCenter dc) {
         int id = dc.getInternalId();
-        int shift = clients.keySet().stream()
+        var shift = clients.keySet().stream()
                 .filter(dcId -> dcId.getId() == id)
                 .mapToInt(DcId::getShift)
-                .max()
-                .orElse(0);
+                .max();
 
-        return DcId.of(id, shift);
+        return DcId.of(id, shift.isEmpty() ? 0 : shift.getAsInt() + 1);
     }
 
     static class ClientInfo {

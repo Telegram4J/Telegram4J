@@ -35,14 +35,15 @@ public interface ResponseTransformer {
      * on flood wait errors for given methods scope.
      *
      * @param methodPredicate The method scope.
+     * @param retrySpec The retry spec for flood wait errors.
      * @return The new {@code ResponseTransformer} which retries signals on flood wait for matched methods.
      */
-    static ResponseTransformer retryFloodWait(MethodPredicate methodPredicate) {
+    static ResponseTransformer retryFloodWait(MethodPredicate methodPredicate, MTProtoRetrySpec retrySpec) {
         return new ResponseTransformer() {
             @Override
             public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
                 if (methodPredicate.test(method)) {
-                    return mono -> mono.retryWhen(MTProtoRetrySpec.instance());
+                    return mono -> mono.retryWhen(retrySpec);
                 }
                 return Function.identity();
             }

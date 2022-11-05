@@ -35,10 +35,16 @@ public class MessageReplyHeader implements TelegramObject {
         return client;
     }
 
+    // TODO: ???
     public boolean isReplyToScheduled() {
         return data.replyToScheduled();
     }
 
+    /**
+     * Gets whether message was sent in channel forum topic.
+     *
+     * @return {@code true} if message was sent in channel forum topic.
+     */
     public boolean isForumTopic() {
         return data.forumTopic();
     }
