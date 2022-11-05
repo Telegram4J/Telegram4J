@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
@@ -19,13 +19,11 @@ import telegram4j.tl.request.users.ImmutableSetSecureValueErrors;
 import telegram4j.tl.users.UserFull;
 
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 public class UserService extends RpcService {
 
-    public UserService(MTProtoClient client, StoreLayout storeLayout) {
-        super(client, storeLayout);
+    public UserService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+        super(groupManager, storeLayout);
     }
 
     // additional methods
@@ -53,7 +51,7 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<List<User>> getUsers(Iterable<? extends InputUser> userIds) {
-        return Mono.defer(() -> client.sendAwait(ImmutableGetUsers.of(userIds)))
+        return Mono.defer(() -> sendMain(ImmutableGetUsers.of(userIds)))
                 .flatMap(u -> storeLayout.onContacts(List.of(), u)
                         .thenReturn(u));
     }
@@ -67,56 +65,56 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<UserFull> getFullUser(InputUser id) {
-        return client.sendAwait(ImmutableGetFullUser.of(id))
+        return sendMain(ImmutableGetFullUser.of(id))
                 .flatMap(u -> storeLayout.onUserUpdate(u).thenReturn(u));
     }
 
     public Mono<Boolean> setSecureValueErrors(InputUser id, Iterable<? extends SecureValueError> errors) {
-        return Mono.defer(() -> client.sendAwait(ImmutableSetSecureValueErrors.of(id, errors)));
+        return Mono.defer(() -> sendMain(ImmutableSetSecureValueErrors.of(id, errors)));
     }
 
     // contacts namespace
     // ======================
 
     public Mono<List<Integer>> getContactsIds(long hash) {
-        return client.sendAwait(ImmutableGetContactIDs.of(hash));
+        return sendMain(ImmutableGetContactIDs.of(hash));
     }
 
     public Mono<List<ContactStatus>> getStatuses() {
-        return client.sendAwait(GetStatuses.instance());
+        return sendMain(GetStatuses.instance());
     }
 
     public Mono<BaseContacts> getContacts(long hash) {
-        return client.sendAwait(ImmutableGetContacts.of(hash))
+        return sendMain(ImmutableGetContacts.of(hash))
                 .ofType(BaseContacts.class);
     }
 
     public Mono<ImportedContacts> importContacts(Iterable<? extends InputContact> contacts) {
-        return Mono.defer(() -> client.sendAwait(ImmutableImportContacts.of(contacts)));
+        return Mono.defer(() -> sendMain(ImmutableImportContacts.of(contacts)));
     }
 
     public Mono<Updates> deleteContacts(Iterable<? extends InputUser> ids) {
-        return Mono.defer(() -> client.sendAwait(ImmutableDeleteContacts.of(ids)));
+        return Mono.defer(() -> sendMain(ImmutableDeleteContacts.of(ids)));
     }
 
     public Mono<Boolean> deleteByPhones(List<String> phones) {
-        return Mono.defer(() -> client.sendAwait(ImmutableDeleteByPhones.of(phones)));
+        return Mono.defer(() -> sendMain(ImmutableDeleteByPhones.of(phones)));
     }
 
     public Mono<Boolean> block(InputPeer peer) {
-        return client.sendAwait(ImmutableBlock.of(peer));
+        return sendMain(ImmutableBlock.of(peer));
     }
 
     public Mono<Boolean> unblock(InputPeer peer) {
-        return client.sendAwait(ImmutableUnblock.of(peer));
+        return sendMain(ImmutableUnblock.of(peer));
     }
 
     public Mono<Blocked> getBlocked(int offset, int limit) {
-        return client.sendAwait(ImmutableGetBlocked.of(offset, limit));
+        return sendMain(ImmutableGetBlocked.of(offset, limit));
     }
 
     public Mono<Found> search(String query, int limit) {
-        return client.sendAwait(ImmutableSearch.of(query, limit));
+        return sendMain(ImmutableSearch.of(query, limit));
     }
 
     /**
@@ -128,55 +126,55 @@ public class UserService extends RpcService {
      */
     @BotCompatible
     public Mono<ResolvedPeer> resolveUsername(String username) {
-        return client.sendAwait(ImmutableResolveUsername.of(username))
+        return sendMain(ImmutableResolveUsername.of(username))
                 .flatMap(d -> storeLayout.onContacts(d.chats(), d.users()).thenReturn(d));
     }
 
     public Mono<TopPeers> getTopPeers(GetTopPeers request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Boolean> resetTopPeerRating(TopPeerCategory category, InputPeer peer) {
-        return client.sendAwait(ImmutableResetTopPeerRating.of(category, peer));
+        return sendMain(ImmutableResetTopPeerRating.of(category, peer));
     }
 
     public Mono<Boolean> resetSaves() {
-        return client.sendAwait(ResetSaved.instance());
+        return sendMain(ResetSaved.instance());
     }
 
     public Mono<List<SavedContact>> getSaved() {
-        return client.sendAwait(GetSaved.instance());
+        return sendMain(GetSaved.instance());
     }
 
     public Mono<Boolean> toggleTopPeers(boolean enabled) {
-        return client.sendAwait(ImmutableToggleTopPeers.of(enabled));
+        return sendMain(ImmutableToggleTopPeers.of(enabled));
     }
 
     public Mono<Updates> addContact(AddContact request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Updates> acceptContact(InputUser id) {
-        return client.sendAwait(ImmutableAcceptContact.of(id));
+        return sendMain(ImmutableAcceptContact.of(id));
     }
 
     public Mono<Updates> getLocated(GetLocated request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Updates> blockFromReplies(BlockFromReplies request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<ResolvedPeer> resolvePhone(String phone) {
-        return client.sendAwait(ImmutableResolvePhone.of(phone));
+        return sendMain(ImmutableResolvePhone.of(phone));
     }
 
     // photos namespace
     // ======================
 
     public Mono<Photo> updateProfilePhoto(InputPhoto photo) {
-        return client.sendAwait(ImmutableUpdateProfilePhoto.of(photo));
+        return sendMain(ImmutableUpdateProfilePhoto.of(photo));
     }
 
     public Mono<Photo> updateProfilePhoto(String photoFileReferenceId) {
@@ -185,23 +183,15 @@ public class UserService extends RpcService {
     }
 
     public Mono<Photo> uploadProfilePhoto(UploadProfilePhoto request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<List<Long>> deletePhotos(Iterable<InputPhoto> photos) {
-        return Mono.defer(() -> client.sendAwait(ImmutableDeletePhotos.of(photos)));
-    }
-
-    public Mono<List<Long>> deletePhotosIds(Iterable<String> photosFileReferenceIds) {
-        return Mono.defer(() -> client.sendAwait(ImmutableDeletePhotos.of(
-                StreamSupport.stream(photosFileReferenceIds.spliterator(), false)
-                        .map(FileReferenceId::deserialize)
-                        .map(FileReferenceId::asInputPhoto)
-                        .collect(Collectors.toUnmodifiableList()))));
+        return Mono.defer(() -> sendMain(ImmutableDeletePhotos.of(photos)));
     }
 
     @BotCompatible
     public Mono<Photos> getUserPhotos(InputUser id, int offset, long maxId, int limit) {
-        return client.sendAwait(ImmutableGetUserPhotos.of(id, offset, maxId, limit));
+        return sendMain(ImmutableGetUserPhotos.of(id, offset, maxId, limit));
     }
 }

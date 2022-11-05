@@ -1,6 +1,5 @@
 package telegram4j.core;
 
-import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -28,10 +27,11 @@ import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.MTProtoOptions;
 import telegram4j.mtproto.file.*;
 import telegram4j.mtproto.service.ServiceHolder;
+import telegram4j.mtproto.service.UploadOptions;
 import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -46,7 +46,7 @@ import java.util.function.Function;
 
 public final class MTProtoTelegramClient implements EntityRetriever {
     private final AuthorizationResources authResources;
-    private final MTProtoClient mtProtoClient;
+    private final MTProtoClientGroup mtProtoClientGroup;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
     private final Id[] selfIdHolder;
@@ -55,13 +55,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authResources,
-                          MTProtoClient mtProtoClient, MTProtoResources mtProtoResources,
+                          MTProtoClientGroup mtProtoClientGroup, MTProtoResources mtProtoResources,
                           Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
                           Id[] selfIdHolder, ServiceHolder serviceHolder,
                           EntityRetrievalStrategy entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
-        this.mtProtoClient = mtProtoClient;
+        this.mtProtoClientGroup = mtProtoClientGroup;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
         this.selfIdHolder = selfIdHolder;
@@ -73,8 +73,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Creates client builder with bot authorization schematic.
      *
-     * @see <a href="https://core.telegram.org/bots#3-how-do-i-create-a-bot">Bots</a>
-     * @see <a href="https://core.telegram.org/api/obtaining_api_id#obtaining-api-id">Obtaining Api Id</a>
+     * @see <a href="https://core.telegram.org/bots/features#botfather">BotFather</a>
+     * @see <a href="https://core.telegram.org/api/obtaining_api_id#obtaining-api-id">Obtaining Api Id and Hash</a>
      * @param apiId The api id.
      * @param apiHash The api hash.
      * @param botAuthToken The bot auth token from BotFather DM.
@@ -126,8 +126,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return mtProtoResources;
     }
 
-    public MTProtoClient getMtProtoClient() {
-        return mtProtoClient;
+    public MTProtoClientGroup getMtProtoClientGroup() {
+        return mtProtoClientGroup;
     }
 
     public ServiceHolder getServiceHolder() {
@@ -135,19 +135,56 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     public Mono<Void> disconnect() {
-        return mtProtoClient.close();
+        return mtProtoClientGroup.close();
     }
 
     public Mono<Void> onDisconnect() {
         return onDisconnect;
     }
 
+    /**
+     * Retrieves a {@link Flux} of the specified {@link Event} type for
+     * subsequent processing and subscription.
+     *
+     * <p> This method doesn't handle errors occurred while processing
+     * events, and occurred errors will terminate reactive sequence. For preventing
+     * this behavior you should use special operators to handle them,
+     * see <a href="https://projectreactor.io/docs/core/release/reference/#error.handling">this</a>
+     * article o reactor wiki.
+     *
+     * <p> Invocation of this method is equivalent to this code:
+     * {@code mtProtoResources.getEventDispatcher().on(type)}.
+     *
+     * @param type the event class of requested events.
+     * @param <E> the event type.
+     * @return a {@link Flux} of events.
+     */
     public <E extends Event> Flux<E> on(Class<E> type) {
         return mtProtoResources.getEventDispatcher().on(type);
     }
 
     // Interaction methods
     // ===========================
+
+    /**
+     * Request to configure default admin rights for <i>current</i> bot
+     * in {@link GroupChat} or {@link SupergroupChat} chats and {@link BroadcastChannel} channels.
+     *
+     * @param type The type of chat.
+     * @param adminRights An {@link Iterable} with default admin rights.
+     * @return A {@link Mono} emitting on successful completion boolean result state.
+     */
+    public Mono<Boolean> setChatDefaultAdminRights(Chat.Type type, Iterable<AdminRight> adminRights) {
+        if (type == Chat.Type.PRIVATE)
+            return Mono.error(new IllegalArgumentException("Invalid chat type: " + type));
+
+        return Mono.defer(() -> {
+            var chatAdminRights = ImmutableChatAdminRights.of(MappingUtil.getMaskValue(adminRights));
+            if (type == Chat.Type.CHANNEL)
+                return serviceHolder.getBotService().setBotBroadcastDefaultAdminRights(chatAdminRights);
+            return serviceHolder.getBotService().setBotGroupDefaultAdminRights(chatAdminRights);
+        });
+    }
 
     /**
      * Request to upload file to Telegram Media DC.
@@ -173,27 +210,26 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     public Mono<InputFile> uploadFile(Path path, String filename, int partSize) {
         return Mono.fromCallable(() -> Files.size(path))
                 .publishOn(Schedulers.boundedElastic())
-                .map(Math::toIntExact)
                 .flatMap(size -> {
                     int ps = UploadService.suggestPartSize(size, partSize);
                     return serviceHolder.getUploadService()
-                            .saveFile(ByteBufFlux.fromPath(path, ps), size, ps, filename);
+                            .saveFile(UploadOptions.builder()
+                                    .data(ByteBufFlux.fromPath(path, ps))
+                                    .size(size)
+                                    .partSize(ps)
+                                    .name(filename)
+                                    .build());
                 });
     }
 
     /**
      * Request to upload file to Telegram Media DC.
      *
-     * @param data The flux of {@link ByteBuf} to upload.
-     * @param filename The name of remote file.
-     * @param size The exact size of file.
-     * @param partSize The part size for uploading, must be divisible by
-     * {@link UploadService#MIN_PART_SIZE} and {@link UploadService#MAX_PART_SIZE} must be evenly divisible by part_size
+     * @param options The options of uploading.
      * @return A {@link Mono} emitting on successful completion {@link InputFile} with file id and MD5 hash if applicable.
      */
-    public Mono<InputFile> uploadFile(ByteBufFlux data, String filename, int size, int partSize) {
-        int ps = UploadService.suggestPartSize(size, partSize);
-        return serviceHolder.getUploadService().saveFile(data, size, ps, filename);
+    public Mono<InputFile> uploadFile(UploadOptions options) {
+        return serviceHolder.getUploadService().saveFile(options);
     }
 
     /**
@@ -660,7 +696,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of bot that used for anonymous admins.
      */
     public Id getGroupAnonymousBotId() {
-        return Id.ofUser(mtProtoClient.getDatacenter().isTest() ? 552888 : 1087968824, 0L);
+        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 552888 : 1087968824, 0L);
     }
 
     /**
@@ -669,7 +705,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of bot that used to keep track of replies to your comments in channels.
      */
     public Id getRepliesBotId() {
-        return Id.ofUser(mtProtoClient.getDatacenter().isTest() ? 708513 : 1271266957, 0L);
+        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 708513 : 1271266957, 0L);
     }
 
     /**

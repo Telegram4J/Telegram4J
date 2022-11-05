@@ -753,8 +753,8 @@ public final class FileReferenceId {
 
                     break;
                 case STICKER_SET_THUMB:
-                    thumbVersion = buf.readIntLE();
                     dcId = buf.readShortLE();
+                    thumbVersion = buf.readIntLE();
                     stickerSet = TlDeserializer.deserialize(buf);
 
                     break;

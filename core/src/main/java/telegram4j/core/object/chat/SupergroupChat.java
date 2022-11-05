@@ -14,6 +14,7 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.messages.AffectedHistory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -196,6 +197,11 @@ public final class SupergroupChat extends BaseChannel {
                 .switchIfEmpty(MappingUtil.unresolvedPeer(id))
                 .flatMap(channel -> client.getServiceHolder().getChatService()
                         .setStickers(channel, stickerSetId));
+    }
+
+    @Override
+    public Mono<AffectedHistory> unpinAllMessages(@Nullable Integer topMessageId) {
+        return super.unpinAllMessages(topMessageId);
     }
 
     @Override

@@ -2,11 +2,8 @@ package telegram4j.mtproto;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import telegram4j.tl.Updates;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
-import telegram4j.tl.request.messages.SendMessage;
 
 /**
  * Interface for MTProto client implementations with minimal method set.
@@ -20,14 +17,6 @@ public interface MTProtoClient {
      * @return A {@link Mono} which emitting signals on client close.
      */
     Mono<Void> connect();
-
-    /**
-     * Gets a {@link Sinks.Many} which redistributes api updates to subscribers and
-     * which it can be used to resend updates, as is the case with {@link SendMessage} mapping.
-     *
-     * @return A {@link Sinks.Many} which redistributes api updates.
-     */
-    Sinks.Many<Updates> updates();
 
     /**
      * Send api request with result awaiting.
@@ -67,14 +56,6 @@ public interface MTProtoClient {
      * @return The current info about mtproto session.
      */
     SessionInfo getSessionInfo();
-
-    /**
-     * Create child media client, associated with given datacenter.
-     *
-     * @param dc The media datacenter.
-     * @return The new child media client.
-     */
-    MTProtoClient createMediaClient(DataCenter dc);
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.

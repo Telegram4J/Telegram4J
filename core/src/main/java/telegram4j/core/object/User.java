@@ -10,11 +10,9 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
-import telegram4j.core.util.PeerId;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -112,15 +110,15 @@ public class User implements MentionablePeer {
         return j.toString();
     }
 
-    /**
-     * Gets username of this user in format <b>username</b>, if present.
-     * Can be used in the {@link EntityRetriever#resolvePeer(PeerId)}
-     *
-     * @return The username of this user, if present.
-     */
     @Override
     public Optional<String> getUsername() {
         return Optional.ofNullable(minData.username());
+    }
+
+    @Override
+    public List<Username> getUsernames() {
+        var list = minData.usernames();
+        return list != null ? list : List.of();
     }
 
     /**

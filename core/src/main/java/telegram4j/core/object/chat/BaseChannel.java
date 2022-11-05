@@ -80,6 +80,12 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
+    public List<Username> getUsernames() {
+        var list = minData.usernames();
+        return list != null ? list : List.of();
+    }
+
+    @Override
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(ChannelFull::about);
     }

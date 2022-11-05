@@ -6,6 +6,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.core.object.TelegramObject;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
@@ -22,7 +23,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /** <a href="https://core.telegram.org/api/poll">Poll</a> object, which represents active or closed poll. */
-public final class Poll {
+public final class Poll implements TelegramObject {
 
     public static final int MAX_ANSWERS_COUNT = 10;
 
@@ -41,6 +42,11 @@ public final class Poll {
         this.client = Objects.requireNonNull(client);
         this.peer = peer;
         this.data = new MessagePoll(data, ImmutablePeerUser.of(-1), -1);
+    }
+
+    @Override
+    public MTProtoTelegramClient getClient() {
+        return client;
     }
 
     /**

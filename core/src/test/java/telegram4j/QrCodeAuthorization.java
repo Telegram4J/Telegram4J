@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * This implementation can work only on linux with installed <b>qrencode</b> lib.
  */
 public class QrCodeAuthorization {
+    // TODO: 2fa
 
     private static final Duration defaultTimeout = Duration.ofSeconds(30);
     private static final Logger log = Loggers.getLogger(QrCodeAuthorization.class);
@@ -43,7 +44,7 @@ public class QrCodeAuthorization {
             int apiId = client.getAuthResources().getApiId();
             String apiHash = client.getAuthResources().getApiHash();
 
-            Mono<Void> updates = Mono.defer(() -> client.getMtProtoClient().updates().asFlux()
+            Mono<Void> updates = Mono.defer(() -> client.getMtProtoClientGroup().main().updates().asFlux()
                     .takeUntil(u -> complete.get())
                     .ofType(UpdateShort.class)
                     .filter(u -> u.update().identifier() == UpdateLoginToken.ID && !complete.get())

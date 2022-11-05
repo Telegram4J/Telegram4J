@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.request.updates.GetChannelDifference;
 import telegram4j.tl.request.updates.GetDifference;
@@ -13,8 +13,8 @@ import telegram4j.tl.updates.State;
 @BotCompatible
 public class UpdatesService extends RpcService {
 
-    public UpdatesService(MTProtoClient client, StoreLayout storeLayout) {
-        super(client, storeLayout);
+    public UpdatesService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+        super(groupManager, storeLayout);
     }
 
     // updates namespace
@@ -26,7 +26,7 @@ public class UpdatesService extends RpcService {
      * @return A {@link Mono} emitting on successful completion current state of updates.
      */
     public Mono<State> getState() {
-        return client.sendAwait(GetState.instance());
+        return sendMain(GetState.instance());
     }
 
     /**
@@ -35,7 +35,7 @@ public class UpdatesService extends RpcService {
      * @return A {@link Mono} emitting on successful completion difference in the <b>common</b> updates from specified parameters.
      */
     public Mono<Difference> getDifference(GetDifference request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     /**
@@ -44,6 +44,6 @@ public class UpdatesService extends RpcService {
      * @return A {@link Mono} emitting on successful completion difference in the <b>channel</b> updates from specified parameters.
      */
     public Mono<ChannelDifference> getChannelDifference(GetChannelDifference request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 }

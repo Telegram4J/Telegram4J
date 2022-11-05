@@ -1,6 +1,7 @@
 package telegram4j.core.spec;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.object.Message;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.ImmutableEnumSet;
@@ -20,12 +21,15 @@ public final class ForwardMessagesSpec {
     private final Instant scheduleTimestamp;
     @Nullable
     private final PeerId sendAs;
+    @Nullable
+    private final Integer topMessageId;
 
     private ForwardMessagesSpec(Iterable<Integer> ids) {
         this.ids = TlEncodingUtil.copyList(ids);
         this.flags = ImmutableEnumSet.of(Flag.class, 0);
         this.scheduleTimestamp = null;
         this.sendAs = null;
+        this.topMessageId = null;
     }
 
     private ForwardMessagesSpec(Builder builder) {
@@ -33,14 +37,17 @@ public final class ForwardMessagesSpec {
         this.ids = List.copyOf(builder.ids);
         this.scheduleTimestamp = builder.scheduleTimestamp;
         this.sendAs = builder.sendAs;
+        this.topMessageId = builder.topMessageId;
     }
 
     private ForwardMessagesSpec(ImmutableEnumSet<Flag> flags, List<Integer> ids,
-                                @Nullable Instant scheduleTimestamp, @Nullable PeerId sendAs) {
+                                @Nullable Instant scheduleTimestamp, @Nullable PeerId sendAs,
+                                @Nullable Integer topMessageId){
         this.flags = flags;
         this.ids = ids;
         this.scheduleTimestamp = scheduleTimestamp;
         this.sendAs = sendAs;
+        this.topMessageId = topMessageId;
     }
 
     public ImmutableEnumSet<Flag> flags() {
@@ -59,18 +66,22 @@ public final class ForwardMessagesSpec {
         return Optional.ofNullable(sendAs);
     }
 
+    public Optional<Integer> topMessageId() {
+        return Optional.ofNullable(topMessageId);
+    }
+
     private ForwardMessagesSpec withFlags(Set<Flag> value) {
         Objects.requireNonNull(value);
         if (flags.equals(value)) return this;
         var newValue = ImmutableEnumSet.of(Flag.class, value);
-        return new ForwardMessagesSpec(newValue, ids, scheduleTimestamp, sendAs);
+        return new ForwardMessagesSpec(newValue, ids, scheduleTimestamp, sendAs, topMessageId);
     }
 
     private ForwardMessagesSpec withIds(Iterable<Integer> value) {
         Objects.requireNonNull(value);
         if (ids == value) return this;
         var newValue = TlEncodingUtil.copyList(value);
-        return new ForwardMessagesSpec(flags, newValue, scheduleTimestamp, sendAs);
+        return new ForwardMessagesSpec(flags, newValue, scheduleTimestamp, sendAs, topMessageId);
     }
 
     private ForwardMessagesSpec withIds(int... value) {
@@ -78,12 +89,12 @@ public final class ForwardMessagesSpec {
                 .boxed()
                 .collect(Collectors.toUnmodifiableList());
         if (ids == newValue) return this;
-        return new ForwardMessagesSpec(flags, newValue, scheduleTimestamp, sendAs);
+        return new ForwardMessagesSpec(flags, newValue, scheduleTimestamp, sendAs, topMessageId);
     }
 
     public ForwardMessagesSpec withScheduleTimestamp(@Nullable Instant value) {
         if (scheduleTimestamp == value) return this;
-        return new ForwardMessagesSpec(flags, ids, value, sendAs);
+        return new ForwardMessagesSpec(flags, ids, value, sendAs, topMessageId);
     }
 
     public ForwardMessagesSpec withScheduleTimestamp(Optional<Instant> opt) {
@@ -100,11 +111,24 @@ public final class ForwardMessagesSpec {
 
     public ForwardMessagesSpec withSendAs(@Nullable PeerId value) {
         if (sendAs == value) return this;
-        return new ForwardMessagesSpec(flags, ids, scheduleTimestamp, value);
+        return new ForwardMessagesSpec(flags, ids, scheduleTimestamp, value, topMessageId);
     }
 
     public ForwardMessagesSpec withSendAs(Optional<PeerId> opt) {
         return withSendAs(opt.orElse(null));
+    }
+
+    public ForwardMessagesSpec withTopMessage(@Nullable Message value) {
+        return withTopMessageId(value != null ? value.getId() : null);
+    }
+
+    public ForwardMessagesSpec withTopMessageId(@Nullable Integer value) {
+        if (Objects.equals(topMessageId, value)) return this;
+        return new ForwardMessagesSpec(flags, ids, scheduleTimestamp, sendAs, value);
+    }
+
+    public ForwardMessagesSpec withTopMessageId(Optional<Integer> opt) {
+        return withTopMessageId(opt.orElse(null));
     }
 
     @Override
@@ -115,7 +139,8 @@ public final class ForwardMessagesSpec {
         return flags.equals(other.flags)
                 && ids.equals(other.ids)
                 && Objects.equals(scheduleTimestamp, other.scheduleTimestamp)
-                && Objects.equals(sendAs, other.sendAs);
+                && Objects.equals(sendAs, other.sendAs)
+                && Objects.equals(topMessageId, other.topMessageId);
     }
 
     @Override
@@ -125,6 +150,7 @@ public final class ForwardMessagesSpec {
         h += (h << 5) + Objects.hashCode(ids);
         h += (h << 5) + Objects.hashCode(scheduleTimestamp);
         h += (h << 5) + Objects.hashCode(sendAs);
+        h += (h << 5) + Objects.hashCode(topMessageId);
         return h;
     }
 
@@ -135,6 +161,7 @@ public final class ForwardMessagesSpec {
                 ", ids=" + ids +
                 ", scheduleTimestamp=" + scheduleTimestamp +
                 ", sendAs=" + sendAs +
+                ", topMessageId=" + topMessageId +
                 '}';
     }
 
@@ -153,6 +180,8 @@ public final class ForwardMessagesSpec {
         private Instant scheduleTimestamp;
         @Nullable
         private PeerId sendAs;
+        @Nullable
+        private Integer topMessageId;
 
         private Builder() {
         }
@@ -162,6 +191,7 @@ public final class ForwardMessagesSpec {
             ids(instance.ids);
             scheduleTimestamp(instance.scheduleTimestamp);
             sendAs(instance.sendAs);
+            topMessageId(instance.topMessageId);
             return this;
         }
 
@@ -252,6 +282,19 @@ public final class ForwardMessagesSpec {
         public Builder sendAs(Optional<PeerId> sendAs) {
             this.sendAs = sendAs.orElse(null);
             return this;
+        }
+
+        public Builder topMessageId(@Nullable Integer topMessageId) {
+            this.topMessageId = topMessageId;
+            return this;
+        }
+
+        public Builder topMessageId(Optional<Integer> opt) {
+            return topMessageId(opt.orElse(null));
+        }
+
+        public Builder topMessage(@Nullable Message message) {
+            return topMessageId(message != null ? message.getId() : null);
         }
 
         public ForwardMessagesSpec build() {

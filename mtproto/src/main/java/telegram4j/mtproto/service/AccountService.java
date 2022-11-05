@@ -2,7 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.account.AutoDownloadSettings;
@@ -16,32 +16,32 @@ import java.util.List;
 
 public class AccountService extends RpcService {
 
-    public AccountService(MTProtoClient client, StoreLayout storeLayout) {
-        super(client, storeLayout);
+    public AccountService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+        super(groupManager, storeLayout);
     }
 
     public Mono<Boolean> registerDevice(RegisterDevice request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Boolean> unregisterDevice(int tokenType, String token, Iterable<Long> otherUids) {
-        return Mono.defer(() -> client.sendAwait(ImmutableUnregisterDevice.of(tokenType, token, otherUids)));
+        return Mono.defer(() -> sendMain(ImmutableUnregisterDevice.of(tokenType, token, otherUids)));
     }
 
     public Mono<Boolean> updateNotifySettings(InputNotifyPeer peer, InputPeerNotifySettings settings) {
-        return client.sendAwait(ImmutableUpdateNotifySettings.of(peer, settings));
+        return sendMain(ImmutableUpdateNotifySettings.of(peer, settings));
     }
 
     public Mono<PeerNotifySettings> getNotifySettings(InputNotifyPeer peer) {
-        return client.sendAwait(ImmutableGetNotifySettings.of(peer));
+        return sendMain(ImmutableGetNotifySettings.of(peer));
     }
 
     public Mono<Boolean> resetNotifySettings() {
-        return client.sendAwait(ResetNotifySettings.instance());
+        return sendMain(ResetNotifySettings.instance());
     }
 
     public Mono<User> updateProfile(@Nullable String firstName, @Nullable String lastName, @Nullable String about) {
-        return client.sendAwait(UpdateProfile.builder()
+        return sendMain(UpdateProfile.builder()
                 .firstName(firstName)
                 .lastName(lastName)
                 .about(about)
@@ -49,215 +49,215 @@ public class AccountService extends RpcService {
     }
 
     public Mono<Boolean> updateStatus(boolean offline) {
-        return client.sendAwait(ImmutableUpdateStatus.of(offline));
+        return sendMain(ImmutableUpdateStatus.of(offline));
     }
 
     public Mono<BaseWallPapers> getWallPapers(long hash) {
-        return client.sendAwait(ImmutableGetWallPapers.of(hash))
+        return sendMain(ImmutableGetWallPapers.of(hash))
                 .ofType(BaseWallPapers.class);
     }
 
     public Mono<Boolean> reportPeer(InputPeer peer, ReportReason reportReason, String message) {
-        return client.sendAwait(ImmutableReportPeer.of(peer, reportReason, message));
+        return sendMain(ImmutableReportPeer.of(peer, reportReason, message));
     }
 
     public Mono<Boolean> checkUsername(String username) {
-        return client.sendAwait(ImmutableCheckUsername.of(username));
+        return sendMain(ImmutableCheckUsername.of(username));
     }
 
     public Mono<User> updateUsername(String username) {
-        return client.sendAwait(ImmutableUpdateUsername.of(username));
+        return sendMain(ImmutableUpdateUsername.of(username));
     }
 
     public Mono<PrivacyRules> getPrivacy(InputPrivacyKey key) {
-        return client.sendAwait(ImmutableGetPrivacy.of(key));
+        return sendMain(ImmutableGetPrivacy.of(key));
     }
 
     public Mono<PrivacyRules> setPrivacy(InputPrivacyKey key, Iterable<? extends InputPrivacyRule> rules) {
-        return Mono.defer(() -> client.sendAwait(ImmutableSetPrivacy.of(key, rules)));
+        return Mono.defer(() -> sendMain(ImmutableSetPrivacy.of(key, rules)));
     }
 
     public Mono<Boolean> deleteAccount(DeleteAccount request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Integer> getAccountTtl() {
-        return client.sendAwait(GetAccountTTL.instance())
+        return sendMain(GetAccountTTL.instance())
                 .map(AccountDaysTTL::days);
     }
 
     public Mono<Boolean> setAccountTtl(int days) {
-        return client.sendAwait(ImmutableSetAccountTTL.of(ImmutableAccountDaysTTL.of(days)));
+        return sendMain(ImmutableSetAccountTTL.of(ImmutableAccountDaysTTL.of(days)));
     }
 
     public Mono<SentCode> sendChangePhoneCode(String phoneNumber, CodeSettings settings) {
-        return client.sendAwait(ImmutableSendChangePhoneCode.of(phoneNumber, settings));
+        return sendMain(ImmutableSendChangePhoneCode.of(phoneNumber, settings));
     }
 
     public Mono<User> changePhone(String phoneNumber, String phoneCodeHash, String phoneCode) {
-        return client.sendAwait(ImmutableChangePhone.of(phoneNumber, phoneCodeHash, phoneCode));
+        return sendMain(ImmutableChangePhone.of(phoneNumber, phoneCodeHash, phoneCode));
     }
 
     public Mono<Boolean> updateDeviceLocked(int period) {
-        return client.sendAwait(ImmutableUpdateDeviceLocked.of(period));
+        return sendMain(ImmutableUpdateDeviceLocked.of(period));
     }
 
     public Mono<Authorizations> getAuthorizations() {
-        return client.sendAwait(GetAuthorizations.instance());
+        return sendMain(GetAuthorizations.instance());
     }
 
     public Mono<Boolean> resetAuthorization(long hash) {
-        return client.sendAwait(ImmutableResetAuthorization.of(hash));
+        return sendMain(ImmutableResetAuthorization.of(hash));
     }
 
     public Mono<Password> getPassword() {
-        return client.sendAwait(GetPassword.instance());
+        return sendMain(GetPassword.instance());
     }
 
     public Mono<PasswordSettings> getPasswordSettings(InputCheckPasswordSRP password) {
-        return client.sendAwait(ImmutableGetPasswordSettings.of(password));
+        return sendMain(ImmutableGetPasswordSettings.of(password));
     }
 
     public Mono<Boolean> updatePasswordSettings(InputCheckPasswordSRP password, PasswordInputSettings settings) {
-        return client.sendAwait(ImmutableUpdatePasswordSettings.of(password, settings));
+        return sendMain(ImmutableUpdatePasswordSettings.of(password, settings));
     }
 
     public Mono<SentCode> sendConfirmPhoneCode(String hash, CodeSettings settings) {
-        return client.sendAwait(ImmutableSendConfirmPhoneCode.of(hash, settings));
+        return sendMain(ImmutableSendConfirmPhoneCode.of(hash, settings));
     }
 
     public Mono<Boolean> confirmPhone(String phoneCodeHash, String phoneCode) {
-        return client.sendAwait(ImmutableConfirmPhone.of(phoneCodeHash, phoneCode));
+        return sendMain(ImmutableConfirmPhone.of(phoneCodeHash, phoneCode));
     }
 
     public Mono<TmpPassword> getTmpPassword(InputCheckPasswordSRP password, int period) {
-        return client.sendAwait(ImmutableGetTmpPassword.of(password, period));
+        return sendMain(ImmutableGetTmpPassword.of(password, period));
     }
 
     public Mono<WebAuthorizations> getWebAuthorizations() {
-        return client.sendAwait(GetWebAuthorizations.instance());
+        return sendMain(GetWebAuthorizations.instance());
     }
 
     public Mono<Boolean> resetWebAuthorization(long hash) {
-        return client.sendAwait(ImmutableResetWebAuthorization.of(hash));
+        return sendMain(ImmutableResetWebAuthorization.of(hash));
     }
 
     public Mono<Boolean> resetWebAuthorizations() {
-        return client.sendAwait(ResetWebAuthorizations.instance());
+        return sendMain(ResetWebAuthorizations.instance());
     }
 
     public Mono<List<SecureValue>> getAllSecureValues() {
-        return client.sendAwait(GetAllSecureValues.instance());
+        return sendMain(GetAllSecureValues.instance());
     }
 
     public Mono<List<SecureValue>> getSecureValue(Iterable<SecureValueType> types) {
-        return Mono.defer(() -> client.sendAwait(ImmutableGetSecureValue.of(types)));
+        return Mono.defer(() -> sendMain(ImmutableGetSecureValue.of(types)));
     }
 
     public Mono<SecureValue> saveSecureValue(InputSecureValue value, long secureSecretId) {
-        return client.sendAwait(ImmutableSaveSecureValue.of(value, secureSecretId));
+        return sendMain(ImmutableSaveSecureValue.of(value, secureSecretId));
     }
 
     public Mono<Boolean> deleteSecureValue(Iterable<SecureValueType> types) {
-        return client.sendAwait(DeleteSecureValue.builder()
+        return sendMain(DeleteSecureValue.builder()
                 .types(types)
                 .build());
     }
 
     public Mono<AuthorizationForm> getAuthorizationForm(long botId, String scope, String publicKey) {
-        return client.sendAwait(ImmutableGetAuthorizationForm.of(botId, scope, publicKey));
+        return sendMain(ImmutableGetAuthorizationForm.of(botId, scope, publicKey));
     }
 
     public Mono<Boolean> acceptAuthorization(AcceptAuthorization request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<SentCode> sendVerifyPhoneCode(String phoneNumber, CodeSettings settings) {
-        return client.sendAwait(ImmutableSendVerifyPhoneCode.of(phoneNumber, settings));
+        return sendMain(ImmutableSendVerifyPhoneCode.of(phoneNumber, settings));
     }
 
     public Mono<Boolean> verifyPhone(String phoneNumber, String phoneCodeHash, String phoneCode) {
-        return client.sendAwait(ImmutableVerifyPhone.of(phoneNumber, phoneCodeHash, phoneCode));
+        return sendMain(ImmutableVerifyPhone.of(phoneNumber, phoneCodeHash, phoneCode));
     }
 
     public Mono<SentEmailCode> sendVerifyEmailCode(EmailVerifyPurpose purpose, String email) {
-        return client.sendAwait(ImmutableSendVerifyEmailCode.of(purpose, email));
+        return sendMain(ImmutableSendVerifyEmailCode.of(purpose, email));
     }
 
     public Mono<EmailVerified> verifyEmail(EmailVerifyPurpose purpose, EmailVerification verification) {
-        return client.sendAwait(ImmutableVerifyEmail.of(purpose, verification));
+        return sendMain(ImmutableVerifyEmail.of(purpose, verification));
     }
 
     public Mono<Long> initTakeoutSession(InitTakeoutSession request) {
-        return client.sendAwait(request).map(Takeout::id);
+        return sendMain(request).map(Takeout::id);
     }
 
     public Mono<Boolean> finishTakeoutSession(FinishTakeoutSession request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Boolean> confirmPasswordEmail(String code) {
-        return client.sendAwait(ImmutableConfirmPasswordEmail.of(code));
+        return sendMain(ImmutableConfirmPasswordEmail.of(code));
     }
 
     public Mono<Boolean> resendPasswordEmail() {
-        return client.sendAwait(ResendPasswordEmail.instance());
+        return sendMain(ResendPasswordEmail.instance());
     }
 
     public Mono<Boolean> cancelPasswordEmail() {
-        return client.sendAwait(CancelPasswordEmail.instance());
+        return sendMain(CancelPasswordEmail.instance());
     }
 
     public Mono<Boolean> getContactSignUpNotification() {
-        return client.sendAwait(GetContactSignUpNotification.instance());
+        return sendMain(GetContactSignUpNotification.instance());
     }
 
     public Mono<Boolean> setContactSignUpNotification(boolean silent) {
-        return client.sendAwait(ImmutableSetContactSignUpNotification.of(silent));
+        return sendMain(ImmutableSetContactSignUpNotification.of(silent));
     }
 
     public Mono<Updates> getNotifyExceptions(GetNotifyExceptions request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<WallPaper> getWallPaper(InputWallPaper wallPaper) {
-        return client.sendAwait(ImmutableGetWallPaper.of(wallPaper));
+        return sendMain(ImmutableGetWallPaper.of(wallPaper));
     }
 
     public Mono<WallPaper> uploadWallPaper(InputFile file, String mimeType, WallPaperSettings settings) {
-        return client.sendAwait(ImmutableUploadWallPaper.of(file, mimeType, settings));
+        return sendMain(ImmutableUploadWallPaper.of(file, mimeType, settings));
     }
 
     public Mono<Boolean> saveWallPaper(InputWallPaper wallPaper, boolean unsave, WallPaperSettings settings) {
-        return client.sendAwait(ImmutableSaveWallPaper.of(wallPaper, unsave, settings));
+        return sendMain(ImmutableSaveWallPaper.of(wallPaper, unsave, settings));
     }
 
     public Mono<Boolean> installWallPaper(InputWallPaper wallPaper, WallPaperSettings settings) {
-        return client.sendAwait(ImmutableInstallWallPaper.of(wallPaper, settings));
+        return sendMain(ImmutableInstallWallPaper.of(wallPaper, settings));
     }
 
     public Mono<Boolean> resetWallPapers() {
-        return client.sendAwait(ResetWallPapers.instance());
+        return sendMain(ResetWallPapers.instance());
     }
 
     public Mono<AutoDownloadSettings> getAutoDownloadSettings() {
-        return client.sendAwait(GetAutoDownloadSettings.instance());
+        return sendMain(GetAutoDownloadSettings.instance());
     }
 
     public Mono<Boolean> saveAutoDownloadSettings(SaveAutoDownloadSettings request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<BaseDocument> uploadTheme(InputFile file, @Nullable InputFile thumb,
                                           String fileName, String mimeType) {
-        return client.sendAwait(ImmutableUploadTheme.of(file, fileName, mimeType)
+        return sendMain(ImmutableUploadTheme.of(file, fileName, mimeType)
                         .withThumb(thumb))
                 .ofType(BaseDocument.class);
     }
 
     public Mono<Theme> createTheme(String slug, String title, @Nullable InputDocument document,
                                    @Nullable Iterable<? extends InputThemeSettings> settings) {
-        return Mono.defer(() -> client.sendAwait(CreateTheme.builder()
+        return Mono.defer(() -> sendMain(CreateTheme.builder()
                 .slug(slug)
                 .title(title)
                 .document(document)
@@ -266,57 +266,57 @@ public class AccountService extends RpcService {
     }
 
     public Mono<Theme> updateTheme(UpdateTheme request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<Boolean> saveTheme(InputTheme theme, boolean unsave) {
-        return client.sendAwait(ImmutableSaveTheme.of(theme, unsave));
+        return sendMain(ImmutableSaveTheme.of(theme, unsave));
     }
 
     public Mono<Boolean> installTheme(InstallTheme request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
-    public Mono<Theme> getTheme(String format, InputTheme theme, long documentId) {
-        return client.sendAwait(ImmutableGetTheme.of(format, theme, documentId));
+    public Mono<Theme> getTheme(String format, InputTheme theme) {
+        return sendMain(ImmutableGetTheme.of(format, theme));
     }
 
     public Mono<BaseThemes> getThemes(String format, long hash) {
-        return client.sendAwait(ImmutableGetThemes.of(format, hash))
+        return sendMain(ImmutableGetThemes.of(format, hash))
                 .ofType(BaseThemes.class);
     }
 
     public Mono<Boolean> setContentSettings(SetContentSettings request) {
-        return client.sendAwait(request);
+        return sendMain(request);
     }
 
     public Mono<ContentSettings> getContentSettings() {
-        return client.sendAwait(GetContentSettings.instance());
+        return sendMain(GetContentSettings.instance());
     }
 
     public Mono<List<WallPaper>> getMultiWallPapers(Iterable<? extends InputWallPaper> wallPapers) {
-        return Mono.defer(() -> client.sendAwait(ImmutableGetMultiWallPapers.of(wallPapers)));
+        return Mono.defer(() -> sendMain(ImmutableGetMultiWallPapers.of(wallPapers)));
     }
 
     public Mono<GlobalPrivacySettings> getGlobalPrivacySettings() {
-        return client.sendAwait(GetGlobalPrivacySettings.instance());
+        return sendMain(GetGlobalPrivacySettings.instance());
     }
 
     public Mono<GlobalPrivacySettings> setGlobalPrivacySettings(GlobalPrivacySettings settings) {
-        return client.sendAwait(ImmutableSetGlobalPrivacySettings.of(settings));
+        return sendMain(ImmutableSetGlobalPrivacySettings.of(settings));
     }
 
     public Mono<Boolean> reportProfilePhoto(InputPeer peer, InputPhoto photo,
                                             ReportReason reason, String message) {
-        return client.sendAwait(ImmutableReportProfilePhoto.of(peer, photo, reason, message));
+        return sendMain(ImmutableReportProfilePhoto.of(peer, photo, reason, message));
     }
 
     public Mono<Boolean> declinePasswordReset() {
-        return client.sendAwait(DeclinePasswordReset.instance());
+        return sendMain(DeclinePasswordReset.instance());
     }
 
     public Mono<BaseThemes> getChatThemes(int hash) {
-        return client.sendAwait(ImmutableGetChatThemes.of(hash))
+        return sendMain(ImmutableGetChatThemes.of(hash))
                 .ofType(BaseThemes.class);
     }
 }

@@ -36,6 +36,8 @@ import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.api.TlObject;
+import telegram4j.tl.request.ImmutableInitConnection;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
@@ -69,6 +71,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options());
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
+    private MTProtoClientGroupManager clientGroupManager;
 
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
@@ -89,6 +92,19 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      */
     public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
         return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authResources);
+    }
+
+    /**
+     * Sets client group manager for working with different datacenters and sessions.
+     * <p>
+     * If custom implementation doesn't set, {@link DefaultMTProtoGroupManager} will be used.
+     *
+     * @param clientGroupManager A new client group manager.
+     * @return This builder.
+     */
+    public MTProtoBootstrap<O> setClientGroupManager(MTProtoClientGroupManager clientGroupManager) {
+        this.clientGroupManager = Objects.requireNonNull(clientGroupManager);
+        return this;
     }
 
     /**
@@ -292,29 +308,35 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param clientFactory A new factory for constructing main MTProto client.
      * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
      */
-    public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MTProtoClient> clientFactory) {
+    public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MainMTProtoClient> clientFactory) {
         return Mono.create(sink -> {
             StoreLayout storeLayout = initStoreLayout();
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
-            MTProtoClient mtProtoClient = clientFactory.apply(optionsModifier.apply(
+            var initConnection = initConnection();
+            var invokeWithLayout =
+                    InvokeWithLayer.<TlObject, InitConnection<TlObject, TlMethod<? extends TlObject>>>builder()
+                            .layer(TlInfo.LAYER)
+                            .query(initConnection)
+                            .build();
+
+            MTProtoClientGroupManager clientGroupManager = initClientGroupManager();
+            MainMTProtoClient leadClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initConnectionRetry(), initAuthRetry(),
                             List.copyOf(responseTransformers))));
 
+            clientGroupManager.setMain(leadClient);
+
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
                     defaultEntityParserFactory, unavailableChatPolicy);
-            ServiceHolder serviceHolder = new ServiceHolder(mtProtoClient, storeLayout);
-            var invokeWithLayout = InvokeWithLayer.builder()
-                    .layer(TlInfo.LAYER)
-                    .query(initConnection())
-                    .build();
+            ServiceHolder serviceHolder = new ServiceHolder(clientGroupManager, storeLayout);
 
             Id[] selfId = {null};
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
-                    authResources, mtProtoClient,
+                    authResources, clientGroupManager,
                     mtProtoResources, updatesManagerFactory, selfId,
                     serviceHolder, entityRetrievalStrategy, onDisconnect.asMono());
 
@@ -327,13 +349,18 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             Disposable.Composite composite = Disposables.composite();
 
-            composite.add(mtProtoClient.connect()
+            composite.add(clientGroupManager.start()
+                    .doOnError(sink::error)
+                    .subscribe(null, t -> log.error("MTProto client group terminated with an error", t),
+                            () -> log.debug("MTProto client group completed")));
+
+            composite.add(leadClient.connect()
                     .doOnError(sink::error)
                     .doFinally(signal -> disconnect.run())
                     .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
                             () -> log.debug("MTProto client completed")));
 
-            composite.add(mtProtoClient.updates().asFlux()
+            composite.add(leadClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
                     .checkpoint("Event dispatch handler")
                     .flatMap(telegramClient.getUpdatesManager()::handle)
@@ -347,7 +374,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             AtomicBoolean emit = new AtomicBoolean(true);
 
-            composite.add(mtProtoClient.state()
+            composite.add(leadClient.state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
                         switch (state) {
@@ -377,14 +404,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .doOnNext(id -> selfId[0] = id)
                                         .then();
 
-                                return mtProtoClient.sendAwait(invokeWithLayout)
+                                return leadClient.sendAwait(invokeWithLayout)
                                         // The best way to check that authorization is needed
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(RpcException.isErrorCode(401)
                                                         .and(t -> !authResources.isBot()))
                                                 .doBeforeRetryAsync(signal -> userAuth))
                                         // startup errors must close client
-                                        .onErrorResume(e -> mtProtoClient.close()
+                                        .onErrorResume(e -> leadClient.close()
                                                 .then(onDisconnect.asMono())
                                                 .then(Mono.fromRunnable(() -> sink.error(e))))
                                         .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
@@ -407,12 +434,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     // Resources initialization
     // ==========================
 
-    private InitConnection<?, TlMethod<?>> initConnection() {
+    private ImmutableInitConnection<TlObject, TlMethod<? extends TlObject>> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
                 : InitConnectionParams.getDefault();
 
-        var initConnection = InitConnection.builder()
+        var initConnection = InitConnection.<TlObject, TlMethod<? extends TlObject>>builder()
                 .apiId(authResources.getApiId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())
@@ -424,7 +451,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (authResources.isBot()) {
             initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getApiId(),
                     authResources.getApiHash(), authResources.getBotAuthToken().orElseThrow()));
-        } else {
+        } else { // to trigger user auth
             initConnection.query(GetState.instance());
         }
 
@@ -432,6 +459,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         params.getParams().ifPresent(initConnection::params);
 
         return initConnection.build();
+    }
+
+    private MTProtoClientGroupManager initClientGroupManager() {
+        if (clientGroupManager == null) {
+            return new DefaultMTProtoGroupManager();
+        }
+        return clientGroupManager;
     }
 
     private TcpClient initTcpClient() {

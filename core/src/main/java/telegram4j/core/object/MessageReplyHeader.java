@@ -39,6 +39,10 @@ public class MessageReplyHeader implements TelegramObject {
         return data.replyToScheduled();
     }
 
+    public boolean isForumTopic() {
+        return data.forumTopic();
+    }
+
     /**
      * Gets id of the message, to which is replying.
      *

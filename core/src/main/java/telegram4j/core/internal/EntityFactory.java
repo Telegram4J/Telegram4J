@@ -252,11 +252,11 @@ public class EntityFactory {
             case telegram4j.tl.MessageActionChannelMigrateFrom.ID:
                 return new MessageAction.ChannelMigrateFrom(client, (telegram4j.tl.MessageActionChannelMigrateFrom) data);
             case telegram4j.tl.MessageActionChatAddUser.ID:
-                return new MessageAction.ChatAddUser(client, (telegram4j.tl.MessageActionChatAddUser) data);
+                return new MessageAction.ChatJoinUsers(client, (telegram4j.tl.MessageActionChatAddUser) data);
             case telegram4j.tl.MessageActionChatCreate.ID:
                 return new MessageAction.ChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
             case telegram4j.tl.MessageActionChatDeleteUser.ID:
-                return new MessageAction.ChatDeleteUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
+                return new MessageAction.ChatLeftUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
             case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageAction.UpdateChatPhoto(client);
             case telegram4j.tl.MessageActionChatEditPhoto.ID:
                 return new MessageAction.UpdateChatPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data,
@@ -303,6 +303,10 @@ public class EntityFactory {
                 return new MessageAction.SetChatTheme(client, (telegram4j.tl.MessageActionSetChatTheme) data);
             case telegram4j.tl.MessageActionSetMessagesTTL.ID:
                 return new MessageAction.SetMessagesTtl(client, (telegram4j.tl.MessageActionSetMessagesTTL) data);
+            case MessageActionTopicCreate.ID:
+                return new MessageAction.TopicCreate(client, (telegram4j.tl.MessageActionTopicCreate) data);
+            case MessageActionTopicEdit.ID:
+                return new MessageAction.TopicEdit(client, (telegram4j.tl.MessageActionTopicEdit) data);
             default:
                 throw new IllegalArgumentException("Unknown MessageAction type: " + data);
         }

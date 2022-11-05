@@ -1,9 +1,14 @@
 package telegram4j.core.object;
 
 import io.netty.buffer.ByteBuf;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.Channel;
+import telegram4j.core.object.chat.GroupChat;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.ChatPhotoContext;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -69,10 +74,10 @@ public class MessageAction implements TelegramObject {
         DELETE_CHAT_PHOTO,
 
         /** New member in the group. */
-        CHAT_ADD_USER,
+        CHAT_JOIN_USERS,
 
         /** User left the group. */
-        CHAT_DELETE_USER,
+        CHAT_LEFT_USER,
 
         /** A user joined the chat via an invitation link. */
         CHAT_JOINED_BY_LINK,
@@ -146,6 +151,9 @@ public class MessageAction implements TelegramObject {
         /** A group call was scheduled. */
         GROUP_CALL_SCHEDULED,
 
+        TOPIC_CREATE,
+
+        TOPIC_EDIT,
         /** The chat theme was changed. */
         SET_CHAT_THEME
     }
@@ -184,6 +192,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service message representing {@link Channel} creation. */
     public static class ChannelCreate extends MessageAction {
 
         private final MessageActionChannelCreate data;
@@ -193,7 +202,12 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
-        public String getChannelTitle() {
+        /**
+         * Gets title of channel on creation.
+         *
+         * @return The title of channel on creation.
+         */
+        public String getTitle() {
             return data.title();
         }
 
@@ -218,6 +232,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service message representing first message after {@link GroupChat} migration. */
     public static class ChannelMigrateFrom extends MessageAction {
 
         private final MessageActionChannelMigrateFrom data;
@@ -227,12 +242,43 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets title of old group chat.
+         *
+         * @return The title of old group chat.
+         */
         public String getChatTitle() {
             return data.title();
         }
 
+        /**
+         * Gets id of old group chat.
+         *
+         * @return The id of old group chat.
+         */
         public Id getChatId() {
             return Id.ofChat(data.chatId());
+        }
+
+        /**
+         * Requests to retrieve {@link GroupChat} from which channel was migrated.
+         *
+         * @return A {@link Mono} emitting on successful completion {@link GroupChat old group chat}.
+         */
+        public Mono<GroupChat> getChat() {
+            return getChat(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve {@link GroupChat} from which channel was migrated using
+         * specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply.
+         * @return A {@link Mono} emitting on successful completion {@link GroupChat old group chat}.
+         */
+        public Mono<GroupChat> getChat(EntityRetrievalStrategy strategy) {
+            return client.withRetrievalStrategy(strategy).getChatById(getChatId())
+                    .cast(GroupChat.class);
         }
 
         @Override
@@ -256,26 +302,54 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class ChatAddUser extends MessageAction {
+    /** Service message representing joined to chat users. */
+    public static class ChatJoinUsers extends MessageAction {
 
         private final MessageActionChatAddUser data;
 
-        public ChatAddUser(MTProtoTelegramClient client, MessageActionChatAddUser data) {
-            super(client, Type.CHAT_ADD_USER);
+        public ChatJoinUsers(MTProtoTelegramClient client, MessageActionChatAddUser data) {
+            super(client, Type.CHAT_JOIN_USERS);
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets a set of ids of the joined users.
+         *
+         * @return The set of ids of the joined users.
+         */
         public Set<Id> getUserIds() {
             return data.users().stream()
                     .map(Id::ofUser)
                     .collect(Collectors.toSet());
         }
 
+        /**
+         * Requests to retrieve joined users.
+         *
+         * @return A {@link Flux} which continually emits {@link User joined users}.
+         */
+        public Flux<User> getUsers() {
+            return getUsers(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve joined users using specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply.
+         * @return A {@link Flux} which continually emits {@link User joined users}.
+         */
+        public Flux<User> getUsers(EntityRetrievalStrategy strategy) {
+            var retriever = client.withRetrievalStrategy(strategy);
+            return Flux.fromIterable(data.users())
+                    .map(Id::ofUser)
+                    .flatMap(retriever::getUserById);
+        }
+
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            ChatAddUser that = (ChatAddUser) o;
+            ChatJoinUsers that = (ChatJoinUsers) o;
             return data.equals(that.data);
         }
 
@@ -292,6 +366,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service message representing {@link GroupChat} creation. */
     public static class ChatCreate extends MessageAction {
 
         private final MessageActionChatCreate data;
@@ -301,14 +376,46 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
-        public String getTitle() {
+        /**
+         * Gets title of group chat.
+         *
+         * @return The title of group chat.
+         */
+        public String getChatTitle() {
             return data.title();
         }
 
+        /**
+         * Gets a set of ids of the invited users.
+         *
+         * @return The set of ids of the invited users.
+         */
         public Set<Id> getUserIds() {
             return data.users().stream()
                     .map(Id::ofUser)
                     .collect(Collectors.toSet());
+        }
+
+        /**
+         * Requests to retrieve invited users.
+         *
+         * @return A {@link Flux} which continually emits {@link User invited users}.
+         */
+        public Flux<User> getUsers() {
+            return getUsers(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve invited users using specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply.
+         * @return A {@link Flux} which continually emits {@link User invited users}.
+         */
+        public Flux<User> getUsers(EntityRetrievalStrategy strategy) {
+            var retriever = client.withRetrievalStrategy(strategy);
+            return Flux.fromIterable(data.users())
+                    .map(Id::ofUser)
+                    .flatMap(retriever::getUserById);
         }
 
         @Override
@@ -332,24 +439,49 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class ChatDeleteUser extends MessageAction {
+    /** Service message representing left from the chat user. */
+    public static class ChatLeftUser extends MessageAction {
 
         private final MessageActionChatDeleteUser data;
 
-        public ChatDeleteUser(MTProtoTelegramClient client, MessageActionChatDeleteUser data) {
-            super(client, Type.CHAT_DELETE_USER);
+        public ChatLeftUser(MTProtoTelegramClient client, MessageActionChatDeleteUser data) {
+            super(client, Type.CHAT_LEFT_USER);
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets id of left user.
+         *
+         * @return The id of left user.
+         */
         public Id getUserId() {
             return Id.ofUser(data.userId());
+        }
+
+        /**
+         * Requests to retrieve left user.
+         *
+         * @return An {@link Mono} emitting on successful completion the {@link User left user}.
+         */
+        public Mono<User> getUser() {
+            return getUser(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve left user using specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply
+         * @return An {@link Mono} emitting on successful completion the {@link User left user}.
+         */
+        public Mono<User> getUser(EntityRetrievalStrategy strategy) {
+            return client.withRetrievalStrategy(strategy).getUserById(getUserId());
         }
 
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            ChatDeleteUser that = (ChatDeleteUser) o;
+            ChatLeftUser that = (ChatLeftUser) o;
             return data.equals(that.data);
         }
 
@@ -385,6 +517,11 @@ public class MessageAction implements TelegramObject {
             this.context = Objects.requireNonNull(context);
         }
 
+        /**
+         * Gets current chat photo, absent if photo was deleted,
+         *
+         * @return The current chat photo, absent if photo was deleted,
+         */
         public Optional<Photo> getCurrentPhoto() {
             return Optional.ofNullable(data)
                     .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BasePhoto.class))
@@ -1026,6 +1163,72 @@ public class MessageAction implements TelegramObject {
             return "SetMessagesTtl{" +
                     "data=" + data +
                     '}';
+        }
+    }
+
+    public static class TopicCreate extends MessageAction {
+        // from https://github.com/telegramdesktop/tdesktop/blob/55fd9c50912b127bf782765f23a1b31569e53cbe/Telegram/SourceFiles/data/data_forum_topic.cpp#L47
+        public static final int BLUE = 0x6FB9F0;
+        public static final int YELLOW = 0xFFD67E;
+        public static final int VIOLET = 0xCB86DB;
+        public static final int GREEN = 0x8EEE98;
+        public static final int ROSE = 0xFF93B2;
+        public static final int RED = 0xFB6F5F;
+
+        private final MessageActionTopicCreate data;
+
+        public TopicCreate(MTProtoTelegramClient client, MessageActionTopicCreate data) {
+            super(client, Type.TOPIC_CREATE);
+            this.data = data;
+        }
+
+        public String getTitle() {
+            return data.title();
+        }
+
+        /**
+         * Gets color of the topic in RGB format, currently only one of constants in this type.
+         *
+         * @return The color of the topic in RGB format, currently only one of constants in this type.
+         */
+        public int getIconColor() {
+            return data.iconColor();
+        }
+
+        public Optional<Long> getIconEmojiId() {
+            return Optional.ofNullable(data.iconEmojiId());
+        }
+
+        public Mono<Sticker> getIconEmoji() {
+            return Mono.justOrEmpty(getIconEmojiId())
+                    .flatMap(client::getCustomEmoji);
+        }
+    }
+
+    public static class TopicEdit extends MessageAction {
+
+        private final MessageActionTopicEdit data;
+
+        public TopicEdit(MTProtoTelegramClient client, MessageActionTopicEdit data) {
+            super(client, Type.TOPIC_EDIT);
+            this.data = data;
+        }
+
+        public Optional<String> getTitle() {
+            return Optional.ofNullable(data.title());
+        }
+
+        public Optional<Long> getIconEmojiId() {
+            return Optional.ofNullable(data.iconEmojiId());
+        }
+
+        public Mono<Sticker> getIconEmoji() {
+            return Mono.justOrEmpty(getIconEmojiId())
+                    .flatMap(client::getCustomEmoji);
+        }
+
+        public Optional<Boolean> isClosed() {
+            return Optional.ofNullable(data.closed());
         }
     }
 }

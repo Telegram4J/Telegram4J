@@ -10,10 +10,8 @@ import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.PeerId;
 import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.*;
@@ -41,15 +39,11 @@ public interface Channel extends Chat, MentionablePeer {
      */
     Set<Flag> getFlags();
 
-    /**
-     * Gets username of channel, if present. This username can be used to retrieve channel
-     * via {@link EntityRetriever#resolvePeer(PeerId)}
-     * or used in {@link PeerId peer id}.
-     *
-     * @return The username of channel, if present.
-     */
     @Override
     Optional<String> getUsername();
+
+    @Override
+    List<Username> getUsernames();
 
     /**
      * Gets timestamp when <i>current</i> user joined, or if the user isn't a member, channel created.
@@ -494,6 +488,8 @@ public interface Channel extends Chat, MentionablePeer {
          * admins in <a href="https://core.telegram.org/api/discussion">discussion replies via @replies</a>.
          */
         BLOCKED(BLOCKED_POS),
+
+        FORUM(FORUM_POS),
 
         // ChannelFull flags2
 

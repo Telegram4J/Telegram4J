@@ -1,10 +1,8 @@
 package telegram4j.mtproto.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.Sinks;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.help.*;
@@ -14,8 +12,8 @@ import java.util.List;
 
 public class HelpService extends RpcService {
 
-    public HelpService(MTProtoClient client, StoreLayout storeLayout) {
-        super(client, storeLayout);
+    public HelpService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+        super(groupManager, storeLayout);
     }
 
     // help namespace
@@ -23,110 +21,100 @@ public class HelpService extends RpcService {
 
     @BotCompatible
     public Mono<Config> getConfig() {
-        return client.sendAwait(GetConfig.instance());
+        return sendMain(GetConfig.instance());
     }
 
     public Mono<NearestDc> getNearestDc() {
-        return client.sendAwait(GetNearestDc.instance());
+        return sendMain(GetNearestDc.instance());
     }
 
     public Mono<BaseAppUpdate> getAppUpdate(String source) {
-        return client.sendAwait(ImmutableGetAppUpdate.of(source))
+        return sendMain(ImmutableGetAppUpdate.of(source))
                 .ofType(BaseAppUpdate.class);
     }
 
     public Mono<String> getInviteText() {
-        return client.sendAwait(GetInviteText.instance()).map(InviteText::message);
+        return sendMain(GetInviteText.instance()).map(InviteText::message);
     }
 
     public Mono<Support> getSupport() {
-        return client.sendAwait(GetSupport.instance());
+        return sendMain(GetSupport.instance());
     }
 
-    public Flux<UpdateServiceNotification> getAppChangelog(String prevAppVersion) {
-        return client.sendAwait(ImmutableGetAppChangelog.of(prevAppVersion))
-                .flatMapMany(updates -> {
-                    if (updates.identifier() == BaseUpdates.ID) {
-                        BaseUpdates casted = (BaseUpdates) updates;
-                        client.updates().emitNext(updates, Sinks.EmitFailureHandler.FAIL_FAST);
-
-                        return Flux.fromIterable(casted.updates());
-                    }
-                    return Flux.error(new IllegalArgumentException("Unknown updates type: " + updates.identifier()));
-                })
-                .ofType(UpdateServiceNotification.class);
+    public Mono<Updates> getAppChangelog(String prevAppVersion) {
+        return sendMain(ImmutableGetAppChangelog.of(prevAppVersion));
     }
 
     @BotCompatible
     public Mono<Boolean> setBotUpdatesStatus(int pendingUpdatesCount, String message) {
-        return client.sendAwait(ImmutableSetBotUpdatesStatus.of(pendingUpdatesCount, message));
+        return sendMain(ImmutableSetBotUpdatesStatus.of(pendingUpdatesCount, message));
     }
 
     @BotCompatible
     public Mono<List<CdnPublicKey>> getCdnConfig() {
-        return client.sendAwait(GetCdnConfig.instance())
+        return sendMain(GetCdnConfig.instance())
                 .map(CdnConfig::publicKeys);
     }
 
     public Mono<RecentMeUrls> getRecentMeUrls(String referer) {
-        return client.sendAwait(ImmutableGetRecentMeUrls.of(referer));
+        return sendMain(ImmutableGetRecentMeUrls.of(referer));
     }
 
     public Mono<TermsOfServiceUpdate> getTermsOfServiceUpdate() {
-        return client.sendAwait(GetTermsOfServiceUpdate.instance());
+        return sendMain(GetTermsOfServiceUpdate.instance());
     }
 
     public Mono<Boolean> acceptTermsOfService(String idJson) {
-        return client.sendAwait(ImmutableAcceptTermsOfService.of(ImmutableDataJSON.of(idJson)));
+        return sendMain(ImmutableAcceptTermsOfService.of(ImmutableDataJSON.of(idJson)));
     }
 
     public Mono<BaseDeepLinkInfo> getDeepLinkInfo(String path) {
-        return client.sendAwait(ImmutableGetDeepLinkInfo.of(path))
+        return sendMain(ImmutableGetDeepLinkInfo.of(path))
                 .ofType(BaseDeepLinkInfo.class);
     }
 
     public Mono<JsonNode> getAppConfig() {
-        return client.sendAwait(GetAppConfig.instance());
+        return sendMain(GetAppConfig.instance());
     }
 
     public Mono<Boolean> saveAppLog(Iterable<? extends InputAppEvent> events) {
-        return Mono.defer(() -> client.sendAwait(ImmutableSaveAppLog.of(events)));
+        return Mono.defer(() -> sendMain(ImmutableSaveAppLog.of(events)));
     }
 
     public Mono<BasePassportConfig> getPassportConfig(int hash) {
-        return client.sendAwait(ImmutableGetPassportConfig.of(hash))
+        return sendMain(ImmutableGetPassportConfig.of(hash))
                 .ofType(BasePassportConfig.class);
     }
 
     public Mono<String> getSupportName() {
-        return client.sendAwait(GetSupportName.instance()).map(SupportName::name);
+        return sendMain(GetSupportName.instance()).map(SupportName::name);
     }
 
     public Mono<UserInfo> getUserInfo(InputUser userId) {
-        return client.sendAwait(ImmutableGetUserInfo.of(userId));
+        return sendMain(ImmutableGetUserInfo.of(userId));
     }
 
     public Mono<UserInfo> getUserInfo(InputUser userId, String message, List<MessageEntity> entities) {
-        return Mono.defer(() -> client.sendAwait(ImmutableEditUserInfo.of(userId, message, entities)));
+        return Mono.defer(() -> sendMain(ImmutableEditUserInfo.of(userId, message, entities)));
     }
 
     public Mono<PromoData> getPromoData() {
-        return client.sendAwait(GetPromoData.instance());
+        return sendMain(GetPromoData.instance());
     }
 
     public Mono<Boolean> hidePromoData(InputPeer peer) {
-        return client.sendAwait(ImmutableHidePromoData.of(peer));
+        return sendMain(ImmutableHidePromoData.of(peer));
     }
 
     public Mono<Boolean> dismissSuggestion(InputPeer peer, String suggestion) {
-        return client.sendAwait(ImmutableDismissSuggestion.of(peer, suggestion));
+        return sendMain(ImmutableDismissSuggestion.of(peer, suggestion));
     }
 
     public Mono<CountriesList> getCountriesList(String langCode, int hash) {
-        return client.sendAwait(ImmutableGetCountriesList.of(langCode, hash));
+        return sendMain(ImmutableGetCountriesList.of(langCode, hash));
     }
 
     public Mono<PremiumPromo> getPremiumPromo() {
-        return client.sendAwait(GetPremiumPromo.instance());
+        return sendMain(GetPremiumPromo.instance());
     }
 }

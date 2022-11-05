@@ -22,6 +22,7 @@ import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.messages.AffectedHistory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -440,6 +441,11 @@ public final class GroupChat extends BaseChat {
     public Mono<Boolean> editAbout(String newAbout) {
         return client.getServiceHolder().getChatService()
                 .editChatAbout(ImmutableInputPeerChat.of(minData.id()), newAbout);
+    }
+
+    @Override
+    public Mono<AffectedHistory> unpinAllMessages(@Nullable Integer topMessageId) {
+        return super.unpinAllMessages(topMessageId);
     }
 
     @Override

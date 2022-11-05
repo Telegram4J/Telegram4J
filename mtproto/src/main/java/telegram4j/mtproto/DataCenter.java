@@ -1,6 +1,7 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.tl.mtproto.PQInnerDataDc;
 
 import java.util.List;
 import java.util.Objects;
@@ -158,6 +159,8 @@ public final class DataCenter {
 
     /**
      * Gets internal representation of datacenter id.
+     *
+     * <p> This id can be used in {@link PQInnerDataDc}.
      *
      * @return The internal representation of datacenter id.
      */

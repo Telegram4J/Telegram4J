@@ -105,7 +105,10 @@ public final class ChatRestrictions {
         INVITE_USERS(INVITE_USERS_POS),
 
         /** Disallows to pin messages in a channel/chat. */
-        PIN_MESSAGES(PIN_MESSAGES_POS);
+        PIN_MESSAGES(PIN_MESSAGES_POS),
+
+        /** Disallows to create, edit and delete group chat topics. */
+        MANAGE_TOPICS(MANAGE_TOPICS_POS);
 
         private final byte position;
 

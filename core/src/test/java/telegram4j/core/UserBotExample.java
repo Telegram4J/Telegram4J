@@ -2,6 +2,7 @@ package telegram4j.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
@@ -12,6 +13,9 @@ import telegram4j.core.retriever.PreferredEntityRetriever;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
 
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public class UserBotExample {
@@ -26,8 +30,8 @@ public class UserBotExample {
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new TlModule());
 
-        int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
-        String apiHash = System.getenv("T4J_API_HASH");
+        int apiId = 27277322;//Integer.parseInt(System.getenv("T4J_API_ID"));
+        String apiHash = "8782058863c5321c89199ec620bb9aee";//System.getenv("T4J_API_HASH");
 
         MTProtoTelegramClient.create(apiId, apiHash, CodeAuthorization::authorize)
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
@@ -35,13 +39,38 @@ public class UserBotExample {
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
                 .withConnection(client -> {
 
-                    Mono<Void> eventLog = client.getMtProtoClient().updates().asFlux()
+                    Mono<Void> eventLog = client.getMtProtoClientGroup().main().updates().asFlux()
                             .publishOn(Schedulers.boundedElastic())
                             .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
                             .doOnNext(log::info)
                             .then();
 
-                    return Mono.when(eventLog);
+                    AtomicBoolean online = new AtomicBoolean(true);
+                    Mono<Void> status = Flux.<Integer>create(sink -> {
+                                var schedule = Schedulers.parallel().schedule(() -> {
+                                    while (!Thread.currentThread().isInterrupted()) {
+                                        try {
+                                            int sleep = ThreadLocalRandom.current().nextInt(45, 160);
+                                            log.info("Delaying {} status for {} seconds", online.getAcquire() ? "offline" : "online", sleep);
+                                            TimeUnit.SECONDS.sleep(sleep);
+                                            sink.next(1);
+                                        } catch (InterruptedException e) {
+                                            break;
+                                        }
+                                    }
+                                });
+                                sink.onCancel(schedule);
+                            })
+                            .flatMap(e -> {
+                                boolean state = online.getAcquire();
+                                online.setRelease(!state);
+                                return client.getServiceHolder()
+                                        .getAccountService()
+                                        .updateStatus(state);
+                            })
+                            .then();
+
+                    return Mono.when(eventLog, status);
                 })
                 .block();
     }

@@ -29,6 +29,8 @@ public final class SendMessageSpec {
     private final Instant scheduleTimestamp;
     @Nullable
     private final PeerId sendAs;
+    @Nullable
+    private final Integer topMessageId;
 
     private SendMessageSpec(String message) {
         this.message = Objects.requireNonNull(message);
@@ -39,6 +41,7 @@ public final class SendMessageSpec {
         this.scheduleTimestamp = null;
         this.sendAs = null;
         this.media = null;
+        this.topMessageId = null;
     }
 
     private SendMessageSpec(Builder builder) {
@@ -50,12 +53,13 @@ public final class SendMessageSpec {
         this.scheduleTimestamp = builder.scheduleTimestamp;
         this.sendAs = builder.sendAs;
         this.media = builder.media;
+        this.topMessageId = builder.topMessageId;
     }
 
     private SendMessageSpec(ImmutableEnumSet<Flag> flags, @Nullable Integer replyToMessageId, String message,
                             @Nullable EntityParserFactory parser, @Nullable ReplyMarkupSpec replyMarkup,
                             @Nullable Instant scheduleTimestamp, @Nullable PeerId sendAs,
-                            @Nullable InputMediaSpec media) {
+                            @Nullable InputMediaSpec media, @Nullable Integer topMessageId) {
         this.flags = flags;
         this.replyToMessageId = replyToMessageId;
         this.message = message;
@@ -64,6 +68,7 @@ public final class SendMessageSpec {
         this.scheduleTimestamp = scheduleTimestamp;
         this.sendAs = sendAs;
         this.media = media;
+        this.topMessageId = topMessageId;
     }
 
     public ImmutableEnumSet<Flag> flags() {
@@ -98,12 +103,16 @@ public final class SendMessageSpec {
         return Optional.ofNullable(media);
     }
 
+    public Optional<Integer> getTopMessageId() {
+        return Optional.ofNullable(topMessageId);
+    }
+
     private SendMessageSpec withFlags(Iterable<Flag> value) {
         Objects.requireNonNull(value);
         if (flags.equals(value)) return this;
         var newValue = ImmutableEnumSet.of(Flag.class, value);
         return new SendMessageSpec(newValue, replyToMessageId, message, parser,
-                replyMarkup, scheduleTimestamp, sendAs, media);
+                replyMarkup, scheduleTimestamp, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withReplyTo(@Nullable Message value) {
@@ -113,7 +122,7 @@ public final class SendMessageSpec {
     public SendMessageSpec withReplyToMessageId(@Nullable Integer value) {
         if (Objects.equals(replyToMessageId, value)) return this;
         return new SendMessageSpec(flags, value, message, parser,
-                replyMarkup, scheduleTimestamp, sendAs, media);
+                replyMarkup, scheduleTimestamp, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withReplyToMessageId(Optional<Integer> opt) {
@@ -124,13 +133,13 @@ public final class SendMessageSpec {
         Objects.requireNonNull(value);
         if (message.equals(value)) return this;
         return new SendMessageSpec(flags, replyToMessageId, value, parser,
-                replyMarkup, scheduleTimestamp, sendAs, media);
+                replyMarkup, scheduleTimestamp, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withParser(@Nullable EntityParserFactory value) {
         if (parser == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, value,
-                replyMarkup, scheduleTimestamp, sendAs, media);
+                replyMarkup, scheduleTimestamp, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withParser(Optional<? extends EntityParserFactory> opt) {
@@ -140,7 +149,7 @@ public final class SendMessageSpec {
     public SendMessageSpec withReplyMarkup(@Nullable ReplyMarkupSpec value) {
         if (replyMarkup == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, parser,
-                value, scheduleTimestamp, sendAs, media);
+                value, scheduleTimestamp, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withReplyMarkup(Optional<ReplyMarkupSpec> opt) {
@@ -150,7 +159,7 @@ public final class SendMessageSpec {
     public SendMessageSpec withScheduleTimestamp(@Nullable Instant value) {
         if (scheduleTimestamp == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, parser,
-                replyMarkup, value, sendAs, media);
+                replyMarkup, value, sendAs, media, topMessageId);
     }
 
     public SendMessageSpec withScheduleTimestamp(Optional<Instant> opt) {
@@ -160,7 +169,7 @@ public final class SendMessageSpec {
     public SendMessageSpec withSendAs(@Nullable PeerId value) {
         if (sendAs == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, parser,
-                replyMarkup, scheduleTimestamp, value, media);
+                replyMarkup, scheduleTimestamp, value, media, topMessageId);
     }
 
     public SendMessageSpec withSendAs(@Nullable String value) {
@@ -178,11 +187,25 @@ public final class SendMessageSpec {
     public SendMessageSpec withMedia(@Nullable InputMediaSpec value) {
         if (media == value) return this;
         return new SendMessageSpec(flags, replyToMessageId, message, parser,
-                replyMarkup, scheduleTimestamp, sendAs, value);
+                replyMarkup, scheduleTimestamp, sendAs, value, topMessageId);
     }
 
     public SendMessageSpec withMedia(Optional<? extends InputMediaSpec> opt) {
         return withMedia(opt.orElse(null));
+    }
+
+    public SendMessageSpec withTopMessage(@Nullable Message value) {
+        return withTopMessageId(value != null ? value.getId() : null);
+    }
+
+    public SendMessageSpec withTopMessageId(@Nullable Integer value) {
+        if (Objects.equals(topMessageId, value)) return this;
+        return new SendMessageSpec(flags, replyToMessageId, message, parser,
+                replyMarkup, scheduleTimestamp, sendAs, media, value);
+    }
+
+    public SendMessageSpec withTopMessageId(Optional<Integer> opt) {
+        return withTopMessageId(opt.orElse(null));
     }
 
     @Override
@@ -197,7 +220,8 @@ public final class SendMessageSpec {
                 && Objects.equals(replyMarkup, other.replyMarkup)
                 && Objects.equals(scheduleTimestamp, other.scheduleTimestamp)
                 && Objects.equals(sendAs, other.sendAs)
-                && Objects.equals(media, other.media);
+                && Objects.equals(media, other.media)
+                && Objects.equals(topMessageId, other.topMessageId);
     }
 
     @Override
@@ -211,6 +235,7 @@ public final class SendMessageSpec {
         h += (h << 5) + Objects.hashCode(scheduleTimestamp);
         h += (h << 5) + Objects.hashCode(sendAs);
         h += (h << 5) + Objects.hashCode(media);
+        h += (h << 5) + Objects.hashCode(topMessageId);
         return h;
     }
 
@@ -225,6 +250,7 @@ public final class SendMessageSpec {
                 ", replyMarkup=" + replyMarkup +
                 ", scheduleTimestamp=" + scheduleTimestamp +
                 ", sendAs=" + sendAs +
+                ", topMessageId=" + topMessageId +
                 '}';
     }
 
@@ -245,6 +271,7 @@ public final class SendMessageSpec {
         private Instant scheduleTimestamp;
         private PeerId sendAs;
         private InputMediaSpec media;
+        private Integer topMessageId;
 
         private Builder() {
         }
@@ -258,6 +285,7 @@ public final class SendMessageSpec {
             scheduleTimestamp(instance.scheduleTimestamp);
             sendAs(instance.sendAs);
             media(instance.media);
+            topMessageId(instance.topMessageId);
             return this;
         }
 
@@ -361,6 +389,19 @@ public final class SendMessageSpec {
         public Builder media(Optional<? extends InputMediaSpec> media) {
             this.media = media.orElse(null);
             return this;
+        }
+
+        public Builder topMessage(@Nullable Message message) {
+            return topMessageId(message != null ? message.getId() : null);
+        }
+
+        public Builder topMessageId(@Nullable Integer topMessageId) {
+            this.topMessageId = topMessageId;
+            return this;
+        }
+
+        public Builder topMessageId(Optional<Integer> opt) {
+            return topMessageId(opt.orElse(null));
         }
 
         public SendMessageSpec build() {
