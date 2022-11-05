@@ -3,7 +3,6 @@ module telegram4j.core {
     requires org.reactivestreams;
     requires io.netty.codec.http;
     requires io.netty.buffer;
-    requires reactor.netty.http;
     requires reactor.netty.core;
     requires reactor.extra;
     requires com.fasterxml.jackson.databind;
