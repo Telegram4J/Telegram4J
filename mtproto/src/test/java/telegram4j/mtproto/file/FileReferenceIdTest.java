@@ -63,7 +63,7 @@ class FileReferenceIdTest {
                 .addSize(ImmutableBasePhotoSize.of("i", 100, 100, -1))
                 .dcId(2)
                 .build(), createMediaContext(ImmutablePeerChannel.of(123), 4235436));
-        var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2);
+        var expStickerSet = ofStickerSet(ImmutableInputStickerSetID.of(1337, -1111), 2, 123);
         var expBotInfoDocument = ofDocument(doc,
                 createBotInfoContext(ImmutablePeerUser.of(123), 123));
 

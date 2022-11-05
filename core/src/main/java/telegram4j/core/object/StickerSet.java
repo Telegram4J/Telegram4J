@@ -28,7 +28,8 @@ public class StickerSet implements TelegramObject {
 
         Integer ver = data.thumbVersion();
         this.fileReferenceId = ver != null ? FileReferenceId.ofStickerSet(
-                ImmutableInputStickerSetID.of(data.id(), data.accessHash()), ver) : null;
+                ImmutableInputStickerSetID.of(data.id(), data.accessHash()), ver,
+                Objects.requireNonNull(data.thumbDcId())) : null;
     }
 
     @Override

@@ -233,16 +233,19 @@ public final class FileReferenceId {
      * @throws IllegalArgumentException If sticker set id is {@link InputStickerSetEmpty} or {@code version} is negative.
      * @param stickerSet The sticker set identifier.
      * @param version The id of sticker set thumbnail.
+     * @param dcId The id of media dc.
      * @return The new {@code FileReferenceId} with sticker set thumbnail from their id.
      */
-    public static FileReferenceId ofStickerSet(InputStickerSet stickerSet, int version) {
+    public static FileReferenceId ofStickerSet(InputStickerSet stickerSet, int version, int dcId) {
         if (stickerSet == InputStickerSetEmpty.instance())
             throw new IllegalArgumentException("Unexpected stickerSet type.");
         if (version < 0)
             throw new IllegalArgumentException("Invalid sticker set thumbnail version.");
+        if (dcId > MAX_DC_ID)
+            throw new IllegalArgumentException("Unexpected dcId: " + dcId + " > " + MAX_DC_ID);
 
         return new FileReferenceId(Type.STICKER_SET_THUMB, null,
-                SIZE_TYPE_ABSENT, (short) -1, -1, -1,
+                SIZE_TYPE_ABSENT, (short) dcId, -1, -1,
                 null, '\0', null, stickerSet,
                 version, Context.noOpContext());
     }
@@ -543,6 +546,7 @@ public final class FileReferenceId {
             case STICKER_SET_THUMB:
                 builder.append(", ").append("stickerSet=").append(stickerSet);
                 builder.append(", ").append("thumbVersion=").append(thumbVersion);
+                builder.append(", ").append("dcId=").append(dcId);
                 break;
             case CHAT_PHOTO:
                 builder.append(", ").append("dcId=").append(dcId);
@@ -569,7 +573,8 @@ public final class FileReferenceId {
                 throw new IllegalStateException();
         }
 
-        builder.append("context=").append(context);
+        if (context != Context.noOpContext())
+            builder.append(", context=").append(context);
         builder.append('}');
 
         return builder.toString();
@@ -749,6 +754,7 @@ public final class FileReferenceId {
                     break;
                 case STICKER_SET_THUMB:
                     thumbVersion = buf.readIntLE();
+                    dcId = buf.readShortLE();
                     stickerSet = TlDeserializer.deserialize(buf);
 
                     break;
@@ -840,6 +846,7 @@ public final class FileReferenceId {
 
                     break;
                 case STICKER_SET_THUMB:
+                    buf.writeShortLE(fileRefId.dcId);
                     buf.writeIntLE(fileRefId.thumbVersion);
 
                     Objects.requireNonNull(fileRefId.stickerSet);

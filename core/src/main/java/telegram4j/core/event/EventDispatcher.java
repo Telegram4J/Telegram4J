@@ -12,7 +12,14 @@ import telegram4j.core.event.domain.Event;
 public interface EventDispatcher {
 
     /**
-     * Retrieves a {@link Flux} of the specified {@link Event} type for subsequent processing and subscription.
+     * Retrieves a {@link Flux} of the specified {@link Event} type for
+     * subsequent processing and subscription.
+     *
+     * <p> This method doesn't handle errors occurred while processing
+     * events, and occurred errors will terminate reactive sequence. For preventing
+     * this behavior you should use special operators to handle them,
+     * see <a href="https://projectreactor.io/docs/core/release/reference/#error.handling">this</a>
+     * article o reactor wiki.
      *
      * @param type the event class of requested events.
      * @param <E> the event type.

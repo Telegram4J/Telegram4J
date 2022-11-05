@@ -15,14 +15,11 @@ public final class AuthorizationResources {
     private final String botAuthToken;
     @Nullable
     private final Function<MTProtoTelegramClient, Publisher<?>> authHandler;
-    private final boolean bot;
 
     AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.botAuthToken = Objects.requireNonNull(botAuthToken);
-        this.bot = true;
-
         this.authHandler = null;
     }
 
@@ -30,8 +27,6 @@ public final class AuthorizationResources {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.authHandler = Objects.requireNonNull(authHandler);
-        this.bot = false;
-
         this.botAuthToken = null;
     }
 
@@ -79,6 +74,6 @@ public final class AuthorizationResources {
      * @return {@code true} if it's bot authorization form.
      */
     public boolean isBot() {
-        return bot;
+        return botAuthToken != null;
     }
 }
