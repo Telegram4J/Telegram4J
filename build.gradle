@@ -6,7 +6,7 @@ plugins {
 }
 
 ext {
-    reactor_bom_version = '2020.0.22'
+    reactor_bom_version = '2020.0.24'
     jackson_version = '2.13.4'
     caffeine_version = '3.1.1'
     jsr305_version = '3.0.2'

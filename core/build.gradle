@@ -1,7 +1,5 @@
 dependencies {
     api project(":mtproto")
-
-    api "io.projectreactor.netty:reactor-netty-http"
 }
 
 sourcesJar {
