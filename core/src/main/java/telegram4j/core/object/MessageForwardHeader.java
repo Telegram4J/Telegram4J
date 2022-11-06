@@ -1,14 +1,13 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Mono;
-import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.PeerId;
 import telegram4j.tl.ImmutableInputMessageID;
 
 import java.time.Instant;
@@ -54,24 +53,23 @@ public class MessageForwardHeader implements TelegramObject {
     }
 
     /**
-     * Requests to retrieve peer from which message was forwarded.
+     * Requests to retrieve chat from which message was forwarded.
      *
-     * @return An {@link Mono} emitting on successful completion the {@link PeerEntity peer}.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
      */
-    public Mono<PeerEntity> getFrom() {
+    public Mono<Chat> getFrom() {
         return getFrom(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
-     * Requests to retrieve peer from which message was forwarded using specified retrieval strategy.
+     * Requests to retrieve chat from which message was forwarded using specified retrieval strategy.
      *
      * @param strategy The strategy to apply.
-     * @return An {@link Mono} emitting on successful completion the {@link PeerEntity peer}.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat chat}.
      */
-    public Mono<PeerEntity> getFrom(EntityRetrievalStrategy strategy) {
+    public Mono<Chat> getFrom(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(getFromId())
-                .flatMap(id -> client.withRetrievalStrategy(strategy)
-                        .resolvePeer(PeerId.of(id)));
+                .flatMap(client.withRetrievalStrategy(strategy)::getChatById);
     }
 
     /**
@@ -121,9 +119,8 @@ public class MessageForwardHeader implements TelegramObject {
     public Mono<AuxiliaryMessages> getChannelPost(EntityRetrievalStrategy strategy) {
         return Mono.justOrEmpty(data.channelPost())
                 .map(id -> List.of(ImmutableInputMessageID.of(id)))
-                .zipWith(Mono.justOrEmpty(getFromId()))
-                .flatMap(TupleUtils.function((messageId, channelId) -> client.withRetrievalStrategy(strategy)
-                        .getMessages(channelId, messageId)));
+                .flatMap(messageId -> client.withRetrievalStrategy(strategy)
+                        .getMessages(getFromId().orElseThrow(), messageId));
     }
 
     /**
@@ -151,6 +148,27 @@ public class MessageForwardHeader implements TelegramObject {
      */
     public Optional<Integer> getSavedFromMessageId() {
         return Optional.ofNullable(data.savedFromMsgId());
+    }
+
+    /**
+     * Requests to retrieve chat from which message was saved.
+     *
+     * @return An {@link Mono} emitting on successful completion the {@link Chat original chat}.
+     */
+    public Mono<Chat> getSavedFromPeer() {
+        return getSavedFromPeer(MappingUtil.IDENTITY_RETRIEVER);
+    }
+
+    /**
+     * Requests to retrieve chat from which message was saved using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return An {@link Mono} emitting on successful completion the {@link Chat original chat}.
+     */
+    public Mono<Chat> getSavedFromPeer(EntityRetrievalStrategy strategy) {
+        return Mono.justOrEmpty(getSavedFromPeerId())
+                .flatMap(messageId -> client.withRetrievalStrategy(strategy)
+                        .getChatById(messageId));
     }
 
     /**

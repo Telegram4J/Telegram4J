@@ -42,7 +42,7 @@ public class DefaultMTProtoGroupManager implements MTProtoClientGroupManager {
     @Override
     public <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method) {
         return Mono.justOrEmpty(clients.get(id))
-                .switchIfEmpty(Mono.error(() -> new IllegalArgumentException("Unknown dcId: " + id)))
+                .switchIfEmpty(Mono.error(() -> new IllegalArgumentException("No client found for dcId: " + id)))
                 .map(c -> {
                     c.lastQueryTimestamp = Instant.now();
                     return c.inner;
@@ -99,14 +99,10 @@ public class DefaultMTProtoGroupManager implements MTProtoClientGroupManager {
     }
 
     @Override
-    public void add(MTProtoClient client) {
+    public DcId add(MTProtoClient client) {
         DcId dcId = nextId(client.getDatacenter());
         clients.put(dcId, new ClientInfo(client));
-    }
-
-    @Override
-    public void remove(DcId id) {
-        clients.remove(id);
+        return dcId;
     }
 
     @Override

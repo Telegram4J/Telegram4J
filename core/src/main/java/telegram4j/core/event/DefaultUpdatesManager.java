@@ -43,6 +43,9 @@ import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 /** Manager for correct and complete work with general and channel updates. */
 public class DefaultUpdatesManager implements UpdatesManager {
+    // TODO:
+    //  - delay getChannelDifference and getDifference for preventing updates duplicating
+    //  - decide on updates emitting order and maybe sort them by date
 
     protected static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
 
@@ -101,7 +104,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                return applyUpdate(UpdateContext.create(client, data.update()));
+                return applyUpdate(UpdateContext.create(client, data.update()), true);
             }
             case BaseUpdates.ID: {
                 BaseUpdates data = (BaseUpdates) updates;
@@ -132,7 +135,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
-                        data.chats(), data.users()));
+                        data.chats(), data.users(), true));
             }
             case UpdatesCombined.ID: {
                 UpdatesCombined data = (UpdatesCombined) updates;
@@ -164,7 +167,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 date = data.date();
 
                 return preApply.concatWith(handleUpdates0(List.of(), data.updates(),
-                        data.chats(), data.users()));
+                        data.chats(), data.users(), true));
             }
             case UpdateShortChatMessage.ID: {
                 UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
@@ -174,7 +177,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
-                    preApply = getDifference();
+                    preApply = getDifference(pts, qts, date);
                 } else if (pts + data.ptsCount() > data.pts()) {
                     return Flux.empty();
                 }
@@ -211,7 +214,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
-                    preApply = getDifference();
+                    preApply = getDifference(pts, qts, date);
                 } else if (pts + data.ptsCount() > data.pts()) {
                     return Flux.empty();
                 }
@@ -256,6 +259,16 @@ public class DefaultUpdatesManager implements UpdatesManager {
         stateInterval.dispose();
     }
 
+    protected Mono<Void> saveStateIf(boolean needSave) {
+        if (!needSave) {
+            return Mono.empty();
+        }
+
+        return client.getMtProtoResources()
+                .getStoreLayout()
+                .updateState(ImmutableState.of(pts, qts, date, seq, -1));
+    }
+
     protected void applyStateLocal(State state) {
         pts = state.pts();
         qts = state.qts();
@@ -263,45 +276,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         seq = state.seq();
     }
 
-    protected void applyIntermediateState(State state) {
-        if (log.isDebugEnabled()) {
-            StringJoiner j = new StringJoiner(", ");
-            int pts = this.pts;
-            if (pts != state.pts()) {
-                j.add("pts: " + pts + "->" + state.pts());
-                this.pts = state.pts();
-            }
-            int qts = this.qts;
-            if (qts != state.qts()) {
-                j.add("qts: " + qts + "->" + state.qts());
-                this.qts = state.qts();
-            }
-            int seq = this.seq;
-            if (seq != state.seq()) {
-                j.add("seq: " + seq + "->" + state.seq());
-                this.seq = state.seq();
-            }
-            int date = this.date;
-            if (date != state.date()) {
-                j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(state.date()));
-                this.date = state.date();
-            }
-
-            String str = j.toString();
-            if (str.isEmpty()) {
-                return;
-            }
-
-            log.debug("Updating state to intermediate, " + j);
-        } else {
-            pts = state.pts();
-            qts = state.qts();
-            date = state.date();
-            seq = state.seq();
-        }
-    }
-
-    protected Mono<Void> applyState(State state) {
+    protected Mono<Void> applyState(State state, boolean intermediate) {
         return Mono.defer(() -> {
             if (log.isDebugEnabled()) {
                 StringJoiner j = new StringJoiner(", ");
@@ -327,7 +302,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     return Mono.empty();
                 }
 
-                log.debug("Updating state, " + j);
+                log.debug("Updating state" + (intermediate ? " to intermediate" : "") + ", " + j);
             }
 
             applyStateLocal(state);
@@ -342,9 +317,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     protected Flux<Event> getDifference(int pts, int qts, int date) {
-        if (pts == -1 || qts == -1 || date == -1) {
+        if (pts == -1 || qts == -1 || date <= 0) {
             if (log.isWarnEnabled()) {
-                log.warn("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+                log.warn("Incorrect get difference parameters, pts: {}, qts: {}, date: {}", pts, qts, date);
             }
             return Flux.empty();
         }
@@ -364,8 +339,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     switch (difference.identifier()) {
                         case DifferenceEmpty.ID: {
-                            DifferenceEmpty diff = (DifferenceEmpty) difference;
+                            var diff = (DifferenceEmpty) difference;
 
+                            boolean updated = false;
                             if (log.isDebugEnabled()) {
                                 StringJoiner j = new StringJoiner(", ");
                                 int seq = this.seq;
@@ -384,28 +360,42 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                     return Mono.empty();
                                 }
 
+                                updated = true;
                                 log.debug("Updating state, " + j);
                             } else {
+                                int seq = this.seq;
+                                if (seq != diff.seq()) {
+                                    this.seq = diff.seq();
+                                    updated = true;
+                                }
+                                int currDate = this.date;
+                                if (currDate != diff.date()) {
+                                    this.date = diff.date();
+                                    updated = true;
+                                }
+
                                 this.seq = diff.seq();
                                 this.date = diff.date();
                             }
 
-                            return Mono.empty();
+                            return saveStateIf(updated)
+                                    .then(Mono.empty());
                         }
                         case BaseDifference.ID: {
-                            BaseDifference diff = (BaseDifference) difference;
+                            var diff = (BaseDifference) difference;
 
-                            return applyState(diff.state())
+                            return applyState(diff.state(), false)
                                     .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
-                                            diff.chats(), diff.users()));
+                                            diff.chats(), diff.users(), false));
                         }
                         case DifferenceSlice.ID: {
-                            DifferenceSlice diff = (DifferenceSlice) difference;
+                            var diff = (DifferenceSlice) difference;
+                            State state = diff.intermediateState();
 
-                            applyIntermediateState(diff.intermediateState());
-
-                            return handleUpdates0(diff.newMessages(), diff.otherUpdates(), diff.chats(), diff.users())
-                                    .concatWith(getDifference());
+                            return applyState(state, true)
+                                    .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
+                                            diff.chats(), diff.users(), false))
+                                    .concatWith(getDifference(state.pts(), state.qts(), state.date()));
                         }
                         default:
                             return Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
@@ -414,7 +404,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     protected Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
-                                         List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users) {
+                                         List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
+                                         boolean notFromDiff) {
         var usersMap = users.stream()
                 .map(u -> EntityFactory.createUser(client, u))
                 .filter(Objects::nonNull)
@@ -488,7 +479,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         Flux<Event> concatedUpdates = Flux.fromIterable(otherUpdates)
                 .map(u -> UpdateContext.create(client, chatsMap, usersMap, u))
-                .flatMap(this::applyUpdate)
+                .flatMap(u -> applyUpdate(u, notFromDiff))
                 .concatWith(messageCreateEvents)
                 .concatWith(applyChannelDifference);
 
@@ -524,8 +515,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
             default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
         }
 
-        Mono<Void> updatePts = client.getMtProtoResources()
-                .getStoreLayout().updateChannelPts(channelId.asLong(), newPts);
+        Mono<Void> updatePts = Mono.defer(() -> {
+            if (log.isDebugEnabled()) {
+                log.debug("Updating state for channel: {}, pts: {}->{}", channelId.asString(), request.pts(), newPts);
+            }
+
+            return client.getMtProtoResources()
+                    .getStoreLayout().updateChannelPts(channelId.asLong(), newPts);
+        });
 
         Flux<Event> refetchDifference = Flux.defer(() -> {
             if (diff.isFinal()) {
@@ -548,7 +545,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         switch (diff.identifier()) {
             case BaseChannelDifference.ID: {
-                BaseChannelDifference diff0 = (BaseChannelDifference) diff;
+                var diff0 = (BaseChannelDifference) diff;
 
                 var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
@@ -585,12 +582,12 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .concatWith(refetchDifference);
             }
             case ChannelDifferenceEmpty.ID: {
-                ChannelDifferenceEmpty diff0 = (ChannelDifferenceEmpty) diff;
+                var diff0 = (ChannelDifferenceEmpty) diff;
 
                 return updatePts.thenMany(Flux.empty());
             }
             case ChannelDifferenceTooLong.ID: {
-                ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
+                var diff0 = (ChannelDifferenceTooLong) diff;
 
                 var usersMap = diff0.users().stream()
                         .map(u -> EntityFactory.createUser(client, u))
@@ -628,7 +625,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
-    protected Flux<Event> applyUpdate(UpdateContext<Update> ctx) {
+    protected Flux<Event> applyUpdate(UpdateContext<Update> ctx, boolean notFromDiff) {
         Flux<Event> mapUpdate = UpdatesMapper.instance.handle(ctx);
 
         if (ctx.getUpdate() instanceof PtsUpdate) {
@@ -636,39 +633,46 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
             long channelId = -1;
             switch (ptsUpdate.identifier()) {
+                case UpdateReadChannelInbox.ID: {
+                    var u = (UpdateReadChannelInbox) ptsUpdate;
+
+                    channelId = u.channelId();
+                    break;
+                }
                 case UpdateDeleteChannelMessages.ID: {
-                    UpdateDeleteChannelMessages u = (UpdateDeleteChannelMessages) ptsUpdate;
+                    var u = (UpdateDeleteChannelMessages) ptsUpdate;
 
                     channelId = u.channelId();
                     break;
                 }
                 case UpdateEditChannelMessage.ID: {
-                    UpdateEditChannelMessage u = (UpdateEditChannelMessage) ptsUpdate;
+                    var u = (UpdateEditChannelMessage) ptsUpdate;
 
                     PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
                     channelId = p.channelId();
                     break;
                 }
                 case UpdateNewChannelMessage.ID: {
-                    UpdateNewChannelMessage u = (UpdateNewChannelMessage) ptsUpdate;
+                    var u = (UpdateNewChannelMessage) ptsUpdate;
                     PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
                     channelId = p.channelId();
                     break;
                 }
                 case UpdatePinnedChannelMessages.ID: {
-                    UpdatePinnedChannelMessages u = (UpdatePinnedChannelMessages) ptsUpdate;
+                    var u = (UpdatePinnedChannelMessages) ptsUpdate;
                     channelId = u.channelId();
                     break;
                 }
                 case UpdateReadHistoryOutbox.ID: {
-                    UpdateReadHistoryOutbox u = (UpdateReadHistoryOutbox) ptsUpdate;
-                    if (u.peer().identifier() == PeerChannel.ID) {
-                        channelId = ((PeerChannel) u.peer()).channelId();
+                    var u = (UpdateReadHistoryOutbox) ptsUpdate;
+                    if (u.peer() instanceof PeerChannel) {
+                        var cp = (PeerChannel) u.peer();
+                        channelId = cp.channelId();
                     }
                     break;
                 }
                 case UpdateChannelWebPage.ID: {
-                    UpdateChannelWebPage u = (UpdateChannelWebPage) ptsUpdate;
+                    var u = (UpdateChannelWebPage) ptsUpdate;
 
                     channelId = u.channelId();
                     break;
@@ -676,17 +680,24 @@ public class DefaultUpdatesManager implements UpdatesManager {
             }
 
             if (channelId == -1) { // common pts
-                Flux<Event> preApply = Flux.empty();
+                Flux<Event> preApply;
                 int pts = this.pts;
                 if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
 
-                    preApply = getDifference();
+                    preApply = getDifference(pts, qts, date);
                 } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                     return Flux.empty();
                 } else {
+                    if (log.isDebugEnabled() && notFromDiff) {
+                        log.debug("Updating state, pts: {}->{}", pts, ptsUpdate.pts());
+                    }
+
                     this.pts = ptsUpdate.pts();
+
+                    preApply = saveStateIf(true)
+                            .thenMany(Flux.empty());
                 }
 
                 return preApply.concatWith(mapUpdate);
@@ -710,7 +721,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .getStoreLayout().updateChannelPts(id, ptsUpdate.pts());
 
                         if (justApplied.get()) {
-                            log.debug("Updating state for channel: {}, pts: unknown->{}", id, ptsUpdate.pts());
+                            if (log.isDebugEnabled() && notFromDiff) {
+                                log.debug("Updating state for channel: {}, pts: unknown->{}", id, ptsUpdate.pts());
+                            }
                             return updatePts.thenMany(mapUpdate);
                         }
 
@@ -725,7 +738,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             return Flux.empty();
                         }
 
-                        log.debug("Updating state for channel: {}, pts: {}->{}", id, pts, ptsUpdate.pts());
+                        if (log.isDebugEnabled() && notFromDiff) {
+                            log.debug("Updating state for channel: {}, pts: {}->{}", id, pts, ptsUpdate.pts());
+                        }
                         return updatePts.thenMany(mapUpdate);
                     });
         }
@@ -733,16 +748,22 @@ public class DefaultUpdatesManager implements UpdatesManager {
         if (ctx.getUpdate() instanceof QtsUpdate) {
             QtsUpdate qtsUpdate = (QtsUpdate) ctx.getUpdate();
 
-            Flux<Event> preApply = Flux.empty();
+            Flux<Event> preApply;
             int qts = this.qts;
             if (qts + 1 < qtsUpdate.qts()) {
                 log.debug("Updates gap found. Received qts: {}, local qts: {}", qtsUpdate.qts(), qts);
 
-                preApply = getDifference();
+                preApply = getDifference(pts, qts, date);
             } else if (qts + 1 > qtsUpdate.qts()) {
                 return Flux.empty();
             } else {
+                if (log.isDebugEnabled() && notFromDiff) {
+                    log.debug("Updating state, qts: {}->{}", qts, qtsUpdate.qts());
+                }
+
                 this.qts = qtsUpdate.qts();
+                preApply = saveStateIf(true)
+                        .thenMany(Flux.empty());
             }
 
             return preApply.concatWith(mapUpdate);
@@ -774,8 +795,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     @Nullable
-    protected Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap,
-                               Map<Id, User> usersMap, @Nullable User selfUser) {
+    protected Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap, Map<Id, User> usersMap, @Nullable User selfUser) {
         switch (peer.getType()) {
             case CHAT:
             case CHANNEL:

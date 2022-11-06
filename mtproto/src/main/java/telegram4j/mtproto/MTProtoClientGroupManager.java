@@ -8,9 +8,7 @@ public interface MTProtoClientGroupManager extends MTProtoClientGroup {
 
     void setMain(MainMTProtoClient client);
 
-    void add(MTProtoClient client);
-
-    void remove(DcId id);
+    DcId add(MTProtoClient client);
 
     MTProtoClient getOrCreateMediaClient(DcId id, DataCenter dc);
 }
