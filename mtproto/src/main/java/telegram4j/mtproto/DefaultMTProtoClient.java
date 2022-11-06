@@ -32,7 +32,10 @@ import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.mtproto.util.TlEntityUtil;
-import telegram4j.tl.*;
+import telegram4j.tl.TlDeserializer;
+import telegram4j.tl.TlSerialUtil;
+import telegram4j.tl.TlSerializer;
+import telegram4j.tl.Updates;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.RpcMethod;
 import telegram4j.tl.api.TlMethod;
@@ -101,6 +104,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
     private volatile AuthorizationKeyHolder authKey;
     private volatile Connection connection;
     private volatile boolean closed;
+    private volatile boolean initConnectionIsSent;
     private volatile int timeOffset;
     private volatile long serverSalt;
     private volatile long lastMessageId;
@@ -309,7 +313,27 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
             Flux<Request> payloadFlux = outbound.asFlux()
                     .filter(DefaultMTProtoClient::isContentRelated)
-                    .delayUntil(e -> onConnect);
+                    .delayUntil(e -> onConnect)
+                    .map(r -> {
+                        if (r instanceof ContainerRequest) {
+                            return r;
+                        } else if (r instanceof RpcRequest) {
+                            var request = (RpcRequest) r;
+                            if (request.method.identifier() == InvokeWithLayer.ID) {
+                                return r;
+                            }
+
+                            if (!initConnectionIsSent) {
+                                return request.withMethod(
+                                        options.getInitConnection().withQuery(
+                                                options.getInitConnection().query()
+                                                        .withQuery(request.method)));
+                            }
+                            return r;
+                        } else {
+                            throw new IllegalStateException();
+                        }
+                    });
 
             Flux<Request> rpcFlux = outbound.asFlux()
                     .filter(e -> !isContentRelated(e));
@@ -383,6 +407,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
             Mono<Void> startSchedule = Mono.defer(() -> {
                 log.info("[C:0x{}] Connected to datacenter.", id);
+                initConnectionIsSent = false;
                 state.emitNext(State.CONNECTED, options.getEmissionHandler());
                 pingEmitter.start(dataCenter.getType() == DataCenter.Type.MEDIA ? PING_QUERY_PERIOD_MEDIA : PING_QUERY_PERIOD);
 
@@ -867,10 +892,16 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             handleMsgsAck(obj, messageId);
 
             var req = (RpcRequest) requests.get(messageId);
+            if (req == null) {
+                return Mono.empty();
+            }
+
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
-                if (req != null) {
-                    obj = createRpcException(rpcError, messageId, req);
+                obj = createRpcException(rpcError, messageId, req);
+            } else {
+                if (req.method.identifier() == InvokeWithLayer.ID) {
+                    initConnectionIsSent = true;
                 }
             }
 
@@ -880,11 +911,9 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                 requests.remove(cntMsg.containerMsgId());
             }
 
-            if (req != null && (req.state & ACKNOWLEDGED) != 0) {
-                return Mono.empty();
+            if ((req.state & ACKNOWLEDGED) == 0) {
+                acknowledgments.add(messageId);
             }
-
-            acknowledgments.add(messageId);
             return Mono.empty();
         }
 
@@ -967,7 +996,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                 }
             });
 
-            updates.emitNext(UpdatesTooLong.instance(), options.getEmissionHandler());
+            // updates.emitNext(UpdatesTooLong.instance(), options.getEmissionHandler());
 
             acknowledgments.add(messageId);
             return Mono.empty();
@@ -999,7 +1028,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                     updateTimeOffset((int) (messageId >> 32));
                     break;
                 case 48:
-                    BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;
+                    var badServerSalt = (BadServerSalt) badMsgNotification;
                     serverSalt = badServerSalt.newServerSalt();
                     break;
             }
@@ -1184,12 +1213,21 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             this.method = method;
         }
 
+        RpcRequest(TlMethod<?> method, int state) {
+            this.method = method;
+            this.state = state;
+        }
+
         @Override
         public String toString() {
             return "RpcRequest{" +
                     "method=" + prettyMethodName(method) +
                     ", state=" + state +
                     '}';
+        }
+
+        public RpcRequest withMethod(TlMethod<?> method) {
+            return new RpcRequest(method, state);
         }
     }
 

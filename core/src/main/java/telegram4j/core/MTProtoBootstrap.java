@@ -38,6 +38,7 @@ import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.request.ImmutableInitConnection;
+import telegram4j.tl.request.ImmutableInvokeWithLayer;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
@@ -314,19 +315,21 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
-            var initConnection = initConnection();
+            // it's fine
+            @SuppressWarnings({"rawtypes", "unchecked"})
             var invokeWithLayout =
-                    InvokeWithLayer.<TlObject, InitConnection<TlObject, TlMethod<? extends TlObject>>>builder()
-                            .layer(TlInfo.LAYER)
-                            .query(initConnection)
-                            .build();
+                    (ImmutableInvokeWithLayer<?, ImmutableInitConnection<?, TlMethod<?>>>)
+                    (ImmutableInvokeWithLayer) InvokeWithLayer.builder()
+                    .layer(TlInfo.LAYER)
+                    .query(initConnection())
+                    .build();
 
             MTProtoClientGroupManager clientGroupManager = initClientGroupManager();
             MainMTProtoClient leadClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initConnectionRetry(), initAuthRetry(),
-                            List.copyOf(responseTransformers))));
+                            List.copyOf(responseTransformers), invokeWithLayout)));
 
             clientGroupManager.setMain(leadClient);
 
@@ -434,7 +437,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     // Resources initialization
     // ==========================
 
-    private ImmutableInitConnection<TlObject, TlMethod<? extends TlObject>> initConnection() {
+    private ImmutableInitConnection<?, ?> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
                 : InitConnectionParams.getDefault();
