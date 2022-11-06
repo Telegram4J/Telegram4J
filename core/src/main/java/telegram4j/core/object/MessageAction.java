@@ -562,6 +562,11 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets current title of chat.
+         *
+         * @return The current title of chat.
+         */
         public String getCurrentTitle() {
             return data.title();
         }
@@ -587,6 +592,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
+    /** Service message representing the joining of <i>current</i> user to the chat by invite link. */
     public static class ChatJoinedByLink extends MessageAction {
 
         private final MessageActionChatJoinedByLink data;
@@ -596,8 +602,32 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
+        /**
+         * Gets id of user, which invited <i>current</i> user to chat.
+         *
+         * @return The id of user, which invited <i>current</i> user to chat.
+         */
         public Id getInviterId() {
             return Id.ofUser(data.inviterId());
+        }
+
+        /**
+         * Requests to retrieve user which invited <i>current</i> user to chat.
+         *
+         * @return An {@link Mono} emitting on successful completion the {@link User inviter}.
+         */
+        public Mono<User> getInviter() {
+            return getInviter(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve user which invited <i>current</i> user to chat using specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply
+         * @return An {@link Mono} emitting on successful completion the {@link User inviter}.
+         */
+        public Mono<User> getInviter(EntityRetrievalStrategy strategy) {
+            return client.withRetrievalStrategy(strategy).getUserById(getInviterId());
         }
 
         @Override

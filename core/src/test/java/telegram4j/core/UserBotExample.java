@@ -30,12 +30,13 @@ public class UserBotExample {
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new TlModule());
 
-        int apiId = 27277322;//Integer.parseInt(System.getenv("T4J_API_ID"));
-        String apiHash = "8782058863c5321c89199ec620bb9aee";//System.getenv("T4J_API_HASH");
+        int apiId      = Integer.parseInt(System.getenv("TEST_API_ID"));
+        String apiHash = System.getenv("TEST_API_HASH");
 
         MTProtoTelegramClient.create(apiId, apiHash, CodeAuthorization::authorize)
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
-                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, PreferredEntityRetriever.Setting.FULL, PreferredEntityRetriever.Setting.FULL))
+                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, PreferredEntityRetriever.Setting.FULL,
+                        PreferredEntityRetriever.Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
                 .withConnection(client -> {
 
@@ -46,8 +47,9 @@ public class UserBotExample {
                             .then();
 
                     AtomicBoolean online = new AtomicBoolean(true);
+                    // randomly update user status
                     Mono<Void> status = Flux.<Integer>create(sink -> {
-                                var schedule = Schedulers.parallel().schedule(() -> {
+                                var schedule = Schedulers.boundedElastic().schedule(() -> {
                                     while (!Thread.currentThread().isInterrupted()) {
                                         try {
                                             int sleep = ThreadLocalRandom.current().nextInt(45, 160);

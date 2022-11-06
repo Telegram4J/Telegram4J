@@ -41,7 +41,7 @@ public class MTProtoBotExample {
 
     public static void main(String[] args) {
 
-        // only for testing
+        // only for testing, do not copy it to your production code
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
 
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
@@ -49,6 +49,7 @@ public class MTProtoBotExample {
         String botAuthToken = System.getenv("T4J_TOKEN");
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
+                // prefer retrieving full data about peer entities
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))

@@ -25,7 +25,23 @@ import java.util.stream.Collectors;
 /** <a href="https://core.telegram.org/api/poll">Poll</a> object, which represents active or closed poll. */
 public final class Poll implements TelegramObject {
 
+    /** The max limit of {@link #getAnswers()}. */
     public static final int MAX_ANSWERS_COUNT = 10;
+
+    /** The min limit of {@link #getAnswers()}. */
+    public static final int MIN_ANSWERS_COUNT = 2;
+
+    /** The max value of {@link #getClosePeriod()} or {@link #getCloseTimestamp()}. */
+    public static final Duration MAX_CLOSE_PERIOD = Duration.ofSeconds(600);
+
+    /** The min value of {@link #getClosePeriod()} or {@link #getCloseTimestamp()}. */
+    public static final Duration MIN_CLOSE_PERIOD = Duration.ofSeconds(5);
+
+    /** The max length of {@link #getQuestion()} for user accounts. */
+    public static final int MAX_QUESTION_LENGTH_USER = 255;
+
+    /** The max length of {@link #getQuestion()} for bot accounts. */
+    public static final int MAX_QUESTION_LENGTH_BOT = 300;
 
     private final MTProtoTelegramClient client;
     private final MessagePoll data;

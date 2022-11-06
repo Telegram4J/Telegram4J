@@ -311,6 +311,12 @@ public final class InputMediaPollSpec implements InputMediaSpec {
         }
 
         public BaseBuilder closePeriod(@Nullable Duration value) {
+            if (value != null) {
+                Preconditions.requireArgument(value.compareTo(Poll.MIN_CLOSE_PERIOD) >= 0 &&
+                        value.compareTo(Poll.MAX_CLOSE_PERIOD) < 0,
+                        "Invalid close period value: " + value);
+            }
+
             this.closePeriod = value;
             this.closeTimestamp = null;
             return this;
@@ -332,6 +338,8 @@ public final class InputMediaPollSpec implements InputMediaSpec {
                 verify(attributes);
                 throw new IllegalStateException("Cannot build InputMediaPollSpec, some required attributes is not set: " + attributes);
             }
+            Preconditions.requireState(answers.size() >= Poll.MIN_ANSWERS_COUNT, () ->
+                    "Too few answers in poll: " + answers.size() + " < " + Poll.MIN_ANSWERS_COUNT);
             return new InputMediaPollSpec(this);
         }
     }
