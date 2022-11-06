@@ -16,7 +16,6 @@ import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -110,17 +109,16 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 BaseUpdates data = (BaseUpdates) updates;
 
                 Flux<Event> preApply = Flux.empty();
-                int seqBegin = data.seq();
-                int seqEnd = seqBegin + 1;
+                int seqEnd = data.seq();
                 StringJoiner j = new StringJoiner(", ");
-                if (seqBegin != 0 && seqEnd != 0) {
+                if (seqEnd != 0) {
                     int seq = this.seq;
 
-                    if (seq + 1 < seqBegin) {
-                        log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
+                    if (seq + 1 < seqEnd) {
+                        log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqEnd, seqEnd, seq);
 
                         preApply = getDifference();
-                    } else if (seq + 1 > seqBegin) {
+                    } else if (seq + 1 > seqEnd) {
                         return Flux.empty();
                     }
 
@@ -143,7 +141,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 Flux<Event> preApply = Flux.empty();
                 int seqBegin = data.seqStart();
                 int seqEnd = data.seq();
-                Preconditions.requireState(seqEnd - seqBegin == 1);
                 StringJoiner j = new StringJoiner(", ");
                 if (seqBegin != 0 && seqEnd != 0) {
                     int seq = this.seq;
