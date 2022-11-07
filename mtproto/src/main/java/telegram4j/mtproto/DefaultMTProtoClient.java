@@ -120,7 +120,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         this.options = options;
 
         this.updates = Sinks.many().multicast()
-                .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+                .onBackpressureBuffer(Queues.XS_BUFFER_SIZE, false);
         this.outbound = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
         this.authOutbound = Sinks.many().multicast()
@@ -840,7 +840,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             MsgsAck msgsAck = (MsgsAck) obj;
 
             if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Handling acknowledge for message(s): [{}]",
+                rpcLog.debug("[C:0x{}, M:0x{}] Received acknowledge for message(s): [{}]",
                         id, Long.toHexString(messageId), msgsAck.msgIds().stream()
                                 .map(l -> String.format("0x%x", l))
                                 .collect(Collectors.joining(", ")));
@@ -883,10 +883,6 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             messageId = rpcResult.reqMsgId();
             obj = rpcResult.result();
 
-            if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
-            }
-
             obj = ungzip(obj);
 
             handleMsgsAck(obj, messageId);
@@ -898,8 +894,18 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
             if (obj instanceof RpcError) {
                 RpcError rpcError = (RpcError) obj;
-                obj = createRpcException(rpcError, messageId, req);
+
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc error, code: {}, message: {}",
+                            id, Long.toHexString(messageId), rpcError.errorCode(), rpcError.errorMessage());
+                }
+
+                obj = createRpcException(rpcError, req);
             } else {
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
+                }
+
                 if (req.method.identifier() == InvokeWithLayer.ID) {
                     initConnectionIsSent = true;
                 }
@@ -987,6 +993,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
             requests.forEach((k, v) -> {
                 if (k < newSession.firstMsgId()) {
+                    v.setState(PENDING);
                     requests.remove(k);
                     if (v instanceof ContainerizedRequest) { // resend only ContainerRequest
                         return;
@@ -1073,15 +1080,15 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                     rpcLog.debug("[C:0x{}, M:0x{}] Received states: [{}]", id, Long.toHexString(inf.reqMsgId()), st);
                 }
 
-                int i = 0;
-                for (long msgId : stater.msgIds()) {
+                var msgIds = stater.msgIds();
+                for (int i = 0; i < msgIds.size(); i++) {
+                    long msgId = msgIds.get(i);
                     var sub = requests.get(msgId);
                     if (sub == null) {
-                        i++;
                         continue;
                     }
 
-                    int state = c.getByte(i++) & 7;
+                    int state = c.getByte(i) & 7;
                     switch (state) {
                         case 1:
                         case 2:
@@ -1089,7 +1096,6 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                             sub.setState(PENDING);
                             requests.remove(msgId);
                             outbound.emitNext(sub, options.getEmissionHandler());
-                            // resendIds.add(msgId);
                             break;
                         case 4:
                             sub.markState(s -> s | ACKNOWLEDGED | REQUESTED_INFO);
@@ -1182,25 +1188,32 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         }
     }
 
-    // name in format: 'users.GetFullUser'
+    // name in format: 'users.getFullUser'
     static String prettyMethodName(TlMethod<?> method) {
-        return method.getClass().getCanonicalName()
-                .replace("telegram4j.tl.", "")
-                .replace("request.", "")
-                .replace("Immutable", "");
+        String name = method.getClass().getSimpleName();
+        if (name.startsWith("Immutable")) {
+            name = name.substring(9);
+        }
+
+        String namespace = method.getClass().getPackageName();
+        if (namespace.startsWith("telegram4j.tl.")) {
+            namespace = namespace.substring(14);
+        }
+        if (namespace.startsWith("request.")) {
+            namespace = namespace.substring(8);
+        }
+        name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
+
+        if (namespace.isEmpty()) {
+            return name;
+        }
+        return namespace + '.' + name;
     }
 
-    static RpcException createRpcException(RpcError error, long messageId, RpcRequest request) {
-        String orig = error.errorMessage();
-        int argIdx = orig.indexOf("_X");
-        String message = argIdx != -1 ? orig.substring(0, argIdx) : orig;
-        String arg = argIdx != -1 ? orig.substring(argIdx) : null;
-        String hexMsgId = Long.toHexString(messageId);
-        String methodName = String.format("%s/0x%s", prettyMethodName(request.method), hexMsgId);
-
-        String format = String.format("%s returned code: %d, message: %s%s",
-                methodName, error.errorCode(),
-                message, arg != null ? ", param: " + arg : "");
+    static RpcException createRpcException(RpcError error, RpcRequest request) {
+        String format = String.format("%s returned code: %d, message: %s",
+                prettyMethodName(request.method), error.errorCode(),
+                error.errorMessage());
 
         return new RpcException(format, error);
     }
@@ -1242,7 +1255,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         @Override
         public String toString() {
             return "RpcQuery{" +
-                    "method=" + method +
+                    "method=" + prettyMethodName(method) +
                     ", state=" + state +
                     '}';
         }
@@ -1272,7 +1285,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         static final int PENDING        = 0b0000;
         static final int SENT           = 0b0001;
         static final int ACKNOWLEDGED   = 0b0010;
-        static final int REQUESTED_INFO = 0b0100;
+        static final int REQUESTED_INFO = 0b0100; // have requested MsgsStateReq for this request
 
         volatile int state = PENDING;
 

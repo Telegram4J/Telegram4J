@@ -93,7 +93,12 @@ public final class Message implements TelegramObject {
      * @return The {@link Id} of the message author, if present.
      */
     public Optional<Id> getAuthorId() {
-        return Optional.ofNullable(getBaseData().fromId()).map(Id::of);
+        return Optional.ofNullable(getBaseData().fromId()).map(Id::of)
+                // it's relative for user accounts; tg may not set fromId
+                // for messages in DMs, but it is not difficult to handle
+                .or(() -> resolvedChatId.getType() == Id.Type.USER
+                        ? Optional.of(getBaseData().out() ? client.getSelfId() : resolvedChatId)
+                        : Optional.empty());
     }
 
     /**
