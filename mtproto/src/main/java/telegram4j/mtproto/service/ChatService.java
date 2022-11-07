@@ -9,6 +9,7 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ExportedChatInvite;
@@ -55,7 +56,7 @@ public class ChatService extends RpcService {
      * @param id The id of chat
      * @return A {@link Mono} emitting on successful completion minimal information about chat
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chat> getChat(long id) {
         return getChats(List.of(id))
                 .cast(BaseChats.class)
@@ -69,7 +70,7 @@ public class ChatService extends RpcService {
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion minimal information about channel
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chat> getChannel(InputChannel id) {
         return getChannels(List.of(id))
                 .cast(BaseChats.class)
@@ -99,7 +100,7 @@ public class ChatService extends RpcService {
     // requestWebView#91b15831 flags:# from_bot_menu:flags.4?true silent:flags.5?true peer:InputPeer bot:InputUser url:flags.1?string start_param:flags.3?string theme_params:flags.2?DataJSON reply_to_msg_id:flags.0?int send_as:flags.13?InputPeer = WebViewResult;
     // prolongWebView#ea5fbcce flags:# silent:flags.5?true peer:InputPeer bot:InputUser query_id:long reply_to_msg_id:flags.0?int send_as:flags.13?InputPeer = Bool;
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> ids) {
         return Mono.defer(() -> sendMain(telegram4j.tl.request.messages.ImmutableGetMessages.of(ids)))
                 .flatMap(m -> storeLayout.onMessages(m).thenReturn(m));
@@ -131,7 +132,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableRateTranscribedAudio.of(peer, messageId, transcriptionId, good));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<List<Document>> getCustomEmojiDocuments(Iterable<Long> documentIds) {
         return Mono.defer(() -> sendMain(ImmutableGetCustomEmojiDocuments.of(documentIds)));
     }
@@ -173,7 +174,7 @@ public class ChatService extends RpcService {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
         return sendMain(DeleteMessages.builder().revoke(revoke).id(ids).build());
     }
@@ -194,13 +195,13 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableReceivedMessages.of(maxId));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Boolean> setTyping(InputPeer peer, @Nullable Integer topMsgId, SendMessageAction action) {
         return sendMain(ImmutableSetTyping.of(peer, action)
                 .withTopMsgId(topMsgId));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Flux<BaseMessageFields> forwardMessages(ForwardMessages request) {
         return sendMain(request)
                 .ofType(BaseUpdates.class)
@@ -292,7 +293,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableImportChatInvite.of(hash));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseStickerSet> getStickerSet(InputStickerSet stickerSet, int hash) {
         return sendMain(ImmutableGetStickerSet.of(stickerSet, hash))
                 .ofType(BaseStickerSet.class);
@@ -330,7 +331,7 @@ public class ChatService extends RpcService {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Document> getDocumentByHash(ByteBuf sha256, int size, String mimeType) {
         return Mono.defer(() -> sendMain(ImmutableGetDocumentByHash.of(sha256, size, mimeType)));
     }
@@ -361,7 +362,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetMessageEditData.of(peer, id)).map(MessageEditData::caption);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<Boolean> editInlineBotMessage(EditInlineBotMessage request) {
         return sendMain(request);
     }
@@ -370,7 +371,7 @@ public class ChatService extends RpcService {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<Boolean> setBotCallbackAnswer(SetBotCallbackAnswer request) {
         return sendMain(request);
     }
@@ -426,17 +427,17 @@ public class ChatService extends RpcService {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<Boolean> setInlineGameScore(SetInlineGameScore request) {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<HighScores> getGameHighScores(InputPeer peer, int id, InputUser user) {
         return sendMain(ImmutableGetGameHighScores.of(peer, id, user));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<HighScores> getInlineGameHighScores(InputBotInlineMessageID id, InputUser user) {
         return sendMain(ImmutableGetInlineGameHighScores.of(id, user));
     }
@@ -470,7 +471,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetPinnedDialogs.of(folderId));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<Boolean> setBotShippingResults(long queryId, @Nullable String error,
                                                @Nullable Iterable<? extends ShippingOption> shippingOptions) {
         return sendMain(SetBotShippingResults.builder()
@@ -480,7 +481,7 @@ public class ChatService extends RpcService {
                 .build());
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<Boolean> setBotPrecheckoutResults(boolean success, long queryId, @Nullable String error) {
         return sendMain(SetBotPrecheckoutResults.builder()
                 .success(success)
@@ -489,7 +490,7 @@ public class ChatService extends RpcService {
                 .build());
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<MessageMedia> uploadMedia(InputPeer peer, InputMedia media) {
         return sendMain(ImmutableUploadMedia.of(peer, media));
     }
@@ -518,7 +519,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetRecentLocations.of(peer, limit, hash));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Updates> sendMultiMedia(SendMultiMedia request) {
         return sendMain(request);
     }
@@ -548,7 +549,7 @@ public class ChatService extends RpcService {
         return sendMain(ClearAllDrafts.instance());
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
         return sendMain(request)
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
@@ -570,7 +571,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetOnlines.of(peer)).map(ChatOnlines::onlines);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Updates> editChatDefaultBannedRights(InputPeer peer, ChatBannedRights rights) {
         return sendMain(ImmutableEditChatDefaultBannedRights.of(peer, rights));
     }
@@ -680,7 +681,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableReadDiscussion.of(peer, msgId, readMaxId));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<AffectedHistory> unpinAllMessages(InputPeer peer, @Nullable Integer topMsgId) {
         return sendMain(ImmutableUnpinAllMessages.of(peer)
                 .withTopMsgId(topMsgId));
@@ -771,7 +772,7 @@ public class ChatService extends RpcService {
 
     // Message interactions
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseMessageFields> sendMessage(SendMessage request) {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
@@ -782,7 +783,7 @@ public class ChatService extends RpcService {
                 });
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseMessageFields> sendMedia(SendMedia request) {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
@@ -806,7 +807,7 @@ public class ChatService extends RpcService {
                 });
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseMessageFields> editMessage(EditMessage request) {
         return sendMain(request)
                 .flatMap(updates -> {
@@ -839,7 +840,7 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion a list of
      * minimal chats or slice of list if there are a lot of chats
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chats> getChats(Iterable<Long> ids) {
         return Mono.defer(() -> sendMain(ImmutableGetChats.of(ids)))
                 .flatMap(c -> storeLayout.onContacts(c.chats(), List.of())
@@ -853,19 +854,19 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * detailed info about chat and auxiliary data
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ChatFull> getFullChat(long chatId) {
         return sendMain(ImmutableGetFullChat.of(chatId))
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> editChatTitle(long chatId, String title) {
         return sendMain(ImmutableEditChatTitle.of(chatId, title))
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> editChatPhoto(long chatId, InputChatPhoto photo) {
         return sendMain(ImmutableEditChatPhoto.of(chatId, photo))
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
@@ -875,7 +876,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableAddChatUser.of(chatId, user, forwardLimit));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> deleteChatUser(long chatId, InputUser userId, boolean revokeHistory) {
         return sendMain(ImmutableDeleteChatUser.builder().revokeHistory(revokeHistory).chatId(chatId).userId(userId).build())
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
@@ -903,29 +904,29 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetSendAs.of(peer));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Boolean> editChatAbout(InputPeer peer, String about) {
         return sendMain(ImmutableEditChatAbout.of(peer, about));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<AffectedMessages> deleteMessages(InputChannel channel, Iterable<Integer> ids) {
         return Mono.defer(() -> sendMain(ImmutableDeleteMessages.of(channel, ids)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Messages> getMessages(InputChannel channel, Iterable<? extends InputMessage> ids) {
         return Mono.defer(() -> sendMain(ImmutableGetMessages.of(channel, ids)))
                 .flatMap(m -> storeLayout.onMessages(m).thenReturn(m));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
                                                      int offset, int limit, Iterable<Long> ids) {
         return Mono.defer(() -> getParticipants(channel, filter, offset, limit, calculatePaginationHash(ids)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseChannelParticipants> getParticipants(InputChannel channel, ChannelParticipantsFilter filter,
                                                          int offset, int limit, long hash) {
         return sendMain(ImmutableGetParticipants.of(channel, filter, offset, limit, hash))
@@ -933,7 +934,7 @@ public class ChatService extends RpcService {
                 .flatMap(p -> storeLayout.onChannelParticipants(TlEntityUtil.getRawPeerId(channel), p).thenReturn(p));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ChannelParticipant> getParticipant(InputChannel channel, InputPeer peer) {
         return sendMain(ImmutableGetParticipant.of(channel, peer))
                 .flatMap(p -> storeLayout.onChannelParticipant(TlEntityUtil.getRawPeerId(channel), p).thenReturn(p));
@@ -947,7 +948,7 @@ public class ChatService extends RpcService {
      * @return A {@link Mono} emitting on successful completion a list of
      * minimal channels or slice of list if there are a lot of channels
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chats> getChannels(Iterable<? extends InputChannel> ids) {
         return Mono.defer(() -> sendMain(ImmutableGetChannels.of(ids)))
                 .flatMap(c -> storeLayout.onContacts(c.chats(), List.of())
@@ -960,13 +961,13 @@ public class ChatService extends RpcService {
      * @param id The id of channel
      * @return A {@link Mono} emitting on successful completion detailed information about channel
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ChatFull> getFullChannel(InputChannel id) {
         return sendMain(ImmutableGetFullChannel.of(id))
                 .flatMap(c -> storeLayout.onChatUpdate(c).thenReturn(c));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chat> editAdmin(InputChannel channel, InputUser user, ChatAdminRights rights, String rank) {
         return sendMain(ImmutableEditAdmin.of(channel, user, rights, rank))
                 .cast(BaseUpdates.class)
@@ -976,13 +977,13 @@ public class ChatService extends RpcService {
                 });
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> editTitle(InputChannel channel, String title) {
         return sendMain(ImmutableEditTitle.of(channel, title))
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Chat> editBanned(InputChannel channel, InputPeer participant, ChatBannedRights rights) {
         return sendMain(ImmutableEditBanned.of(channel, participant, rights))
                 .cast(BaseUpdates.class)
@@ -992,19 +993,19 @@ public class ChatService extends RpcService {
                 });
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> editPhoto(InputChannel channel, InputChatPhoto photo) {
         return sendMain(ImmutableEditPhoto.of(channel, photo))
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Void> leaveChannel(InputChannel channel) {
         return sendMain(ImmutableLeaveChannel.of(channel))
                 .flatMap(u -> Mono.fromRunnable(() -> groupManager.main().updates().emitNext(u, DEFAULT_PARKING)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Boolean> setStickers(InputChannel channel, InputStickerSet stickerSet) {
         return sendMain(ImmutableSetStickers.of(channel, stickerSet));
     }
@@ -1017,7 +1018,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableToggleJoinRequest.of(channel, enabled));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<AffectedHistory> deleteParticipantHistory(InputChannel channel, InputPeer participant) {
         return sendMain(ImmutableDeleteParticipantHistory.of(channel, participant));
     }

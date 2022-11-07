@@ -3,6 +3,7 @@ package telegram4j.mtproto.service;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.contacts.*;
@@ -35,7 +36,7 @@ public class UserService extends RpcService {
      * @param userId The id of user
      * @return A {@link Mono} emitting on successful completion minimal information about user
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<User> getUser(InputUser userId) {
         return getUsers(List.of(userId)).mapNotNull(u -> u.isEmpty() ? null : u.get(0));
     }
@@ -49,7 +50,7 @@ public class UserService extends RpcService {
      * @param userIds An iterable of user id elements
      * @return A {@link Mono} emitting list with minimal users
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<List<User>> getUsers(Iterable<? extends InputUser> userIds) {
         return Mono.defer(() -> sendMain(ImmutableGetUsers.of(userIds)))
                 .flatMap(u -> storeLayout.onContacts(List.of(), u)
@@ -63,7 +64,7 @@ public class UserService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * detailed info about user and auxiliary data
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<UserFull> getFullUser(InputUser id) {
         return sendMain(ImmutableGetFullUser.of(id))
                 .flatMap(u -> storeLayout.onUserUpdate(u).thenReturn(u));
@@ -124,7 +125,7 @@ public class UserService extends RpcService {
      * @return A {@link Mono} emitting on successful completion an object contains
      * info on users found by username and auxiliary data
      */
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ResolvedPeer> resolveUsername(String username) {
         return sendMain(ImmutableResolveUsername.of(username))
                 .flatMap(d -> storeLayout.onContacts(d.chats(), d.users()).thenReturn(d));
@@ -190,7 +191,7 @@ public class UserService extends RpcService {
         return Mono.defer(() -> sendMain(ImmutableDeletePhotos.of(photos)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Photos> getUserPhotos(InputUser id, int offset, long maxId, int limit) {
         return sendMain(ImmutableGetUserPhotos.of(id, offset, maxId, limit));
     }

@@ -19,7 +19,7 @@ public class HelpService extends RpcService {
     // help namespace
     // =========================
 
-    @BotCompatible
+    @Compatible(Compatible.Type.BOTH)
     public Mono<Config> getConfig() {
         return sendMain(GetConfig.instance());
     }
@@ -45,12 +45,12 @@ public class HelpService extends RpcService {
         return sendMain(ImmutableGetAppChangelog.of(prevAppVersion));
     }
 
-    @BotCompatible
+    @Compatible(Compatible.Type.BOT)
     public Mono<Boolean> setBotUpdatesStatus(int pendingUpdatesCount, String message) {
         return sendMain(ImmutableSetBotUpdatesStatus.of(pendingUpdatesCount, message));
     }
 
-    @BotCompatible
+    @Compatible(Compatible.Type.BOTH)
     public Mono<List<CdnPublicKey>> getCdnConfig() {
         return sendMain(GetCdnConfig.instance())
                 .map(CdnConfig::publicKeys);

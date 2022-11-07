@@ -62,7 +62,7 @@ public final class DcId implements Comparable<DcId> {
      *
      * @param o the other instant to compare to, not null.
      * @return the comparator value, negative if less, positive if greater.
-     * @throws NullPointerException if otherInstant is null
+     * @throws NullPointerException if {@code o} is null
      */
     @Override
     public int compareTo(DcId o) {

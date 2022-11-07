@@ -3,6 +3,7 @@ package telegram4j.mtproto.service;
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.CodeSettings;
 import telegram4j.tl.InputCheckPasswordSRP;
@@ -18,28 +19,28 @@ public class AuthService extends RpcService {
     // auth namespace
     // =========================
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Authorization> importAuthorization(int dcId, ByteBuf bytes) {
         return Mono.defer(() -> sendMain(ImmutableImportAuthorization.of(dcId, bytes)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ExportedAuthorization> exportAuthorization(int dcId) {
         return sendMain(ImmutableExportAuthorization.of(dcId));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<ByteBuf> logOut() {
         return sendMain(LogOut.instance())
                 .mapNotNull(LoggedOut::futureAuthToken);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<Boolean> bindTempAuthKey(long permAuthKeyId, long nonce, int expiresAt, ByteBuf encryptedMessage) {
         return Mono.defer(() -> sendMain(ImmutableBindTempAuthKey.of(permAuthKeyId, nonce, expiresAt, encryptedMessage)));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<BaseAuthorization> importBotAuthorization(int flags, int apiId, String apiHash, String botAuthToken) {
         return sendMain(ImmutableImportBotAuthorization.of(flags, apiId, apiHash, botAuthToken))
                 .cast(BaseAuthorization.class);

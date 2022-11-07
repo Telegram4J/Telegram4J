@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.InputDocument;
 import telegram4j.tl.InputStickerSet;
@@ -16,27 +17,27 @@ public class StickersService extends RpcService {
         super(groupManager, storeLayout);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<StickerSet> createStickerSet(CreateStickerSet request) {
         return sendMain(request);
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<StickerSet> removeStickerFromSet(InputDocument sticker) {
         return sendMain(ImmutableRemoveStickerFromSet.of(sticker));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<StickerSet> changeStickerPosition(InputDocument sticker, int position) {
         return sendMain(ImmutableChangeStickerPosition.of(sticker, position));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<StickerSet> addStickerToSet(InputStickerSet stickerSet, InputStickerSetItem sticker) {
         return sendMain(ImmutableAddStickerToSet.of(stickerSet, sticker));
     }
 
-    @BotCompatible
+    @Compatible(Type.BOT)
     public Mono<StickerSet> setStickerSetThumb(InputStickerSet stickerSet, InputDocument thumb) {
         return sendMain(ImmutableSetStickerSetThumb.of(stickerSet, thumb));
     }

@@ -473,16 +473,6 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         ContainerMessage(long messageId, int seqNo, TlMethod<?> method) {
             this(messageId, seqNo, method, TlSerializer.sizeOf(method));
         }
-
-        @Override
-        public String toString() {
-            return "ContainerMessage{" +
-                    "messageId=0x" + Long.toHexString(messageId) +
-                    ", seqNo=" + seqNo +
-                    ", size=" + size +
-                    ", method=" + prettyMethodName(method) +
-                    '}';
-        }
     }
 
     private Function<Request, ByteBuf> serializePacket(ByteBufAllocator alloc) {
@@ -616,7 +606,6 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
                             inners.add(wrap);
                         }
-
                     }
 
                     req = new ContainerRequest(inners);
@@ -667,13 +656,12 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             ByteBuf packet = Unpooled.wrappedBuffer(authKeyId.retain(), messageKey, encrypted);
 
             if (rpcLog.isDebugEnabled()) {
-                if (canContainerize) {
-                    rpcLog.debug("[C:0x{}, M:0x{}] Sending in container 0x{}: {}", id,
-                            Long.toHexString(requestMessageId), Long.toHexString(containerMsgId),
-                            prettyMethodName(rpcRequest.method));
-                } else if (req instanceof ContainerRequest) {
-                    rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {}", id,
-                            Long.toHexString(containerMsgId), prettyMethodName(rpcQuery.method));
+                if (req instanceof ContainerRequest) {
+                    var cnt = (ContainerRequest) req;
+                    rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", id,
+                            Long.toHexString(containerMsgId), cnt.messages.stream()
+                                    .map(r -> "0x" + Long.toHexString(r.msgId()) + ": " + prettyMethodName(r.method()))
+                                    .collect(Collectors.joining(", ")));
                 } else {
                     rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
                             Long.toHexString(requestMessageId), prettyMethodName(rpcRequest.method));
@@ -822,7 +810,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         return messageId;
     }
 
-    private int updateSeqNo(TlObject object) {
+    private int updateSeqNo(TlMethod<?> object) {
         return updateSeqNo(isContentRelated(object));
     }
 
@@ -913,8 +901,11 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
 
             resolve(messageId, obj);
             if (req instanceof ContainerizedRequest) {
-                var cntMsg = (ContainerizedRequest) req;
-                requests.remove(cntMsg.containerMsgId());
+                var aux = (ContainerizedRequest) req;
+                var cnt = (ContainerRequest) requests.get(aux.containerMsgId());
+                if (cnt != null && cnt.decrementCnt()) {
+                    requests.remove(aux.containerMsgId());
+                }
             }
 
             if ((req.state & ACKNOWLEDGED) == 0) {
@@ -1093,9 +1084,30 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
                         case 1:
                         case 2:
                         case 3: // not received, resend
-                            sub.setState(PENDING);
+                            sub.markState(s -> s | REQUESTED_INFO);
                             requests.remove(msgId);
-                            outbound.emitNext(sub, options.getEmissionHandler());
+
+                            if (sub instanceof ContainerizedRequest) {
+                                var aux = (ContainerizedRequest) sub;
+                                var cnt = (ContainerRequest) requests.get(aux.containerMsgId());
+                                if (cnt != null && cnt.decrementCnt()) {
+                                    requests.remove(aux.containerMsgId());
+                                }
+                            }
+
+                            // TODO: check whether it is necessary
+                            Request copy;
+                            if (sub instanceof RpcQuery) {
+                                var query = (RpcQuery) sub;
+                                copy = new RpcQuery(query.method, query.sink);
+                            } else if (sub instanceof RpcRequest) {
+                                var request = (RpcRequest) sub;
+                                copy = new RpcRequest(request.method);
+                            } else {
+                                throw new IllegalStateException();
+                            }
+
+                            outbound.emitNext(copy, options.getEmissionHandler());
                             break;
                         case 4:
                             sub.markState(s -> s | ACKNOWLEDGED | REQUESTED_INFO);
@@ -1174,7 +1186,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
         return t == RETRY || t instanceof AbortedException || t instanceof IOException;
     }
 
-    static boolean isContentRelated(TlObject object) {
+    static boolean isContentRelated(TlMethod<?> object) {
         switch (object.identifier()) {
             case MsgsAck.ID:
             case Ping.ID:
@@ -1323,11 +1335,32 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
     }
 
     static class ContainerRequest extends BaseRequest {
+        static final VarHandle CNT;
+
+        static {
+            try {
+                var l = MethodHandles.lookup();
+                CNT = l.findVarHandle(ContainerRequest.class, "cnt", int.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
 
         final List<ContainerizedRequest> messages;
 
+        volatile int cnt;
+
         ContainerRequest(List<ContainerizedRequest> messages) {
             this.messages = messages;
+
+            CNT.setVolatile(this, (int) messages.stream()
+                    .filter(req -> isContentRelated(req.method()))
+                    .count());
+        }
+
+        boolean decrementCnt() {
+            int cnt = (int)CNT.getAndAdd(this, -1) - 1;
+            return cnt == 0;
         }
 
         @Override
@@ -1335,6 +1368,7 @@ public class DefaultMTProtoClient implements MainMTProtoClient {
             return "ContainerRequest{" +
                     "messages=" + messages +
                     ", state=" + state +
+                    ", cnt=" + cnt +
                     '}';
         }
 

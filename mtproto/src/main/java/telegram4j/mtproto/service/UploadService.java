@@ -6,6 +6,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.FileHash;
 import telegram4j.tl.InputFile;
@@ -62,7 +63,7 @@ public class UploadService extends RpcService {
     // upload.reuploadCdnFile#9b2754a8 file_token:bytes request_token:bytes = Vector<FileHash>;
     // upload.getCdnFileHashes#91dc3f31 file_token:bytes offset:long = Vector<FileHash>;
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<InputFile> saveFile(UploadOptions options) {
         Objects.requireNonNull(options);
 
@@ -78,7 +79,7 @@ public class UploadService extends RpcService {
     // upload namespace
     // =========================
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Flux<BaseFile> getFile(InputFileLocation location) {
         return Flux.defer(() -> {
             AtomicInteger offset = new AtomicInteger();
@@ -123,7 +124,7 @@ public class UploadService extends RpcService {
         });
     }
 
-    @BotCompatible
+    @Compatible(Type.BOTH)
     public Mono<List<FileHash>> getFileHashes(InputFileLocation location, long offset) {
         return sendMain(ImmutableGetFileHashes.of(location, offset));
     }

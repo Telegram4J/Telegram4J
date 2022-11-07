@@ -18,7 +18,7 @@ public abstract class RpcService {
         this.storeLayout = Objects.requireNonNull(storeLayout);
     }
 
-    public final MTProtoClientGroup getGroup() {
+    public final MTProtoClientGroup getClientGroup() {
         return groupManager;
     }
 
