@@ -53,7 +53,8 @@ public class MTProtoBotExample {
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
-                .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(), MTProtoRetrySpec.instance()))
+                .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
+                        MTProtoRetrySpec.max(d -> d.getSeconds() < 30, 2)))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.getCommands(BotCommandScopeSpec.of(Type.CHATS), "en")

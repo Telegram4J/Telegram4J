@@ -133,11 +133,15 @@ public class UploadOptions {
         }
 
         public Builder size(long size) {
+            if (size <= 0 || size > MAX_FILE_SIZE)
+                throw new IllegalArgumentException("Invalid file size: " + size);
             this.size = size;
             return this;
         }
 
         public Builder partSize(int partSize) {
+            if (partSize < -1 || partSize % 1024 != 0 || MAX_PART_SIZE % partSize != 0)
+                throw new IllegalArgumentException("Invalid part size: " + partSize);
             this.partSize = partSize;
             return this;
         }
@@ -148,6 +152,8 @@ public class UploadOptions {
         }
 
         public Builder parallelism(int parallelism) {
+            if (parallelism < 1 && parallelism != -1)
+                throw new IllegalArgumentException("Invalid parallelism");
             this.parallelism = parallelism;
             return this;
         }
@@ -155,14 +161,8 @@ public class UploadOptions {
         public UploadOptions build() {
             Objects.requireNonNull(name);
             Objects.requireNonNull(data);
-            if (size <= 0 || size > MAX_FILE_SIZE)
-                throw new IllegalArgumentException("Invalid file size: " + size);
-            if (partSize == -1) {
+            if (partSize == -1)
                 partSize = UploadService.suggestPartSize(size, partSize);
-            } else {
-                if (partSize < 0 || partSize % 1024 != 0 || MAX_PART_SIZE % partSize != 0)
-                    throw new IllegalArgumentException("Invalid part size: " + partSize);
-            }
             partsCount = (int) Math.ceil((double) size / partSize);
             if (partsCount > MAX_PARTS_COUNT) {
                 throw new IllegalArgumentException("Invalid size and part size parameters, parts count is too big." +
@@ -170,8 +170,6 @@ public class UploadOptions {
             }
             if (parallelism == -1)
                 parallelism = UploadService.suggestParallelism(size);
-            if (parallelism < 1)
-                throw new IllegalArgumentException("Invalid parallelism parameter");
 
             return new UploadOptions(this);
         }
