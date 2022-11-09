@@ -75,11 +75,11 @@ public interface MTProtoClient {
         /** The state indicates client's willingness to send requests, i.e. after sending a transport id. */
         CONFIGURED,
 
-        /**
-         * The state in which the client is connected to
-         * the dc and ready to send and receive packets.
-         */
+        /** The state in which the client is connected to the dc. */
         CONNECTED,
+
+        /** The state in which the client is ready to send requests to the dc. */
+        READY,
 
         /** The state in which the client is starts the auth key gen. */
         AUTHORIZATION_BEGIN,

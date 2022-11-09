@@ -7,12 +7,12 @@ import telegram4j.tl.request.messages.SendMessage;
 public interface MainMTProtoClient extends MTProtoClient {
 
     /**
-     * Create child media client, associated with given datacenter.
+     * Create child client, associated with given datacenter.
      *
-     * @param dc The media datacenter.
-     * @return The new child media client.
+     * @param dc The datacenter.
+     * @return The new child client.
      */
-    MTProtoClient createMediaClient(DataCenter dc);
+    MTProtoClient createChildClient(DataCenter dc);
 
     /**
      * Gets a {@link Sinks.Many} which redistributes api updates to subscribers and

@@ -4,7 +4,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -67,13 +66,7 @@ public class UploadService extends RpcService {
     public Mono<InputFile> saveFile(UploadOptions options) {
         Objects.requireNonNull(options);
 
-        DataCenter mediaDc = DataCenter.production.stream()
-                .filter(dc -> dc.getType() == DataCenter.Type.MEDIA &&
-                        dc.getId() == groupManager.main().getDatacenter().getId())
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No media DC found for main: " + groupManager.main().getDatacenter()));
-
-        return new UploadMono(groupManager, mediaDc, options);
+        return new UploadMono(groupManager, options);
     }
 
     // upload namespace

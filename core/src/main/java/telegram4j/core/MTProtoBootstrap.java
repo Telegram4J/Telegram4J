@@ -36,12 +36,10 @@ import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
-import telegram4j.tl.api.TlObject;
-import telegram4j.tl.request.ImmutableInitConnection;
-import telegram4j.tl.request.ImmutableInvokeWithLayer;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
+import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.updates.GetState;
 
 import java.time.Duration;
@@ -315,14 +313,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
-            // it's fine
-            @SuppressWarnings({"rawtypes", "unchecked"})
             var invokeWithLayout =
-                    (ImmutableInvokeWithLayer<?, ImmutableInitConnection<?, TlMethod<?>>>)
-                    (ImmutableInvokeWithLayer) InvokeWithLayer.builder()
-                    .layer(TlInfo.LAYER)
-                    .query(initConnection())
-                    .build();
+                    InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
+                            .layer(TlInfo.LAYER)
+                            .query(initConnection())
+                            .build();
 
             MTProtoClientGroupManager clientGroupManager = initClientGroupManager();
             MainMTProtoClient leadClient = clientFactory.apply(optionsModifier.apply(
@@ -382,7 +377,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .flatMap(state -> {
                         switch (state) {
                             case CLOSED: return Mono.fromRunnable(disconnect);
-                            case CONNECTED:
+                            case READY:
                                 // delegate all auth work to the user and trigger authorization only if auth key is new
                                 Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
                                         .flatMapMany(f -> f.apply(telegramClient))
@@ -407,8 +402,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .doOnNext(id -> selfId[0] = id)
                                         .then();
 
-                                return leadClient.sendAwait(invokeWithLayout)
-                                        // The best way to check that authorization is needed
+                                // to trigger user auth
+                                return leadClient.sendAwait(GetState.instance())
                                         .retryWhen(Retry.indefinitely()
                                                 .filter(RpcException.isErrorCode(401)
                                                         .and(t -> !authResources.isBot()))
@@ -437,12 +432,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     // Resources initialization
     // ==========================
 
-    private ImmutableInitConnection<?, ?> initConnection() {
+    private InitConnection<Object, TlMethod<?>> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
                 : InitConnectionParams.getDefault();
 
-        var initConnection = InitConnection.<TlObject, TlMethod<? extends TlObject>>builder()
+        var initConnection = InitConnection.builder()
                 .apiId(authResources.getApiId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())
@@ -454,8 +449,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (authResources.isBot()) {
             initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getApiId(),
                     authResources.getApiHash(), authResources.getBotAuthToken().orElseThrow()));
-        } else { // to trigger user auth
-            initConnection.query(GetState.instance());
+        } else {
+            initConnection.query(GetConfig.instance());
         }
 
         params.getProxy().ifPresent(initConnection::proxy);

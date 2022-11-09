@@ -55,6 +55,20 @@ public final class DcId implements Comparable<DcId> {
     }
 
     /**
+     * Creates new {@code DcId} with shift which equals to {@code shift + delta}.
+     *
+     * @param delta The value to be added to current shift.
+     * @return A new {@code DcId} with new shift value, or if {@code delta} is 0 returns current id.
+     */
+    public DcId shift(int delta) {
+        int newShift = Math.addExact(this.shift, delta);
+        if (newShift < 0)
+            throw new IllegalArgumentException("Invalid shift: " + delta);
+        if (newShift == this.shift) return this;
+        return new DcId(id, newShift);
+    }
+
+    /**
      * Compares this id to the specified id.
      * <p>
      * The comparison is based on the {@link #getId() internal} representation of id
@@ -89,9 +103,6 @@ public final class DcId implements Comparable<DcId> {
 
     @Override
     public String toString() {
-        return "DcId{" +
-                "id=" + id +
-                ", shift=" + shift +
-                '}';
+        return id + "+" + shift;
     }
 }

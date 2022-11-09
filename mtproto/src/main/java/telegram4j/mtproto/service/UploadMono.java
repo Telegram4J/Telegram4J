@@ -9,7 +9,6 @@ import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoClientGroupManager;
@@ -22,20 +21,22 @@ import telegram4j.tl.request.upload.SaveFilePart;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static telegram4j.mtproto.service.UploadService.log;
 
 class UploadMono extends Mono<InputFile> {
 
+    // It's necessary to avoid connection reset by server
+    static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
+
     private final MTProtoClientGroupManager groupManager;
-    private final DataCenter mediaDc;
     private final UploadOptions options;
     private final long fileId = CryptoUtil.random.nextLong();
 
-    UploadMono(MTProtoClientGroupManager groupManager, DataCenter mediaDc, UploadOptions options) {
+    UploadMono(MTProtoClientGroupManager groupManager, UploadOptions options) {
         this.groupManager = groupManager;
-        this.mediaDc = mediaDc;
         this.options = options;
     }
 
@@ -51,6 +52,8 @@ class UploadMono extends Mono<InputFile> {
         private CompositeByteBuf buffer;
         private MessageDigest md5;
         private int roundRobin;
+
+        private final AtomicInteger received = new AtomicInteger();
 
         public UploadSubscriber(CoreSubscriber<? super InputFile> actual) {
             this.actual = actual;
@@ -69,16 +72,16 @@ class UploadMono extends Mono<InputFile> {
             }
 
             AtomicInteger pending = new AtomicInteger(options.getParallelism());
-            for (int i = 0; i < options.getParallelism(); i++) {
-                DcId dcId = DcId.of(mediaDc, i);
-                var child = groupManager.getOrCreateMediaClient(dcId, mediaDc);
+            for (int i = 1; i <= options.getParallelism(); i++) {
+                DcId dcId = groupManager.mainId().shift(i);
+                var child = groupManager.getOrCreateMediaClient(dcId, groupManager.main().getDatacenter());
 
                 child.state()
-                        .filter(s -> s == MTProtoClient.State.CONNECTED)
+                        .filter(s -> s == MTProtoClient.State.READY)
                         .next()
                         .doOnNext(s -> {
                             if (pending.decrementAndGet() == 0) {
-                                log.info("All media clients connected");
+                                log.debug("All upload clients connected");
                                 subscription.request(options.getPartsCount());
                                 actual.onSubscribe(this);
                             }
@@ -139,19 +142,25 @@ class UploadMono extends Mono<InputFile> {
                 roundRobin = 0;
             }
 
-            DcId dcId = DcId.of(mediaDc, idx);
+            // idx is one-based to prevent using main client as uploader
+            DcId dcId = groupManager.mainId().shift(idx + 1);
 
-            if (log.isDebugEnabled())
+            if (log.isDebugEnabled()) {
                 log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, fileId, part.filePart() + 1, options.getPartsCount());
+            }
 
-            groupManager.send(dcId, part)
+            Mono.delay(UPLOAD_INTERVAL)
+                    .then(groupManager.send(dcId, part))
                     .subscribe(res -> {
                         if (!res) throw new IllegalStateException("Unexpected result state");
 
-                        if (log.isDebugEnabled())
-                            log.debug("[DC:{}, F:{}] Uploaded {}/{}", dcId, fileId, part.filePart() + 1, options.getPartsCount());
+                        int cnt = received.incrementAndGet();
+                        if (log.isDebugEnabled()) {
+                            log.debug("[DC:{}, F:{}] Uploaded part {}, {}/{}", dcId, fileId,
+                                    part.filePart() + 1, cnt, options.getPartsCount());
+                        }
 
-                        if (part.filePart() == options.getPartsCount() - 1) {
+                        if (cnt == options.getPartsCount()) {
                             if (options.isBigFile()) {
                                 actual.onNext(ImmutableInputFileBig.of(fileId, options.getPartsCount(), options.getName()));
                             } else {
@@ -160,7 +169,7 @@ class UploadMono extends Mono<InputFile> {
                             }
                             actual.onComplete();
                         }
-                    });
+                    }, this::onError);
         }
     }
 }

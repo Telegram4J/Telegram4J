@@ -4,6 +4,8 @@ import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
 import telegram4j.tl.InputFileBig;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static telegram4j.mtproto.service.UploadService.*;
@@ -118,17 +120,24 @@ public class UploadOptions {
     }
 
     public static class Builder {
+        static final byte INIT_BIT_DATA = 1 << 0;
+        static final byte INIT_BIT_SIZE = 1 << 1;
+        static final byte INIT_BIT_NAME = 1 << 2;
+
+        private byte initBits = INIT_BIT_DATA | INIT_BIT_SIZE | INIT_BIT_NAME;
+        private int partsCount;
+
         private Publisher<? extends ByteBuf> data;
         private long size;
         private String name;
         private int partSize = -1;
         private int parallelism = -1;
-        private int partsCount;
 
         private Builder() {}
 
         public Builder data(Publisher<? extends ByteBuf> data) {
             this.data = Objects.requireNonNull(data);
+            initBits &= ~INIT_BIT_DATA;
             return this;
         }
 
@@ -136,6 +145,7 @@ public class UploadOptions {
             if (size <= 0 || size > MAX_FILE_SIZE)
                 throw new IllegalArgumentException("Invalid file size: " + size);
             this.size = size;
+            initBits &= ~INIT_BIT_SIZE;
             return this;
         }
 
@@ -148,6 +158,7 @@ public class UploadOptions {
 
         public Builder name(String name) {
             this.name = Objects.requireNonNull(name);
+            initBits &= ~INIT_BIT_NAME;
             return this;
         }
 
@@ -159,8 +170,13 @@ public class UploadOptions {
         }
 
         public UploadOptions build() {
-            Objects.requireNonNull(name);
-            Objects.requireNonNull(data);
+            if (initBits != 0) {
+                List<String> attributes = new ArrayList<>(Integer.bitCount(initBits));
+                if ((initBits & INIT_BIT_DATA) != 0) attributes.add("data");
+                if ((initBits & INIT_BIT_SIZE) != 0) attributes.add("size");
+                if ((initBits & INIT_BIT_NAME) != 0) attributes.add("name");
+                throw new IllegalStateException("Can not create UploadOptions, some of required attributes are not set: " + attributes);
+            }
             if (partSize == -1)
                 partSize = UploadService.suggestPartSize(size, partSize);
             partsCount = (int) Math.ceil((double) size / partSize);

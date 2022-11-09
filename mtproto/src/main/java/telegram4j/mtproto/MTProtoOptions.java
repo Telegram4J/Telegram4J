@@ -6,8 +6,8 @@ import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.tl.api.TlMethod;
-import telegram4j.tl.request.ImmutableInitConnection;
-import telegram4j.tl.request.ImmutableInvokeWithLayer;
+import telegram4j.tl.request.InitConnection;
+import telegram4j.tl.request.InvokeWithLayer;
 
 import java.util.List;
 import java.util.Objects;
@@ -22,14 +22,14 @@ public class MTProtoOptions {
     protected final RetryBackoffSpec connectionRetry;
     protected final RetryBackoffSpec authRetry;
     protected final List<ResponseTransformer> responseTransformers;
-    protected final ImmutableInvokeWithLayer<?, ImmutableInitConnection<?, TlMethod<?>>> initConnection;
+    protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<Transport> transport, StoreLayout storeLayout,
                           Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec connectionRetry, RetryBackoffSpec authRetry,
                           List<ResponseTransformer> responseTransformers,
-                          ImmutableInvokeWithLayer<?, ImmutableInitConnection<?, TlMethod<?>>> initConnection) {
+                          InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection) {
         this.datacenter = Objects.requireNonNull(datacenter);
         this.tcpClient = Objects.requireNonNull(tcpClient);
         this.transport = Objects.requireNonNull(transport);
@@ -38,7 +38,7 @@ public class MTProtoOptions {
         this.connectionRetry = Objects.requireNonNull(connectionRetry);
         this.authRetry = Objects.requireNonNull(authRetry);
         this.responseTransformers = Objects.requireNonNull(responseTransformers);
-        this.initConnection = initConnection;
+        this.initConnection = Objects.requireNonNull(initConnection);
     }
 
     public DataCenter getDatacenter() {
@@ -73,7 +73,7 @@ public class MTProtoOptions {
         return responseTransformers;
     }
 
-    public ImmutableInvokeWithLayer<?, ImmutableInitConnection<?, TlMethod<?>>> getInitConnection() {
+    public InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> getInitConnection() {
         return initConnection;
     }
 }

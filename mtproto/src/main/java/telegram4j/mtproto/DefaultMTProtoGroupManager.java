@@ -107,7 +107,7 @@ public class DefaultMTProtoGroupManager implements MTProtoClientGroupManager {
 
     @Override
     public MTProtoClient getOrCreateMediaClient(DcId id, DataCenter dc) {
-        return clients.computeIfAbsent(id, i -> new ClientInfo(main().createMediaClient(dc))).inner;
+        return clients.computeIfAbsent(id, i -> new ClientInfo(main().createChildClient(dc))).inner;
     }
 
     private DcId nextId(DataCenter dc) {
