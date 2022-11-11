@@ -4,18 +4,14 @@ import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
 import telegram4j.tl.Updates;
 
-public class DefaultMTProtoClient extends BaseMTProtoClient implements MainMTProtoClient {
+public final class DefaultMTProtoClient extends BaseMTProtoClient implements MainMTProtoClient {
 
     private final Sinks.Many<Updates> updates;
 
-    DefaultMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
-        super(dataCenter, options);
+    public DefaultMTProtoClient(MTProtoOptions options) {
+        super(options.getDatacenter(), options);
         this.updates = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-    }
-
-    public DefaultMTProtoClient(MTProtoOptions options) {
-        this(options.getDatacenter(), options);
     }
 
     @Override

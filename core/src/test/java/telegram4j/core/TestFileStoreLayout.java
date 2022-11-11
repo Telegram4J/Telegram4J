@@ -12,6 +12,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.MessagePoll;
 import telegram4j.mtproto.store.ResolvedChatParticipant;
@@ -264,6 +265,16 @@ public class TestFileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> onMessages(Messages payload) {
         return delegate.onMessages(payload);
+    }
+
+    @Override
+    public Mono<DcOptions> getDcOptions() {
+        return delegate.getDcOptions();
+    }
+
+    @Override
+    public Mono<Void> updateDcOptions(DcOptions dcOptions) {
+        return delegate.updateDcOptions(dcOptions);
     }
 
     private Mono<Void> save(DataCenter dc, AuthorizationKeyHolder authKey, @Nullable State state) {

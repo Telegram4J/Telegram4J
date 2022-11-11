@@ -4,7 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.FileHash;
@@ -35,7 +35,7 @@ public class UploadService extends RpcService {
     static final int MAX_PARTS_COUNT = 4000; // it's for users with tg premium; for other users limit is 3000
     static final long MAX_FILE_SIZE = 4L * 1000 * 1024 * 1024; // 4gb for premium users; for other = 2gb
 
-    public UploadService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public UploadService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.InputDocument;
@@ -13,7 +13,7 @@ import telegram4j.tl.stickers.SuggestedShortName;
 
 public class StickersService extends RpcService {
 
-    public StickersService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public StickersService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

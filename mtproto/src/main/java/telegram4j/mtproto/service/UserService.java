@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -23,7 +23,7 @@ import java.util.List;
 
 public class UserService extends RpcService {
 
-    public UserService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public UserService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

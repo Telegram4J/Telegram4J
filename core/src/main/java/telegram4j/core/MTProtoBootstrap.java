@@ -69,9 +69,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options());
+    private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = DefaultMTProtoClientGroup::new;
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
-    private MTProtoClientGroupManager clientGroupManager;
-
+    private PublicRsaKeyRegister publicRsaKeyRegister;
+    private DcOptions dcOptions;
     private InitConnectionParams initConnectionParams;
     private StoreLayout storeLayout;
     private EventDispatcher eventDispatcher;
@@ -94,15 +95,15 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
-     * Sets client group manager for working with different datacenters and sessions.
+     * Sets the factory of client group for working with different datacenters and sessions.
      * <p>
-     * If custom implementation doesn't set, {@link DefaultMTProtoGroupManager} will be used.
+     * If custom implementation doesn't set, {@link DefaultMTProtoClientGroup} will be used.
      *
-     * @param clientGroupManager A new client group manager.
+     * @param clientGroupFactory A new factory for client group.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setClientGroupManager(MTProtoClientGroupManager clientGroupManager) {
-        this.clientGroupManager = Objects.requireNonNull(clientGroupManager);
+    public MTProtoBootstrap<O> setClientGroupManager(Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory) {
+        this.clientGroupFactory = Objects.requireNonNull(clientGroupFactory);
         return this;
     }
 
@@ -263,6 +264,30 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
+     * Sets register with known public RSA keys, needed for auth key generation,
+     * by default {@link PublicRsaKeyRegister#createDefault()} will be used.
+     *
+     * @param publicRsaKeyRegister A new register with known public RSA keys.
+     * @return This builder.
+     */
+    public MTProtoBootstrap<O> setPublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister) {
+        this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
+        return this;
+    }
+
+    /**
+     * Sets list of known dc options, used in connection establishment,
+     * by default {@link DcOptions#createDefault(boolean, boolean)} will be used.
+     *
+     * @param dcOptions A new list of known dc options.
+     * @return This builder.
+     */
+    public MTProtoBootstrap<O> setDcOptions(DcOptions dcOptions) {
+        this.dcOptions = Objects.requireNonNull(dcOptions);
+        return this;
+    }
+
+    /**
      * Adds new {@link ResponseTransformer} to transformation list.
      *
      * @param responseTransformer The new {@link ResponseTransformer} to add.
@@ -319,14 +344,15 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             .query(initConnection())
                             .build();
 
-            MTProtoClientGroupManager clientGroupManager = initClientGroupManager();
+            var dcOptions = initDcOptions();
             MainMTProtoClient leadClient = clientFactory.apply(optionsModifier.apply(
-                    new MTProtoOptions(initDataCenter(), initTcpClient(), transport,
+                    new MTProtoOptions(initDataCenter(dcOptions), initTcpClient(),
+                            initPublicRsaKeyRegister(), transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initConnectionRetry(), initAuthRetry(),
                             List.copyOf(responseTransformers), invokeWithLayout)));
-
-            clientGroupManager.setMain(leadClient);
+            MTProtoClientGroup clientGroupManager = clientGroupFactory.apply(
+                    new MTProtoClientGroupOptions(leadClient, storeLayout, dcOptions));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
                     defaultEntityParserFactory, unavailableChatPolicy);
@@ -348,27 +374,27 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             Disposable.Composite composite = Disposables.composite();
 
             composite.add(clientGroupManager.start()
+                    .takeUntilOther(onDisconnect.asMono())
                     .doOnError(sink::error)
                     .subscribe(null, t -> log.error("MTProto client group terminated with an error", t),
                             () -> log.debug("MTProto client group completed")));
 
             composite.add(leadClient.connect()
                     .doOnError(sink::error)
-                    .doFinally(signal -> disconnect.run())
                     .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
                             () -> log.debug("MTProto client completed")));
 
             composite.add(leadClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
-                    .checkpoint("Event dispatch handler")
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
                     .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t),
                             () -> log.debug("Event dispatcher completed")));
 
-            composite.add(telegramClient.getUpdatesManager().start().subscribe(null,
-                    t -> log.error("Updates manager terminated with an error", t),
-                    () -> log.debug("Updates manager completed")));
+            composite.add(telegramClient.getUpdatesManager().start()
+                    .takeUntilOther(onDisconnect.asMono())
+                    .subscribe(null, t -> log.error("Updates manager terminated with an error", t),
+                            () -> log.debug("Updates manager completed")));
 
             AtomicBoolean emit = new AtomicBoolean(true);
 
@@ -459,13 +485,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return initConnection.build();
     }
 
-    private MTProtoClientGroupManager initClientGroupManager() {
-        if (clientGroupManager == null) {
-            return new DefaultMTProtoGroupManager();
-        }
-        return clientGroupManager;
-    }
-
     private TcpClient initTcpClient() {
         if (tcpClient != null) {
             return tcpClient;
@@ -477,7 +496,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events"),
+        return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events", 4),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 EmissionHandlers.DEFAULT_PARKING);
     }
@@ -489,21 +508,33 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         return new StoreLayoutImpl(c -> c.maximumSize(1000));
     }
 
-    private DataCenter initDataCenter() {
+    private DataCenter initDataCenter(DcOptions opts) {
         if (dataCenter != null) {
             return dataCenter;
         }
-        return DataCenter.production.stream()
-                .filter(dc -> dc.getType() == DataCenter.Type.REGULAR && dc.getId() == 2)
-                .findFirst()
-                .orElseThrow();
+        return opts.find(DataCenter.Type.REGULAR, 2)
+                .orElseThrow(() -> new IllegalStateException("Could not find dc 2 for main client in options: " + opts));
+    }
+
+    private DcOptions initDcOptions() {
+        if (dcOptions != null) {
+            return dcOptions;
+        }
+        return DcOptions.createDefault(false, false);
     }
 
     private RetryBackoffSpec initConnectionRetry() {
         if (connectionRetry != null) {
             return connectionRetry;
         }
-        return Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(5));
+        return Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5));
+    }
+
+    private PublicRsaKeyRegister initPublicRsaKeyRegister() {
+        if (publicRsaKeyRegister != null) {
+            return publicRsaKeyRegister;
+        }
+        return PublicRsaKeyRegister.createDefault();
     }
 
     private RetryBackoffSpec initAuthRetry() {

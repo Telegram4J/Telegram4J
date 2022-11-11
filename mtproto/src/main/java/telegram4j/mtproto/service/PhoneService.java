@@ -2,7 +2,7 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.phone.GroupCall;
@@ -14,7 +14,7 @@ import java.util.List;
 
 public class PhoneService extends RpcService {
 
-    public PhoneService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public PhoneService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

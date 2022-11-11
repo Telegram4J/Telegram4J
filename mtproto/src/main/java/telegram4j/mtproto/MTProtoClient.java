@@ -5,8 +5,12 @@ import reactor.core.publisher.Mono;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 
+import java.time.Instant;
+import java.util.Optional;
+
 /**
  * Interface for MTProto client implementations with minimal method set.
+ *
  * @implSpec The client must implement RPC, auth, update logics and auto-reconnects.
  */
 public interface MTProtoClient {
@@ -14,7 +18,7 @@ public interface MTProtoClient {
     /**
      * Gets a {@link Mono} with empty signals which starts client on subscribe.
      *
-     * @return A {@link Mono} which emitting signals on client close.
+     * @return A {@link Mono} which emitting signals on client {@link State#READY} state.
      */
     Mono<Void> connect();
 
@@ -51,11 +55,11 @@ public interface MTProtoClient {
     DataCenter getDatacenter();
 
     /**
-     * Gets current info about mtproto session.
+     * Gets statistic for client.
      *
-     * @return The current info about mtproto session.
+     * @return The statistic for client.
      */
-    SessionInfo getSessionInfo();
+    Stats getStats();
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.
@@ -64,7 +68,7 @@ public interface MTProtoClient {
      */
     Mono<Void> close();
 
-    /** Available client states. */
+    /** Client initialization stages. */
     enum State {
         /** The state in which the client must reconnect. */
         DISCONNECTED,
@@ -89,5 +93,16 @@ public interface MTProtoClient {
 
         /** The intermediate state indicating reconnection of the client to the dc. */
         RECONNECT
+    }
+
+    /** Interface for client statistic. */
+    interface Stats {
+
+        /**
+         * Gets timestamp of last {@link #sendAwait(TlMethod)} call, if present.
+         *
+         * @return The timestamp of last send query call, if present.
+         */
+        Optional<Instant> getLastQueryTimestamp();
     }
 }

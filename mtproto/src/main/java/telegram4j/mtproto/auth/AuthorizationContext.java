@@ -1,6 +1,7 @@
 package telegram4j.mtproto.auth;
 
 import io.netty.buffer.ByteBuf;
+import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.tl.mtproto.ServerDHParams;
 
 import java.util.Objects;
@@ -10,6 +11,8 @@ import static io.netty.util.ReferenceCountUtil.safeRelease;
 
 /** Holder object used during authorization key generation. */
 public final class AuthorizationContext {
+    private final PublicRsaKeyRegister publicRsaKeyRegister;
+
     private volatile ByteBuf nonce;
     private volatile ByteBuf newNonce;
     private volatile ByteBuf serverNonce;
@@ -17,8 +20,12 @@ public final class AuthorizationContext {
     private volatile long serverSalt;
     private volatile ByteBuf authAuxHash;
     private volatile ServerDHParams serverDHParams;
-    private volatile int timeOffset;
+    private volatile int serverTime;
     private final AtomicInteger retry = new AtomicInteger();
+
+    public AuthorizationContext(PublicRsaKeyRegister publicRsaKeyRegister) {
+        this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
+    }
 
     public ByteBuf getNonce() {
         return nonce;
@@ -80,13 +87,16 @@ public final class AuthorizationContext {
         return retry;
     }
 
-    public int getTimeOffset() {
-        return timeOffset;
+    public int getServerTime() {
+        return serverTime;
     }
 
-    public void setTimeOffset(int serverTime) {
-        int now = (int) (System.currentTimeMillis() / 1000);
-        timeOffset = serverTime - now;
+    public PublicRsaKeyRegister getPublicRsaKeyRegister() {
+        return publicRsaKeyRegister;
+    }
+
+    public void setServerTime(int serverTime) {
+        this.serverTime = serverTime;
     }
 
     public void clear() {
@@ -101,7 +111,7 @@ public final class AuthorizationContext {
         serverNonce = null;
         authKey = null;
         serverSalt = 0;
-        timeOffset = 0;
+        serverTime = 0;
         authAuxHash = null;
         serverDHParams = null;
         retry.set(0);

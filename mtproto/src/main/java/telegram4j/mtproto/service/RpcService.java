@@ -2,7 +2,6 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClientGroup;
-import telegram4j.mtproto.MTProtoClientGroupManager;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlMethod;
@@ -10,10 +9,10 @@ import telegram4j.tl.api.TlMethod;
 import java.util.Objects;
 
 public abstract class RpcService {
-    protected final MTProtoClientGroupManager groupManager;
+    protected final MTProtoClientGroup groupManager;
     protected final StoreLayout storeLayout;
 
-    public RpcService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public RpcService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         this.groupManager = Objects.requireNonNull(groupManager);
         this.storeLayout = Objects.requireNonNull(storeLayout);
     }

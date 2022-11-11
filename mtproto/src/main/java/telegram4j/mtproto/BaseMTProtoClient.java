@@ -50,6 +50,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.InetSocketAddress;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -83,7 +84,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private final TcpClient tcpClient;
     private final Transport transport;
 
-    private final AuthorizationContext authContext = new AuthorizationContext();
+    private final AuthorizationContext authContext;
     private final Sinks.Many<Request> outbound;
     private final Sinks.Many<TlMethod<?>> authOutbound;
     private final ResettableInterval pingEmitter;
@@ -93,13 +94,13 @@ class BaseMTProtoClient implements MTProtoClient {
     private final DataCenter dataCenter;
 
     protected final MTProtoOptions options;
+    protected final InnerStats stats = new InnerStats();
 
     private volatile long lastPing; // nanotime of sent Ping
     private volatile long lastPong; // nanotime of received Pong
     private final AtomicInteger missedPong = new AtomicInteger();
 
     private final long sessionId = random.nextLong();
-    private volatile Sinks.Empty<Void> closeHook;
     private volatile Connection connection;
     private volatile boolean closed;
 
@@ -122,6 +123,7 @@ class BaseMTProtoClient implements MTProtoClient {
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
         this.options = options;
+        this.authContext = new AuthorizationContext(options.getPublicRsaKeyRegister());
 
         this.outbound = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
@@ -147,11 +149,8 @@ class BaseMTProtoClient implements MTProtoClient {
 
     @Override
     public Mono<Void> connect() {
-        return tcpClient
-                .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
-                .connect()
-                .flatMap(connection -> {
-                    this.closeHook = Sinks.empty();
+        return tcpClient.connect()
+                .flatMap(connection -> Mono.create(sink -> {
                     this.connection = connection;
 
                     Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
@@ -175,7 +174,6 @@ class BaseMTProtoClient implements MTProtoClient {
                                     case CLOSED:
                                         closed = true;
                                         pingEmitter.dispose();
-                                        closeHook.emitEmpty(FAIL_FAST);
 
                                         if (log.isDebugEnabled()) {
                                             log.debug("[C:0x{}] Disconnected from the datacenter {}", id, dataCenter);
@@ -189,6 +187,9 @@ class BaseMTProtoClient implements MTProtoClient {
                                         return Mono.fromRunnable(connection::dispose)
                                                 .onErrorResume(t -> Mono.empty())
                                                 .then(Mono.error(RETRY));
+                                    case READY:
+                                        sink.success();
+                                        return Mono.empty();
                                     case CONNECTED:
                                         return sendAwait(options.getInitConnection())
                                                 .doOnNext(result -> this.state.emitNext(State.READY, options.getEmissionHandler()));
@@ -205,6 +206,8 @@ class BaseMTProtoClient implements MTProtoClient {
                     Mono<Void> onReady = state.asFlux().filter(state -> state == State.READY).next().then();
 
                     Mono<Void> inboundHandler = connection.inbound().receive()
+                            // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
+                            .switchIfEmpty(Mono.error(RETRY))
                             .map(ByteBuf::retainedDuplicate)
                             .flatMap(payload -> {
                                 if (payload.readableBytes() == 4) {
@@ -377,7 +380,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
                             .doOnNext(auth -> {
                                 serverSalt = authContext.getServerSalt(); // apply temporal salt
-                                updateTimeOffset(authContext.getTimeOffset());
+                                updateTimeOffset(authContext.getServerTime());
                                 authContext.clear();
                                 state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                             })
@@ -412,8 +415,8 @@ class BaseMTProtoClient implements MTProtoClient {
                                     .then(startSchedule))
                             .then();
 
-                    return Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
-                            .doOnError(t -> !isRetryException(t), t -> {
+                    Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
+                            .doOnError(Predicate.not(BaseMTProtoClient::isRetryException), t -> {
                                 if (t instanceof TransportException) {
                                     TransportException t0 = (TransportException) t;
                                     log.error("[C:0x" + id + "] Transport exception, code: " + t0.getCode(), t0);
@@ -421,23 +424,22 @@ class BaseMTProtoClient implements MTProtoClient {
                                     log.error("[C:0x" + id + "] Unexpected client exception", t);
                                 }
                             })
-                            .onErrorResume(t -> Mono.empty())
-                            .then();
-                })
-                // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
-                .switchIfEmpty(reconnect())
-                .retryWhen(options.getConnectionRetry()
-                        .filter(t -> !closed && isRetryException(t))
-                        .doAfterRetry(signal -> {
-                            state.emitNext(State.RECONNECT, options.getEmissionHandler());
-                            log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
-                        }))
-                .then(Mono.defer(() -> closeHook.asMono()));
+                            .retryWhen(options.getConnectionRetry()
+                                    .filter(t -> !closed && isRetryException(t))
+                                    .doAfterRetry(signal -> {
+                                        state.emitNext(State.RECONNECT, options.getEmissionHandler());
+                                        log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
+                                    })
+                                    .doAfterRetryAsync(s -> reconnect()))
+                            .then()
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe(null, sink::error);
+                }));
     }
 
     @Override
-    public SessionInfo getSessionInfo() {
-        return new SessionInfo(timeOffset, sessionId, seqNo.get(), serverSalt, lastMessageId);
+    public Stats getStats() {
+        return stats;
     }
 
     @Override
@@ -448,6 +450,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 return Mono.empty();
             }
 
+            stats.lastQueryTimestamp = Instant.now();
             Sinks.One<R> res = Sinks.one();
             outbound.emitNext(new RpcQuery(method, res), options.getEmissionHandler());
 
@@ -722,6 +725,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private TcpClient initTcpClient(TcpClient tcpClient) {
         return tcpClient
+                .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
                 .observe((con, st) -> {
                     if (st == ConnectionObserver.State.CONFIGURED) {
                         if (log.isDebugEnabled()) {
@@ -1292,6 +1296,7 @@ class BaseMTProtoClient implements MTProtoClient {
         // sorted so that first there are those messages
         // that need to be answered, and then there are other service messages
         final long[] msgIds;
+        // one of messages content-related, see isContentRelated()
         final boolean hasContentRelated;
         // The counter of messages for which response has not received yet
         volatile short cnt;
@@ -1421,6 +1426,15 @@ class BaseMTProtoClient implements MTProtoClient {
             if (buf != null) {
                 out.add(buf);
             }
+        }
+    }
+
+    static class InnerStats implements Stats {
+        volatile Instant lastQueryTimestamp;
+
+        @Override
+        public Optional<Instant> getLastQueryTimestamp() {
+            return Optional.ofNullable(lastQueryTimestamp);
         }
     }
 }

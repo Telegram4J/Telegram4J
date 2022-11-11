@@ -3,6 +3,7 @@ package telegram4j.mtproto.store;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.BaseChannelParticipants;
@@ -36,6 +37,8 @@ public interface StoreLayout {
      * object with info about local updates state.
      */
     Mono<State> getCurrentState();
+
+    Mono<DcOptions> getDcOptions();
 
     /**
      * Retrieve auth key holder, associated with specified dc.
@@ -271,6 +274,8 @@ public interface StoreLayout {
      * @return A {@link Mono} completing the operation is done.
      */
     Mono<Void> updateState(State state);
+
+    Mono<Void> updateDcOptions(DcOptions dcOptions);
 
     /**
      * Updates the local auth key state of the store according to the given {@link AuthorizationKeyHolder auth key}.

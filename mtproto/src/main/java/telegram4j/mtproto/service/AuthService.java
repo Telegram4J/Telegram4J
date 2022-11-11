@@ -2,7 +2,7 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.CodeSettings;
@@ -12,7 +12,7 @@ import telegram4j.tl.request.auth.*;
 
 public class AuthService extends RpcService {
 
-    public AuthService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public AuthService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

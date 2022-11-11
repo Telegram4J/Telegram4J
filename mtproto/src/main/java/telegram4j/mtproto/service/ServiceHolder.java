@@ -1,6 +1,6 @@
 package telegram4j.mtproto.service;
 
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 
 public final class ServiceHolder {
@@ -16,7 +16,7 @@ public final class ServiceHolder {
     private final UserService userService;
     private final BotService botService;
 
-    public ServiceHolder(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public ServiceHolder(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         this.authService = new AuthService(groupManager, storeLayout);
         this.accountService = new AccountService(groupManager, storeLayout);
         this.chatService = new ChatService(groupManager, storeLayout);

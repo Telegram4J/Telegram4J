@@ -8,7 +8,6 @@ import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
@@ -87,18 +86,10 @@ public final class AuthorizationHandler {
         if (!nonce.equals(context.getNonce())) return emitError("Nonce mismatch");
 
         var fingerprints = resPQ.serverPublicKeyFingerprints();
-        long fingerprint = -1;
-        PublicRsaKey key = null;
-        for (long l : fingerprints) {
-            PublicRsaKey k = PublicRsaKey.publicKeys.get(l);
-            if (k != null) {
-                fingerprint = l;
-                key = k;
-                break;
-            }
-        }
+        var keyTuple = context.getPublicRsaKeyRegister().findAny(fingerprints)
+                .orElse(null);
 
-        if (fingerprint == -1) {
+        if (keyTuple == null) {
             return emitError("Unknown server fingerprints: " + fingerprints.stream()
                     .map(Long::toHexString)
                     .collect(Collectors.joining(", ", "[", "]")));
@@ -139,7 +130,7 @@ public final class AuthorizationHandler {
         random.nextBytes(seedb);
         ByteBuf seed = Unpooled.wrappedBuffer(seedb);
         ByteBuf dataWithHash = Unpooled.wrappedBuffer(hash, pqInnerDataBuf, seed);
-        ByteBuf encrypted = rsaEncrypt(dataWithHash, key);
+        ByteBuf encrypted = rsaEncrypt(dataWithHash, keyTuple.getT2());
 
         return client.sendAuth(ReqDHParams.builder()
                 .nonce(nonce)
@@ -147,7 +138,7 @@ public final class AuthorizationHandler {
                 .encryptedData(encrypted)
                 .p(pb)
                 .q(qb)
-                .publicKeyFingerprint(fingerprint)
+                .publicKeyFingerprint(keyTuple.getT1())
                 .build());
     }
 
@@ -221,7 +212,7 @@ public final class AuthorizationHandler {
 
         BigInteger authKey = ga.modPow(b, dhPrime);
 
-        context.setTimeOffset(serverDHInnerData.serverTime());
+        context.setServerTime(serverDHInnerData.serverTime());
         context.setAuthKey(alignKeyZero(toByteBuf(authKey), 256));
         context.setAuthAuxHash(sha1Digest(context.getAuthKey()).slice(0, 8));
 

@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.request.updates.GetChannelDifference;
@@ -14,7 +14,7 @@ import telegram4j.tl.updates.State;
 @Compatible(Type.BOTH)
 public class UpdatesService extends RpcService {
 
-    public UpdatesService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public UpdatesService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

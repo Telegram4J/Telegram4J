@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatFull;
@@ -298,6 +299,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authKeys.get(dc));
+    }
+
+    @Override
+    public Mono<DcOptions> getDcOptions() {
+        return Mono.empty();
     }
 
     // Updates methods
@@ -609,6 +615,11 @@ public class StoreLayoutImpl implements StoreLayout {
                     break;
             }
         });
+    }
+
+    @Override
+    public Mono<Void> updateDcOptions(DcOptions dcOptions) {
+        return Mono.empty();
     }
 
     private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {

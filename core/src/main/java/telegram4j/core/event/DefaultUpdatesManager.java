@@ -26,6 +26,7 @@ import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
+import telegram4j.tl.request.updates.GetState;
 import telegram4j.tl.request.updates.ImmutableGetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.*;
@@ -102,7 +103,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                return applyUpdate(UpdateContext.create(client, data.update()), true);
+                return saveStateIf(true)
+                        .thenMany(applyUpdate(UpdateContext.create(client, data.update()), true));
             }
             case BaseUpdates.ID: {
                 BaseUpdates data = (BaseUpdates) updates;
@@ -180,7 +182,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 log.debug("Updating state, pts: {}->{}", pts, data.pts());
                 this.pts = data.pts();
 
-                return UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                var mapUpdate = UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(BaseMessage.builder()
                                 .flags(data.flags())
                                 .id(data.id())
@@ -197,6 +199,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
                         .build()));
+
+                return saveStateIf(true)
+                        .thenMany(mapUpdate);
             }
             case UpdateShortMessage.ID: {
                 UpdateShortMessage data = (UpdateShortMessage) updates;
@@ -217,7 +222,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 log.debug("Updating state, pts: {}->{}", pts, data.pts());
                 this.pts = data.pts();
 
-                return UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
+                var mapUpdate = UpdatesMapper.instance.handle(UpdateContext.create(client, UpdateNewMessage.builder()
                         .message(BaseMessage.builder()
                                 .flags(data.flags())
                                 .id(data.id())
@@ -236,6 +241,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .pts(data.pts())
                         .ptsCount(data.ptsCount())
                         .build()));
+
+                return saveStateIf(true)
+                        .thenMany(mapUpdate);
             }
             default:
                 return Flux.error(new IllegalArgumentException("Unknown Updates type: " + updates));
@@ -802,9 +810,17 @@ public class DefaultUpdatesManager implements UpdatesManager {
         private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
         private static final boolean DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES = false;
 
+        /** Interval for retrieving {@link GetState}. */
         public final Duration checkin;
+        /** Maximal amount of updates in {@link GetChannelDifference} requests for user accounts. */
         public final int maxUserChannelDifference;
+        /** Maximal amount of updates in {@link GetChannelDifference} requests for bot accounts. */
         public final int maxBotChannelDifference;
+
+        /**
+         * Whether received {@link UpdateShortChatMessage} and {@link UpdateShortMessage}
+         * updates will be ignored and refetched as normal message events.
+         */
         public final boolean discardMinimalMessageUpdates;
 
         public Options() {

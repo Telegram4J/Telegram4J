@@ -10,8 +10,7 @@ import reactor.core.CoreSubscriber;
 import reactor.core.publisher.BaseSubscriber;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DcId;
-import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.ImmutableBaseInputFile;
 import telegram4j.tl.ImmutableInputFileBig;
@@ -31,11 +30,11 @@ class UploadMono extends Mono<InputFile> {
     // It's necessary to avoid connection reset by server
     static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
 
-    private final MTProtoClientGroupManager groupManager;
+    private final MTProtoClientGroup groupManager;
     private final UploadOptions options;
     private final long fileId = CryptoUtil.random.nextLong();
 
-    UploadMono(MTProtoClientGroupManager groupManager, UploadOptions options) {
+    UploadMono(MTProtoClientGroup groupManager, UploadOptions options) {
         this.groupManager = groupManager;
         this.options = options;
     }
@@ -73,22 +72,16 @@ class UploadMono extends Mono<InputFile> {
 
             AtomicInteger pending = new AtomicInteger(options.getParallelism());
             for (int i = 1; i <= options.getParallelism(); i++) {
-                DcId dcId = groupManager.mainId().shift(i);
-                var child = groupManager.getOrCreateMediaClient(dcId, groupManager.main().getDatacenter());
+                DcId dcId = groupManager.mainId().withType(DcId.Type.UPLOAD).shift(i);
 
-                child.state()
-                        .filter(s -> s == MTProtoClient.State.READY)
-                        .next()
-                        .doOnNext(s -> {
+                groupManager.getOrCreateClient(dcId)
+                        .doOnNext(client -> {
                             if (pending.decrementAndGet() == 0) {
-                                log.debug("All upload clients connected");
                                 subscription.request(options.getPartsCount());
                                 actual.onSubscribe(this);
                             }
                         })
                         .subscribe();
-
-                child.connect().subscribe();
             }
         }
 

@@ -7,7 +7,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-import telegram4j.mtproto.MTProtoClientGroupManager;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -42,7 +42,7 @@ import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
 /** Rpc service with chat and channel related methods. */
 public class ChatService extends RpcService {
 
-    public ChatService(MTProtoClientGroupManager groupManager, StoreLayout storeLayout) {
+    public ChatService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
     }
 

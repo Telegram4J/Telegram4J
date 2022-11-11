@@ -15,7 +15,6 @@ import telegram4j.tl.json.TlModule;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public class UserBotExample {
@@ -46,14 +45,14 @@ public class UserBotExample {
                             .doOnNext(log::info)
                             .then();
 
-                    AtomicBoolean online = new AtomicBoolean(true);
-                    // randomly update user status
+                    var online = new boolean[]{false};
+                    // update user status in fixed random interval
                     Mono<Void> status = Flux.<Integer>create(sink -> {
-                                var schedule = Schedulers.boundedElastic().schedule(() -> {
+                                var schedule = Schedulers.newSingle("t4j-user-status").schedule(() -> {
                                     while (!Thread.currentThread().isInterrupted()) {
                                         try {
                                             int sleep = ThreadLocalRandom.current().nextInt(45, 160);
-                                            log.info("Delaying {} status for {} seconds", online.getAcquire() ? "offline" : "online", sleep);
+                                            log.info("Delaying {} status for {} seconds", online[0] ? "offline" : "online", sleep);
                                             TimeUnit.SECONDS.sleep(sleep);
                                             sink.next(1);
                                         } catch (InterruptedException e) {
@@ -64,8 +63,8 @@ public class UserBotExample {
                                 sink.onCancel(schedule);
                             })
                             .flatMap(e -> {
-                                boolean state = online.getAcquire();
-                                online.setRelease(!state);
+                                boolean state = online[0];
+                                online[0] = !state;
                                 return client.getServiceHolder()
                                         .getAccountService()
                                         .updateStatus(state);
