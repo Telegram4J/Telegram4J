@@ -476,13 +476,17 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                                     .filter(b -> botId.equals(b.getBotId()))
                                                     .findFirst())))
                                             .flatMap(b -> Mono.justOrEmpty(b.getDescriptionDocument()))
-                                            .map(Document::getFileReferenceId);
+                                            .map(Document::getFileReferenceId)
+                                            // Need to select correct file, because getDescriptionDocument()
+                                            // can return Photo or Document objects
+                                            .filter(doc -> doc.getFileType() == fileRefId.getFileType());
                                 case USER:
                                     return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                             .getUserFullById(chatPeer)
                                             .flatMap(u -> Mono.justOrEmpty(u.getBotInfo()))
                                             .flatMap(b -> Mono.justOrEmpty(b.getDescriptionDocument()))
-                                            .map(Document::getFileReferenceId);
+                                            .map(Document::getFileReferenceId)
+                                            .filter(doc -> doc.getFileType() == fileRefId.getFileType());
                                 default:
                                     return Mono.error(new IllegalStateException());
                             }

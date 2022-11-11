@@ -43,7 +43,7 @@ public enum AdminRight implements BitFlag {
     /** Set this flag if none of the other flags are set, but you still want the user to be an admin. */
     OTHER(OTHER_POS),
 
-    /** Allows to create, edit and delete group chat topics. */
+    /** Allows to create, edit and delete supergroup topics. */
     MANAGE_TOPICS(MANAGE_TOPICS_POS);
 
     private final byte position;
