@@ -13,6 +13,7 @@ import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoSink;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
@@ -92,6 +93,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private final String id = Integer.toHexString(hashCode());
     private final DataCenter dataCenter;
+    private final DcId.Type type;
 
     protected final MTProtoOptions options;
     protected final InnerStats stats = new InnerStats();
@@ -114,11 +116,8 @@ class BaseMTProtoClient implements MTProtoClient {
     private final ConcurrentHashMap<Long, Request> requests = new ConcurrentHashMap<>();
     private final Cache<Integer, Long> quickAckTokens;
 
-    public BaseMTProtoClient(MTProtoOptions options) {
-        this(options.getDatacenter(), options);
-    }
-
-    BaseMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
+    BaseMTProtoClient(DcId.Type type, DataCenter dataCenter, MTProtoOptions options) {
+        this.type = type;
         this.dataCenter = dataCenter;
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
@@ -147,294 +146,311 @@ class BaseMTProtoClient implements MTProtoClient {
         this.quickAckTokens = cacheBuilder.build();
     }
 
-    @Override
-    public Mono<Void> connect() {
-        return tcpClient.connect()
-                .flatMap(connection -> Mono.create(sink -> {
-                    this.connection = connection;
+    private Mono<Void> acquireConnection(MonoSink<Void> sink) {
+        return tcpClient.connect().flatMap(connection -> {
 
-                    Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
-                    ByteBufAllocator alloc = connection.channel().alloc();
+            this.connection = connection;
 
-                    AuthorizationHandler authHandler = new AuthorizationHandler(this, authContext, onAuthSink, alloc);
+            Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
+            ByteBufAllocator alloc = connection.channel().alloc();
 
-                    connection.addHandlerFirst(new DecodeChannelHandler());
+            AuthorizationHandler authHandler = new AuthorizationHandler(this, authContext, onAuthSink, alloc);
 
-                    Mono<Void> stateHandler = state.asFlux()
-                            .flatMap(state -> {
-                                log.debug("[C:0x{}] Updating state: {}", id, state);
+            connection.addHandlerFirst(new DecodeChannelHandler());
 
-                                switch (state) {
-                                    case AUTHORIZATION_END:
-                                    case AUTHORIZATION_BEGIN:
-                                        // auth requests doesn't require acknowledging
-                                        boolean enable = state == State.AUTHORIZATION_END;
-                                        transport.setQuickAckState(enable);
-                                        return Mono.empty();
-                                    case CLOSED:
-                                        closed = true;
-                                        pingEmitter.dispose();
+            Mono<Void> stateHandler = state.asFlux()
+                    .flatMap(state -> {
+                        log.debug("[C:0x{}] Updating state: {}", id, state);
 
-                                        if (log.isDebugEnabled()) {
-                                            log.debug("[C:0x{}] Disconnected from the datacenter {}", id, dataCenter);
-                                        }
+                        switch (state) {
+                            case AUTHORIZATION_END:
+                            case AUTHORIZATION_BEGIN:
+                                // auth requests doesn't require acknowledging
+                                boolean enable = state == State.AUTHORIZATION_END;
+                                transport.setQuickAckState(enable);
+                                return Mono.empty();
+                            case CLOSED:
+                                closed = true;
+                                pingEmitter.dispose();
 
-                                        return Mono.fromRunnable(connection::dispose)
-                                                .onErrorResume(t -> Mono.empty());
-                                    case DISCONNECTED:
-                                        pingEmitter.dispose();
-
-                                        return Mono.fromRunnable(connection::dispose)
-                                                .onErrorResume(t -> Mono.empty())
-                                                .then(Mono.error(RETRY));
-                                    case READY:
-                                        sink.success();
-                                        return Mono.empty();
-                                    case CONNECTED:
-                                        return sendAwait(options.getInitConnection())
-                                                .doOnNext(result -> this.state.emitNext(State.READY, options.getEmissionHandler()));
-                                    case CONFIGURED: // if not reset there is a chance that the ping interval will not work after reconnect
-                                        lastPong = 0;
-                                        lastPing = 0;
-                                        missedPong.set(0);
-                                    default:
-                                        return Mono.empty();
-                                }
-                            })
-                            .then();
-
-                    Mono<Void> onReady = state.asFlux().filter(state -> state == State.READY).next().then();
-
-                    Mono<Void> inboundHandler = connection.inbound().receive()
-                            // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
-                            .switchIfEmpty(Mono.error(RETRY))
-                            .map(ByteBuf::retainedDuplicate)
-                            .flatMap(payload -> {
-                                if (payload.readableBytes() == 4) {
-                                    int val = payload.readIntLE();
-                                    payload.release();
-
-                                    if (!TransportException.isError(val) && transport.supportQuickAck()) { // quick acknowledge
-                                        Long msgId = quickAckTokens.getIfPresent(val);
-                                        if (msgId == null) {
-                                            rpcLog.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
-                                            return Mono.empty();
-                                        }
-
-                                        var req = requests.get(msgId);
-                                        if (req != null) { // just in case
-                                            req.markState(s -> s | ACKNOWLEDGED);
-                                        }
-
-                                        if (rpcLog.isDebugEnabled()) {
-                                            rpcLog.debug("[C:0x{}, M:0x{}] Handling quick ack",
-                                                    this.id, Long.toHexString(msgId));
-                                        }
-
-                                        quickAckTokens.invalidate(val);
-                                        return Mono.empty();
-                                    }
-
-                                    // The error code writes as negative int32
-                                    TransportException exc = TransportException.create(val);
-                                    if (val == -404 && authKey == null) { // retry authorization
-                                        onAuthSink.emitError(new AuthorizationException(exc), FAIL_FAST);
-                                        return Mono.empty();
-                                    }
-
-                                    return Mono.error(exc);
-                                }
-                                return Mono.just(payload);
-                            })
-                            .publishOn(Schedulers.boundedElastic())
-                            .flatMap(buf -> {
-                                long authKeyId = buf.readLongLE();
-
-                                if (authKeyId == 0) { // unencrypted message
-                                    buf.skipBytes(12); // message id (8) + payload length (4)
-
-                                    try {
-                                        MTProtoObject obj = TlDeserializer.deserialize(buf);
-                                        return authHandler.handle(obj);
-                                    } catch (Throwable t) {
-                                        return Mono.error(Exceptions.propagate(t));
-                                    } finally {
-                                        buf.release();
-                                    }
+                                if (log.isDebugEnabled()) {
+                                    log.debug("[C:0x{}] Disconnected from the datacenter {}", id, dataCenter);
                                 }
 
-                                AuthorizationKeyHolder authKeyHolder = this.authKey;
-                                long authKeyIdAsLong = authKeyHolder.getAuthKeyId().getLongLE(0);
-                                if (authKeyId != authKeyIdAsLong) {
-                                    return Mono.error(new MTProtoException("Incorrect auth key id. Received: 0x"
-                                            + Long.toHexString(authKeyId) + ", but excepted: 0x"
-                                            + Long.toHexString(authKeyIdAsLong)));
+                                return Mono.fromRunnable(connection::dispose)
+                                        .onErrorResume(t -> Mono.empty());
+                            case DISCONNECTED:
+                                pingEmitter.dispose();
+
+                                return Mono.fromRunnable(connection::dispose)
+                                        .onErrorResume(t -> Mono.empty())
+                                        .then(Mono.error(RETRY));
+                            case READY:
+                                sink.success();
+                                return Mono.empty();
+                            case CONNECTED:
+                                return sendAwait(options.getInitConnection())
+                                        .doOnNext(result -> this.state.emitNext(State.READY, options.getEmissionHandler()));
+                            case CONFIGURED: // if not reset there is a chance that the ping interval will not work after reconnect
+                                lastPong = 0;
+                                lastPing = 0;
+                                missedPong.set(0);
+                            default:
+                                return Mono.empty();
+                        }
+                    })
+                    .then();
+
+            Mono<Void> onReady = state.asFlux().filter(state -> state == State.READY).next().then();
+
+            Mono<Void> inboundHandler = connection.inbound().receive()
+                    .map(ByteBuf::retainedDuplicate)
+                    .flatMap(payload -> {
+                        if (payload.readableBytes() == 4) {
+                            int val = payload.readIntLE();
+                            payload.release();
+
+                            if (!TransportException.isError(val) && transport.supportQuickAck()) { // quick acknowledge
+                                Long msgId = quickAckTokens.getIfPresent(val);
+                                if (msgId == null) {
+                                    rpcLog.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
+                                    return Mono.empty();
                                 }
 
-                                // message key recheck
-
-                                ByteBuf messageKey = buf.readRetainedSlice(16);
-
-                                ByteBuf authKey = authKeyHolder.getAuthKey();
-                                AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
-
-                                ByteBuf decrypted = cipher.decrypt(buf.slice());
-
-                                ByteBuf messageKeyHash = sha256Digest(authKey.slice(96, 32), decrypted);
-                                ByteBuf messageKeyHashSlice = messageKeyHash.slice(8, 16);
-
-                                if (!messageKey.equals(messageKeyHashSlice)) {
-                                    return Mono.error(new MTProtoException("Incorrect message key. Received: 0x"
-                                            + ByteBufUtil.hexDump(messageKey) + ", but recomputed: 0x"
-                                            + ByteBufUtil.hexDump(messageKeyHashSlice)));
+                                var req = requests.get(msgId);
+                                if (req != null) { // just in case
+                                    req.markState(s -> s | ACKNOWLEDGED);
                                 }
-
-                                messageKey.release();
-
-                                decrypted.readLongLE();
-                                long sessionId = decrypted.readLongLE();
-                                if (this.sessionId != sessionId) {
-                                    return Mono.error(new IllegalStateException("Incorrect session identifier. Current: 0x"
-                                            + Long.toHexString(this.sessionId) + ", received: 0x"
-                                            + Long.toHexString(sessionId)));
-                                }
-                                long messageId = decrypted.readLongLE();
-                                decrypted.readIntLE();
-                                int length = decrypted.readIntLE();
-                                if (length % 4 != 0) {
-                                    return Mono.error(new IllegalStateException("Data isn't aligned by 4 bytes"));
-                                }
-
-                                updateTimeOffset((int) (messageId >> 32));
-
-                                ByteBuf payload = decrypted.readSlice(length);
-                                try {
-                                    TlObject obj = TlDeserializer.deserialize(payload);
-                                    // check for end of input?
-                                    return handleServiceMessage(obj, messageId);
-                                } catch (Throwable t) {
-                                    return Mono.error(Exceptions.propagate(t));
-                                } finally {
-                                    payload.release();
-                                }
-                            })
-                            .then();
-
-                    Flux<Request> startupPayloadFlux = outbound.asFlux()
-                            .filter(this::isStartupPayload);
-
-                    Flux<Request> payloadFlux = outbound.asFlux()
-                            .filter(this::isContentRelated)
-                            .filter(Predicate.not(this::isStartupPayload))
-                            .delayUntil(e -> onReady);
-
-                    Flux<Request> rpcFlux = outbound.asFlux()
-                            .filter(Predicate.not(this::isContentRelated));
-
-                    Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, startupPayloadFlux, payloadFlux)
-                            .mapNotNull(serializePacket(alloc));
-
-                    Flux<ByteBuf> authFlux = authOutbound.asFlux()
-                            .map(method -> {
-                                int size = TlSerializer.sizeOf(method);
-                                ByteBuf payload = alloc.buffer(20 + size)
-                                        .writeLongLE(0) // auth key id
-                                        .writeLongLE(getMessageId()) // Message id in the auth requests doesn't allow receiving payload
-                                        .writeIntLE(size);
-                                TlSerializer.serialize(payload, method);
 
                                 if (rpcLog.isDebugEnabled()) {
-                                    rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(method));
+                                    rpcLog.debug("[C:0x{}, M:0x{}] Handling quick ack",
+                                            this.id, Long.toHexString(msgId));
                                 }
 
-                                return transport.encode(payload, false);
-                            });
+                                quickAckTokens.invalidate(val);
+                                return Mono.empty();
+                            }
 
-                    Mono<Void> outboundHandler = Flux.merge(authFlux, outboundFlux)
-                            .flatMap(b -> FutureMono.from(connection.channel().writeAndFlush(b)))
-                            .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
-                            .then();
+                            // The error code writes as negative int32
+                            TransportException exc = TransportException.create(val);
+                            if (val == -404 && authKey == null) { // retry authorization
+                                onAuthSink.emitError(new AuthorizationException(exc), FAIL_FAST);
+                                return Mono.empty();
+                            }
 
-                    // Pings will send with MsgsAck in and MsgsStateReq container
-                    Mono<Void> ping = pingEmitter.ticks()
-                            .flatMap(tick -> {
-                                if (lastPing - lastPong > 0) {
-                                    int missed = missedPong.incrementAndGet();
-                                    if (missed >= MAX_MISSED_PONG) {
-                                        lastMessageId = 0; // to break connection
-                                        if (missed > MAX_MISSED_PONG) {
-                                            return Mono.empty();
-                                        }
-                                    }
-                                }
+                            return Mono.error(exc);
+                        }
+                        return Mono.just(payload);
+                    })
+                    .publishOn(Schedulers.boundedElastic())
+                    .flatMap(buf -> {
+                        long authKeyId = buf.readLongLE();
 
-                                lastPing = System.nanoTime();
-                                return sendAwait(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT));
-                            })
-                            .then();
+                        if (authKeyId == 0) { // unencrypted message
+                            buf.skipBytes(12); // message id (8) + payload length (4)
 
-                    Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() ->
-                                    state.emitNext(State.AUTHORIZATION_BEGIN, options.getEmissionHandler()))
-                            .then(authHandler.start())
-                            .checkpoint("Authorization key generation")
-                            .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
-                            .doOnNext(auth -> {
-                                serverSalt = authContext.getServerSalt(); // apply temporal salt
-                                updateTimeOffset(authContext.getServerTime());
-                                authContext.clear();
-                                state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
-                            })
-                            .flatMap(key -> options.getStoreLayout()
-                                    .updateAuthorizationKey(dataCenter, key).thenReturn(key));
+                            try {
+                                MTProtoObject obj = TlDeserializer.deserialize(buf);
+                                return authHandler.handle(obj);
+                            } catch (Throwable t) {
+                                return Mono.error(Exceptions.propagate(t));
+                            } finally {
+                                buf.release();
+                            }
+                        }
 
-                    Mono<Void> awaitKey = Mono.justOrEmpty(authKey)
-                            .switchIfEmpty(options.getStoreLayout().getAuthorizationKey(dataCenter))
-                            .doOnNext(key -> onAuthSink.emitValue(key, FAIL_FAST))
-                            .switchIfEmpty(startAuth)
-                            .doOnNext(key -> this.authKey = key)
-                            .then();
+                        AuthorizationKeyHolder authKeyHolder = this.authKey;
+                        long authKeyIdAsLong = authKeyHolder.getAuthKeyId().getLongLE(0);
+                        if (authKeyId != authKeyIdAsLong) {
+                            return Mono.error(new MTProtoException("Incorrect auth key id. Received: 0x"
+                                    + Long.toHexString(authKeyId) + ", but excepted: 0x"
+                                    + Long.toHexString(authKeyIdAsLong)));
+                        }
 
-                    Mono<Void> updateStoreDataCenter = options.storeLayout.getDataCenter()
-                            .switchIfEmpty(options.storeLayout.updateDataCenter(dataCenter).then(Mono.empty()))
-                            .then();
+                        // message key recheck
 
-                    Mono<Void> startSchedule = Mono.defer(() -> {
-                        log.info("[C:0x{}] Connected to datacenter.", id);
-                        state.emitNext(State.CONNECTED, options.getEmissionHandler());
-                        pingEmitter.start(dataCenter.getType() == DataCenter.Type.MEDIA
-                                ? PING_QUERY_PERIOD_MEDIA : PING_QUERY_PERIOD);
+                        ByteBuf messageKey = buf.readRetainedSlice(16);
 
-                        return ping;
+                        ByteBuf authKey = authKeyHolder.getAuthKey();
+                        AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
+
+                        ByteBuf decrypted = cipher.decrypt(buf.slice());
+
+                        ByteBuf messageKeyHash = sha256Digest(authKey.slice(96, 32), decrypted);
+                        ByteBuf messageKeyHashSlice = messageKeyHash.slice(8, 16);
+
+                        if (!messageKey.equals(messageKeyHashSlice)) {
+                            return Mono.error(new MTProtoException("Incorrect message key. Received: 0x"
+                                    + ByteBufUtil.hexDump(messageKey) + ", but recomputed: 0x"
+                                    + ByteBufUtil.hexDump(messageKeyHashSlice)));
+                        }
+
+                        messageKey.release();
+
+                        decrypted.readLongLE();
+                        long sessionId = decrypted.readLongLE();
+                        if (this.sessionId != sessionId) {
+                            return Mono.error(new IllegalStateException("Incorrect session identifier. Current: 0x"
+                                    + Long.toHexString(this.sessionId) + ", received: 0x"
+                                    + Long.toHexString(sessionId)));
+                        }
+                        long messageId = decrypted.readLongLE();
+                        decrypted.readIntLE();
+                        int length = decrypted.readIntLE();
+                        if (length % 4 != 0) {
+                            return Mono.error(new IllegalStateException("Data isn't aligned by 4 bytes"));
+                        }
+
+                        updateTimeOffset((int) (messageId >> 32));
+
+                        ByteBuf payload = decrypted.readSlice(length);
+                        try {
+                            TlObject obj = TlDeserializer.deserialize(payload);
+                            // check for end of input?
+                            return handleServiceMessage(obj, messageId);
+                        } catch (Throwable t) {
+                            return Mono.error(Exceptions.propagate(t));
+                        } finally {
+                            payload.release();
+                        }
+                    })
+                    .then();
+
+            Flux<Request> startupPayloadFlux = outbound.asFlux()
+                    .filter(this::isStartupPayload);
+
+            Flux<Request> payloadFlux = outbound.asFlux()
+                    .filter(this::isContentRelated)
+                    .filter(Predicate.not(this::isStartupPayload))
+                    .delayUntil(e -> onReady);
+
+            Flux<Request> rpcFlux = outbound.asFlux()
+                    .filter(Predicate.not(this::isContentRelated));
+
+            Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, startupPayloadFlux, payloadFlux)
+                    .mapNotNull(serializePacket(alloc));
+
+            Flux<ByteBuf> authFlux = authOutbound.asFlux()
+                    .map(method -> {
+                        int size = TlSerializer.sizeOf(method);
+                        ByteBuf payload = alloc.buffer(20 + size)
+                                .writeLongLE(0) // auth key id
+                                .writeLongLE(getMessageId()) // Message id in the auth requests doesn't allow receiving payload
+                                .writeIntLE(size);
+                        TlSerializer.serialize(payload, method);
+
+                        if (rpcLog.isDebugEnabled()) {
+                            rpcLog.debug("[C:0x{}] Sending mtproto request: {}", id, prettyMethodName(method));
+                        }
+
+                        return transport.encode(payload, false);
                     });
 
-                    Mono<Void> initialize = state.asFlux()
-                            .filter(s -> s == State.CONFIGURED)
-                            .next()
-                            .flatMap(s -> updateStoreDataCenter
-                                    .then(awaitKey)
-                                    .then(startSchedule))
-                            .then();
+            Mono<Void> outboundHandler = Flux.merge(authFlux, outboundFlux)
+                    .flatMap(b -> FutureMono.from(connection.channel().writeAndFlush(b)))
+                    .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
+                    .then();
 
-                    Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
-                            .doOnError(Predicate.not(BaseMTProtoClient::isRetryException), t -> {
-                                if (t instanceof TransportException) {
-                                    TransportException t0 = (TransportException) t;
-                                    log.error("[C:0x" + id + "] Transport exception, code: " + t0.getCode(), t0);
-                                } else if (!(t instanceof AuthorizationException)) {
-                                    log.error("[C:0x" + id + "] Unexpected client exception", t);
+            // Pings will send with MsgsAck in and MsgsStateReq container
+            Mono<Void> ping = pingEmitter.ticks()
+                    .flatMap(tick -> {
+                        if (lastPing - lastPong > 0) {
+                            int missed = missedPong.incrementAndGet();
+                            if (missed >= MAX_MISSED_PONG) {
+                                lastMessageId = 0; // to break connection
+                                if (missed > MAX_MISSED_PONG) {
+                                    return Mono.empty();
                                 }
-                            })
-                            .retryWhen(options.getConnectionRetry()
-                                    .filter(t -> !closed && isRetryException(t))
-                                    .doAfterRetry(signal -> {
-                                        state.emitNext(State.RECONNECT, options.getEmissionHandler());
-                                        log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
-                                    })
-                                    .doAfterRetryAsync(s -> reconnect()))
-                            .then()
-                            .subscribeOn(Schedulers.boundedElastic())
-                            .subscribe(null, sink::error);
-                }));
+                            }
+                        }
+
+                        lastPing = System.nanoTime();
+                        return sendAwait(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT));
+                    })
+                    .then();
+
+            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() ->
+                            state.emitNext(State.AUTHORIZATION_BEGIN, options.getEmissionHandler()))
+                    .then(authHandler.start())
+                    .checkpoint("Authorization key generation")
+                    .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
+                    .doOnNext(auth -> {
+                        serverSalt = authContext.getServerSalt(); // apply temporal salt
+                        updateTimeOffset(authContext.getServerTime());
+                        authContext.clear();
+                        state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
+                    })
+                    .flatMap(key -> options.getStoreLayout()
+                            .updateAuthorizationKey(dataCenter, key).thenReturn(key));
+
+            Mono<Void> awaitKey = Mono.justOrEmpty(authKey)
+                    .switchIfEmpty(options.getStoreLayout().getAuthorizationKey(dataCenter))
+                    .doOnNext(key -> onAuthSink.emitValue(key, FAIL_FAST))
+                    .switchIfEmpty(startAuth)
+                    .doOnNext(key -> this.authKey = key)
+                    .then();
+
+            Mono<Void> updateStoreDataCenter = options.storeLayout.getDataCenter()
+                    .switchIfEmpty(options.storeLayout.updateDataCenter(dataCenter).then(Mono.empty()))
+                    .then();
+
+            Mono<Void> startSchedule = Mono.defer(() -> {
+                log.info("[C:0x{}] Connected to datacenter.", id);
+                state.emitNext(State.CONNECTED, options.getEmissionHandler());
+                Duration period;
+                switch (type) {
+                    case MAIN:
+                    case REGULAR:
+                        period = PING_QUERY_PERIOD;
+                        break;
+                    case UPLOAD:
+                    case DOWNLOAD:
+                        period = PING_QUERY_PERIOD_MEDIA;
+                        break;
+                    default: throw new IllegalStateException();
+                }
+                pingEmitter.start(period);
+
+                return ping;
+            });
+
+            Mono<Void> initialize = state.asFlux()
+                    .filter(s -> s == State.CONFIGURED)
+                    .next()
+                    .flatMap(s -> updateStoreDataCenter
+                            .then(awaitKey)
+                            .then(startSchedule))
+                    .then();
+
+            return Mono.zip(inboundHandler, outboundHandler, stateHandler, initialize)
+                    .doOnError(Predicate.not(BaseMTProtoClient::isRetryException), t -> {
+                        if (t instanceof TransportException) {
+                            TransportException t0 = (TransportException) t;
+                            log.error("[C:0x" + id + "] Transport exception, code: " + t0.getCode(), t0);
+                        } else if (!(t instanceof AuthorizationException)) {
+                            log.error("[C:0x" + id + "] Unexpected client exception", t);
+                        }
+                        sink.error(t);
+                    })
+                    .onErrorResume(t -> Mono.empty())
+                    .then();
+        })
+        // FluxReceive (inbound) emits empty signals if channel was DISCONNECTING
+        .switchIfEmpty(reconnect())
+        .retryWhen(options.getConnectionRetry()
+                .filter(t -> !closed && isRetryException(t))
+                .doAfterRetry(signal -> {
+                    state.emitNext(State.RECONNECT, options.getEmissionHandler());
+                    log.debug("[C:0x{}] Reconnecting to the datacenter (attempts: {})", id, signal.totalRetriesInARow());
+                }))
+        .then();
+    }
+
+    @Override
+    public Mono<Void> connect() {
+        return Mono.create(sink -> sink.onCancel(acquireConnection(sink)
+                .subscribeOn(Schedulers.boundedElastic())
+                .subscribe()));
     }
 
     @Override

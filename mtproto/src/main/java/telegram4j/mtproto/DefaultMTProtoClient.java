@@ -9,7 +9,7 @@ public final class DefaultMTProtoClient extends BaseMTProtoClient implements Mai
     private final Sinks.Many<Updates> updates;
 
     public DefaultMTProtoClient(MTProtoOptions options) {
-        super(options.getDatacenter(), options);
+        super(DcId.Type.MAIN, options.getDatacenter(), options);
         this.updates = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
     }
@@ -20,8 +20,8 @@ public final class DefaultMTProtoClient extends BaseMTProtoClient implements Mai
     }
 
     @Override
-    public MTProtoClient createChildClient(DataCenter dc) {
-        BaseMTProtoClient client = new BaseMTProtoClient(dc, options);
+    public MTProtoClient createChildClient(DcId.Type type, DataCenter dc) {
+        BaseMTProtoClient client = new BaseMTProtoClient(type, dc, options);
 
         client.authKey = authKey;
         client.timeOffset = timeOffset;

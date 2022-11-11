@@ -129,7 +129,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             var dc = dcOptions.find(id)
                     .orElseThrow(() -> new IllegalArgumentException("No dc found for specified id: " + id));
             created[0] = true;
-            return main.createChildClient(dc);
+            return main.createChildClient(id.getType(), dc);
         }))
         .flatMap(c -> created[0] ? c.connect().thenReturn(c) : Mono.just(c));
     }

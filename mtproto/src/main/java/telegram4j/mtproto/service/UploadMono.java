@@ -136,7 +136,9 @@ class UploadMono extends Mono<InputFile> {
             }
 
             // idx is one-based to prevent using main client as uploader
-            DcId dcId = groupManager.mainId().shift(idx + 1);
+            DcId dcId = groupManager.mainId()
+                    .withType(DcId.Type.UPLOAD)
+                    .shift(idx + 1);
 
             if (log.isDebugEnabled()) {
                 log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, fileId, part.filePart() + 1, options.getPartsCount());
