@@ -16,6 +16,7 @@ import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
+import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
@@ -68,7 +69,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EntityParserFactory defaultEntityParserFactory;
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
-            new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options());
+            new DefaultUpdatesManager(c, new Options(c));
     private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = DefaultMTProtoClientGroup::new;
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private PublicRsaKeyRegister publicRsaKeyRegister;

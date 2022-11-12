@@ -453,7 +453,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
                     int dpts = Math.max(1, Math.max(upts, cpts));
-                    int limit = getMaxChannelDifference();
+                    int limit = options.channelDifferenceLimit;
 
                     if (log.isDebugEnabled()) {
                         log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", u.channelId(), dpts, limit);
@@ -764,7 +764,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     protected Flux<Event> getChannelDifference(InputChannel id, int pts) {
-        int limit = getMaxChannelDifference();
+        int limit = options.channelDifferenceLimit;
 
         if (log.isDebugEnabled()) {
             log.debug("Getting channel difference, channel: {}, pts: {}, limit: {}", getRawPeerId(id), pts, limit);
@@ -798,42 +798,34 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
-    protected int getMaxChannelDifference() {
-        return client.getAuthResources().isBot()
-                ? options.maxBotChannelDifference
-                : options.maxUserChannelDifference;
-    }
-
     public static class Options {
-        private static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
-        private static final int MAX_BOT_CHANNEL_DIFFERENCE  = 100000;
-        private static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
-        private static final boolean DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES = false;
+        public static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
+        public static final int MAX_BOT_CHANNEL_DIFFERENCE  = 100000;
+        public static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
+        public static final boolean DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES = false;
 
         /** Interval for retrieving {@link GetState}. */
         public final Duration checkin;
-        /** Maximal amount of updates in {@link GetChannelDifference} requests for user accounts. */
-        public final int maxUserChannelDifference;
-        /** Maximal amount of updates in {@link GetChannelDifference} requests for bot accounts. */
-        public final int maxBotChannelDifference;
-
+        /** Maximal amount of updates in {@link GetChannelDifference} requests. */
+        public final int channelDifferenceLimit;
+        // TODO limit for common difference?
         /**
          * Whether received {@link UpdateShortChatMessage} and {@link UpdateShortMessage}
          * updates will be ignored and refetched as normal message events.
          */
         public final boolean discardMinimalMessageUpdates;
 
-        public Options() {
+        public Options(MTProtoTelegramClient client) {
             checkin = DEFAULT_CHECKIN;
-            maxUserChannelDifference = MAX_USER_CHANNEL_DIFFERENCE;
-            maxBotChannelDifference = MAX_BOT_CHANNEL_DIFFERENCE;
+            channelDifferenceLimit = client.getAuthResources().isBot()
+                    ? MAX_BOT_CHANNEL_DIFFERENCE
+                    : MAX_USER_CHANNEL_DIFFERENCE;
             discardMinimalMessageUpdates = DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES;
         }
 
-        public Options(Duration checkin, int maxUserChannelDifference, int maxBotChannelDifference, boolean discardMinimalMessageUpdates) {
+        public Options(Duration checkin, int channelDifferenceLimit, boolean discardMinimalMessageUpdates) {
             this.checkin = Objects.requireNonNull(checkin);
-            this.maxUserChannelDifference = maxUserChannelDifference;
-            this.maxBotChannelDifference = maxBotChannelDifference;
+            this.channelDifferenceLimit = channelDifferenceLimit;
             this.discardMinimalMessageUpdates = discardMinimalMessageUpdates;
         }
     }
