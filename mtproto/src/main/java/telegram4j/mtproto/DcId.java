@@ -24,14 +24,14 @@ public final class DcId implements Comparable<DcId> {
      * @return A new {@code DcId} with specified parameters.
      */
     public static DcId of(Type type, DataCenter id, int shift) {
-        return of(type, id.getInternalId(), shift);
+        return of(type, id.getId(), shift);
     }
 
     /**
      * Creates new {@code DcId} with specified type, id and sequence number.
      *
      * @param type The type of client connection to this dc.
-     * @param id The {@link DataCenter#getInternalId() internal} representation of DC identifier.
+     * @param id The DC identifier.
      * @param shift The sequence number of client.
      * @return A new {@code DcId} with specified parameters.
      */
@@ -40,9 +40,8 @@ public final class DcId implements Comparable<DcId> {
     }
 
     /**
-     * Gets internal representation of DC's id.
+     * Gets id of DC.
      *
-     * @see DataCenter#getInternalId()
      * @return The internal representation of DC's id.
      */
     public int getId() {
@@ -152,24 +151,6 @@ public final class DcId implements Comparable<DcId> {
                 case 2: return UPLOAD;
                 case 3: return DOWNLOAD;
                 default: throw new IllegalArgumentException("Unknown type: " + type);
-            }
-        }
-
-        /**
-         * Converts connection type to DC type.
-         *
-         * @return The DC type.
-         */
-        public DataCenter.Type asDcType() {
-            switch (this) {
-                case MAIN:
-                case REGULAR:
-                case UPLOAD:
-                    return DataCenter.Type.REGULAR;
-                case DOWNLOAD:
-                    return DataCenter.Type.MEDIA;
-                default:
-                    throw new IllegalStateException();
             }
         }
     }

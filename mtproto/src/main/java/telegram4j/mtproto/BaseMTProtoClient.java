@@ -358,7 +358,9 @@ class BaseMTProtoClient implements MTProtoClient {
                         if (lastPing - lastPong > 0) {
                             int missed = missedPong.incrementAndGet();
                             if (missed >= MAX_MISSED_PONG) {
-                                state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+                                if (missed == MAX_MISSED_PONG) {
+                                    state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+                                }
                                 return Mono.empty();
                             }
                         }
@@ -1124,7 +1126,7 @@ class BaseMTProtoClient implements MTProtoClient {
             case MsgsAck.ID:
                 // case Ping.ID:
                 // case PingDelayDisconnect.ID:
-            case MessageContainer.ID:
+            // case MessageContainer.ID:
                 // case MsgsStateReq.ID:
                 // case MsgResendReq.ID:
                 return false;

@@ -9,16 +9,16 @@ import telegram4j.tl.api.TlMethod;
 import java.util.Objects;
 
 public abstract class RpcService {
-    protected final MTProtoClientGroup groupManager;
+    protected final MTProtoClientGroup clientGroup;
     protected final StoreLayout storeLayout;
 
-    public RpcService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        this.groupManager = Objects.requireNonNull(groupManager);
+    public RpcService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        this.clientGroup = Objects.requireNonNull(clientGroup);
         this.storeLayout = Objects.requireNonNull(storeLayout);
     }
 
     public final MTProtoClientGroup getClientGroup() {
-        return groupManager;
+        return clientGroup;
     }
 
     public final StoreLayout getStoreLayout() {
@@ -26,7 +26,7 @@ public abstract class RpcService {
     }
 
     protected <R, M extends TlMethod<R>> Mono<R> sendMain(M method) {
-        return groupManager.send(groupManager.mainId(), method);
+        return clientGroup.send(clientGroup.mainId(), method);
     }
 
     protected Mono<Peer> toPeer(InputPeer inputPeer) {

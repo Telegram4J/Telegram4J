@@ -267,8 +267,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                         .map(FilePart::ofWebFile);
             }
 
-            return serviceHolder.getUploadService()
-                    .getFile(loc.asLocation().orElseThrow())
+            return serviceHolder.getUploadService().getFile(loc)
                     .map(FilePart::ofFile);
         });
     }

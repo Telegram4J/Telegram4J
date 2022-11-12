@@ -14,8 +14,8 @@ import java.util.List;
 
 public class PhoneService extends RpcService {
 
-    public PhoneService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public PhoneService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // phone namespace

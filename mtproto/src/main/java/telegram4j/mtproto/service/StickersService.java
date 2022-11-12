@@ -13,8 +13,8 @@ import telegram4j.tl.stickers.SuggestedShortName;
 
 public class StickersService extends RpcService {
 
-    public StickersService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public StickersService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     @Compatible(Type.BOT)

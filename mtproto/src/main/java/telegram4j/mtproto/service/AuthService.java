@@ -12,8 +12,8 @@ import telegram4j.tl.request.auth.*;
 
 public class AuthService extends RpcService {
 
-    public AuthService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public AuthService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // auth namespace

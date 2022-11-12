@@ -23,8 +23,8 @@ import java.util.List;
 
 public class UserService extends RpcService {
 
-    public UserService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public UserService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // additional methods

@@ -30,12 +30,12 @@ class UploadMono extends Mono<InputFile> {
     // It's necessary to avoid connection reset by server
     static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
 
-    private final MTProtoClientGroup groupManager;
+    private final MTProtoClientGroup clientGroup;
     private final UploadOptions options;
     private final long fileId = CryptoUtil.random.nextLong();
 
-    UploadMono(MTProtoClientGroup groupManager, UploadOptions options) {
-        this.groupManager = groupManager;
+    UploadMono(MTProtoClientGroup clientGroup, UploadOptions options) {
+        this.clientGroup = clientGroup;
         this.options = options;
     }
 
@@ -72,9 +72,9 @@ class UploadMono extends Mono<InputFile> {
 
             AtomicInteger pending = new AtomicInteger(options.getParallelism());
             for (int i = 1; i <= options.getParallelism(); i++) {
-                DcId dcId = groupManager.mainId().withType(DcId.Type.UPLOAD).shift(i);
+                DcId dcId = clientGroup.mainId().withType(DcId.Type.UPLOAD).shift(i);
 
-                groupManager.getOrCreateClient(dcId)
+                clientGroup.getOrCreateClient(dcId)
                         .doOnNext(client -> {
                             if (pending.decrementAndGet() == 0) {
                                 subscription.request(options.getPartsCount());
@@ -136,7 +136,7 @@ class UploadMono extends Mono<InputFile> {
             }
 
             // idx is one-based to prevent using main client as uploader
-            DcId dcId = groupManager.mainId()
+            DcId dcId = clientGroup.mainId()
                     .withType(DcId.Type.UPLOAD)
                     .shift(idx + 1);
 
@@ -145,7 +145,7 @@ class UploadMono extends Mono<InputFile> {
             }
 
             Mono.delay(UPLOAD_INTERVAL)
-                    .then(groupManager.send(dcId, part))
+                    .then(clientGroup.send(dcId, part))
                     .subscribe(res -> {
                         if (!res) throw new IllegalStateException("Unexpected result state");
 

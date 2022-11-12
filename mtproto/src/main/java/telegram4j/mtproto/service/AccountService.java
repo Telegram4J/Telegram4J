@@ -16,8 +16,8 @@ import java.util.List;
 
 public class AccountService extends RpcService {
 
-    public AccountService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public AccountService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     public Mono<Boolean> registerDevice(RegisterDevice request) {

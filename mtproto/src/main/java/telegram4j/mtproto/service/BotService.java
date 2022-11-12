@@ -12,8 +12,8 @@ import java.util.List;
 @Compatible(Type.BOT)
 public class BotService extends RpcService {
 
-    public BotService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public BotService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // bots namespace

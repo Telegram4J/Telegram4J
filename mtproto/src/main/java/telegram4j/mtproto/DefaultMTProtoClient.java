@@ -22,10 +22,11 @@ public final class DefaultMTProtoClient extends BaseMTProtoClient implements Mai
     @Override
     public MTProtoClient createChildClient(DcId.Type type, DataCenter dc) {
         BaseMTProtoClient client = new BaseMTProtoClient(type, dc, options);
-
-        client.authKey = authKey;
-        client.timeOffset = timeOffset;
-        client.serverSalt = serverSalt;
+        if (dc.getId() == getDatacenter().getId()) {
+            client.authKey = authKey;
+            client.timeOffset = timeOffset;
+            client.serverSalt = serverSalt;
+        }
 
         return client;
     }

@@ -16,17 +16,17 @@ public final class ServiceHolder {
     private final UserService userService;
     private final BotService botService;
 
-    public ServiceHolder(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        this.authService = new AuthService(groupManager, storeLayout);
-        this.accountService = new AccountService(groupManager, storeLayout);
-        this.chatService = new ChatService(groupManager, storeLayout);
-        this.phoneService = new PhoneService(groupManager, storeLayout);
-        this.stickersService = new StickersService(groupManager, storeLayout);
-        this.helpService = new HelpService(groupManager, storeLayout);
-        this.uploadService = new UploadService(groupManager, storeLayout);
-        this.updatesService = new UpdatesService(groupManager, storeLayout);
-        this.userService = new UserService(groupManager, storeLayout);
-        this.botService = new BotService(groupManager, storeLayout);
+    public ServiceHolder(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        this.authService = new AuthService(clientGroup, storeLayout);
+        this.accountService = new AccountService(clientGroup, storeLayout);
+        this.chatService = new ChatService(clientGroup, storeLayout);
+        this.phoneService = new PhoneService(clientGroup, storeLayout);
+        this.stickersService = new StickersService(clientGroup, storeLayout);
+        this.helpService = new HelpService(clientGroup, storeLayout);
+        this.uploadService = new UploadService(clientGroup, storeLayout);
+        this.updatesService = new UpdatesService(clientGroup, storeLayout);
+        this.userService = new UserService(clientGroup, storeLayout);
+        this.botService = new BotService(clientGroup, storeLayout);
     }
 
     public AuthService getAuthService() {

@@ -125,7 +125,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             return Mono.error(new IllegalArgumentException("Main clients can't created for this group"));
 
         var created = new boolean[]{false};
-        return Mono.just(clients.computeIfAbsent(id, i -> {
+        return Mono.fromSupplier(() -> clients.computeIfAbsent(id, i -> {
             var dc = dcOptions.find(id)
                     .orElseThrow(() -> new IllegalArgumentException("No dc found for specified id: " + id));
             created[0] = true;

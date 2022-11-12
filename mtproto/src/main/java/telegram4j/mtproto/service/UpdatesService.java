@@ -14,8 +14,8 @@ import telegram4j.tl.updates.State;
 @Compatible(Type.BOTH)
 public class UpdatesService extends RpcService {
 
-    public UpdatesService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public UpdatesService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // updates namespace

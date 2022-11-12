@@ -6,9 +6,9 @@ import reactor.util.annotation.Nullable;
 import telegram4j.tl.Config;
 import telegram4j.tl.api.TlEncodingUtil;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.DataCenter.*;
@@ -24,6 +24,41 @@ public final class DcOptions {
     DcOptions(List<DataCenter> options, byte flags) {
         this.options = options;
         this.flags = flags;
+    }
+
+    static Comparator<DataCenter> dcComparator(DataCenter.Type type, int id, boolean preferIpv6) {
+        return Comparator.<DataCenter>comparingInt(dc -> {
+                    int d = Integer.compare(id, dc.getId());
+                    return d == 0 ? -1 : 1;
+                })
+                .thenComparingInt(dc -> type == dc.getType() ? -1 : 1)
+                .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
+    }
+
+    static Comparator<DataCenter> dcIdComparator(DcId dcId, boolean preferIpv6) {
+        // filter options with other ids
+        return Comparator.<DataCenter>comparingInt(dc -> {
+            int d = Integer.compare(dcId.getId(), dc.getId());
+            return d == 0 ? -1 : 1;
+        })
+        .thenComparing(dc -> {
+            switch (dcId.getType()) {
+                case MAIN:
+                case REGULAR:
+                case UPLOAD:
+                    return dc.getType() == Type.REGULAR ? -1 : 1;
+                case DOWNLOAD:
+                    // prefer MEDIA dcs for downloading
+                    switch (dc.getType()) {
+                        case MEDIA: return -2;
+                        case REGULAR: return -1;
+                        case CDN: return 2;
+                        default: throw new IllegalStateException();
+                    }
+                default: throw new IllegalStateException();
+            }
+        })
+        .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
     }
 
     /**
@@ -117,7 +152,7 @@ public final class DcOptions {
      * @return A dc option found by specified id, if present.
      */
     public Optional<DataCenter> find(DcId id) {
-        return find0(id.getType().asDcType(), isPreferIpv6(), dc -> dc.getInternalId() == id.getId());
+        return find(id, isPreferIpv6());
     }
 
     /**
@@ -128,7 +163,7 @@ public final class DcOptions {
      * @return A dc option found by specified id, if present.
      */
     public Optional<DataCenter> find(DcId id, boolean preferIpv6) {
-        return find0(id.getType().asDcType(), preferIpv6, dc -> dc.getInternalId() == id.getId());
+        return find0(dcIdComparator(id, preferIpv6));
     }
 
     /**
@@ -152,18 +187,11 @@ public final class DcOptions {
      * @return A dc option found by specified type and id, if present.
      */
     public Optional<DataCenter> find(DataCenter.Type type, int id, boolean preferIpv6) {
-        return find0(type, preferIpv6, dc -> dc.getId() == id);
+        return find0(dcComparator(type, id, preferIpv6));
     }
 
-    private Optional<DataCenter> find0(DataCenter.Type type, boolean preferIpv6, Predicate<DataCenter> predicate) {
-        for (DataCenter o : options) {
-            if (o.getType() == type && predicate.test(o)) {
-                if (preferIpv6 == o.isIpv6()) {
-                    return Optional.of(o);
-                }
-            }
-        }
-        return Optional.empty();
+    private Optional<DataCenter> find0(Comparator<DataCenter> comp) {
+        return options.stream().min(comp);
     }
 
     /**

@@ -2,15 +2,21 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.MTProtoClient;
 import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.FileHash;
 import telegram4j.tl.InputFile;
 import telegram4j.tl.InputFileLocation;
 import telegram4j.tl.InputWebFileLocation;
+import telegram4j.tl.request.auth.ImmutableExportAuthorization;
+import telegram4j.tl.request.auth.ImmutableImportAuthorization;
 import telegram4j.tl.request.upload.ImmutableGetFile;
 import telegram4j.tl.request.upload.ImmutableGetFileHashes;
 import telegram4j.tl.request.upload.ImmutableGetWebFile;
@@ -66,33 +72,50 @@ public class UploadService extends RpcService {
     public Mono<InputFile> saveFile(UploadOptions options) {
         Objects.requireNonNull(options);
 
-        return new UploadMono(groupManager, options);
+        return new UploadMono(clientGroup, options);
     }
 
     // upload namespace
     // =========================
 
+    private Flux<BaseFile> getFile0(MTProtoClient client, FileReferenceId fileRefId) {
+        AtomicInteger offset = new AtomicInteger();
+        AtomicBoolean complete = new AtomicBoolean();
+        int limit = PRECISE_LIMIT;
+        ImmutableGetFile request = ImmutableGetFile.of(ImmutableGetFile.PRECISE_MASK,
+                fileRefId.asLocation().orElseThrow(), 0, limit);
+
+        return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
+                .cast(BaseFile.class)
+                .mapNotNull(part -> {
+                    offset.addAndGet(limit);
+                    if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
+                        complete.set(true);
+                        return null;
+                    }
+
+                    return part;
+                })
+                .repeat(() -> !complete.get());
+    }
+
     @Compatible(Type.BOTH)
-    public Flux<BaseFile> getFile(InputFileLocation location) {
-        return Flux.defer(() -> {
-            AtomicInteger offset = new AtomicInteger();
-            AtomicBoolean complete = new AtomicBoolean();
-            int limit = PRECISE_LIMIT;
-            ImmutableGetFile request = ImmutableGetFile.of(ImmutableGetFile.PRECISE_MASK, location, 0, limit);
+    public Flux<BaseFile> getFile(FileReferenceId location) {
+        if (location.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
+            return Flux.error(new IllegalArgumentException("Web documents can not be downloaded as normal files"));
+        }
 
-            return Flux.defer(() -> sendMain(request.withOffset(offset.get())))
-                    .cast(BaseFile.class)
-                    .mapNotNull(part -> {
-                        offset.addAndGet(limit);
-                        if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
-                            complete.set(true);
-                            return null;
-                        }
-
-                        return part;
-                    })
-                    .repeat(() -> !complete.get());
-        });
+        DcId dcId = DcId.of(DcId.Type.DOWNLOAD, location.getDcId(), 0);
+        if (location.getDcId() != clientGroup.mainId().getId()) {
+            return sendMain(ImmutableExportAuthorization.of(dcId.getId()))
+                    .zipWith(clientGroup.getOrCreateClient(dcId))
+                    .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
+                            ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
+                            .thenReturn(client)))
+                    .flatMapMany(client -> getFile0(client, location));
+        }
+        return clientGroup.getOrCreateClient(dcId)
+                .flatMapMany(client -> getFile0(client, location));
     }
 
     public Flux<WebFile> getWebFile(InputWebFileLocation location) {

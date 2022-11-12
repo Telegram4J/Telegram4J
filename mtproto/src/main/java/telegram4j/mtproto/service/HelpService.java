@@ -3,6 +3,7 @@ package telegram4j.mtproto.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.help.*;
@@ -12,14 +13,14 @@ import java.util.List;
 
 public class HelpService extends RpcService {
 
-    public HelpService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
-        super(groupManager, storeLayout);
+    public HelpService(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+        super(clientGroup, storeLayout);
     }
 
     // help namespace
     // =========================
 
-    @Compatible(Compatible.Type.BOTH)
+    @Compatible(Type.BOTH)
     public Mono<Config> getConfig() {
         return sendMain(GetConfig.instance());
     }
@@ -45,12 +46,12 @@ public class HelpService extends RpcService {
         return sendMain(ImmutableGetAppChangelog.of(prevAppVersion));
     }
 
-    @Compatible(Compatible.Type.BOT)
+    @Compatible(Type.BOT)
     public Mono<Boolean> setBotUpdatesStatus(int pendingUpdatesCount, String message) {
         return sendMain(ImmutableSetBotUpdatesStatus.of(pendingUpdatesCount, message));
     }
 
-    @Compatible(Compatible.Type.BOTH)
+    @Compatible(Type.BOTH)
     public Mono<List<CdnPublicKey>> getCdnConfig() {
         return sendMain(GetCdnConfig.instance())
                 .map(CdnConfig::publicKeys);
