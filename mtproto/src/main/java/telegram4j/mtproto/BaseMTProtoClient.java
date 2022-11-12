@@ -84,7 +84,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private final Transport transport;
 
     private final AuthorizationContext authContext;
-    private final Sinks.Many<Request> outbound;
+    private final Sinks.Many<RpcRequest> outbound;
     private final Sinks.Many<TlMethod<?>> authOutbound;
     private final ResettableInterval pingEmitter;
     private final Sinks.Many<State> state;
@@ -317,15 +317,15 @@ class BaseMTProtoClient implements MTProtoClient {
                     })
                     .then();
 
-            Flux<Request> startupPayloadFlux = outbound.asFlux()
+            Flux<RpcRequest> startupPayloadFlux = outbound.asFlux()
                     .filter(this::isStartupPayload);
 
-            Flux<Request> payloadFlux = outbound.asFlux()
+            Flux<RpcRequest> payloadFlux = outbound.asFlux()
                     .filter(this::isContentRelated)
                     .filter(Predicate.not(this::isStartupPayload))
                     .delayUntil(e -> onReady);
 
-            Flux<Request> rpcFlux = outbound.asFlux()
+            Flux<RpcRequest> rpcFlux = outbound.asFlux()
                     .filter(Predicate.not(this::isContentRelated));
 
             Flux<ByteBuf> outboundFlux = Flux.merge(rpcFlux, startupPayloadFlux, payloadFlux)
@@ -519,7 +519,7 @@ class BaseMTProtoClient implements MTProtoClient {
         }
     }
 
-    private Function<Request, ByteBuf> serializePacket(ByteBufAllocator alloc) {
+    private Function<RpcRequest, ByteBuf> serializePacket(ByteBufAllocator alloc) {
         return req -> {
             if (log.isTraceEnabled() && !requests.isEmpty()) {
                 log.trace(requests.entrySet().stream()
@@ -530,47 +530,44 @@ class BaseMTProtoClient implements MTProtoClient {
 
             long containerMsgId = -1;
             int requestSize = -1;
-            long requestMessageId = -1;
-            RpcRequest rpcRequest = null;
-            RpcQuery rpcQuery = null;
-            boolean canContainerize = req instanceof RpcRequest &&
-                    // server returns -404 transport error when this packet placed in container
-                    (rpcRequest = (RpcRequest) req).method.identifier() != InvokeWithLayer.ID &&
-                    (requestSize = TlSerializer.sizeOf(rpcRequest.method)) < MAX_CONTAINER_LENGTH;
-            ByteBuf message;
+            // server returns -404 transport error when this packet placed in container
+            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID &&
+                    (requestSize = TlSerializer.sizeOf(req.method)) < MAX_CONTAINER_LENGTH;
             var messages = List.<ContainerMessage>of();
 
-            // TODO: destroy container and resend query
-            if (req instanceof ContainerRequest) {
-                var container = (ContainerRequest) req;
+            Request containerOrRequest = req;
+            long requestMessageId = getMessageId();
+            int requestSeqNo = updateSeqNo(req.method);
 
-                messages = new ArrayList<>(container.msgIds.length);
-                for (var msgId : container.msgIds) {
-                    var old = requests.remove(msgId);
-                    if (old instanceof RpcQuery) {
-                        rpcQuery = (RpcQuery) old;
-                        requestMessageId = getMessageId();
-                    } else if (old instanceof RpcRequest) {
-                        var request = (RpcRequest) old;
-                        if (request.method.identifier() == MsgsStateReq.ID) {
-                            continue;
-                        }
-                        messages.add(new ContainerMessage(getMessageId(), updateSeqNo(request.method), request.method));
+            ByteBuf message;
+            List<Long> statesIds = new ArrayList<>();
+            if (canContainerize) {
+                for (var e : requests.entrySet()) {
+                    long key = e.getKey();
+                    var inf = e.getValue();
+                    if (inf instanceof ContainerRequest) {
+                        continue;
+                    }
+
+                    statesIds.add(key);
+                    if (statesIds.size() >= MAX_IDS_SIZE) {
+                        break;
                     }
                 }
+            }
 
-                // we rechecked the container, and it turned out that all messages were processed
-                if (messages.isEmpty()) {
-                    return null;
-                }
-                Objects.requireNonNull(rpcQuery);
+            messages = new ArrayList<>();
+            if (!statesIds.isEmpty())
+                messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false),
+                        ImmutableMsgsStateReq.of(statesIds)));
+            if (!acknowledgments.isEmpty())
+                messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false), collectAcks()));
+
+            canContainerize &= !messages.isEmpty();
+
+            if (canContainerize) {
+                messages.add(new ContainerMessage(requestMessageId, requestSeqNo, req.method, requestSize));
                 containerMsgId = getMessageId();
-                requests.put(requestMessageId, new QueryContainerRequest(rpcQuery, containerMsgId));
-
-                long rmsgId0 = requestMessageId;
-                messages.sort(Comparator.<ContainerMessage, Boolean>comparing(c -> c.messageId == rmsgId0)
-                        .thenComparing(c -> isContentRelated(c.method))
-                        .reversed());
 
                 int containerSeqNo = updateSeqNo(false);
                 int payloadSize = messages.stream().mapToInt(c -> c.size + 16).sum();
@@ -581,6 +578,14 @@ class BaseMTProtoClient implements MTProtoClient {
                 message.writeIntLE(MessageContainer.ID);
                 message.writeIntLE(messages.size());
 
+                messages.sort(Comparator.<ContainerMessage, Boolean>comparing(c -> c.messageId == requestMessageId)
+                        .thenComparing(c -> isContentRelated(c.method))
+                        .reversed());
+
+                var rpcInCont = req instanceof RpcQuery
+                        ? new QueryContainerRequest((RpcQuery) req, containerMsgId)
+                        : new RpcContainerRequest(req, containerMsgId);
+                requests.put(requestMessageId, rpcInCont);
                 var msgIds = new long[messages.size()];
                 for (int i = 0; i < messages.size(); i++) {
                     var c = messages.get(i);
@@ -595,89 +600,17 @@ class BaseMTProtoClient implements MTProtoClient {
                     TlSerializer.serialize(message, c.method);
                 }
 
-                req = new ContainerRequest(msgIds, isContentRelated(req));
-                requests.put(containerMsgId, req);
-            } else if (req instanceof RpcRequest) {
-                requestMessageId = getMessageId();
-                int requestSeqNo = updateSeqNo(rpcRequest.method);
-
-                List<Long> statesIds = new ArrayList<>();
-                if (canContainerize) {
-                    for (var e : requests.entrySet()) {
-                        long key = e.getKey();
-                        var inf = e.getValue();
-                        if (inf instanceof ContainerRequest) {
-                            continue;
-                        }
-
-                        statesIds.add(key);
-                        if (statesIds.size() >= MAX_IDS_SIZE) {
-                            break;
-                        }
-                    }
-                }
-
-                messages = new ArrayList<>();
-
-                if (!statesIds.isEmpty())
-                    messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false),
-                            ImmutableMsgsStateReq.of(statesIds)));
-                if (!acknowledgments.isEmpty())
-                    messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false), collectAcks()));
-
-                canContainerize &= !messages.isEmpty();
-
-                if (canContainerize) {
-                    messages.add(new ContainerMessage(requestMessageId, requestSeqNo, rpcRequest.method, requestSize));
-                    containerMsgId = getMessageId();
-
-                    int containerSeqNo = updateSeqNo(false);
-
-                    int payloadSize = messages.stream().mapToInt(c -> c.size + 16).sum();
-                    message = alloc.buffer(24 + payloadSize);
-                    message.writeLongLE(containerMsgId);
-                    message.writeIntLE(containerSeqNo);
-                    message.writeIntLE(payloadSize + 8);
-                    message.writeIntLE(MessageContainer.ID);
-                    message.writeIntLE(messages.size());
-
-                    long rmsgId0 = requestMessageId;
-                    messages.sort(Comparator.<ContainerMessage, Boolean>comparing(c -> c.messageId == rmsgId0)
-                            .thenComparing(c -> isContentRelated(c.method))
-                            .reversed());
-
-                    var rpcInCont = req instanceof RpcQuery
-                            ? new QueryContainerRequest((RpcQuery) req, containerMsgId)
-                            : new RpcContainerRequest((RpcRequest) req, containerMsgId);
-                    requests.put(requestMessageId, rpcInCont);
-                    var msgIds = new long[messages.size()];
-                    for (int i = 0; i < messages.size(); i++) {
-                        var c = messages.get(i);
-                        msgIds[i] = c.messageId;
-                        if (c.messageId != requestMessageId) {
-                            requests.put(c.messageId, new RpcContainerRequest(c.method, containerMsgId));
-                        }
-
-                        message.writeLongLE(c.messageId);
-                        message.writeIntLE(c.seqNo);
-                        message.writeIntLE(c.size);
-                        TlSerializer.serialize(message, c.method);
-                    }
-
-                    req = new ContainerRequest(msgIds, isContentRelated(req));
-                    requests.put(containerMsgId, req);
-                } else {
-                    requests.put(requestMessageId, req);
-                    if (requestSize == -1)
-                        requestSize = TlSerializer.sizeOf(rpcRequest.method);
-                    message = alloc.buffer(16 + requestSize)
-                            .writeLongLE(requestMessageId)
-                            .writeIntLE(requestSeqNo)
-                            .writeIntLE(requestSize);
-                    TlSerializer.serialize(message, rpcRequest.method);
-                }
+                containerOrRequest = new ContainerRequest(msgIds, isContentRelated(req));
+                requests.put(containerMsgId, containerOrRequest);
             } else {
-                throw new IllegalStateException();
+                requests.put(requestMessageId, req);
+                if (requestSize == -1)
+                    requestSize = TlSerializer.sizeOf(req.method);
+                message = alloc.buffer(16 + requestSize)
+                        .writeLongLE(requestMessageId)
+                        .writeIntLE(requestSeqNo)
+                        .writeIntLE(requestSize);
+                TlSerializer.serialize(message, req.method);
             }
 
             int minPadding = 12;
@@ -712,14 +645,14 @@ class BaseMTProtoClient implements MTProtoClient {
             ByteBuf packet = Unpooled.wrappedBuffer(authKeyId.retain(), messageKey, encrypted);
 
             if (rpcLog.isDebugEnabled()) {
-                if (req instanceof ContainerRequest) {
+                if (containerOrRequest instanceof ContainerRequest) {
                     rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", id,
                             Long.toHexString(containerMsgId), messages.stream()
                                     .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + prettyMethodName(m.method))
                                     .collect(Collectors.joining(", ")));
                 } else {
                     rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
-                            Long.toHexString(requestMessageId), prettyMethodName(rpcRequest.method));
+                            Long.toHexString(requestMessageId), prettyMethodName(req.method));
                 }
             }
 
@@ -998,11 +931,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     break;
             }
 
-            var request = requests.remove(badMsgNotification.badMsgId());
-            if (request != null) {
-                outbound.emitNext(request, options.getEmissionHandler());
-            }
-
+            emitUnwrapped(badMsgNotification.badMsgId());
             return Mono.empty();
         }
 
@@ -1035,31 +964,20 @@ class BaseMTProtoClient implements MTProtoClient {
                 var msgIds = original.msgIds();
                 for (int i = 0; i < msgIds.size(); i++) {
                     long msgId = msgIds.get(i);
-                    var sub = (RpcRequest) requests.get(msgId);
-                    if (sub == null) {
-                        continue;
-                    }
 
                     int state = c.getByte(i) & 7;
                     switch (state) {
                         case 1:
                         case 2:
                         case 3: // not received, resend
-                            requests.remove(msgId);
-                            decContainer(sub);
-
-                            // necessary to reset state and unwrap container messages
-                            Request copy;
-                            if (sub instanceof RpcQuery) {
-                                var query = (RpcQuery) sub;
-                                copy = new RpcQuery(query.method, query.sink);
-                            } else {
-                                copy = new RpcRequest(sub.method);
-                            }
-
-                            outbound.emitNext(copy, options.getEmissionHandler());
+                            emitUnwrapped(msgId);
                             break;
                         case 4:
+                            var sub = (RpcRequest) requests.get(msgId);
+                            if (sub == null) {
+                                continue;
+                            }
+
                             // sub.markState(s -> s | ACKNOWLEDGED);
                             if (!isResultAwait(sub.method)) {
                                 requests.remove(msgId);
@@ -1100,6 +1018,51 @@ class BaseMTProtoClient implements MTProtoClient {
 
         log.warn("[C:0x{}] Unhandled payload: {}", id, obj);
         return Mono.empty();
+    }
+
+    private void emitUnwrappedContainer(ContainerRequest container) {
+        for (long msgId : container.msgIds) {
+            var inner = (RpcRequest) requests.remove(msgId);
+            // If inner is null this mean response for mean was received
+            if (inner != null) {
+                // This method was called from MessageStateInfo handling;
+                // Failed to send acks, just give back to queue
+                if (inner.method instanceof MsgsAck) {
+                    var acks = (MsgsAck) inner.method;
+                    acknowledgments.addAll(acks.msgIds());
+                // There is no need to resend this requests,
+                // because it computed on relevant 'requests' map
+                } else if (inner.method.identifier() == MsgsStateReq.ID) {
+                    continue;
+                } else {
+                    RpcRequest single;
+                    if (inner instanceof QueryContainerRequest) {
+                        var query = (RpcQuery) inner;
+                        single = new RpcQuery(query.method, query.sink);
+                    } else {
+                        single = new RpcRequest(inner.method);
+                    }
+
+                    outbound.emitNext(single, options.getEmissionHandler());
+                }
+            }
+        }
+    }
+
+    private void emitUnwrapped(long possibleCntMsgId) {
+        Request request = requests.remove(possibleCntMsgId);
+        if (request instanceof ContainerRequest) {
+            var container = (ContainerRequest) request;
+            emitUnwrappedContainer(container);
+        } else if (request instanceof ContainerizedRequest) {
+            var cntMessage = (ContainerizedRequest) request;
+            var cnt = (ContainerRequest) requests.remove(cntMessage.containerMsgId());
+            if (cnt != null) {
+                emitUnwrappedContainer(cnt);
+            }
+        } else if (request != null) {
+            outbound.emitNext((RpcRequest) request, options.getEmissionHandler());
+        }
     }
 
     private void decContainer(RpcRequest req) {
