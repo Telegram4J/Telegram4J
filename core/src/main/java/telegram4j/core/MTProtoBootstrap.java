@@ -381,8 +381,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
             composite.add(leadClient.connect()
                     .doOnError(sink::error)
-                    .subscribe(null, t -> log.error("MTProto client terminated with an error", t),
-                            () -> log.debug("MTProto client completed")));
+                    .subscribe(null, t -> log.error("MTProto client terminated with an error", t)));
 
             composite.add(leadClient.updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())

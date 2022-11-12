@@ -58,12 +58,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import java.util.function.IntUnaryOperator;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
-import static telegram4j.mtproto.BaseMTProtoClient.BaseRequest.*;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
@@ -75,7 +73,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private static final Throwable RETRY = new RetryConnectException();
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
     private static final Duration PING_QUERY_PERIOD_MEDIA = PING_QUERY_PERIOD.multipliedBy(2);
-    private static final int PING_TIMEOUT = (int) PING_QUERY_PERIOD.multipliedBy(2).getSeconds();
+    private static final int PING_TIMEOUT = 60;
 
     // limit for service container like a MsgsAck, MsgsStateReq
     private static final int MAX_IDS_SIZE = 8192;
@@ -102,7 +100,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private volatile long lastPong; // nanotime of received Pong
     private final AtomicInteger missedPong = new AtomicInteger();
 
-    private final long sessionId = random.nextLong();
+    private volatile long sessionId = random.nextLong();
     private volatile Connection connection;
     private volatile boolean closed;
 
@@ -114,6 +112,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, Request> requests = new ConcurrentHashMap<>();
+    // Very often the server may not send a quick ack, but send it in a message container
     private final Cache<Integer, Long> quickAckTokens;
 
     BaseMTProtoClient(DcId.Type type, DataCenter dataCenter, MTProtoOptions options) {
@@ -124,7 +123,7 @@ class BaseMTProtoClient implements MTProtoClient {
         this.options = options;
         this.authContext = new AuthorizationContext(options.getPublicRsaKeyRegister());
 
-        this.outbound = Sinks.many().multicast()
+        this.outbound = Sinks.unsafe().many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
         this.authOutbound = Sinks.many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
@@ -132,9 +131,9 @@ class BaseMTProtoClient implements MTProtoClient {
                 .latestOrDefault(State.RECONNECT);
         this.pingEmitter = new ResettableInterval(Schedulers.parallel());
         var cacheBuilder = Caffeine.newBuilder()
-                .expireAfterWrite(2, TimeUnit.MINUTES);
-        // And yes, it will be triggered if the message was acked via MsgsAck.
+                .expireAfterWrite(1, TimeUnit.MINUTES);
         if (rpcLog.isDebugEnabled()) {
+            // And yes, it will be triggered if the message was acked via MsgsAck.
             cacheBuilder.<Integer, Long>evictionListener((key, value, cause) -> {
                 if (cause == RemovalCause.EXPIRED) {
                     Objects.requireNonNull(value);
@@ -180,6 +179,8 @@ class BaseMTProtoClient implements MTProtoClient {
                                 return Mono.fromRunnable(connection::dispose)
                                         .onErrorResume(t -> Mono.empty());
                             case DISCONNECTED:
+                                sessionId = random.nextLong();
+                                seqNo.set(0);
                                 pingEmitter.dispose();
 
                                 return Mono.fromRunnable(connection::dispose)
@@ -217,10 +218,10 @@ class BaseMTProtoClient implements MTProtoClient {
                                     return Mono.empty();
                                 }
 
-                                var req = requests.get(msgId);
-                                if (req != null) { // just in case
-                                    req.markState(s -> s | ACKNOWLEDGED);
-                                }
+                                // var req = requests.get(msgId);
+                                // if (req != null) { // just in case
+                                //     req.markState(s -> s | ACKNOWLEDGED);
+                                // }
 
                                 if (rpcLog.isDebugEnabled()) {
                                     rpcLog.debug("[C:0x{}, M:0x{}] Handling quick ack",
@@ -357,10 +358,8 @@ class BaseMTProtoClient implements MTProtoClient {
                         if (lastPing - lastPong > 0) {
                             int missed = missedPong.incrementAndGet();
                             if (missed >= MAX_MISSED_PONG) {
-                                lastMessageId = 0; // to break connection
-                                if (missed > MAX_MISSED_PONG) {
-                                    return Mono.empty();
-                                }
+                                state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+                                return Mono.empty();
                             }
                         }
 
@@ -469,12 +468,11 @@ class BaseMTProtoClient implements MTProtoClient {
             stats.lastQueryTimestamp = Instant.now();
             Sinks.One<R> res = Sinks.one();
             outbound.emitNext(new RpcQuery(method, res), options.getEmissionHandler());
-
-            return res.asMono()
-                    .transform(options.getResponseTransformers().stream()
-                            .map(tr -> tr.transform(method))
-                            .reduce(Function.identity(), Function::andThen));
-        });
+            return res.asMono();
+        })
+        .transform(options.getResponseTransformers().stream()
+                .map(tr -> tr.transform(method))
+                .reduce(Function.identity(), Function::andThen));
     }
 
     @Override
@@ -501,7 +499,7 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     protected void emitUpdates(Updates updates) {
-        throw new UnsupportedOperationException();
+
     }
 
     private boolean isStartupPayload(Request request) {
@@ -533,10 +531,10 @@ class BaseMTProtoClient implements MTProtoClient {
             long containerMsgId = -1;
             int requestSize = -1;
             long requestMessageId = -1;
-            // server returns -404 transport error when this packet placed in container
             RpcRequest rpcRequest = null;
             RpcQuery rpcQuery = null;
             boolean canContainerize = req instanceof RpcRequest &&
+                    // server returns -404 transport error when this packet placed in container
                     (rpcRequest = (RpcRequest) req).method.identifier() != InvokeWithLayer.ID &&
                     (requestSize = TlSerializer.sizeOf(rpcRequest.method)) < MAX_CONTAINER_LENGTH;
             ByteBuf message;
@@ -554,6 +552,9 @@ class BaseMTProtoClient implements MTProtoClient {
                         requestMessageId = getMessageId();
                     } else if (old instanceof RpcRequest) {
                         var request = (RpcRequest) old;
+                        if (request.method.identifier() == MsgsStateReq.ID) {
+                            continue;
+                        }
                         messages.add(new ContainerMessage(getMessageId(), updateSeqNo(request.method), request.method));
                     }
                 }
@@ -605,15 +606,13 @@ class BaseMTProtoClient implements MTProtoClient {
                     for (var e : requests.entrySet()) {
                         long key = e.getKey();
                         var inf = e.getValue();
-                        if (inf instanceof ContainerRequest)
+                        if (inf instanceof ContainerRequest) {
                             continue;
+                        }
 
-                        int st = inf.state();
-                        if ((st & SENT) == 1) {
-                            statesIds.add(key);
-                            if (statesIds.size() >= MAX_IDS_SIZE) {
-                                break;
-                            }
+                        statesIds.add(key);
+                        if (statesIds.size() >= MAX_IDS_SIZE) {
+                            break;
                         }
                     }
                 }
@@ -724,8 +723,6 @@ class BaseMTProtoClient implements MTProtoClient {
                 }
             }
 
-            req.setState(SENT);
-
             return transport.encode(packet, quickAck);
         };
     }
@@ -830,15 +827,16 @@ class BaseMTProtoClient implements MTProtoClient {
                     var container = (ContainerRequest) req;
                     // I think containers will not receive notifications if it's acknowledged
                     requests.remove(msgId);
-                    for (var cmsgId : container.msgIds) {
-                        var msg = requests.get(cmsgId);
-                        if (msg != null) {
-                            msg.markState(s -> s | ACKNOWLEDGED);
-                        }
-                    }
-                } else if (req != null) {
-                    req.markState(s -> s | ACKNOWLEDGED);
+                    // for (var cmsgId : container.msgIds) {
+                    //     var msg = requests.get(cmsgId);
+                    //     if (msg != null) {
+                    //         msg.markState(s -> s | ACKNOWLEDGED);
+                    //     }
+                    // }
                 }
+                // else if (req != null) {
+                //     req.markState(s -> s | ACKNOWLEDGED);
+                // }
             }
             return true;
         }
@@ -847,7 +845,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private Object ungzip(Object obj) {
         if (obj instanceof GzipPacked) {
-            GzipPacked gzipPacked = (GzipPacked) obj;
+            var gzipPacked = (GzipPacked) obj;
             obj = TlSerialUtil.decompressGzip(gzipPacked.packedData());
         }
         return obj;
@@ -861,7 +859,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
             obj = ungzip(obj);
 
-            handleMsgsAck(obj, messageId);
+            boolean needAck = !handleMsgsAck(obj, messageId);
 
             var req = (RpcRequest) requests.get(messageId);
             if (req == null) {
@@ -886,7 +884,7 @@ class BaseMTProtoClient implements MTProtoClient {
             resolveQuery(messageId, obj);
             decContainer(req);
 
-            if ((req.state & ACKNOWLEDGED) == 0) {
+            if (needAck) {
                 acknowledgments.add(messageId);
             }
             return Mono.empty();
@@ -956,12 +954,12 @@ class BaseMTProtoClient implements MTProtoClient {
             serverSalt = newSession.serverSalt();
             lastMessageId = newSession.firstMsgId();
 
-            requests.forEach((k, v) -> {
-                if (k > newSession.firstMsgId()) {
-                    // resend will process on msgsStateReq request
-                    v.setState(SENT);
-                }
-            });
+            // requests.forEach((k, v) -> {
+            //     if (k > newSession.firstMsgId()) {
+            //         resend will process on msgsStateReq request
+            //         v.setState(SENT);
+            //     }
+            // });
 
             // updates.emitNext(UpdatesTooLong.instance(), options.getEmissionHandler());
 
@@ -1002,7 +1000,6 @@ class BaseMTProtoClient implements MTProtoClient {
 
             var request = requests.remove(badMsgNotification.badMsgId());
             if (request != null) {
-                request.setState(PENDING);
                 outbound.emitNext(request, options.getEmissionHandler());
             }
 
@@ -1063,7 +1060,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             outbound.emitNext(copy, options.getEmissionHandler());
                             break;
                         case 4:
-                            sub.markState(s -> s | ACKNOWLEDGED);
+                            // sub.markState(s -> s | ACKNOWLEDGED);
                             if (!isResultAwait(sub.method)) {
                                 requests.remove(msgId);
                                 decContainer(sub);
@@ -1087,10 +1084,10 @@ class BaseMTProtoClient implements MTProtoClient {
                             Long.toHexString(base.msgId()), Long.toHexString(base.answerMsgId()));
                 }
 
-                var req = requests.get(base.msgId());
-                if (req != null) {
-                    req.markState(s -> s | ACKNOWLEDGED);
-                }
+                // var req = requests.get(base.msgId());
+                // if (req != null) {
+                //     req.markState(s -> s | ACKNOWLEDGED);
+                // }
             } else {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.debug("[C:0x{}] Handling message info. answerId: 0x{}", id, Long.toHexString(info.answerMsgId()));
@@ -1202,7 +1199,7 @@ class BaseMTProtoClient implements MTProtoClient {
         return new RpcException(format, error);
     }
 
-    static class RpcRequest extends BaseRequest {
+    static class RpcRequest implements Request {
         final TlMethod<?> method;
 
         RpcRequest(TlMethod<?> method) {
@@ -1211,10 +1208,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcRequest{" +
-                    "method=" + prettyMethodName(method) +
-                    ", state=" + state +
-                    '}';
+            return "RpcRequest{" + prettyMethodName(method) + '}';
         }
     }
 
@@ -1228,74 +1222,13 @@ class BaseMTProtoClient implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcQuery{" +
-                    "method=" + prettyMethodName(method) +
-                    ", state=" + state +
-                    '}';
+            return "RpcQuery{" + prettyMethodName(method) + '}';
         }
     }
 
-    interface Request {
+    interface Request {}
 
-        int state();
-
-        void markState(IntUnaryOperator updateFunction);
-
-        void setState(int state);
-    }
-
-    static class BaseRequest implements Request {
-        static final VarHandle STATE;
-
-        static {
-            try {
-                var l = MethodHandles.lookup();
-                STATE = l.findVarHandle(BaseRequest.class, "state", int.class);
-            } catch (ReflectiveOperationException e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
-        static final int PENDING        = 0b0000;
-        static final int SENT           = 0b0001;
-        static final int ACKNOWLEDGED   = 0b0010;
-
-        volatile int state = PENDING;
-
-        @Override
-        public String toString() {
-            return "Request{" +
-                    "state=" + state +
-                    '}';
-        }
-
-        @Override
-        public void markState(IntUnaryOperator updateFunction) {
-            int prev = state, next = 0;
-            for (boolean haveNext = false;;) {
-                if (!haveNext) {
-                    next = updateFunction.applyAsInt(prev);
-                }
-
-                if (STATE.weakCompareAndSet(this, prev, next)) {
-                    return;
-                }
-                haveNext = prev == (prev = state);
-            }
-        }
-
-        @Override
-        public int state() {
-            return state;
-        }
-
-        @Override
-        public void setState(int state) {
-            this.state = state;
-        }
-    }
-
-    static class ContainerRequest extends BaseRequest {
+    static class ContainerRequest implements Request {
         static final VarHandle CNT;
 
         static {
@@ -1334,7 +1267,6 @@ class BaseMTProtoClient implements MTProtoClient {
                     "msgIds=" + Arrays.stream(msgIds)
                     .mapToObj(s -> "0x" + Long.toHexString(s))
                     .collect(Collectors.joining(", ", "[", "]")) +
-                    ", state=" + state +
                     ", cnt=" + cnt +
                     '}';
         }
@@ -1354,7 +1286,6 @@ class BaseMTProtoClient implements MTProtoClient {
         RpcContainerRequest(TlMethod<?> request, long containerMsgId) {
             super(request);
             this.containerMsgId = containerMsgId;
-            this.state = SENT;
         }
 
         RpcContainerRequest(RpcRequest request, long containerMsgId) {
@@ -1365,7 +1296,6 @@ class BaseMTProtoClient implements MTProtoClient {
         public String toString() {
             return "RpcContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", state=" + state +
                     ", method=" + prettyMethodName(method) +
                     '}';
         }
@@ -1387,14 +1317,12 @@ class BaseMTProtoClient implements MTProtoClient {
         QueryContainerRequest(RpcQuery query, long containerMsgId) {
             super(query.method, query.sink);
             this.containerMsgId = containerMsgId;
-            this.state = SENT;
         }
 
         @Override
         public String toString() {
             return "QueryContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", state=" + state +
                     ", method=" + prettyMethodName(method) +
                     '}';
         }

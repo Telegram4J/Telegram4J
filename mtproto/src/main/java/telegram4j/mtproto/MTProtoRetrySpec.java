@@ -48,7 +48,6 @@ public class MTProtoRetrySpec extends Retry {
         return create(canRetry, maxAttempts, true);
     }
 
-
     public MTProtoRetrySpec withPredicate(Predicate<Duration> predicate) {
         if (predicate == this.predicate) return this;
         return new MTProtoRetrySpec(predicate, maxAttempts, inRow);
