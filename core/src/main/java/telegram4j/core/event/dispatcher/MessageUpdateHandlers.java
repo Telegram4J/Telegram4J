@@ -14,8 +14,8 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
-import telegram4j.mtproto.store.MessagePoll;
-import telegram4j.mtproto.store.ResolvedDeletedMessages;
+import telegram4j.mtproto.store.object.MessagePoll;
+import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 
 import java.util.Objects;

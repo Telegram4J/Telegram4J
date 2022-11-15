@@ -19,4 +19,5 @@ module telegram4j.mtproto {
     exports telegram4j.mtproto.store;
     exports telegram4j.mtproto.transport;
     exports telegram4j.mtproto.util;
+    exports telegram4j.mtproto.store.object;
 }

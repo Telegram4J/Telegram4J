@@ -1,4 +1,4 @@
-package telegram4j.mtproto.store;
+package telegram4j.mtproto.store.object;
 
 import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.InputPeer;

@@ -10,7 +10,7 @@ import telegram4j.core.object.TelegramObject;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
-import telegram4j.mtproto.store.MessagePoll;
+import telegram4j.mtproto.store.object.MessagePoll;
 import telegram4j.tl.ImmutableInputMediaPoll;
 import telegram4j.tl.ImmutablePeerUser;
 import telegram4j.tl.ImmutablePoll;

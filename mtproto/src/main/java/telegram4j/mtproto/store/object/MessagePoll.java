@@ -1,4 +1,4 @@
-package telegram4j.mtproto.store;
+package telegram4j.mtproto.store.object;
 
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;

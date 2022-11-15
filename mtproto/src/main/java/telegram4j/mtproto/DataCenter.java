@@ -9,15 +9,16 @@ import telegram4j.tl.api.TlEncodingUtil;
 import telegram4j.tl.mtproto.PQInnerDataDc;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /** Identifier of the Telegram datacenter with IP address and port. */
 public final class DataCenter {
     // https://github.com/tdlib/td/blob/31a46084636486d9a2e1348491cab079c6edf386/td/telegram/net/ConnectionCreator.cpp#L675
     private static final int TEST_DC_SHIFT = 10000;
 
-    private static final byte TEST_MASK = 1 << 1;
+    private static final byte TEST_MASK = 1 << 0;
     private static final byte STATIC_MASK = 1 << 1;
-    private static final byte TCPO_ONLY_MASK = 1 << 1;
+    private static final byte TCPO_ONLY_MASK = 1 << 2;
 
     private final Type type;
     private final int id;
@@ -146,6 +147,15 @@ public final class DataCenter {
      */
     public int getPort() {
         return port;
+    }
+
+    /**
+     * Gets secret value for the obfuscated transport, if present.
+     *
+     * @return The secret for MTProxy, if present.
+     */
+    public Optional<ByteBuf> getSecret() {
+        return Optional.ofNullable(secret).map(ByteBuf::duplicate);
     }
 
     /**

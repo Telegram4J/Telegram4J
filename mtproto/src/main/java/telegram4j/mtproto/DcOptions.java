@@ -15,7 +15,7 @@ import static telegram4j.mtproto.DataCenter.*;
 
 /** List-like container with known {@link DataCenter} options, which used in connection creating. */
 public final class DcOptions {
-    private static final byte TEST_MASK        = 1 << 1;
+    private static final byte TEST_MASK        = 1 << 0;
     private static final byte PREFER_IPV6_MASK = 1 << 1;
 
     private final List<DataCenter> options;
@@ -142,6 +142,20 @@ public final class DcOptions {
         byte flags = test ? TEST_MASK : 0;
         flags |= preferIpv6 ? PREFER_IPV6_MASK : 0;
         return new DcOptions(opts, flags);
+    }
+
+    /**
+     * Creates a new {@code DcOptions} with specified options and settings.
+     *
+     * @param options An iterable with dc options.
+     * @param test {@code true} for creating options for test env.
+     * @param preferIpv6 Whether IPv6 addresses are preferred.
+     * @return A new {@code DcOptions} containing all options from specified config.
+     */
+    public static DcOptions create(Iterable<DataCenter> options, boolean test, boolean preferIpv6) {
+        byte flags = test ? TEST_MASK : 0;
+        flags |= preferIpv6 ? PREFER_IPV6_MASK : 0;
+        return new DcOptions(TlEncodingUtil.copyList(options), flags);
     }
 
     /**

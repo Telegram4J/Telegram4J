@@ -261,11 +261,10 @@ class BaseMTProtoClient implements MTProtoClient {
                         }
 
                         AuthorizationKeyHolder authKeyHolder = this.authKey;
-                        long authKeyIdAsLong = authKeyHolder.getAuthKeyId().getLongLE(0);
-                        if (authKeyId != authKeyIdAsLong) {
+                        if (authKeyId != authKeyHolder.getAuthKeyId()) {
                             return Mono.error(new MTProtoException("Incorrect auth key id. Received: 0x"
                                     + Long.toHexString(authKeyId) + ", but excepted: 0x"
-                                    + Long.toHexString(authKeyIdAsLong)));
+                                    + Long.toHexString(authKeyHolder.getAuthKeyId())));
                         }
 
                         // message key recheck
@@ -629,7 +628,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
             var authKeyHolder = this.authKey;
             ByteBuf authKey = authKeyHolder.getAuthKey();
-            ByteBuf authKeyId = authKeyHolder.getAuthKeyId();
+            ByteBuf authKeyId = Unpooled.copyLong(Long.reverseBytes(authKeyHolder.getAuthKeyId()));
 
             ByteBuf messageKeyHash = sha256Digest(authKey.slice(88, 32), plainData);
 
@@ -644,7 +643,7 @@ class BaseMTProtoClient implements MTProtoClient {
             AES256IGECipher cipher = createAesCipher(messageKey, authKey, false);
 
             ByteBuf encrypted = cipher.encrypt(plainData);
-            ByteBuf packet = Unpooled.wrappedBuffer(authKeyId.retain(), messageKey, encrypted);
+            ByteBuf packet = Unpooled.wrappedBuffer(authKeyId, messageKey, encrypted);
 
             if (rpcLog.isDebugEnabled()) {
                 if (containerOrRequest instanceof ContainerRequest) {

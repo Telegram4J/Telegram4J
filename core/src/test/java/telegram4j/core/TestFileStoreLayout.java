@@ -14,10 +14,10 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.store.MessagePoll;
-import telegram4j.mtproto.store.ResolvedChatParticipant;
-import telegram4j.mtproto.store.ResolvedDeletedMessages;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.store.object.MessagePoll;
+import telegram4j.mtproto.store.object.ResolvedChatParticipant;
+import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.channels.ChannelParticipant;
@@ -282,7 +282,7 @@ public class TestFileStoreLayout implements StoreLayout {
             log.debug("Saving session information to file store for dc №{}.", dc.getId());
 
             ByteBuf authKeyBytes = TlSerialUtil.serializeBytes(allocator, authKey.getAuthKey().retainedDuplicate());
-            ByteBuf authKeyId = TlSerialUtil.serializeBytes(allocator, authKey.getAuthKeyId().retainedDuplicate());
+            ByteBuf authKeyId = Unpooled.copyLong(authKey.getAuthKeyId());
             ByteBuf stateBytes = state != null ? TlSerializer.serialize(allocator, state) : Unpooled.EMPTY_BUFFER;
             ByteBuf buf = Unpooled.wrappedBuffer(authKeyBytes, authKeyId, stateBytes);
 
@@ -316,7 +316,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
                     ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
                     ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
-                    ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
+                    long authKeyId = buf.readLong();
                     var keyHolder = new AuthorizationKeyHolder(authKey, authKeyId);
                     State state = buf.readableBytes() == 0 ? null : TlDeserializer.deserialize(buf);
 
@@ -344,7 +344,7 @@ public class TestFileStoreLayout implements StoreLayout {
 
             ByteBuf buf = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump(lines));
             ByteBuf authKey = TlSerialUtil.deserializeBytes(buf).copy();
-            ByteBuf authKeyId = TlSerialUtil.deserializeBytes(buf).copy();
+            long authKeyId = buf.readLong();
             var keyHolder = new AuthorizationKeyHolder(authKey, authKeyId);
             buf.release();
 

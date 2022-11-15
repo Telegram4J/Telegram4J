@@ -11,17 +11,17 @@ import static telegram4j.mtproto.util.CryptoUtil.sha1Digest;
  */
 public class AuthorizationKeyHolder {
     private final ByteBuf value;
-    private final ByteBuf id;
+    private final long id;
 
     /**
      * Constructs a {@code AuthorizationKeyHolder} with given dc id, key and id.
      *
      * @param value The auth key in the {@link ByteBuf}.
-     * @param id The id of auth key in the {@link ByteBuf}.
+     * @param id The id of auth key.
      */
-    public AuthorizationKeyHolder(ByteBuf value, ByteBuf id) {
+    public AuthorizationKeyHolder(ByteBuf value, long id) {
         this.value = value.asReadOnly();
-        this.id = id.asReadOnly();
+        this.id = id;
     }
 
     /**
@@ -33,7 +33,7 @@ public class AuthorizationKeyHolder {
     public AuthorizationKeyHolder(ByteBuf value) {
         this.value = value.asReadOnly();
         ByteBuf authKeyHash = sha1Digest(value);
-        this.id = authKeyHash.slice(authKeyHash.readableBytes() - 8, 8).asReadOnly();
+        this.id = authKeyHash.getLongLE(authKeyHash.readableBytes() - 8);
     }
 
     /**
@@ -46,11 +46,11 @@ public class AuthorizationKeyHolder {
     }
 
     /**
-     * Gets auth key id in read-only {@link ByteBuf}.
+     * Gets auth key id.
      *
-     * @return The {@link ByteBuf} with auth key id.
+     * @return The id of auth key.
      */
-    public ByteBuf getAuthKeyId() {
+    public long getAuthKeyId() {
         return id;
     }
 
@@ -59,14 +59,14 @@ public class AuthorizationKeyHolder {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         AuthorizationKeyHolder that = (AuthorizationKeyHolder) o;
-        return value.equals(that.value) && id.equals(that.id);
+        return value.equals(that.value) && id == that.id;
     }
 
     @Override
     public int hashCode() {
         int h = 5381;
         h += (h << 5) + value.hashCode();
-        h += (h << 5) + id.hashCode();
+        h += (h << 5) + Long.hashCode(id);
         return h;
     }
 }
