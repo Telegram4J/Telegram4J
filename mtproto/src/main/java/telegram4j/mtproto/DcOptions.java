@@ -45,10 +45,10 @@ public final class DcOptions {
             switch (dcId.getType()) {
                 case MAIN:
                 case REGULAR:
-                case UPLOAD:
                     return dc.getType() == Type.REGULAR ? -1 : 1;
+                case UPLOAD:
                 case DOWNLOAD:
-                    // prefer MEDIA dcs for downloading
+                    // prefer MEDIA dcs for downloading/uploading
                     switch (dc.getType()) {
                         case MEDIA: return -2;
                         case REGULAR: return -1;

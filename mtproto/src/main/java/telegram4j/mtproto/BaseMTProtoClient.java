@@ -37,14 +37,11 @@ import telegram4j.tl.TlSerialUtil;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.Updates;
 import telegram4j.tl.api.MTProtoObject;
-import telegram4j.tl.api.RpcMethod;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.InvokeWithLayer;
-import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
-import telegram4j.tl.request.mtproto.Ping;
-import telegram4j.tl.request.mtproto.PingDelayDisconnect;
+import telegram4j.tl.request.mtproto.*;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -56,6 +53,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -69,7 +67,6 @@ class BaseMTProtoClient implements MTProtoClient {
     private static final Logger log = Loggers.getLogger("telegram4j.mtproto.MTProtoClient");
     private static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
-    private static final int MAX_MISSED_PONG = 1;
     private static final Throwable RETRY = new RetryConnectException();
     private static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
     private static final Duration PING_QUERY_PERIOD_MEDIA = PING_QUERY_PERIOD.multipliedBy(2);
@@ -95,11 +92,9 @@ class BaseMTProtoClient implements MTProtoClient {
 
     protected final MTProtoOptions options;
     protected final InnerStats stats = new InnerStats();
+    protected final AtomicBoolean inflightPing = new AtomicBoolean();
 
-    private volatile long lastPing; // nanotime of sent Ping
-    private volatile long lastPong; // nanotime of received Pong
-    private final AtomicInteger missedPong = new AtomicInteger();
-
+    private volatile long oldSessionId;
     private volatile long sessionId = random.nextLong();
     private volatile Connection connection;
     private volatile boolean closed;
@@ -179,8 +174,10 @@ class BaseMTProtoClient implements MTProtoClient {
                                 return Mono.fromRunnable(connection::dispose)
                                         .onErrorResume(t -> Mono.empty());
                             case DISCONNECTED:
+                                oldSessionId = sessionId;
                                 sessionId = random.nextLong();
                                 seqNo.set(0);
+                                inflightPing.set(false);
                                 pingEmitter.dispose();
 
                                 return Mono.fromRunnable(connection::dispose)
@@ -190,12 +187,21 @@ class BaseMTProtoClient implements MTProtoClient {
                                 sink.success();
                                 return Mono.empty();
                             case CONNECTED:
-                                return sendAwait(options.getInitConnection())
-                                        .doOnNext(result -> this.state.emitNext(State.READY, options.getEmissionHandler()));
-                            case CONFIGURED: // if not reset there is a chance that the ping interval will not work after reconnect
-                                lastPong = 0;
-                                lastPing = 0;
-                                missedPong.set(0);
+                                Mono<Void> deletePrevSession = Mono.defer(() -> {
+                                    long oldSessionId = this.oldSessionId;
+                                    if (oldSessionId == 0 || oldSessionId == sessionId) {
+                                        return Mono.empty();
+                                    }
+                                    return sendAwait(ImmutableDestroySession.of(oldSessionId));
+                                })
+                                .then();
+
+                                Mono<Void> initConnection = sendAwait(options.getInitConnection())
+                                        .doOnNext(result -> this.state.emitNext(State.READY, options.getEmissionHandler()))
+                                        .then();
+
+                                return deletePrevSession
+                                        .and(initConnection);
                             default:
                                 return Mono.empty();
                         }
@@ -289,9 +295,10 @@ class BaseMTProtoClient implements MTProtoClient {
 
                         decrypted.readLongLE();
                         long sessionId = decrypted.readLongLE();
-                        if (this.sessionId != sessionId) {
+                        long currSessionId = this.sessionId;
+                        if (currSessionId != sessionId) {
                             return Mono.error(new IllegalStateException("Incorrect session identifier. Current: 0x"
-                                    + Long.toHexString(this.sessionId) + ", received: 0x"
+                                    + Long.toHexString(currSessionId) + ", received: 0x"
                                     + Long.toHexString(sessionId)));
                         }
                         long messageId = decrypted.readLongLE();
@@ -354,19 +361,13 @@ class BaseMTProtoClient implements MTProtoClient {
             // Pings will send with MsgsAck in and MsgsStateReq container
             Mono<Void> ping = pingEmitter.ticks()
                     .flatMap(tick -> {
-                        if (lastPing - lastPong > 0) {
-                            int missed = missedPong.incrementAndGet();
-                            if (missed >= MAX_MISSED_PONG) {
-                                if (missed == MAX_MISSED_PONG) {
-                                    state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
-                                }
-                                return Mono.empty();
-                            }
+                        if (inflightPing.compareAndSet(false, true)) {
+                            return sendAwait(ImmutablePingDelayDisconnect.of(System.nanoTime(), PING_TIMEOUT));
                         }
-
-                        lastPing = System.nanoTime();
-                        return sendAwait(ImmutablePingDelayDisconnect.of(random.nextLong(), PING_TIMEOUT));
-                    })
+                        log.debug("[C:0x{}] Closing by ping timeout", id);
+                        state.emitNext(State.DISCONNECTED, options.getEmissionHandler());
+                        return Mono.empty();
+                    }, 1)
                     .then();
 
             Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() ->
@@ -461,7 +462,7 @@ class BaseMTProtoClient implements MTProtoClient {
     @Override
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
         return Mono.defer(() -> {
-            if (method instanceof RpcMethod) {
+            if (!isResultAwait(method)) {
                 outbound.emitNext(new RpcRequest(method), options.getEmissionHandler());
                 return Mono.empty();
             }
@@ -500,7 +501,7 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     protected void emitUpdates(Updates updates) {
-
+        throw new UnsupportedOperationException("Received update on non-main client 0x" + id);
     }
 
     private boolean isStartupPayload(Request request) {
@@ -787,7 +788,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private Mono<Void> handleServiceMessage(Object obj, long messageId) {
         if (obj instanceof RpcResult) {
-            RpcResult rpcResult = (RpcResult) obj;
+            var rpcResult = (RpcResult) obj;
             messageId = rpcResult.reqMsgId();
             obj = rpcResult.result();
 
@@ -825,7 +826,7 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         if (obj instanceof MessageContainer) {
-            MessageContainer messageContainer = (MessageContainer) obj;
+            var messageContainer = (MessageContainer) obj;
             if (rpcLog.isTraceEnabled()) {
                 rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer);
             } else if (rpcLog.isDebugEnabled()) {
@@ -841,7 +842,7 @@ class BaseMTProtoClient implements MTProtoClient {
         // Applicable for updates
         obj = ungzip(obj);
         if (obj instanceof Updates) {
-            Updates updates = (Updates) obj;
+            var updates = (Updates) obj;
             if (rpcLog.isTraceEnabled()) {
                 rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
             }
@@ -851,22 +852,23 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         if (obj instanceof Pong) {
-            Pong pong = (Pong) obj;
+            var pong = (Pong) obj;
             messageId = pong.msgId();
 
-            long nanoTime = System.nanoTime();
-            lastPong = nanoTime;
-            missedPong.set(0);
-
+            inflightPing.set(false);
             if (rpcLog.isDebugEnabled()) {
+                long nanoTime = System.nanoTime();
                 rpcLog.debug("[C:0x{}, M:0x{}] Receiving pong after {}", id, Long.toHexString(messageId),
-                        Duration.ofNanos(nanoTime - lastPing));
+                        Duration.ofNanos(nanoTime - pong.pingId()));
             }
 
-            decContainer((RpcRequest) requests.remove(messageId));
+            var req = (RpcQuery) requests.get(messageId);
+            resolveQuery(messageId, pong);
+            decContainer(req);
             return Mono.empty();
         }
 
+        // TODO: necessary?
         // if (obj instanceof FutureSalts) {
         //     FutureSalts futureSalts = (FutureSalts) obj;
         //     messageId = futureSalts.reqMsgId();
@@ -1017,6 +1019,21 @@ class BaseMTProtoClient implements MTProtoClient {
             return Mono.empty();
         }
 
+        if (obj instanceof DestroySessionRes) {
+            var res = (DestroySessionRes) obj;
+
+            // Why DestroySession have concrete type of response, but also have a wrong message_id
+            // which can't be used as key of the requests map?
+
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[C:0x{}] Session 0x{} destroyed {}",
+                        id, Long.toHexString(res.sessionId()),
+                        res.identifier() == DestroySessionOk.ID ? "successfully" : "with nothing");
+            }
+
+            return Mono.empty();
+        }
+
         log.warn("[C:0x{}] Unhandled payload: {}", id, obj);
         return Mono.empty();
     }
@@ -1123,11 +1140,9 @@ class BaseMTProtoClient implements MTProtoClient {
     static boolean isResultAwait(TlMethod<?> object) {
         switch (object.identifier()) {
             case MsgsAck.ID:
-                // case Ping.ID:
-                // case PingDelayDisconnect.ID:
-            // case MessageContainer.ID:
-                // case MsgsStateReq.ID:
-                // case MsgResendReq.ID:
+            case DestroySession.ID:
+            // for this message MsgsStateInfo is response
+            // case MsgsStateReq.ID:
                 return false;
             default:
                 return true;
@@ -1228,10 +1243,9 @@ class BaseMTProtoClient implements MTProtoClient {
         @Override
         public String toString() {
             return "ContainerRequest{" +
-                    "msgIds=" + Arrays.stream(msgIds)
+                    "msgIds=" + Arrays.stream(msgIds, 0, cnt)
                     .mapToObj(s -> "0x" + Long.toHexString(s))
                     .collect(Collectors.joining(", ", "[", "]")) +
-                    ", cnt=" + cnt +
                     '}';
         }
     }

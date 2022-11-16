@@ -211,7 +211,9 @@ public final class DataCenter {
                 ", id=" + id +
                 ", address='" + address + '\'' +
                 ", port=" + port +
-                ", flags=" + flags +
+                ", test=" + isTest() +
+                ", static=" + isStatic() +
+                ", tcpoOnly=" + isTcpObfuscatedOnly() +
                 ", secret=" + (secret != null ? ByteBufUtil.hexDump(secret) : null) +
                 '}';
     }
