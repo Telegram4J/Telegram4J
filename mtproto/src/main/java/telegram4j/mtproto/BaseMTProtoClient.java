@@ -239,7 +239,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             }
 
                             // The error code writes as negative int32
-                            TransportException exc = TransportException.create(val);
+                            TransportException exc = new TransportException(val);
                             if (val == -404 && authKey == null) { // retry authorization
                                 onAuthSink.emitError(new AuthorizationException(exc), FAIL_FAST);
                                 return Mono.empty();
