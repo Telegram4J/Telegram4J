@@ -19,9 +19,11 @@ import telegram4j.core.spec.BotCommandScopeSpec.Type;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
+import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,7 +54,8 @@ public class MTProtoBotExample {
                 // prefer retrieving full data about peer entities
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
-                .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
+                .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
+                        Path.of("core/src/test/resources/t4j.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
                         MTProtoRetrySpec.max(d -> d.getSeconds() < 30, 2)))
                 .withConnection(client -> {

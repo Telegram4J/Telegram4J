@@ -346,9 +346,10 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             .build();
 
             var dcOptions = initDcOptions();
+            var pubRsaKeyRegister = initPublicRsaKeyRegister();
             MainMTProtoClient leadClient = clientFactory.apply(optionsModifier.apply(
                     new MTProtoOptions(initDataCenter(dcOptions), initTcpClient(),
-                            initPublicRsaKeyRegister(), transport,
+                            pubRsaKeyRegister, transport,
                             storeLayout, EmissionHandlers.DEFAULT_PARKING,
                             initConnectionRetry(), initAuthRetry(),
                             List.copyOf(responseTransformers), invokeWithLayout)));
@@ -373,6 +374,11 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             };
 
             Disposable.Composite composite = Disposables.composite();
+
+            composite.add(storeLayout.initialize()
+                    .subscribe(null, t -> log.error("Store layout terminated with an error", t),
+                            () -> log.debug("Store layout completed")));
+            composite.add(storeLayout.updatePublicRsaKeyRegister(pubRsaKeyRegister).subscribe());
 
             composite.add(clientGroupManager.start()
                     .takeUntilOther(onDisconnect.asMono())
@@ -406,7 +412,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             case READY:
                                 // delegate all auth work to the user and trigger authorization only if auth key is new
                                 Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
-                                        .flatMapMany(f -> f.apply(telegramClient))
+                                        .flatMap(f -> f.apply(telegramClient))
+                                        .flatMap(storeLayout::onAuthorization)
                                         .then();
 
                                 Mono<Void> fetchSelfId = Mono.defer(() -> {

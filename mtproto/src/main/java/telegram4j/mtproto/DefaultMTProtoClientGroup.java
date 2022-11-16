@@ -69,9 +69,8 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         var initDcOptions = Mono.defer(() -> {
             var curr = dcOptions;
             if (curr != null) {
-                return Mono.empty();
+                return storeLayout.updateDcOptions(dcOptions);
             }
-
             return storeLayout.getDcOptions()
                     .doOnNext(opts -> dcOptions = opts);
         });

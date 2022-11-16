@@ -4,11 +4,13 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
+import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.object.MessagePoll;
 import telegram4j.mtproto.store.object.ResolvedChatParticipant;
 import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
 import telegram4j.tl.*;
+import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.contacts.ResolvedPeer;
@@ -24,6 +26,9 @@ import telegram4j.tl.users.UserFull;
  * because of relativity of the message ids from user to user.
  */
 public interface StoreLayout {
+
+    Mono<Void> initialize();
+
     // region retrieve methods
 
     /**
@@ -42,6 +47,8 @@ public interface StoreLayout {
     Mono<State> getCurrentState();
 
     Mono<DcOptions> getDcOptions();
+
+    Mono<PublicRsaKeyRegister> getPublicRsaKeyRegister();
 
     /**
      * Retrieve auth key holder, associated with specified dc.
@@ -280,6 +287,8 @@ public interface StoreLayout {
 
     Mono<Void> updateDcOptions(DcOptions dcOptions);
 
+    Mono<Void> updatePublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister);
+
     /**
      * Updates the local auth key state of the store according to the given {@link AuthorizationKeyHolder auth key}.
      *
@@ -353,6 +362,8 @@ public interface StoreLayout {
      * @return A {@link Mono} completing the operation is done.
      */
     Mono<Void> onMessages(Messages payload);
+
+    Mono<Void> onAuthorization(BaseAuthorization auth);
 
     // endregion
 }

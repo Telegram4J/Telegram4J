@@ -7,6 +7,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
+import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
 import telegram4j.mtproto.store.object.MessagePoll;
 import telegram4j.mtproto.store.object.ResolvedChatParticipant;
@@ -15,6 +16,7 @@ import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatFull;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.channels.ImmutableChannelParticipant;
 import telegram4j.tl.contacts.ImmutableResolvedPeer;
@@ -46,14 +48,21 @@ public class StoreLayoutImpl implements StoreLayout {
     // TODO: make weak or limit by size?
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<DataCenter, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
 
     private volatile DataCenter dataCenter;
-    private volatile long selfId = -1;
+    private volatile long selfId;
     private volatile ImmutableState state;
+    private volatile PublicRsaKeyRegister publicRsaKeyRegister;
+    private volatile DcOptions dcOptions;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
         this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
+    }
+
+    @Override
+    public Mono<Void> initialize() {
+        return Mono.empty();
     }
 
     @Override
@@ -68,7 +77,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Long> getSelfId() {
-        return Mono.just(selfId).filter(l -> l != -1);
+        return Mono.just(selfId).filter(l -> l != 0);
     }
 
     @Override
@@ -301,12 +310,17 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.fromSupplier(() -> authKeys.get(dc));
+        return Mono.fromSupplier(() -> authKeys.get(dc.getId()));
     }
 
     @Override
     public Mono<DcOptions> getDcOptions() {
-        return Mono.empty();
+        return Mono.justOrEmpty(dcOptions);
+    }
+
+    @Override
+    public Mono<PublicRsaKeyRegister> getPublicRsaKeyRegister() {
+        return Mono.justOrEmpty(publicRsaKeyRegister);
     }
 
     // Updates methods
@@ -515,7 +529,7 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
         Objects.requireNonNull(dc);
         Objects.requireNonNull(authKey);
-        return Mono.fromRunnable(() -> authKeys.put(dc, authKey));
+        return Mono.fromRunnable(() -> authKeys.put(dc.getId(), authKey));
     }
 
     @Override
@@ -621,8 +635,18 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> onAuthorization(BaseAuthorization auth) {
+        return Mono.fromRunnable(() -> saveUser(null, auth.user()));
+    }
+
+    @Override
     public Mono<Void> updateDcOptions(DcOptions dcOptions) {
-        return Mono.empty();
+        return Mono.fromRunnable(() -> this.dcOptions = dcOptions);
+    }
+
+    @Override
+    public Mono<Void> updatePublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister) {
+        return Mono.fromRunnable(() -> this.publicRsaKeyRegister = publicRsaKeyRegister);
     }
 
     private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
@@ -800,7 +824,7 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private long selfId() {
         long id = selfId;
-        if (id == -1) {
+        if (id == 0) {
             throw new IllegalStateException("No information about current user.");
         }
         return id;

@@ -15,8 +15,10 @@ import telegram4j.core.spec.markup.InlineButtonSpec;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
@@ -38,7 +40,8 @@ public class MTProtoBotInlineExample {
 
         // Don't forget to enable inline queries in the @BotFather settings
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
-                .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
+                .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
+                        Path.of("core/src/test/resources/t4j.bin")))
                 .withConnection(client -> {
 
                     Mono<Void> listenInline = client.on(InlineQueryEvent.class)

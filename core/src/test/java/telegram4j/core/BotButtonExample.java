@@ -23,8 +23,10 @@ import telegram4j.core.spec.markup.InlineButtonSpec;
 import telegram4j.core.spec.markup.ReplyButtonSpec;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.parser.EntityParserFactory;
+import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
@@ -46,7 +48,8 @@ public class BotButtonExample {
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setDefaultEntityParserFactory(EntityParserFactory.MARKDOWN_V2)
-                .setStoreLayout(new TestFileStoreLayout(new StoreLayoutImpl(Function.identity())))
+                .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
+                        Path.of("core/src/test/resources/t4j.bin")))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.setCommands(

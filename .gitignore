@@ -2,4 +2,4 @@
 .gradle
 build
 
-/core/src/test/resources/db-*.bin
+/core/src/test/resources/t4j.bin

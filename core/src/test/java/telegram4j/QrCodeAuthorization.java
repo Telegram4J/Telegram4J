@@ -1,12 +1,13 @@
 package telegram4j;
 
-import org.reactivestreams.Publisher;
+import reactor.core.Disposables;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.retry.Retry;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.UpdateLoginToken;
@@ -31,28 +32,34 @@ import java.util.concurrent.atomic.AtomicReference;
  * This implementation can work only on linux with installed <b>qrencode</b> lib.
  */
 public class QrCodeAuthorization {
-    // TODO: 2fa
 
     private static final Duration defaultTimeout = Duration.ofSeconds(30);
     private static final Logger log = Loggers.getLogger(QrCodeAuthorization.class);
 
-    public static Publisher<?> authorize(MTProtoTelegramClient client) {
-        return Mono.defer(() -> {
+    public static Mono<BaseAuthorization> authorize(MTProtoTelegramClient client) {
+        return Mono.create(sink -> {
             AtomicReference<Duration> timeout = new AtomicReference<>(defaultTimeout);
             AtomicBoolean complete = new AtomicBoolean();
 
             int apiId = client.getAuthResources().getApiId();
             String apiHash = client.getAuthResources().getApiHash();
 
-            Mono<Void> updates = Mono.defer(() -> client.getMtProtoClientGroup().main().updates().asFlux()
+            var listenTokens = client.getMtProtoClientGroup().main().updates().asFlux()
                     .takeUntil(u -> complete.get())
                     .ofType(UpdateShort.class)
-                    .filter(u -> u.update().identifier() == UpdateLoginToken.ID && !complete.get())
+                    .filter(u -> u.update().identifier() == UpdateLoginToken.ID)
                     .flatMap(l -> client.getServiceHolder()
                             .getAuthService()
                             .exportLoginToken(apiId, apiHash, List.of()))
+                    // TODO: handling for other types
                     .cast(LoginTokenSuccess.class)
-                    .timeout(timeout.get())
+                    .map(LoginTokenSuccess::authorization)
+                    .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> {
+                        TwoFactorAuthHandler tfa = new TwoFactorAuthHandler(client, sink);
+                        return tfa.begin2FA()
+                                .retryWhen(Retry.indefinitely()
+                                        .filter(RpcException.isErrorMessage("PASSWORD_HASH_INVALID")));
+                    })
                     .cast(BaseAuthorization.class)
                     .doOnNext(l -> {
                         BaseUser b = (BaseUser) l.user();
@@ -60,15 +67,16 @@ public class QrCodeAuthorization {
                         Optional.ofNullable(b.firstName()).ifPresent(j::add);
                         Optional.ofNullable(b.lastName()).ifPresent(j::add);
                         String name = (name = j.toString()).isEmpty() ? "unknown" : name;
-                        log.info("Successfully login as {}.", name);
+                        log.info("Successfully login as {}", name);
                         complete.set(true);
+                        sink.success(l);
                     })
-                    .then());
+                    .subscribe();
 
-            return Mono.defer(() -> client.getServiceHolder().getAuthService()
+            var qrDisplay = Mono.defer(() -> client.getServiceHolder().getAuthService()
                             .exportLoginToken(apiId, apiHash, List.of())
                             .cast(BaseLoginToken.class)
-                            .doOnNext(b -> timeout.set(Duration.ofSeconds(System.currentTimeMillis() - b.expires())))
+                            .doOnNext(b -> timeout.set(Duration.ofSeconds(b.expires() - (System.currentTimeMillis() / 1000))))
                             .doOnNext(b -> {
                                 String token = java.util.Base64.getUrlEncoder().encodeToString(CryptoUtil.toByteArray(b.token()));
 
@@ -78,11 +86,14 @@ public class QrCodeAuthorization {
                                     System.out.println(generateQr(url));
                                     System.out.println();
                                 }
-                            }))
-                    .and(updates)
+                            })
+                            .timeout(timeout.get()))
                     .retryWhen(Retry.indefinitely()
                             .filter(e -> e instanceof TimeoutException && !complete.get())
-                            .doAfterRetry(signal -> log.info("Token expired. Regenerating qr code...")));
+                            .doAfterRetry(signal -> log.info("Token expired. Regenerating qr code...")))
+                    .subscribe();
+
+            sink.onCancel(Disposables.composite(listenTokens, qrDisplay));
         });
     }
 

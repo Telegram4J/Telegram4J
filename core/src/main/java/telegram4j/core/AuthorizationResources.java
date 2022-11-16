@@ -1,7 +1,8 @@
 package telegram4j.core;
 
-import org.reactivestreams.Publisher;
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import telegram4j.tl.auth.BaseAuthorization;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -14,7 +15,7 @@ public final class AuthorizationResources {
     @Nullable
     private final String botAuthToken;
     @Nullable
-    private final Function<MTProtoTelegramClient, Publisher<?>> authHandler;
+    private final Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler;
 
     AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
         this.apiId = apiId;
@@ -23,7 +24,7 @@ public final class AuthorizationResources {
         this.authHandler = null;
     }
 
-    AuthorizationResources(int apiId, String apiHash, Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
+    AuthorizationResources(int apiId, String apiHash, Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler) {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.authHandler = Objects.requireNonNull(authHandler);
@@ -63,7 +64,7 @@ public final class AuthorizationResources {
      *
      * @return The authorization handler.
      */
-    public Optional<Function<MTProtoTelegramClient, Publisher<?>>> getAuthHandler() {
+    public Optional<Function<MTProtoTelegramClient, Mono<BaseAuthorization>>> getAuthHandler() {
         return Optional.ofNullable(authHandler);
     }
 

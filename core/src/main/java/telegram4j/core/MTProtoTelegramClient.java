@@ -1,6 +1,5 @@
 package telegram4j.core;
 
-import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -35,6 +34,7 @@ import telegram4j.mtproto.service.UploadOptions;
 import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
+import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.messages.AffectedMessages;
 
 import java.nio.file.Files;
@@ -95,7 +95,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The new {@link MTProtoBootstrap} client builder.
      */
     public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash,
-                                                          Function<MTProtoTelegramClient, Publisher<?>> authHandler) {
+                                                          Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler) {
         return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, authHandler));
     }
 
