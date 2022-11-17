@@ -41,7 +41,7 @@ public class MTProtoBotInlineExample {
         // Don't forget to enable inline queries in the @BotFather settings
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
-                        Path.of("core/src/test/resources/t4j.bin")))
+                        Path.of("core/src/test/resources/t4j-bot.bin")))
                 .withConnection(client -> {
 
                     Mono<Void> listenInline = client.on(InlineQueryEvent.class)

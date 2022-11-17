@@ -96,7 +96,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case UpdatesTooLong.ID:
                 return getDifference();
             case UpdateShort.ID: {
-                UpdateShort data = (UpdateShort) updates;
+                var data = (UpdateShort) updates;
 
                 if (log.isDebugEnabled()) {
                     log.debug("Updating state, date: {}->{}", Instant.ofEpochSecond(date), Instant.ofEpochSecond(data.date()));
@@ -107,7 +107,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .thenMany(applyUpdate(UpdateContext.create(client, data.update()), true));
             }
             case BaseUpdates.ID: {
-                BaseUpdates data = (BaseUpdates) updates;
+                var data = (BaseUpdates) updates;
 
                 int seqEnd = data.seq();
                 StringJoiner j = new StringJoiner(", ");
@@ -135,7 +135,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 return handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
             }
             case UpdatesCombined.ID: {
-                UpdatesCombined data = (UpdatesCombined) updates;
+                var data = (UpdatesCombined) updates;
 
                 int seqBegin = data.seqStart();
                 int seqEnd = data.seq();
@@ -164,7 +164,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 return handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
             }
             case UpdateShortChatMessage.ID: {
-                UpdateShortChatMessage data = (UpdateShortChatMessage) updates;
+                var data = (UpdateShortChatMessage) updates;
 
                 int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
@@ -204,7 +204,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .thenMany(mapUpdate);
             }
             case UpdateShortMessage.ID: {
-                UpdateShortMessage data = (UpdateShortMessage) updates;
+                var data = (UpdateShortMessage) updates;
 
                 int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
@@ -260,9 +260,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
             return Mono.empty();
         }
 
-        return client.getMtProtoResources()
+        // TODO: fix
+        if (pts == -1 || qts == -1 || date == -1 || seq == -1) {
+            return Mono.empty();
+        }
+
+        return Mono.defer(() -> client.getMtProtoResources()
                 .getStoreLayout()
-                .updateState(ImmutableState.of(pts, qts, date, seq, -1));
+                .updateState(ImmutableState.of(pts, qts, date, seq, -1)));
     }
 
     protected void applyStateLocal(State state) {
@@ -740,15 +745,10 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         if (ctx.getUpdate() instanceof QtsUpdate) {
             QtsUpdate qtsUpdate = (QtsUpdate) ctx.getUpdate();
+            boolean botQtsUpdate = qtsUpdate.identifier() != UpdateNewEncryptedMessage.ID;
 
             int qts = this.qts;
-            if (qts + 1 < qtsUpdate.qts()) {
-                log.debug("Updates gap found. Received qts: {}, local qts: {}", qtsUpdate.qts(), qts);
-
-                return getDifference(pts, qts, date);
-            } else if (qts + 1 > qtsUpdate.qts()) {
-                return Flux.empty();
-            } else {
+            if (botQtsUpdate && qts == 0) {
                 if (log.isDebugEnabled() && notFromDiff) {
                     log.debug("Updating state, qts: {}->{}", qts, qtsUpdate.qts());
                 }
@@ -757,6 +757,23 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                 return saveStateIf(true)
                         .thenMany(mapUpdate);
+            } else {
+                if (qts + 1 < qtsUpdate.qts()) {
+                    log.debug("Updates gap found. Received qts: {}, local qts: {}", qtsUpdate.qts(), qts);
+
+                    return getDifference(pts, qts, date);
+                } else if (qts + 1 > qtsUpdate.qts()) {
+                    return Flux.empty();
+                } else {
+                    if (log.isDebugEnabled() && notFromDiff) {
+                        log.debug("Updating state, qts: {}->{}", qts, qtsUpdate.qts());
+                    }
+
+                    this.qts = qtsUpdate.qts();
+
+                    return saveStateIf(true)
+                            .thenMany(mapUpdate);
+                }
             }
         }
 

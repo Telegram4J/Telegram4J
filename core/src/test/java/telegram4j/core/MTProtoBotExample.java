@@ -55,7 +55,7 @@ public class MTProtoBotExample {
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL, Setting.FULL))
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
-                        Path.of("core/src/test/resources/t4j.bin")))
+                        Path.of("core/src/test/resources/t4j-bot.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
                         MTProtoRetrySpec.max(d -> d.getSeconds() < 30, 2)))
                 .withConnection(client -> {

@@ -49,7 +49,7 @@ public class BotButtonExample {
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setDefaultEntityParserFactory(EntityParserFactory.MARKDOWN_V2)
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
-                        Path.of("core/src/test/resources/t4j.bin")))
+                        Path.of("core/src/test/resources/t4j-bot.bin")))
                 .withConnection(client -> {
 
                     Mono<Void> updateCommands = client.setCommands(
