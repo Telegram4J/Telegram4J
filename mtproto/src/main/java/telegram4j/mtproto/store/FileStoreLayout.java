@@ -245,8 +245,7 @@ public class FileStoreLayout implements StoreLayout {
     public Mono<DataCenter> getDataCenter() {
         return Mono.fromSupplier(() -> mainDcId)
                 .filter(id -> id != 0)
-                .map(id -> dcOptions.find(DcId.of(DcId.Type.MAIN, id, 0))
-                        .orElseThrow());
+                .map(id -> dcOptions.find(DcId.main(id)).orElseThrow());
     }
 
     @Override

@@ -104,5 +104,12 @@ public interface MTProtoClient {
          * @return The timestamp of last send query call, if present.
          */
         Optional<Instant> getLastQueryTimestamp();
+
+        /**
+         * Gets current count of pending queries.
+         *
+         * @return The current count of pending queries.
+         */
+        int getQueriesCount();
     }
 }

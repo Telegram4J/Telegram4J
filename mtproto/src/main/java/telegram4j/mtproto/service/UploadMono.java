@@ -71,8 +71,8 @@ class UploadMono extends Mono<InputFile> {
             }
 
             AtomicInteger pending = new AtomicInteger(options.getParallelism());
-            for (int i = 1; i <= options.getParallelism(); i++) {
-                DcId dcId = clientGroup.mainId().withType(DcId.Type.UPLOAD).shift(i);
+            for (int i = 0; i < options.getParallelism(); i++) {
+                DcId dcId = DcId.upload(clientGroup.mainId().getId(), i);
 
                 clientGroup.getOrCreateClient(dcId)
                         .doOnNext(client -> {
@@ -135,11 +135,7 @@ class UploadMono extends Mono<InputFile> {
                 roundRobin = 0;
             }
 
-            // idx is one-based to prevent using main client as uploader
-            DcId dcId = clientGroup.mainId()
-                    .withType(DcId.Type.UPLOAD)
-                    .shift(idx + 1);
-
+            DcId dcId = DcId.upload(clientGroup.mainId().getId(), idx);
             if (log.isDebugEnabled()) {
                 log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, fileId, part.filePart() + 1, options.getPartsCount());
             }

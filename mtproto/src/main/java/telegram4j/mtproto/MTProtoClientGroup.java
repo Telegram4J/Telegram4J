@@ -4,8 +4,6 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.api.TlMethod;
 
-import java.util.Optional;
-
 /** The group of MTProto clients which associated to one user.  */
 public interface MTProtoClientGroup {
 
@@ -23,14 +21,6 @@ public interface MTProtoClientGroup {
      * @return The {@code DcId} of lead client.
      */
     DcId mainId();
-
-    /**
-     * Gets {@code MTProtoClient} by specified id.
-     *
-     * @param id The id of client.
-     * @return The {@code MTProtoClient} client, if found.
-     */
-    Optional<MTProtoClient> find(DcId id);
 
     /**
      * Sends TL method to specified datacenter.

@@ -37,6 +37,7 @@ import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
@@ -70,7 +71,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new Options(c));
-    private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = DefaultMTProtoClientGroup::new;
+    private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = options ->
+            new DefaultMTProtoClientGroup(options, new DefaultMTProtoClientGroup.Options());
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private PublicRsaKeyRegister publicRsaKeyRegister;
     private DcOptions dcOptions;
@@ -410,12 +412,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                         switch (state) {
                             case CLOSED: return Mono.fromRunnable(disconnect);
                             case READY:
-                                // delegate all auth work to the user and trigger authorization only if auth key is new
-                                Mono<Void> userAuth = Mono.justOrEmpty(authResources.getAuthHandler())
-                                        .flatMap(f -> f.apply(telegramClient))
-                                        .flatMap(storeLayout::onAuthorization)
-                                        .then();
-
                                 Mono<Void> fetchSelfId = Mono.defer(() -> {
                                             // bot user id writes before ':' char
                                             if (parseBotIdFromToken && authResources.isBot()) {
@@ -435,22 +431,36 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                         .doOnNext(id -> selfId[0] = id)
                                         .then();
 
-                                // to trigger user auth
-                                return leadClient.sendAwait(GetState.instance())
-                                        .retryWhen(Retry.indefinitely()
-                                                .filter(RpcException.isErrorCode(401)
-                                                        .and(t -> !authResources.isBot()))
-                                                .doBeforeRetryAsync(signal -> userAuth))
-                                        // startup errors must close client
-                                        .onErrorResume(e -> leadClient.close()
-                                                .then(onDisconnect.asMono())
-                                                .then(Mono.fromRunnable(() -> sink.error(e))))
-                                        .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
-                                        .doOnSuccess(any -> {
-                                            if (emit.compareAndSet(true, false)) {
-                                                sink.success(telegramClient);
-                                            }
-                                        });
+                                return Mono.defer(() -> {
+                                    if (authResources.isBot()) {
+                                        return leadClient.sendAwait(ImmutableImportBotAuthorization.of(0,
+                                                authResources.getApiId(), authResources.getApiHash(),
+                                                authResources.getBotAuthToken().orElseThrow()))
+                                                .cast(BaseAuthorization.class)
+                                                .flatMap(storeLayout::onAuthorization);
+
+                                    }
+                                    // to trigger user auth
+                                    return leadClient.sendAwait(GetState.instance())
+                                            .retryWhen(Retry.indefinitely()
+                                                    .filter(RpcException.isErrorCode(401)
+                                                            .and(t -> !authResources.isBot()))
+                                                    // delegate all auth work to the user and trigger authorization only if auth key is new
+                                                    .doBeforeRetryAsync(signal -> Mono.justOrEmpty(authResources.getAuthHandler())
+                                                            .flatMap(f -> f.apply(telegramClient))
+                                                            .flatMap(storeLayout::onAuthorization)
+                                                            .then()));
+                                })
+                                // startup errors must close client
+                                .onErrorResume(e -> leadClient.close()
+                                        .then(onDisconnect.asMono())
+                                        .then(Mono.fromRunnable(() -> sink.error(e))))
+                                .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
+                                .doOnSuccess(any -> {
+                                    if (emit.compareAndSet(true, false)) {
+                                        sink.success(telegramClient);
+                                    }
+                                });
                             default:
                                 return Mono.empty();
                         }
@@ -477,14 +487,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                 .langCode(params.getLangCode())
                 .langPack(params.getLangPack())
                 .systemVersion(params.getSystemVersion())
-                .systemLangCode(params.getSystemLangCode());
-
-        if (authResources.isBot()) {
-            initConnection.query(ImmutableImportBotAuthorization.of(0, authResources.getApiId(),
-                    authResources.getApiHash(), authResources.getBotAuthToken().orElseThrow()));
-        } else {
-            initConnection.query(GetConfig.instance());
-        }
+                .systemLangCode(params.getSystemLangCode())
+                .query(GetConfig.instance());
 
         params.getProxy().ifPresent(initConnection::proxy);
         params.getParams().ifPresent(initConnection::params);

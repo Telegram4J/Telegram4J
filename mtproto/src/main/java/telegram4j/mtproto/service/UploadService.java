@@ -105,8 +105,8 @@ public class UploadService extends RpcService {
             return Flux.error(new IllegalArgumentException("Web documents can not be downloaded as normal files"));
         }
 
-        DcId dcId = DcId.of(DcId.Type.DOWNLOAD, location.getDcId(), 0);
-        if (location.getDcId() != clientGroup.mainId().getId()) {
+        DcId dcId = DcId.download(location.getDcId(), DcId.AUTO_SHIFT);
+        if (dcId.getId() != clientGroup.mainId().getId()) {
             return sendMain(ImmutableExportAuthorization.of(dcId.getId()))
                     .zipWith(clientGroup.getOrCreateClient(dcId))
                     .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(

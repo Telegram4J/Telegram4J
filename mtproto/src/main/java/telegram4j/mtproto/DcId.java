@@ -5,6 +5,13 @@ import reactor.util.annotation.Nullable;
 /** Value-based Data Center identifier which allows to associate several clients to one DC. */
 public final class DcId implements Comparable<DcId> {
 
+    /**
+     * Special value of client {@link #getShift()} to get
+     * the most unloaded client or create new using auto-incremented
+     * shift value.
+     */
+    public static final int AUTO_SHIFT = -1;
+
     private final byte type;
     private final int id;
     private final int shift;
@@ -15,28 +22,51 @@ public final class DcId implements Comparable<DcId> {
         this.shift = shift;
     }
 
-    /**
-     * Creates new {@code DcId} by specified datacenter info and sequence number.
-     *
-     * @param type The type of client connection to this dc.
-     * @param id The datacenter info.
-     * @param shift The sequence number of client.
-     * @return A new {@code DcId} with specified parameters.
-     */
-    public static DcId of(Type type, DataCenter id, int shift) {
-        return of(type, id.getId(), shift);
+    private static DcId of(Type type, int id, int shift) {
+        return new DcId((byte) type.ordinal(), id, shift);
     }
 
     /**
-     * Creates new {@code DcId} with specified type, id and sequence number.
+     * Creates new {@code DcId} which indicates a main client.
      *
-     * @param type The type of client connection to this dc.
+     * @param id The DC identifier.
+     * @return A new {@code DcId} with specified parameters.
+     */
+    public static DcId main(int id) {
+        return of(Type.MAIN, id, 0);
+    }
+
+    /**
+     * Creates new {@code DcId} which indicates an upload client with specified sequence number.
+     *
      * @param id The DC identifier.
      * @param shift The sequence number of client.
      * @return A new {@code DcId} with specified parameters.
      */
-    public static DcId of(Type type, int id, int shift) {
-        return new DcId((byte) type.ordinal(), id, shift);
+    public static DcId upload(int id, int shift) {
+        return of(Type.UPLOAD, id, shift);
+    }
+
+    /**
+     * Creates new {@code DcId} which indicates a non-media client with specified sequence number.
+     *
+     * @param id The DC identifier.
+     * @param shift The sequence number of client.
+     * @return A new {@code DcId} with specified parameters.
+     */
+    public static DcId regular(int id, int shift) {
+        return of(Type.REGULAR, id, shift);
+    }
+
+    /**
+     * Creates new {@code DcId} which indicates a download client with specified sequence number.
+     *
+     * @param id The DC identifier.
+     * @param shift The sequence number of client.
+     * @return A new {@code DcId} with specified parameters.
+     */
+    public static DcId download(int id, int shift) {
+        return of(Type.DOWNLOAD, id, shift);
     }
 
     /**
@@ -73,23 +103,13 @@ public final class DcId implements Comparable<DcId> {
      * @return A new {@code DcId} with new shift value, or if {@code delta} is 0 returns current id.
      */
     public DcId shift(int delta) {
+        if (getType() == Type.MAIN)
+            throw new IllegalStateException("Main clients can't have a shift");
         int newShift = Math.addExact(this.shift, delta);
         if (newShift < 0)
             throw new IllegalArgumentException("Invalid shift: " + delta);
         if (newShift == this.shift) return this;
         return new DcId(type, id, newShift);
-    }
-
-    /**
-     * Constructs new {@code DcId} with specified connection type.
-     *
-     * @param type The new type of DC connection.
-     * @return A new {@code DcId} with new connection type, or if {@code type} is equals to current type returns current id.
-     */
-    public DcId withType(Type type) {
-        byte ordinal  = (byte) type.ordinal();
-        if (this.type == ordinal) return this;
-        return new DcId(ordinal, id, shift);
     }
 
     /**
@@ -139,9 +159,13 @@ public final class DcId implements Comparable<DcId> {
     }
 
     public enum Type {
+        /** Represents a {@link MainMTProtoClient}. {@link DcId#getShift()} will always is 0. */
         MAIN,
+        /** Represents any non-media client exclude main clients. */
         REGULAR,
+        /** Represents an upload client. */
         UPLOAD,
+        /** Represents a download client. */
         DOWNLOAD;
 
         private static Type of(byte type) {

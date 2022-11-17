@@ -467,7 +467,11 @@ class BaseMTProtoClient implements MTProtoClient {
                 return Mono.empty();
             }
 
-            stats.lastQueryTimestamp = Instant.now();
+            if (method.identifier() != Ping.ID && method.identifier() != PingDelayDisconnect.ID) {
+                stats.incrementQueriesCount();
+                stats.lastQueryTimestamp = Instant.now();
+            }
+
             Sinks.One<R> res = Sinks.one();
             outbound.emitNext(new RpcQuery(method, res), options.getEmissionHandler());
             return res.asMono();
@@ -737,12 +741,10 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     private int updateSeqNo(boolean content) {
-        int no = seqNo.get() * 2 + (content ? 1 : 0);
         if (content) {
-            seqNo.incrementAndGet();
+            return seqNo.getAndIncrement() * 2 + 1;
         }
-
-        return no;
+        return seqNo.get() * 2;
     }
 
     private boolean handleMsgsAck(Object obj, long messageId) {
@@ -816,6 +818,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 }
             }
 
+            stats.decrementQueriesCount();
             resolveQuery(messageId, obj);
             decContainer(req);
 
@@ -1352,11 +1355,44 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     static class InnerStats implements Stats {
+        static final VarHandle QUERIES_COUNT;
+
+        static {
+            try {
+                var l = MethodHandles.lookup();
+                QUERIES_COUNT = l.findVarHandle(InnerStats.class, "queriesCount", int.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
         volatile Instant lastQueryTimestamp;
+        volatile int queriesCount;
+
+        void incrementQueriesCount() {
+            QUERIES_COUNT.getAndAdd(this, 1);
+        }
+
+        void decrementQueriesCount() {
+            QUERIES_COUNT.getAndAdd(this, -1);
+        }
 
         @Override
         public Optional<Instant> getLastQueryTimestamp() {
             return Optional.ofNullable(lastQueryTimestamp);
+        }
+
+        @Override
+        public int getQueriesCount() {
+            return queriesCount;
+        }
+
+        @Override
+        public String toString() {
+            return "Stats{" +
+                    "lastQueryTimestamp=" + lastQueryTimestamp +
+                    ", queriesCount=" + queriesCount +
+                    '}';
         }
     }
 }
