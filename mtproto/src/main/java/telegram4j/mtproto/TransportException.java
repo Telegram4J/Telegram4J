@@ -13,6 +13,7 @@ public class TransportException extends MTProtoException {
     public static boolean isError(int code) {
         switch (code) {
             case -404:
+            case -444:
             case -429: return true;
             default: return false;
         }

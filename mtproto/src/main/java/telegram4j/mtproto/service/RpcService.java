@@ -26,7 +26,7 @@ public abstract class RpcService {
     }
 
     protected <R, M extends TlMethod<R>> Mono<R> sendMain(M method) {
-        return clientGroup.send(clientGroup.mainId(), method);
+        return clientGroup.main().sendAwait(method);
     }
 
     protected Mono<Peer> toPeer(InputPeer inputPeer) {
