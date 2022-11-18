@@ -369,6 +369,11 @@ public final class FileReferenceId {
         return Optional.ofNullable(documentType);
     }
 
+    /**
+     * Gets original context where document was found.
+     *
+     * @return The original context where document was found.
+     */
     public Context getContext() {
         return context;
     }
@@ -471,6 +476,15 @@ public final class FileReferenceId {
         return ImmutableBaseInputPhoto.of(documentId, accessHash, fileReference);
     }
 
+    /**
+     * Creates a new {@code FileReferenceId} with specified {@code thumbSizeType} or
+     * if it equals to current returns this object.
+     *
+     * @see <a href="https://core.telegram.org/api/files#image-thumbnail-types">Thumbnail Types</a>
+     * @param thumbSizeType The new type of thumbnail.
+     * @return A new {@code FileReferenceId} with specified thumb type or current object
+     * if it is not changed.
+     */
     public FileReferenceId withThumbSizeType(char thumbSizeType) {
         if (fileType != Type.DOCUMENT && fileType != Type.PHOTO && (fileType != Type.CHAT_PHOTO || sizeType != SIZE_TYPE_ABSENT)) {
             throw new IllegalStateException("Thumb size type can't be set for file ref id: " + this);
@@ -480,8 +494,16 @@ public final class FileReferenceId {
                 fileReference, thumbSizeType, url, stickerSet, thumbVersion, context);
     }
 
-    public FileReferenceId withContext(Context value) {
-        if (context.equals(value)) return this;
+    /**
+     * Creates a new {@code FileReferenceId} with specified {@code context} or
+     * if it equals to current returns this object.
+     *
+     * @param context The new context for this file ref id.
+     * @return A new {@code FileReferenceId} with specified context or current object
+     * if it is not changed.
+     */
+    public FileReferenceId withContext(Context context) {
+        if (this.context.equals(context)) return this;
         return new FileReferenceId(fileType, documentType, sizeType,
                 dcId, documentId, accessHash, fileReference,
                 thumbSizeType, url, stickerSet, thumbVersion, context);
