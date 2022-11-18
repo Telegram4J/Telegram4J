@@ -1,8 +1,5 @@
 package telegram4j.mtproto;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
@@ -52,7 +49,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -107,8 +103,6 @@ class BaseMTProtoClient implements MTProtoClient {
     private final AtomicInteger seqNo = new AtomicInteger();
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, Request> requests = new ConcurrentHashMap<>();
-    // Very often the server may not send a quick ack, but send it in a message container
-    private final Cache<Integer, Long> quickAckTokens;
 
     BaseMTProtoClient(DcId.Type type, DataCenter dataCenter, MTProtoOptions options) {
         this.type = type;
@@ -125,24 +119,10 @@ class BaseMTProtoClient implements MTProtoClient {
         this.state = Sinks.many().replay()
                 .latestOrDefault(State.RECONNECT);
         this.pingEmitter = new ResettableInterval(Schedulers.parallel());
-        var cacheBuilder = Caffeine.newBuilder()
-                .expireAfterWrite(1, TimeUnit.MINUTES);
-        if (rpcLog.isDebugEnabled()) {
-            // And yes, it will be triggered if the message was acked via MsgsAck.
-            cacheBuilder.<Integer, Long>evictionListener((key, value, cause) -> {
-                if (cause == RemovalCause.EXPIRED) {
-                    Objects.requireNonNull(value);
-                    rpcLog.debug("[C:0x{}] Evicted quick acknowledge for 0x{}", this.id, Long.toHexString(value));
-                }
-            });
-        }
-
-        this.quickAckTokens = cacheBuilder.build();
     }
 
     private Mono<Void> acquireConnection(MonoSink<Void> sink) {
         return tcpClient.connect().flatMap(connection -> {
-
             this.connection = connection;
 
             Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
@@ -218,23 +198,10 @@ class BaseMTProtoClient implements MTProtoClient {
                             payload.release();
 
                             if (!TransportException.isError(val) && transport.supportQuickAck()) { // quick acknowledge
-                                Long msgId = quickAckTokens.getIfPresent(val);
-                                if (msgId == null) {
-                                    rpcLog.debug("[C:0x{}] Unserialized quick acknowledge", this.id);
-                                    return Mono.empty();
-                                }
-
-                                // var req = requests.get(msgId);
-                                // if (req != null) { // just in case
-                                //     req.markState(s -> s | ACKNOWLEDGED);
-                                // }
-
                                 if (rpcLog.isDebugEnabled()) {
-                                    rpcLog.debug("[C:0x{}, M:0x{}] Handling quick ack",
-                                            this.id, Long.toHexString(msgId));
+                                    rpcLog.debug("[C:0x{}, Q:0x{}] Received quick ack",
+                                            this.id, Integer.toHexString(val));
                                 }
-
-                                quickAckTokens.invalidate(val);
                                 return Mono.empty();
                             }
 
@@ -327,8 +294,8 @@ class BaseMTProtoClient implements MTProtoClient {
                     .filter(this::isStartupPayload);
 
             Flux<RpcRequest> payloadFlux = outbound.asFlux()
-                    .filter(this::isContentRelated)
-                    .filter(Predicate.not(this::isStartupPayload))
+                    .filter(Predicate.<RpcRequest>not(this::isStartupPayload)
+                            .and(this::isContentRelated))
                     .delayUntil(e -> onReady);
 
             Flux<RpcRequest> rpcFlux = outbound.asFlux()
@@ -513,16 +480,8 @@ class BaseMTProtoClient implements MTProtoClient {
                 ((RpcQuery) request).method == options.getInitConnection();
     }
 
-    private boolean isContentRelated(Request request) {
-        if (request instanceof ContainerRequest) {
-            var container = (ContainerRequest) request;
-            return container.hasContentRelated;
-        } else if (request instanceof RpcRequest) {
-            var rpcRequest = (RpcRequest) request;
-            return isContentRelated(rpcRequest.method);
-        } else {
-            throw new IllegalStateException();
-        }
+    private boolean isContentRelated(RpcRequest request) {
+        return isContentRelated(request.method);
     }
 
     private Function<RpcRequest, ByteBuf> serializePacket(ByteBufAllocator alloc) {
@@ -606,7 +565,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     TlSerializer.serialize(message, c.method);
                 }
 
-                containerOrRequest = new ContainerRequest(msgIds, isContentRelated(req));
+                containerOrRequest = new ContainerRequest(msgIds);
                 requests.put(containerMsgId, containerOrRequest);
             } else {
                 requests.put(requestMessageId, req);
@@ -638,9 +597,9 @@ class BaseMTProtoClient implements MTProtoClient {
             ByteBuf messageKeyHash = sha256Digest(authKey.slice(88, 32), plainData);
 
             boolean quickAck = false;
+            int quickAckToken = -1;
             if (!canContainerize && isContentRelated(req) && transport.supportQuickAck()) {
-                int quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
-                quickAckTokens.put(quickAckToken, requestMessageId);
+                quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
                 quickAck = true;
             }
 
@@ -657,8 +616,14 @@ class BaseMTProtoClient implements MTProtoClient {
                                     .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + prettyMethodName(m.method))
                                     .collect(Collectors.joining(", ")));
                 } else {
-                    rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
-                            Long.toHexString(requestMessageId), prettyMethodName(req.method));
+                    if (quickAck) {
+                        rpcLog.debug("[C:0x{}, M:0x{}, Q:0x{}] Sending request: {}", id,
+                                Long.toHexString(requestMessageId), Integer.toHexString(quickAckToken),
+                                prettyMethodName(req.method));
+                    } else {
+                        rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
+                                Long.toHexString(requestMessageId), prettyMethodName(req.method));
+                    }
                 }
             }
 
@@ -749,7 +714,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private boolean handleMsgsAck(Object obj, long messageId) {
         if (obj instanceof MsgsAck) {
-            MsgsAck msgsAck = (MsgsAck) obj;
+            var msgsAck = (MsgsAck) obj;
 
             if (rpcLog.isDebugEnabled()) {
                 rpcLog.debug("[C:0x{}, M:0x{}] Received acknowledge for message(s): [{}]",
@@ -758,23 +723,21 @@ class BaseMTProtoClient implements MTProtoClient {
                                 .collect(Collectors.joining(", ")));
             }
 
-            for (long msgId : msgsAck.msgIds()) {
-                var req = requests.get(msgId);
-                if (req instanceof ContainerRequest) {
-                    var container = (ContainerRequest) req;
-                    // I think containers will not receive notifications if it's acknowledged
-                    requests.remove(msgId);
+            // for (long msgId : msgsAck.msgIds()) {
+            //     var req = requests.get(msgId);
+                // if (req instanceof ContainerRequest) {
+                //     var container = (ContainerRequest) req;
                     // for (var cmsgId : container.msgIds) {
                     //     var msg = requests.get(cmsgId);
                     //     if (msg != null) {
                     //         msg.markState(s -> s | ACKNOWLEDGED);
                     //     }
                     // }
-                }
+                // }
                 // else if (req != null) {
                 //     req.markState(s -> s | ACKNOWLEDGED);
                 // }
-            }
+            // }
             return true;
         }
         return false;
@@ -1227,15 +1190,12 @@ class BaseMTProtoClient implements MTProtoClient {
         // sorted so that first there are those messages
         // that need to be answered, and then there are other service messages
         final long[] msgIds;
-        // one of messages content-related, see isContentRelated()
-        final boolean hasContentRelated;
         // The counter of messages for which response has not received yet
         volatile short cnt;
 
-        ContainerRequest(long[] msgIds, boolean hasContentRelated) {
+        ContainerRequest(long[] msgIds) {
             this.msgIds = msgIds;
             this.cnt = (short) msgIds.length;
-            this.hasContentRelated = hasContentRelated;
         }
 
         boolean decrementCnt() {
