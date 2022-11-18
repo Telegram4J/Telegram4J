@@ -6,7 +6,6 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.media.GeoPoint;
@@ -21,7 +20,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Subtype of channel, which represents a large group of 0-200,000 users.
@@ -35,8 +33,8 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData,
-                          telegram4j.tl.Channel minData, @Nullable ExportedChatInvite exportedChatInvite) {
-        super(client, fullData, minData, exportedChatInvite);
+                          telegram4j.tl.Channel minData, @Nullable List<BotInfo> botInfo) {
+        super(client, fullData, minData, botInfo);
     }
 
     @Override
@@ -57,21 +55,6 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     // ChannelFull fields
-
-    /**
-     * Gets list of information about chat bots, if present
-     * and if detailed information about channel is available.
-     *
-     * @return The list of information about chat bots, if present
-     * and if detailed information about channel is available.
-     */
-    public Optional<List<BotInfo>> getBotInfo() {
-        return Optional.ofNullable(fullData)
-                .map(ChannelFull::botInfo)
-                .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d, getId()))
-                        .collect(Collectors.toList()));
-    }
 
     /**
      * Gets id of the group chat from which this supergroup was migrated, if full data about chat is available and present.

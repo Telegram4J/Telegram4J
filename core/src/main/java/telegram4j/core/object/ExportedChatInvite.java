@@ -7,16 +7,15 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+// TODO: highlight ChatInvitePublicJoinRequests
 public class ExportedChatInvite implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.ChatInviteExported data;
-    private final User admin;
 
-    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ChatInviteExported data, User admin) {
+    public ExportedChatInvite(MTProtoTelegramClient client, telegram4j.tl.ChatInviteExported data) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
-        this.admin = Objects.requireNonNull(admin);
     }
 
     /**
@@ -44,15 +43,6 @@ public class ExportedChatInvite implements TelegramObject {
      */
     public String getLink() {
         return data.link();
-    }
-
-    /**
-     * Gets admin that created this invite.
-     *
-     * @return The {@link User} that created this invite.
-     */
-    public User getAdmin() {
-        return admin;
     }
 
     /**
@@ -140,7 +130,6 @@ public class ExportedChatInvite implements TelegramObject {
     public String toString() {
         return "ExportedChatInvite{" +
                 "data=" + data +
-                ", admin=" + admin +
                 '}';
     }
 }

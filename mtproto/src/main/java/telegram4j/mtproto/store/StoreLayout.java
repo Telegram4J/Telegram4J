@@ -6,9 +6,7 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.store.object.MessagePoll;
-import telegram4j.mtproto.store.object.ResolvedChatParticipant;
-import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
+import telegram4j.mtproto.store.object.*;
 import telegram4j.tl.*;
 import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.channels.BaseChannelParticipants;
@@ -167,6 +165,8 @@ public interface StoreLayout {
      */
     Mono<ChatFull> getChatFullById(long chatId);
 
+    Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId);
+
     /**
      * Retrieve minimal channel information by specified id.
      *
@@ -185,6 +185,8 @@ public interface StoreLayout {
      */
     Mono<ChatFull> getChannelFullById(long channelId);
 
+    Mono<ChatData<Channel, telegram4j.tl.ChannelFull>> getChannelById(long channelId);
+
     /**
      * Retrieve minimal user information by specified id.
      *
@@ -201,6 +203,8 @@ public interface StoreLayout {
      * the {@link UserFull} container with detailed and minimal information about user.
      */
     Mono<UserFull> getUserFullById(long userId);
+
+    Mono<PeerData<BaseUser, telegram4j.tl.UserFull>> getUserById(long userId);
 
     /**
      * Retrieve channel participant by specified channel id and peer id.

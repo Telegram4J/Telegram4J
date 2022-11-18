@@ -26,11 +26,15 @@ public class BotInfo implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.BotInfo data;
     private final Id peer;
+    @Nullable
+    private final User resolvedBot;
 
-    public BotInfo(MTProtoTelegramClient client, telegram4j.tl.BotInfo data, Id peer) {
+    public BotInfo(MTProtoTelegramClient client, telegram4j.tl.BotInfo data,
+                   Id peer, @Nullable User resolvedBot) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
         this.peer = Objects.requireNonNull(peer);
+        this.resolvedBot = resolvedBot;
     }
 
     @Override
@@ -50,6 +54,15 @@ public class BotInfo implements TelegramObject {
                         ? Optional.of(peer)
                         : Optional.empty())
                 .orElseThrow(() -> new IllegalStateException("Peer: " + peer)); // need to verify
+    }
+
+    /**
+     * Gets bot described by this info, if from full channel or group chat.
+     *
+     * @return The bot described by this info, if from full channel or group chat.
+     */
+    public Optional<User> getResolvedBot() {
+        return Optional.ofNullable(resolvedBot);
     }
 
     /**

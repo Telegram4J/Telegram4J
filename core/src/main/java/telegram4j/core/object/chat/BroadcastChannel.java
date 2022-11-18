@@ -3,8 +3,10 @@ package telegram4j.core.object.chat;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.ExportedChatInvite;
+import telegram4j.core.object.BotInfo;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
+
+import java.util.List;
 
 /**
  * Represents an unlimited channel with messages broadcasting.
@@ -18,8 +20,8 @@ public final class BroadcastChannel extends BaseChannel {
     }
 
     public BroadcastChannel(MTProtoTelegramClient client, telegram4j.tl.ChannelFull fullData,
-                            telegram4j.tl.Channel minData, @Nullable ExportedChatInvite exportedChatInvite) {
-        super(client, fullData, minData, exportedChatInvite);
+                            telegram4j.tl.Channel minData, @Nullable List<BotInfo> botInfo) {
+        super(client, fullData, minData, botInfo);
     }
 
     @Override

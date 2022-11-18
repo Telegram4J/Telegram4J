@@ -41,26 +41,26 @@ public final class GroupChat extends BaseChat {
     @Nullable
     private final telegram4j.tl.BaseChatFull fullData;
     @Nullable
-    private final ExportedChatInvite exportedChatInvite;
-    @Nullable
     private final List<ChatParticipant> participants;
+    @Nullable
+    private final List<BotInfo> botInfo;
 
     public GroupChat(MTProtoTelegramClient client, telegram4j.tl.BaseChat minData) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = null;
-        this.exportedChatInvite = null;
         this.participants = null;
+        this.botInfo = null;
     }
 
-    public GroupChat(MTProtoTelegramClient client, BaseChatFull fullData,
-                     telegram4j.tl.BaseChat minData, @Nullable ExportedChatInvite exportedChatInvite,
-                     @Nullable List<ChatParticipant> participants) {
+    public GroupChat(MTProtoTelegramClient client, @Nullable BaseChatFull fullData,
+                     telegram4j.tl.BaseChat minData,
+                     @Nullable List<ChatParticipant> participants, @Nullable List<BotInfo> botInfo) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = Objects.requireNonNull(fullData);
-        this.exportedChatInvite = exportedChatInvite;
         this.participants = participants;
+        this.botInfo = botInfo;
     }
 
     @Override
@@ -266,7 +266,9 @@ public final class GroupChat extends BaseChat {
      * @return The {@link ExportedChatInvite invite} for chat, if present.
      */
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(exportedChatInvite);
+        return Optional.ofNullable(fullData)
+                .map(d -> TlEntityUtil.unmapEmpty(d.exportedInvite(), ChatInviteExported.class))
+                .map(d -> new ExportedChatInvite(client, d));
     }
 
     /**
@@ -275,11 +277,7 @@ public final class GroupChat extends BaseChat {
      * @return The mutable list of {@link BotInfo bots} of chat, if present.
      */
     public Optional<List<BotInfo>> getBotInfo() {
-        return Optional.ofNullable(fullData)
-                .map(BaseChatFull::botInfo)
-                .map(list -> list.stream()
-                        .map(d -> new BotInfo(client, d, getId()))
-                        .collect(Collectors.toList()));
+        return Optional.ofNullable(botInfo);
     }
 
     /**

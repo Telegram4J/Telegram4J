@@ -60,7 +60,7 @@ public interface EntityRetriever {
     /**
      * Retrieve chat with retriever strategy by the specified id.
      *
-     * @implSpec {@link PrivateChat} must contain full information about self user.
+     * @implSpec {@link PrivateChat} may retrieve full information about self user.
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion the {@link Chat}.
@@ -72,7 +72,7 @@ public interface EntityRetriever {
     /**
      * Retrieve chat with minimal information by the specified id.
      *
-     * @implSpec {@link PrivateChat} must contain full information about self user.
+     * @implSpec {@link PrivateChat} may retrieve full information about self user.
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
@@ -83,7 +83,7 @@ public interface EntityRetriever {
     /**
      * Retrieve chat with detailed information by the specified id.
      *
-     * @implSpec {@link PrivateChat} must contain full information about self user.
+     * @implSpec {@link PrivateChat} may retrieve full information about self user.
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion

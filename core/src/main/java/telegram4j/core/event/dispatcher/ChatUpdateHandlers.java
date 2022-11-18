@@ -49,8 +49,7 @@ class ChatUpdateHandlers {
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ExportedChatInvite exportedChatInvite = Optional.ofNullable(upd.invite())
                 .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                .map(d -> new ExportedChatInvite(context.getClient(), d,
-                        context.getUsers().get(Id.ofUser(d.adminId()))))
+                .map(d -> new ExportedChatInvite(context.getClient(), d))
                 .orElse(null);
         GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
         User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
@@ -76,7 +75,7 @@ class ChatUpdateHandlers {
         GroupChat chat = (GroupChat) Objects.requireNonNull(context.getChats().get(chatId));
         switch (chatParticipants.identifier()) {
             case ChatParticipantsForbidden.ID: {
-                ChatParticipantsForbidden upd = (ChatParticipantsForbidden) chatParticipants;
+                var upd = (ChatParticipantsForbidden) chatParticipants;
 
                 ChatParticipant selfParticipant = Optional.ofNullable(upd.selfParticipant())
                         .map(d -> new ChatParticipant(context.getClient(),
@@ -87,7 +86,7 @@ class ChatUpdateHandlers {
                         chat, selfParticipant, null, null));
             }
             case BaseChatParticipants.ID: {
-                BaseChatParticipants upd = (BaseChatParticipants) chatParticipants;
+                var upd = (BaseChatParticipants) chatParticipants;
 
                 var participants = upd.participants().stream()
                         .map(d -> new ChatParticipant(context.getClient(),

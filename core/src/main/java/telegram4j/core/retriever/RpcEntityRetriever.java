@@ -33,10 +33,25 @@ public class RpcEntityRetriever implements EntityRetriever {
 
     private final MTProtoTelegramClient client;
     private final ServiceHolder serviceHolder;
+    private final boolean retrieveSelfUserForDMs;
 
     public RpcEntityRetriever(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client);
-        this.serviceHolder = client.getServiceHolder();
+        this(client, true);
+    }
+
+    public RpcEntityRetriever(MTProtoTelegramClient client, boolean retrieveSelfUserForDMs) {
+        this(client, client.getServiceHolder(), retrieveSelfUserForDMs);
+    }
+
+    private RpcEntityRetriever(MTProtoTelegramClient client, ServiceHolder serviceHolder, boolean retrieveSelfUserForDMs) {
+        this.client = client;
+        this.serviceHolder = serviceHolder;
+        this.retrieveSelfUserForDMs = retrieveSelfUserForDMs;
+    }
+
+    public RpcEntityRetriever withRetrieveSelfUserForDMs(boolean state) {
+        if (retrieveSelfUserForDMs == state) return this;
+        return new RpcEntityRetriever(client, serviceHolder, state);
     }
 
     @Override
@@ -98,10 +113,15 @@ public class RpcEntityRetriever implements EntityRetriever {
                         .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                 case USER: return client.asInputUser(chatId)
                         .flatMap(serviceHolder.getUserService()::getUser)
-                        .zipWith(client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
-                                .getUserFullById(client.getSelfId())
-                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
-                        .mapNotNull(TupleUtils.function((c, userFull) -> EntityFactory.createChat(client, c, userFull)));
+                        .flatMap(p -> {
+                            var retrieveSelf = retrieveSelfUserForDMs
+                                    ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
+                                    .getUserById(client.getSelfId())
+                                    : Mono.<User>empty();
+                            return retrieveSelf
+                                    .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                        });
                 default: return Mono.error(new IllegalStateException());
             }
         });
@@ -118,10 +138,15 @@ public class RpcEntityRetriever implements EntityRetriever {
                         .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                 case USER: return client.asInputUser(chatId)
                         .flatMap(serviceHolder.getUserService()::getFullUser)
-                        .zipWith(client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
-                                .getUserFullById(client.getSelfId())
-                                .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
-                        .mapNotNull(TupleUtils.function((c, userFull) -> EntityFactory.createChat(client, c, userFull)));
+                        .flatMap(p -> {
+                            var retrieveSelf = retrieveSelfUserForDMs
+                                    ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
+                                    .getUserById(client.getSelfId())
+                                    : Mono.<User>empty();
+                            return retrieveSelf
+                                    .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                        });
                 default: return Mono.error(new IllegalStateException());
             }
         });

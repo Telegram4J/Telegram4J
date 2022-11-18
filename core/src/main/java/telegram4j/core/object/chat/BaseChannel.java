@@ -8,6 +8,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
@@ -40,22 +41,22 @@ abstract class BaseChannel extends BaseChat implements Channel {
     @Nullable
     protected final telegram4j.tl.ChannelFull fullData;
     @Nullable
-    protected final ExportedChatInvite exportedChatInvite;
+    private final List<BotInfo> botInfo;
 
     protected BaseChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = null;
-        this.exportedChatInvite = null;
+        this.botInfo = null;
     }
 
     protected BaseChannel(MTProtoTelegramClient client,
                           ChannelFull fullData, telegram4j.tl.Channel minData,
-                          @Nullable ExportedChatInvite exportedChatInvite) {
+                          @Nullable List<BotInfo> botInfo) {
         super(client);
         this.minData = Objects.requireNonNull(minData);
         this.fullData = Objects.requireNonNull(fullData);
-        this.exportedChatInvite = exportedChatInvite;
+        this.botInfo = botInfo;
     }
 
     @Override
@@ -293,12 +294,19 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(exportedChatInvite);
+        return Optional.ofNullable(fullData)
+                .map(d -> TlEntityUtil.mapCast(d.exportedInvite(), ChatInviteExported.class))
+                .map(d -> new ExportedChatInvite(client, d));
     }
 
     @Override
     public Optional<Integer> getStatsDcId() {
         return Optional.ofNullable(fullData).map(ChannelFull::statsDc);
+    }
+
+    @Override
+    public Optional<List<BotInfo>> getBotInfo() {
+        return Optional.ofNullable(botInfo);
     }
 
     @Override

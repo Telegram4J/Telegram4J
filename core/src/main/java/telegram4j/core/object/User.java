@@ -37,16 +37,10 @@ public class User implements MentionablePeer {
     @Nullable
     private final UserFull fullData;
 
-    public User(MTProtoTelegramClient client, UserFull fullData, BaseUser minData) {
+    public User(MTProtoTelegramClient client, BaseUser minData, @Nullable UserFull fullData) {
         this.client = Objects.requireNonNull(client);
         this.minData = Objects.requireNonNull(minData);
-        this.fullData = Objects.requireNonNull(fullData);
-    }
-
-    public User(MTProtoTelegramClient client, BaseUser minData) {
-        this.client = Objects.requireNonNull(client);
-        this.minData = Objects.requireNonNull(minData);
-        this.fullData = null;
+        this.fullData = fullData;
     }
 
     @Override
@@ -249,7 +243,7 @@ public class User implements MentionablePeer {
     public Optional<BotInfo> getBotInfo() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botInfo)
-                .map(d -> new BotInfo(client, d, getId()));
+                .map(d -> new BotInfo(client, d, getId(), null));
     }
 
     /**

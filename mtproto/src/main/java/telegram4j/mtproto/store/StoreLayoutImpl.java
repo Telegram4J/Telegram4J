@@ -9,9 +9,7 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.store.object.MessagePoll;
-import telegram4j.mtproto.store.object.ResolvedChatParticipant;
-import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
+import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatFull;
 import telegram4j.tl.*;
@@ -209,17 +207,57 @@ public class StoreLayoutImpl implements StoreLayout {
                         return null;
                     }
 
-                    var participants = chatInfo.participants != null ? chatInfo.participants.values().stream()
-                            .map(c -> users.get(c.userId()))
-                            .map(u -> u.min)
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toUnmodifiableList()) : List.<ImmutableBaseUser>of();
+                    List<BaseUser> users = new ArrayList<>();
+                    if (chatInfo.participants != null) {
+                        for (var p : chatInfo.participants.values()) {
+                            var u = this.users.get(p.userId());
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
+                    var botInfo = chatInfo.full.botInfo();
+                    if (botInfo != null) {
+                        for (BotInfo info : botInfo) {
+                            var u = this.users.get(Objects.requireNonNull(info.userId()));
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
 
                     return telegram4j.tl.messages.ChatFull.builder()
-                            .users(participants)
+                            .users(users)
                             .chats(List.of(chatInfo.min))
                             .fullChat(chatInfo.full)
                             .build();
+                });
+    }
+
+    @Override
+    public Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId) {
+        return Mono.fromSupplier(() -> chats.get(chatId))
+                .map(chatInfo -> {
+                    List<BaseUser> users = new ArrayList<>();
+                    if (chatInfo.participants != null) {
+                        for (var p : chatInfo.participants.values()) {
+                            var u = this.users.get(p.userId());
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
+                    List<BotInfo> botInfo;
+                    if (chatInfo.full != null && (botInfo = chatInfo.full.botInfo()) != null) {
+                        for (BotInfo info : botInfo) {
+                            var u = this.users.get(Objects.requireNonNull(info.userId()));
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
+
+                    return new ChatData<>(chatInfo.min, chatInfo.full, users);
                 });
     }
 
@@ -232,11 +270,41 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<telegram4j.tl.messages.ChatFull> getChannelFullById(long channelId) {
         return Mono.fromSupplier(() -> channels.get(channelId))
                 .filter(channelInfo -> channelInfo.full != null)
-                .map(channelInfo -> telegram4j.tl.messages.ChatFull.builder()
-                        .chats(List.of(channelInfo.min))
-                        .users(List.of())
-                        .fullChat(Objects.requireNonNull(channelInfo.full))
-                        .build());
+                .map(channelInfo -> {
+                    List<BaseUser> users = new ArrayList<>();
+                    if (channelInfo.full != null) {
+                        for (BotInfo info : channelInfo.full.botInfo()) {
+                            var u = this.users.get(Objects.requireNonNull(info.userId()));
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
+
+                    return telegram4j.tl.messages.ChatFull.builder()
+                            .chats(List.of(channelInfo.min))
+                            .users(users)
+                            .fullChat(Objects.requireNonNull(channelInfo.full))
+                            .build();
+                });
+    }
+
+    @Override
+    public Mono<ChatData<Channel, ChannelFull>> getChannelById(long channelId) {
+        return Mono.fromSupplier(() -> channels.get(channelId))
+                .map(channelInfo -> {
+                    List<BaseUser> users = new ArrayList<>();
+                    if (channelInfo.full != null) {
+                        for (BotInfo info : channelInfo.full.botInfo()) {
+                            var u = this.users.get(Objects.requireNonNull(info.userId()));
+                            if (u != null) {
+                                users.add(u.min);
+                            }
+                        }
+                    }
+
+                    return new ChatData<>(channelInfo.min, channelInfo.full, users);
+                });
     }
 
     @Override
@@ -253,6 +321,12 @@ public class StoreLayoutImpl implements StoreLayout {
                         .fullUser(Objects.requireNonNull(userInfo.full))
                         .chats(List.of())
                         .build());
+    }
+
+    @Override
+    public Mono<PeerData<BaseUser, UserFull>> getUserById(long userId) {
+        return Mono.fromSupplier(() -> users.get(userId))
+                .map(userInfo -> new PeerData<>(userInfo.min, userInfo.full));
     }
 
     @Override

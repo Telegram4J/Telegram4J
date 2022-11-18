@@ -5,8 +5,8 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.Document;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.MessageAction;
 import telegram4j.core.object.MessageMedia;
@@ -32,7 +32,8 @@ import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 import telegram4j.mtproto.file.StickerSetContext;
-import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.mtproto.store.object.ChatData;
+import telegram4j.mtproto.store.object.PeerData;
 import telegram4j.tl.BaseChat;
 import telegram4j.tl.Channel;
 import telegram4j.tl.*;
@@ -81,6 +82,82 @@ public class EntityFactory {
         }
     }
 
+    public static Chat createChat(MTProtoTelegramClient client, PeerData<?, ?> data, @Nullable User selfUser) {
+        if (data.minData instanceof BaseChat) {
+            @SuppressWarnings("unchecked")
+            var chatData = (ChatData<BaseChat, BaseChatFull>) data;
+
+            if (chatData.fullData != null) {
+                var usersMap = chatData.users.stream()
+                        .map(d -> createUser(client, d))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                Id chatId = Id.ofChat(chatData.minData.id());
+                var botInfo = Optional.ofNullable(chatData.fullData.botInfo())
+                        .map(list -> list.stream()
+                                .map(d -> new BotInfo(client, d, chatId,
+                                        usersMap.get(Objects.requireNonNull(d.userId()))))
+                                .collect(Collectors.toUnmodifiableList()))
+                        .orElse(null);
+
+                List<ChatParticipant> chatParticipants;
+                switch (chatData.fullData.participants().identifier()) {
+                    case BaseChatParticipants.ID: {
+                        var d = (BaseChatParticipants) chatData.fullData.participants();
+                        chatParticipants = d.participants().stream()
+                                .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
+                                .collect(Collectors.toUnmodifiableList());
+                        break;
+                    }
+                    case ChatParticipantsForbidden.ID: {
+                        var d = (ChatParticipantsForbidden) chatData.fullData.participants();
+                        chatParticipants = Optional.ofNullable(d.selfParticipant())
+                                .map(c -> List.of(new ChatParticipant(client, usersMap.get(c.userId()), c, chatId)))
+                                .orElse(null);
+                        break;
+                    }
+                    default: throw new IllegalStateException("Unknown ChatParticipants type: " + chatData.fullData.participants());
+                }
+
+                return new GroupChat(client, chatData.fullData,
+                        chatData.minData, chatParticipants, botInfo);
+            }
+            return new GroupChat(client, chatData.minData);
+        } else if (data.minData instanceof BaseUser) {
+            @SuppressWarnings("unchecked")
+            var userData = (PeerData<BaseUser, telegram4j.tl.UserFull>) data;
+
+            var user = new User(client, userData.minData, userData.fullData);
+            return new PrivateChat(client, user, selfUser);
+        } else if (data.minData instanceof Channel) {
+            @SuppressWarnings("unchecked")
+            var channelData = (ChatData<Channel, ChannelFull>) data;
+
+            if (channelData.fullData != null) {
+                var usersMap = channelData.users.stream()
+                        .map(d -> createUser(client, d))
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                Long acc = channelData.minData.min() ? null : channelData.minData.accessHash();
+                Id channelId = Id.ofChannel(channelData.minData.id(), acc);
+                var botInfo = channelData.fullData.botInfo().stream()
+                        .map(d -> new BotInfo(client, d, channelId,
+                                usersMap.get(Objects.requireNonNull(d.userId()))))
+                        .collect(Collectors.toUnmodifiableList());
+
+                return channelData.minData.broadcast()
+                        ? new BroadcastChannel(client, channelData.fullData, channelData.minData, botInfo)
+                        : new SupergroupChat(client, channelData.fullData, channelData.minData, botInfo);
+            }
+
+            return channelData.minData.broadcast()
+                    ? new BroadcastChannel(client, channelData.minData)
+                    : new SupergroupChat(client, channelData.minData);
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
     @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
                                   @Nullable User selfUser) {
@@ -112,13 +189,13 @@ public class EntityFactory {
                     return null;
                 }
 
-                User mappedFullUser = new User(client, userFull.fullUser(), minData);
+                User mappedFullUser = new User(client, minData, userFull.fullUser());
                 return new PrivateChat(client, mappedFullUser, selfUser);
             }
             case BaseUser.ID:
                 BaseUser baseUser = (BaseUser) possibleChat;
 
-                User mappedMinUser = new User(client, baseUser);
+                User mappedMinUser = new User(client, baseUser, null);
                 return new PrivateChat(client, mappedMinUser, selfUser);
             case BaseChat.ID:
                 BaseChat baseChat = (BaseChat) possibleChat;
@@ -162,34 +239,36 @@ public class EntityFactory {
                     return null;
                 }
 
-                var exportedChatInvite = Optional.ofNullable(chatFull.fullChat().exportedInvite())
-                        .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                        .map(d -> new ExportedChatInvite(client, d, chatFull.users().stream()
-                                // This list is *usually* small, so there is no point in computing map
-                                .filter(u -> u.id() == d.adminId())
-                                .findFirst()
-                                .map(u -> createUser(client, u))
-                                .orElseThrow()))
-                        .orElse(null);
-
-                if (chatFull.fullChat().identifier() == ChannelFull.ID) {
-                    ChannelFull channelFull = (ChannelFull) chatFull.fullChat();
-                    var channelMin = (telegram4j.tl.Channel) minData;
-
-                    if (channelMin.megagroup()) {
-                        return new SupergroupChat(client, channelFull, channelMin, exportedChatInvite);
-                    }
-                    return new BroadcastChannel(client, channelFull, channelMin, exportedChatInvite);
-                }
-
                 var usersMap = chatFull.users().stream()
                         .map(d -> createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
+                if (chatFull.fullChat() instanceof ChannelFull) {
+                    var channelFull = (ChannelFull) chatFull.fullChat();
+                    var channelMin = (telegram4j.tl.Channel) minData;
 
-                var chat = (telegram4j.tl.BaseChatFull) chatFull.fullChat();
-                List<ChatParticipant> chatParticipants;
+                    Long acc = channelMin.min() ? null : channelMin.accessHash();
+                    Id channelId = Id.ofChannel(channelMin.id(), acc);
+                    var botInfo = channelFull.botInfo().stream()
+                            .map(d -> new BotInfo(client, d, channelId,
+                                    usersMap.get(Objects.requireNonNull(d.userId()))))
+                            .collect(Collectors.toUnmodifiableList());
+
+                    return channelMin.megagroup()
+                            ? new SupergroupChat(client, channelFull, channelMin, botInfo)
+                            : new BroadcastChannel(client, channelFull, channelMin, botInfo);
+                }
+
+                var chat = (BaseChatFull) chatFull.fullChat();
                 Id chatId = Id.ofChat(chat.id());
+                var botInfo = Optional.ofNullable(chat.botInfo())
+                        .map(list -> list.stream()
+                                .map(d -> new BotInfo(client, d, chatId,
+                                        usersMap.get(Objects.requireNonNull(d.userId()))))
+                                .collect(Collectors.toUnmodifiableList()))
+                        .orElse(null);
+
+                List<ChatParticipant> chatParticipants;
                 switch (chat.participants().identifier()) {
                     case BaseChatParticipants.ID: {
                         BaseChatParticipants d = (BaseChatParticipants) chat.participants();
@@ -208,7 +287,8 @@ public class EntityFactory {
                     default: throw new IllegalStateException("Unknown ChatParticipants type: " + chat.participants());
                 }
 
-                return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData, exportedChatInvite, chatParticipants);
+                return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData,
+                        chatParticipants, botInfo);
             default:
                 throw new IllegalArgumentException("Unknown Chat type: " + possibleChat);
         }
@@ -226,7 +306,7 @@ public class EntityFactory {
         if (minData == null) {
             return null;
         }
-        return new User(client, userFull.fullUser(), minData);
+        return new User(client, minData, userFull.fullUser());
     }
 
     @Nullable
@@ -236,7 +316,7 @@ public class EntityFactory {
             case BaseUser.ID:
                 BaseUser baseUser = (BaseUser) anyUser;
 
-                return new User(client, baseUser);
+                return new User(client, baseUser, null);
             default:
                 throw new IllegalArgumentException("Unknown User type: " + anyUser);
         }

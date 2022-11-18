@@ -10,9 +10,7 @@ import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.store.object.MessagePoll;
-import telegram4j.mtproto.store.object.ResolvedChatParticipant;
-import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
+import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.auth.BaseAuthorization;
@@ -335,6 +333,21 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     // delegation
+
+    @Override
+    public Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId) {
+        return entityDelegate.getChatById(chatId);
+    }
+
+    @Override
+    public Mono<ChatData<Channel, ChannelFull>> getChannelById(long channelId) {
+        return entityDelegate.getChannelById(channelId);
+    }
+
+    @Override
+    public Mono<PeerData<BaseUser, telegram4j.tl.UserFull>> getUserById(long userId) {
+        return entityDelegate.getUserById(userId);
+    }
 
     @Override
     public Mono<ResolvedPeer> resolvePeer(String username) {

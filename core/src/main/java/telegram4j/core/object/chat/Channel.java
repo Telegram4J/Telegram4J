@@ -5,10 +5,11 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
-import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
+import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
@@ -312,6 +313,15 @@ public interface Channel extends Chat, MentionablePeer {
      * and if detailed information about channel is available.
      */
     Optional<Integer> getStatsDcId();
+
+    /**
+     * Gets list of information about chat bots, if present
+     * and if detailed information about channel is available.
+     *
+     * @return The list of information about chat bots, if present
+     * and if detailed information about channel is available.
+     */
+    Optional<List<BotInfo>> getBotInfo();
 
     // Interaction methods
 

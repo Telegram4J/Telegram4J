@@ -2,13 +2,11 @@ package telegram4j.core.retriever;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
-import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
@@ -21,17 +19,30 @@ import telegram4j.tl.InputMessage;
 import telegram4j.tl.PeerChannel;
 import telegram4j.tl.PeerUser;
 
-import java.util.Objects;
-
 /** Implementation of {@code EntityRetriever} which uses {@link StoreLayout storage}. */
 public class StoreEntityRetriever implements EntityRetriever {
 
     private final MTProtoTelegramClient client;
     private final StoreLayout storeLayout;
+    private final boolean retrieveSelfUserForDMs;
 
     public StoreEntityRetriever(MTProtoTelegramClient client) {
-        this.client = Objects.requireNonNull(client);
-        this.storeLayout = client.getMtProtoResources().getStoreLayout();
+        this(client, true);
+    }
+
+    public StoreEntityRetriever(MTProtoTelegramClient client, boolean retrieveSelfUserForDMs) {
+        this(client, client.getMtProtoResources().getStoreLayout(), retrieveSelfUserForDMs);
+    }
+
+    private StoreEntityRetriever(MTProtoTelegramClient client, StoreLayout storeLayout, boolean retrieveSelfUserForDMs) {
+        this.client = client;
+        this.storeLayout = storeLayout;
+        this.retrieveSelfUserForDMs = retrieveSelfUserForDMs;
+    }
+
+    public StoreEntityRetriever withRetrieveSelfUserForDMs(boolean state) {
+        if (retrieveSelfUserForDMs == state) return this;
+        return new StoreEntityRetriever(client, storeLayout, state);
     }
 
     @Override
@@ -60,7 +71,13 @@ public class StoreEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<User> getUserById(Id userId) {
-        return getUserMinById(userId);
+        if (userId.getType() != Id.Type.USER) {
+            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: "
+                    + Id.Type.USER + ", but given: " + userId.getType()));
+        }
+
+        return storeLayout.getUserById(userId.asLong())
+                .map(u -> new User(client, u.minData, u.fullData));
     }
 
     @Override
@@ -71,7 +88,7 @@ public class StoreEntityRetriever implements EntityRetriever {
         }
 
         return storeLayout.getUserMinById(userId.asLong())
-                .mapNotNull(u -> EntityFactory.createUser(client, u));
+                .map(u -> new User(client, u, null));
     }
 
     @Override
@@ -87,7 +104,24 @@ public class StoreEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<Chat> getChatById(Id chatId) {
-        return getChatMinById(chatId);
+        return Mono.defer(() -> {
+            switch (chatId.getType()) {
+                case CHAT: return storeLayout.getChatById(chatId.asLong())
+                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                case CHANNEL: return storeLayout.getChannelById(chatId.asLong())
+                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+                case USER: return storeLayout.getUserById(chatId.asLong())
+                        .flatMap(p -> {
+                            var retrieveSelf = retrieveSelfUserForDMs
+                                    ? getUserById(client.getSelfId())
+                                    : Mono.<User>empty();
+                            return retrieveSelf
+                                    .map(u -> EntityFactory.createChat(client, p, u))
+                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                        });
+                default: return Mono.error(new IllegalStateException());
+            }
+        });
     }
 
     @Override
@@ -99,9 +133,14 @@ public class StoreEntityRetriever implements EntityRetriever {
                         case CHANNEL: return storeLayout.getChannelMinById(chatId.asLong())
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserMinById(chatId.asLong())
-                                .zipWith(getUserById(client.getSelfId())
-                                        .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
-                                .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
+                                .flatMap(p -> {
+                                    var retrieveSelf = retrieveSelfUserForDMs
+                                            ? getUserById(client.getSelfId())
+                                            : Mono.<User>empty();
+                                    return retrieveSelf
+                                            .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                            .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                                });
                         default: return Mono.error(new IllegalStateException());
                     }
                 });
@@ -116,9 +155,14 @@ public class StoreEntityRetriever implements EntityRetriever {
                         case CHANNEL: return storeLayout.getChannelFullById(chatId.asLong())
                                 .mapNotNull(c -> EntityFactory.createChat(client, c, null));
                         case USER: return storeLayout.getUserFullById(chatId.asLong())
-                                .zipWith(getUserById(client.getSelfId())
-                                        .switchIfEmpty(MappingUtil.unresolvedPeer(client.getSelfId())))
-                                .mapNotNull(TupleUtils.function((c, selfUser) -> EntityFactory.createChat(client, c, selfUser)));
+                                .flatMap(p -> {
+                                    var retrieveSelf = retrieveSelfUserForDMs
+                                            ? getUserById(client.getSelfId())
+                                            : Mono.<User>empty();
+                                    return retrieveSelf
+                                            .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                            .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                                });
                         default: return Mono.error(new IllegalStateException());
                     }
                 });
