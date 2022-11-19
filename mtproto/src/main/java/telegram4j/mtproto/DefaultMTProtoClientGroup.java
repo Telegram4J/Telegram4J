@@ -62,7 +62,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             return main.sendAwait(method);
         }
 
-        var cat = categories[id.getType().ordinal()];
+        var cat = categories[id.getType().ordinal() - 1];
 
         Mono<MTProtoClient> client;
         if (id.getShift() == DcId.AUTO_SHIFT) {
@@ -158,7 +158,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         if (id.equals(mainId()))
             return Mono.just(main);
 
-        var cat = categories[id.getType().ordinal()];
+        var cat = categories[id.getType().ordinal() - 1];
 
         if (id.getShift() == DcId.AUTO_SHIFT) {
             return Mono.justOrEmpty(cat.clients.stream()

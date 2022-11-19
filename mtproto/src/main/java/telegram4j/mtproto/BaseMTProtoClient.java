@@ -76,7 +76,6 @@ class BaseMTProtoClient implements MTProtoClient {
     private final TcpClient tcpClient;
     private final Transport transport;
 
-    private final AuthorizationContext authContext;
     private final Sinks.Many<RpcRequest> outbound;
     private final Sinks.Many<TlMethod<?>> authOutbound;
     private final ResettableInterval pingEmitter;
@@ -90,6 +89,7 @@ class BaseMTProtoClient implements MTProtoClient {
     protected final InnerStats stats = new InnerStats();
     protected final AtomicBoolean inflightPing = new AtomicBoolean();
 
+    private volatile AuthorizationHandler authHandler;
     private volatile long oldSessionId;
     private volatile long sessionId = random.nextLong();
     private volatile Connection connection;
@@ -110,11 +110,10 @@ class BaseMTProtoClient implements MTProtoClient {
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
         this.options = options;
-        this.authContext = new AuthorizationContext(options.getPublicRsaKeyRegister());
 
         this.outbound = Sinks.unsafe().many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
-        this.authOutbound = Sinks.many().multicast()
+        this.authOutbound = Sinks.unsafe().many().multicast()
                 .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
         this.state = Sinks.many().replay()
                 .latestOrDefault(State.RECONNECT);
@@ -127,8 +126,6 @@ class BaseMTProtoClient implements MTProtoClient {
 
             Sinks.One<AuthorizationKeyHolder> onAuthSink = Sinks.one();
             ByteBufAllocator alloc = connection.channel().alloc();
-
-            AuthorizationHandler authHandler = new AuthorizationHandler(this, authContext, onAuthSink, alloc);
 
             connection.addHandlerFirst(new DecodeChannelHandler());
 
@@ -221,10 +218,12 @@ class BaseMTProtoClient implements MTProtoClient {
                         long authKeyId = buf.readLongLE();
 
                         if (authKeyId == 0) { // unencrypted message
-                            buf.skipBytes(12); // message id (8) + payload length (4)
+                            buf.readLongLE(); // messageId
+                            int payloadLength = buf.readIntLE();
+                            ByteBuf payload = buf.readSlice(payloadLength);
 
                             try {
-                                MTProtoObject obj = TlDeserializer.deserialize(buf);
+                                MTProtoObject obj = TlDeserializer.deserialize(payload);
                                 return authHandler.handle(obj);
                             } catch (Throwable t) {
                                 return Mono.error(Exceptions.propagate(t));
@@ -337,29 +336,37 @@ class BaseMTProtoClient implements MTProtoClient {
                     }, 1)
                     .then();
 
-            Mono<AuthorizationKeyHolder> startAuth = Mono.fromRunnable(() ->
-                            state.emitNext(State.AUTHORIZATION_BEGIN, options.getEmissionHandler()))
-                    .then(authHandler.start())
-                    .checkpoint("Authorization key generation")
-                    .then(onAuthSink.asMono().retryWhen(authRetry(authHandler)))
+            Mono<AuthorizationHandler> initializeAuthHandler = options.getStoreLayout().getPublicRsaKeyRegister()
+                    .switchIfEmpty(Mono.defer(() -> {
+                        var pubRsaKeyReg = options.publicRsaKeyRegister.get();
+                        return options.getStoreLayout().updatePublicRsaKeyRegister(pubRsaKeyReg)
+                                .thenReturn(pubRsaKeyReg);
+                    }))
+                    .map(pubRsaKeyReg -> new AuthorizationHandler(this,
+                            new AuthorizationContext(pubRsaKeyReg),
+                            onAuthSink, alloc))
+                    .doOnNext(handler -> this.authHandler = handler);
+
+            Mono<AuthorizationKeyHolder> startAuth = initializeAuthHandler
+                    .doOnNext(auth -> state.emitNext(State.AUTHORIZATION_BEGIN, options.getEmissionHandler()))
+                    .flatMap(authHandler -> authHandler.start()
+                            .checkpoint("Authorization key generation")
+                            .then(onAuthSink.asMono().retryWhen(authRetry(authHandler))))
                     .doOnNext(auth -> {
-                        serverSalt = authContext.getServerSalt(); // apply temporal salt
-                        updateTimeOffset(authContext.getServerTime());
-                        authContext.clear();
+                        serverSalt = authHandler.getContext().getServerSalt(); // apply temporal salt
+                        updateTimeOffset(authHandler.getContext().getServerTime());
+                        authHandler.getContext().clear();
                         state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                     })
                     .flatMap(key -> options.getStoreLayout()
-                            .updateAuthorizationKey(dataCenter, key).thenReturn(key));
+                            .updateAuthorizationKey(dataCenter, key)
+                            .thenReturn(key));
 
-            Mono<Void> awaitKey = Mono.justOrEmpty(authKey)
+            Mono<Void> loadAuthKey = Mono.justOrEmpty(authKey)
                     .switchIfEmpty(options.getStoreLayout().getAuthorizationKey(dataCenter))
                     .doOnNext(key -> onAuthSink.emitValue(key, FAIL_FAST))
                     .switchIfEmpty(startAuth)
                     .doOnNext(key -> this.authKey = key)
-                    .then();
-
-            Mono<Void> updateStoreDataCenter = options.storeLayout.getDataCenter()
-                    .switchIfEmpty(options.storeLayout.updateDataCenter(dataCenter).then(Mono.empty()))
                     .then();
 
             Mono<Void> startSchedule = Mono.defer(() -> {
@@ -382,11 +389,15 @@ class BaseMTProtoClient implements MTProtoClient {
                 return ping;
             });
 
+            Mono<Void> assignDc = this instanceof MainMTProtoClient
+                    ? options.getStoreLayout().updateDataCenter(dataCenter)
+                    : Mono.empty();
+
             Mono<Void> initialize = state.asFlux()
                     .filter(s -> s == State.CONFIGURED)
                     .next()
-                    .flatMap(s -> updateStoreDataCenter
-                            .then(awaitKey)
+                    .flatMap(s -> loadAuthKey
+                            .then(assignDc)
                             .then(startSchedule))
                     .then();
 
@@ -398,7 +409,6 @@ class BaseMTProtoClient implements MTProtoClient {
                         } else if (!(t instanceof AuthorizationException)) {
                             log.error("[C:0x" + id + "] Unexpected client exception", t);
                         }
-                        sink.error(t);
                     })
                     .onErrorResume(t -> Mono.empty())
                     .then();
@@ -418,7 +428,7 @@ class BaseMTProtoClient implements MTProtoClient {
     public Mono<Void> connect() {
         return Mono.create(sink -> sink.onCancel(acquireConnection(sink)
                 .subscribeOn(Schedulers.boundedElastic())
-                .subscribe()));
+                .subscribe(null, sink::error)));
     }
 
     @Override
@@ -429,6 +439,9 @@ class BaseMTProtoClient implements MTProtoClient {
     @Override
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
         return Mono.defer(() -> {
+            if (closed) {
+                return Mono.error(new MTProtoException("Client has been closed"));
+            }
             if (!isResultAwait(method)) {
                 outbound.emitNext(new RpcRequest(method), options.getEmissionHandler());
                 return Mono.empty();
@@ -450,7 +463,13 @@ class BaseMTProtoClient implements MTProtoClient {
 
     @Override
     public Mono<Void> sendAuth(TlMethod<? extends MTProtoObject> method) {
-        return Mono.fromRunnable(() -> authOutbound.emitNext(method, options.getEmissionHandler()));
+        return Mono.fromRunnable(() -> {
+            if (closed) {
+                throw new MTProtoException("Client has been closed");
+            }
+
+            authOutbound.emitNext(method, options.getEmissionHandler());
+        });
     }
 
     @Override
@@ -466,7 +485,7 @@ class BaseMTProtoClient implements MTProtoClient {
     @Override
     public Mono<Void> close() {
         return Mono.fromSupplier(() -> connection)
-                .switchIfEmpty(Mono.error(new IllegalStateException("MTProto client isn't connected")))
+                .switchIfEmpty(Mono.error(new MTProtoException("MTProto client isn't connected")))
                 .doOnNext(con -> state.emitNext(State.CLOSED, options.getEmissionHandler()))
                 .then();
     }
@@ -542,10 +561,6 @@ class BaseMTProtoClient implements MTProtoClient {
                 message.writeIntLE(payloadSize + 8);
                 message.writeIntLE(MessageContainer.ID);
                 message.writeIntLE(messages.size());
-
-                messages.sort(Comparator.<ContainerMessage, Boolean>comparing(c -> c.messageId == requestMessageId)
-                        .thenComparing(c -> isContentRelated(c.method))
-                        .reversed());
 
                 var rpcInCont = req instanceof RpcQuery
                         ? new QueryContainerRequest((RpcQuery) req, containerMsgId)
@@ -682,7 +697,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 .doAfterRetry(signal -> {
                     log.debug("[C:0x{}] Retrying regenerate auth key (attempts: {})",
                             id, signal.totalRetriesInARow());
-                    authContext.clear();
+                    authHandler.getContext().clear();
                 });
     }
 
@@ -1185,10 +1200,6 @@ class BaseMTProtoClient implements MTProtoClient {
             }
         }
 
-        // array of message's messageId;
-        // first value always is the query message
-        // sorted so that first there are those messages
-        // that need to be answered, and then there are other service messages
         final long[] msgIds;
         // The counter of messages for which response has not received yet
         volatile short cnt;
@@ -1199,14 +1210,14 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         boolean decrementCnt() {
-            int cnt = (short)CNT.getAndAdd(this, (short)-1) - 1;
-            return cnt == 0;
+            int cnt = (int)CNT.getAndAdd(this, (short)-1) - 1;
+            return cnt <= 0;
         }
 
         @Override
         public String toString() {
             return "ContainerRequest{" +
-                    "msgIds=" + Arrays.stream(msgIds, 0, cnt)
+                    "msgIds=" + Arrays.stream(msgIds)
                     .mapToObj(s -> "0x" + Long.toHexString(s))
                     .collect(Collectors.joining(", ", "[", "]")) +
                     '}';

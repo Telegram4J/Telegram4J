@@ -41,6 +41,14 @@ public final class AuthorizationHandler {
         this.alloc = Objects.requireNonNull(alloc);
     }
 
+    public MTProtoClient getClient() {
+        return client;
+    }
+
+    public AuthorizationContext getContext() {
+        return context;
+    }
+
     public Mono<Void> start() {
         return Mono.defer(() -> {
             byte[] nonceb = new byte[16];
@@ -79,6 +87,9 @@ public final class AuthorizationHandler {
                 return emitError("Incorrect MTProto object: " + obj);
         }
     }
+
+    // handling
+    // ====================
 
     private Mono<Void> handleResPQ(ResPQ resPQ) {
         ByteBuf nonce = resPQ.nonce();

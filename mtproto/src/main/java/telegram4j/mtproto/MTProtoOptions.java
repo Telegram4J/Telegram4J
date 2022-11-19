@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 public class MTProtoOptions {
     protected final DataCenter datacenter;
     protected final TcpClient tcpClient;
-    protected final PublicRsaKeyRegister publicRsaKeyRegister;
+    protected final Supplier<PublicRsaKeyRegister> publicRsaKeyRegister;
     protected final Supplier<Transport> transport;
     protected final StoreLayout storeLayout;
     protected final Sinks.EmitFailureHandler emissionHandler;
@@ -26,14 +26,14 @@ public class MTProtoOptions {
     protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
-                          PublicRsaKeyRegister publicRsaKeyRegister, Supplier<Transport> transport,
+                          Supplier<PublicRsaKeyRegister> publicRsaKeyRegister, Supplier<Transport> transport,
                           StoreLayout storeLayout, Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec connectionRetry, RetryBackoffSpec authRetry,
                           List<ResponseTransformer> responseTransformers,
                           InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection) {
         this.datacenter = Objects.requireNonNull(datacenter);
         this.tcpClient = Objects.requireNonNull(tcpClient);
-        this.publicRsaKeyRegister = publicRsaKeyRegister;
+        this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
         this.transport = Objects.requireNonNull(transport);
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.emissionHandler = Objects.requireNonNull(emissionHandler);
@@ -55,7 +55,7 @@ public class MTProtoOptions {
         return transport;
     }
 
-    public PublicRsaKeyRegister getPublicRsaKeyRegister() {
+    public Supplier<PublicRsaKeyRegister> getPublicRsaKeyRegister() {
         return publicRsaKeyRegister;
     }
 
