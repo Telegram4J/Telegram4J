@@ -35,22 +35,22 @@ public abstract class RpcService {
                 case InputPeerSelf.ID:
                     return storeLayout.getSelfId()
                             .map(ImmutablePeerUser::of)
-                            .switchIfEmpty(Mono.error(new IllegalStateException(
-                                    "Failed to load self user id from store.")));
+                            .switchIfEmpty(Mono.error(() -> new IllegalStateException(
+                                    "Failed to load self user id from store")));
                 case InputPeerChannel.ID:
-                    InputPeerChannel inputPeerChannel = (InputPeerChannel) inputPeer;
+                    var inputPeerChannel = (InputPeerChannel) inputPeer;
                     return Mono.just(ImmutablePeerChannel.of(inputPeerChannel.channelId()));
                 case InputPeerChannelFromMessage.ID:
-                    InputPeerChannelFromMessage inputPeerChannelFromMessage = (InputPeerChannelFromMessage) inputPeer;
+                    var inputPeerChannelFromMessage = (InputPeerChannelFromMessage) inputPeer;
                     return Mono.just(ImmutablePeerChannel.of(inputPeerChannelFromMessage.channelId()));
                 case InputPeerChat.ID:
-                    InputPeerChat inputPeerChat = (InputPeerChat) inputPeer;
+                    var inputPeerChat = (InputPeerChat) inputPeer;
                     return Mono.just(ImmutablePeerChat.of(inputPeerChat.chatId()));
                 case InputPeerUser.ID:
-                    InputPeerUser inputPeerUser = (InputPeerUser) inputPeer;
+                    var inputPeerUser = (InputPeerUser) inputPeer;
                     return Mono.just(ImmutablePeerUser.of(inputPeerUser.userId()));
                 case InputPeerUserFromMessage.ID:
-                    InputPeerUserFromMessage inputPeerUserFromMessage = (InputPeerUserFromMessage) inputPeer;
+                    var inputPeerUserFromMessage = (InputPeerUserFromMessage) inputPeer;
                     return Mono.just(ImmutablePeerUser.of(inputPeerUserFromMessage.userId()));
                 default:
                     return Mono.error(new IllegalArgumentException("Unknown input peer type: 0x"

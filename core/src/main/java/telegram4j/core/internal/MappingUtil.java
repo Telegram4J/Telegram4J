@@ -55,9 +55,8 @@ public class MappingUtil {
                                 case PRIVATE:
                                     PrivateChat pc = (PrivateChat) c;
                                     return message.out() ? pc.getSelfUser().orElse(null) : pc.getUser();
-                                case SUPERGROUP:
-                                    // how verify this?
-                                    return usersMap.get(client.getGroupAnonymousBotId());
+                                case CHANNEL: return usersMap.get(client.getChannelBotId());
+                                case SUPERGROUP: return usersMap.get(client.getGroupAnonymousBotId());
                                 default: return null;
                             }
                         }));

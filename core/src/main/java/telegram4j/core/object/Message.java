@@ -6,6 +6,7 @@ import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.markup.ReplyMarkup;
@@ -79,7 +80,10 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets the <b>incremental</b> id of message for <i>current</i> user if message from DM or group chat or for channel.
+     * Gets the <b>incremental</b> id of message.
+     *
+     * <p> Message ids in the DMs and group chats are relevant to <i>current</i> user and can't be used as
+     * parameters for other accounts. For channels ids are absolute for all users.
      *
      * @return The id of message.
      */
@@ -88,7 +92,10 @@ public final class Message implements TelegramObject {
     }
 
     /**
-     * Gets id of the message author, if present.
+     * Gets id of the message author or if it's a service message author of action, if present.
+     *
+     * <p> This field might be absent if message is a channel post or sent by anonymous admin in
+     * the supergroup.
      *
      * @return The {@link Id} of the message author, if present.
      */
@@ -523,7 +530,10 @@ public final class Message implements TelegramObject {
         EDIT_HIDE(EDIT_HIDE_POS),
 
         /** Whether this message is <a href="https://core.telegram.org/api/pin">pinned</a>. */
-        PINNED(PINNED_POS);
+        PINNED(PINNED_POS),
+
+        /** Whether this message was sent by admin with {@link AdminRight#ANONYMOUS} right. */
+        ANONYMOUS_ADMIN((byte) 31);
 
         private final byte position;
 
@@ -559,7 +569,8 @@ public final class Message implements TelegramObject {
         private static Set<Flag> of0(telegram4j.tl.BaseMessageFields data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            set.removeIf(value -> (flags & value.mask()) == 0);
+            boolean anonymousAuthor = !data.post() && data.peerId().identifier() == PeerChannel.ID;
+            set.removeIf(value -> value == ANONYMOUS_ADMIN ? !anonymousAuthor : (flags & value.mask()) == 0);
             return set;
         }
     }

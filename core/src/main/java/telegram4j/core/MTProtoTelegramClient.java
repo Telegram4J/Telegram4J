@@ -118,6 +118,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Objects.requireNonNull(selfIdHolder[0]);
     }
 
+    /**
+     * Gets authorization resources used to log in.
+     *
+     * @return The authorization resources used to log in.
+     */
     public AuthorizationResources getAuthResources() {
         return authResources;
     }
@@ -696,10 +701,19 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Gets id of special bot that is used to anonymize admins in groups if {@link AdminRight#ANONYMOUS} right is set.
      *
-     * @return The id of bot that used for anonymous admins.
+     * @return The id of bot that is used for anonymous admins.
      */
     public Id getGroupAnonymousBotId() {
         return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 552888 : 1087968824, 0L);
+    }
+
+    /**
+     * Gets id of special bot that is used as author of channel posts.
+     *
+     * @return The id of bot that is used for anonymous admins.
+     */
+    public Id getChannelBotId() {
+        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 936174 : 136817688, 0L);
     }
 
     /**

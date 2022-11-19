@@ -3,15 +3,35 @@
 <!--    <logger name="telegram4j.mtproto.auth" level="TRACE"/>-->
 <!--    <logger name="telegram4j.mtproto" level="TRACE"/>-->
 <!--    <logger name="telegram4j.mtproto.rpc" level="TRACE"/>-->
-<!--    <logger name="telegram4j.mtproto.payload" level="TRACE"/>-->
+<!--    <logger name="telegram4j.mtproto.transport" level="OFF"/>-->
+<!--    <logger name="telegram4j.core.event" level="OFF"/>-->
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{HH:mm:ss.SSS} %-20.20thread %5p %-36.36logger{36} - %m%n</pattern>
+            <pattern>[%d{HH:mm:ss.SSS}] [%-15.15thread] [%0.-1level] %-36.36logger{36} : %m%n</pattern>
         </encoder>
     </appender>
 
-    <root level="DEBUG">
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>90</maxHistory>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>[%d{MM-dd-yyyy HH:mm:ss.SSS}] [%-20.20thread] [%0.-1level] %-40.40logger{39} : %m%n</pattern>
+        </encoder>
+        <prudent>true</prudent>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <root level="TRACE">
         <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
     </root>
 </configuration>

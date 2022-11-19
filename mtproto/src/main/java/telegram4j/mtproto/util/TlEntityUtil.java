@@ -111,11 +111,11 @@ public class TlEntityUtil {
     public static InputPeer toInputPeer(InputUser user) {
         switch (user.identifier()) {
             case InputUserFromMessage.ID:
-                InputUserFromMessage d = (InputUserFromMessage) user;
+                var d = (InputUserFromMessage) user;
                 return ImmutableInputPeerUserFromMessage.of(d.peer(), d.msgId(), d.userId());
             case InputUserSelf.ID: return InputPeerSelf.instance();
             case BaseInputUser.ID:
-                BaseInputUser v = (BaseInputUser) user;
+                var v = (BaseInputUser) user;
                 return ImmutableInputPeerUser.of(v.userId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input user type: " + user);
         }
@@ -124,10 +124,10 @@ public class TlEntityUtil {
     public static InputPeer toInputPeer(InputChannel channel) {
         switch (channel.identifier()) {
             case InputChannelFromMessage.ID:
-                InputChannelFromMessage d = (InputChannelFromMessage) channel;
+                var d = (InputChannelFromMessage) channel;
                 return ImmutableInputPeerChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
             case BaseInputChannel.ID:
-                BaseInputChannel v = (BaseInputChannel) channel;
+                var v = (BaseInputChannel) channel;
                 return ImmutableInputPeerChannel.of(v.channelId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input channel type: " + channel);
         }
@@ -136,11 +136,11 @@ public class TlEntityUtil {
     public static InputUser toInputUser(InputPeer peer) {
         switch (peer.identifier()) {
             case InputPeerUserFromMessage.ID:
-                InputPeerUserFromMessage d = (InputPeerUserFromMessage) peer;
+                var d = (InputPeerUserFromMessage) peer;
                 return ImmutableInputUserFromMessage.of(d.peer(), d.msgId(), d.userId());
             case InputPeerSelf.ID: return InputUserSelf.instance();
             case InputPeerUser.ID:
-                InputPeerUser v = (InputPeerUser) peer;
+                var v = (InputPeerUser) peer;
                 return ImmutableBaseInputUser.of(v.userId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input peer user type: " + peer);
         }
@@ -149,10 +149,10 @@ public class TlEntityUtil {
     public static InputChannel toInputChannel(InputPeer peer) {
         switch (peer.identifier()) {
             case InputPeerChannelFromMessage.ID:
-                InputPeerChannelFromMessage d = (InputPeerChannelFromMessage) peer;
+                var d = (InputPeerChannelFromMessage) peer;
                 return ImmutableInputChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
             case InputPeerChannel.ID:
-                InputPeerChannel v = (InputPeerChannel) peer;
+                var v = (InputPeerChannel) peer;
                 return ImmutableBaseInputChannel.of(v.channelId(), v.accessHash());
             default: throw new IllegalArgumentException("Unknown input peer channel type: " + peer);
         }

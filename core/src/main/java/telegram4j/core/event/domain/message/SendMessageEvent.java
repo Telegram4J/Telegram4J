@@ -49,7 +49,9 @@ public class SendMessageEvent extends MessageEvent {
      * Gets author of new message, if present.
      *
      * <p> This peer may have different id rather than {@link Message#getAuthorId()} if
-     * real author of message is admin and have {@link AdminRight#ANONYMOUS} permission.
+     * real author of message is admin and have {@link AdminRight#ANONYMOUS} permission the special
+     * user with id {@link MTProtoTelegramClient#getGroupAnonymousBotId()} may be passed or
+     * if message is a channel post then {@link MTProtoTelegramClient#getChannelBotId()}.
      *
      * @return The author entity of new message, if present.
      */

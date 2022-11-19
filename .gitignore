@@ -2,5 +2,6 @@
 .gradle
 build
 
+logs
 /core/src/test/resources/t4j.bin
 /core/src/test/resources/t4j-bot.bin
