@@ -280,19 +280,25 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     /**
-     * Request to download file by their reference from Telegram Media DC or
-     * if file is {@link Document#isWeb() web} and haven't telegram-proxying or download is invoked on bot account
+     * Request to download file by their reference from Telegram Media DC.
+     *
+     * <p> If file is {@link Document#isWeb() web} and haven't telegram-proxying or download is invoked on bot account
      * emit {@link IllegalStateException} exception.
      *
-     * <h3> Chunk parameters must meet the following requirements: </h3>
-     * <p> if {@code precise} flag is set then
-     *   <li>{@code offset % 1024 == 0}.</li>
-     *   <li>{@code limit % 1024 == 0}.</li>
-     *   <li>{@code limit <= 1024 * 1024}.</li>
-     * <p> In other case
-     *   <li>{@code offset % (4 * 1024) == 0}.</li>
-     *   <li>{@code limit % (4 * 1024) == 0}.</li>
-     *   <li>{@code (1024 * 1024) %  limit == 0}.</li>
+     * <p> Chunk parameters must meet the following requirements: </p>
+     * If {@code precise} flag is set then:
+     * <ul>
+     *   <li>{@code offset % 1024 == 0}</li>
+     *   <li>{@code limit % 1024 == 0}</li>
+     *   <li>{@code limit <= 1024 * 1024}</li>
+     * </ul>
+     *
+     * In other case:
+     * <ul>
+     *   <li>{@code offset % (4 * 1024) == 0}</li>
+     *   <li>{@code limit % (4 * 1024) == 0}</li>
+     *   <li>{@code (1024 * 1024) %  limit == 0}</li>
+     * </ul>
      *
      * @see <a href="https://core.telegram.org/api/files#downloading-files">File Downloading</a>
      * @param fileRefId The location of file.

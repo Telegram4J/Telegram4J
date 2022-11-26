@@ -250,6 +250,7 @@ public final class GroupChat extends BaseChat {
      * Can contain only participant info about <i>current</i> user, to determinate this situation
      * check {@link Flag#CAN_VIEW_PARTICIPANTS} is not present in {@link #getFlags() flags}.
      *
+     * @param userId The id of user.
      * @return The list of {@link ChatParticipant participants} in this chat, if present.
      */
     public Optional<ChatParticipant> getParticipant(Id userId) {
