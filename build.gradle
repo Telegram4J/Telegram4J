@@ -65,6 +65,8 @@ subprojects {
             encoding = "UTF-8"
             addBooleanOption "html5", true
             addStringOption "encoding", "UTF-8"
+            // TODO: remove after fixing https://bugs.openjdk.org/browse/JDK-8295850
+            addStringOption "Xdoclint:none", "-quiet"
             tags = ["apiNote:a:API Note:",
                     "implSpec:a:Implementation Requirements:",
                     "implNote:a:Implementation Note:"]
