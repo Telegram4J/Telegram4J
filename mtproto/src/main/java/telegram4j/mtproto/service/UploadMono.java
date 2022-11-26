@@ -7,11 +7,14 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
-import reactor.core.publisher.BaseSubscriber;
+import reactor.core.Scannable;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Operators;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.annotation.Nullable;
+import reactor.util.context.Context;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.MTProtoClientGroup;
-import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.ImmutableBaseInputFile;
 import telegram4j.tl.ImmutableInputFileBig;
 import telegram4j.tl.InputFile;
@@ -27,12 +30,8 @@ import static telegram4j.mtproto.service.UploadService.log;
 
 class UploadMono extends Mono<InputFile> {
 
-    // It's necessary to avoid connection reset by server
-    static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
-
     private final MTProtoClientGroup clientGroup;
     private final UploadOptions options;
-    private final long fileId = CryptoUtil.random.nextLong();
 
     UploadMono(MTProtoClientGroup clientGroup, UploadOptions options) {
         this.clientGroup = clientGroup;
@@ -41,82 +40,35 @@ class UploadMono extends Mono<InputFile> {
 
     @Override
     public void subscribe(CoreSubscriber<? super InputFile> actual) {
-        options.getData().subscribe(new UploadSubscriber(actual));
+        options.getData().subscribe(new UploadSubscriber(actual, clientGroup, options));
     }
 
-    class UploadSubscriber extends BaseSubscriber<ByteBuf> {
-        private final CoreSubscriber<? super InputFile> actual;
+    static class UploadSubscriber implements CoreSubscriber<ByteBuf>, Scannable, Subscription {
+        // It's necessary to avoid connection reset by server
+        static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
 
-        private int readParts;
-        private CompositeByteBuf buffer;
-        private MessageDigest md5;
-        private int roundRobin;
+        static final int CANCELLED = 1 << 0;
+        static final int TERMINATED = 1 << 1;
 
-        private final AtomicInteger received = new AtomicInteger();
+        int readParts;
+        CompositeByteBuf buffer;
+        MessageDigest md5;
+        int roundRobin;
 
-        public UploadSubscriber(CoreSubscriber<? super InputFile> actual) {
+        final CoreSubscriber<? super InputFile> actual;
+        final MTProtoClientGroup clientGroup;
+        final UploadOptions options;
+        final AtomicInteger received = new AtomicInteger();
+
+        Subscription subscription;
+        int state;
+
+        public UploadSubscriber(CoreSubscriber<? super InputFile> actual,
+                                MTProtoClientGroup clientGroup,
+                                UploadOptions options) {
             this.actual = actual;
-        }
-
-        @Override
-        protected void hookOnSubscribe(Subscription subscription) {
-            if (options.isBigFile()) {
-                md5 = null;
-            } else {
-                try {
-                    md5 = MessageDigest.getInstance("MD5");
-                } catch (NoSuchAlgorithmException e) {
-                    onError(e);
-                }
-            }
-
-            AtomicInteger pending = new AtomicInteger(options.getParallelism());
-            for (int i = 0; i < options.getParallelism(); i++) {
-                DcId dcId = DcId.upload(clientGroup.mainId().getId(), i);
-
-                clientGroup.getOrCreateClient(dcId)
-                        .doOnNext(client -> {
-                            if (pending.decrementAndGet() == 0) {
-                                subscription.request(options.getPartsCount());
-                                actual.onSubscribe(this);
-                            }
-                        })
-                        .subscribe();
-            }
-        }
-
-        @Override
-        protected void hookOnError(Throwable throwable) {
-            actual.onError(throwable);
-        }
-
-        @Override
-        protected void hookOnNext(ByteBuf buf) {
-            // TODO: synchronization?
-
-            // aligned buffer
-            if (buf.readableBytes() % options.getPartSize() == 0) {
-                while (buf.isReadable()) {
-                    send(buf.readRetainedSlice(options.getPartSize()));
-                    readParts++;
-                }
-            }
-
-            if (buffer == null)
-                buffer = UnpooledByteBufAllocator.DEFAULT.compositeHeapBuffer();
-
-            buffer.addFlattenedComponents(true, buf);
-            while (buffer.isReadable(options.getPartSize())) {
-                send(buffer.readRetainedSlice(options.getPartSize()));
-                readParts++;
-            }
-
-            // latest part or part size is too large and file can be sent as one part
-            if (readParts == options.getPartsCount() - 1) {
-                if (buffer.isReadable()) // the last part can be misaligned
-                    send(buffer);
-                onComplete();
-            }
+            this.clientGroup = clientGroup;
+            this.options = options;
         }
 
         void send(ByteBuf buf) {
@@ -125,7 +77,7 @@ class UploadMono extends Mono<InputFile> {
 
             SaveFilePart part;
             try {
-                part = ImmutableSaveFilePart.of(fileId, readParts, buf);
+                part = ImmutableSaveFilePart.of(options.getFileId(), readParts++, buf);
             } finally {
                 ReferenceCountUtil.safeRelease(buf);
             }
@@ -137,7 +89,8 @@ class UploadMono extends Mono<InputFile> {
 
             DcId dcId = DcId.upload(clientGroup.mainId().getId(), idx);
             if (log.isDebugEnabled()) {
-                log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, fileId, part.filePart() + 1, options.getPartsCount());
+                log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, options.getFileId(),
+                        part.filePart() + 1, options.getPartsCount());
             }
 
             Mono.delay(UPLOAD_INTERVAL)
@@ -147,20 +100,140 @@ class UploadMono extends Mono<InputFile> {
 
                         int cnt = received.incrementAndGet();
                         if (log.isDebugEnabled()) {
-                            log.debug("[DC:{}, F:{}] Uploaded part {}, {}/{}", dcId, fileId,
+                            log.debug("[DC:{}, F:{}] Uploaded part {}, {}/{}", dcId, options.getFileId(),
                                     part.filePart() + 1, cnt, options.getPartsCount());
                         }
 
                         if (cnt == options.getPartsCount()) {
-                            if (options.isBigFile()) {
-                                actual.onNext(ImmutableInputFileBig.of(fileId, options.getPartsCount(), options.getName()));
-                            } else {
-                                actual.onNext(ImmutableBaseInputFile.of(fileId, options.getPartsCount(),
-                                        options.getName(), ByteBufUtil.hexDump(md5.digest())));
-                            }
-                            actual.onComplete();
+                            completeInner();
                         }
                     }, this::onError);
+        }
+
+        void completeInner() {
+            if ((state & CANCELLED) != 0) {
+                return;
+            }
+
+            if (options.isBigFile()) {
+                actual.onNext(ImmutableInputFileBig.of(options.getFileId(), options.getPartsCount(), options.getName()));
+            } else {
+                actual.onNext(ImmutableBaseInputFile.of(options.getFileId(), options.getPartsCount(),
+                        options.getName(), ByteBufUtil.hexDump(md5.digest())));
+            }
+            actual.onComplete();
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            if (Operators.validate(this.subscription, s)) {
+                this.subscription = s;
+                actual.onSubscribe(this);
+            }
+        }
+
+        @Override
+        public void onNext(ByteBuf buf) {
+            if ((state & TERMINATED) != 0) {
+                Operators.onNextDropped(buf, currentContext());
+                return;
+            }
+
+            // aligned buffer
+            if (buf.readableBytes() % options.getPartSize() == 0) {
+                while (buf.isReadable()) {
+                    send(buf.readRetainedSlice(options.getPartSize()));
+                }
+                ReferenceCountUtil.release(buf);
+                return;
+            }
+
+            if (buffer == null) {
+                buffer = UnpooledByteBufAllocator.DEFAULT.compositeHeapBuffer();
+            }
+
+            buffer.addFlattenedComponents(true, buf);
+            while (buffer.isReadable(options.getPartSize())) {
+                send(buffer.readRetainedSlice(options.getPartSize()));
+            }
+
+            if (readParts == options.getPartsCount() - 1 && buffer.isReadable()) {
+                send(buffer);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if ((state & TERMINATED) != 0) {
+                Operators.onErrorDropped(t, currentContext());
+                return;
+            }
+
+            state |= TERMINATED;
+            actual.onError(t);
+        }
+
+        @Override
+        public void onComplete() {
+            if ((state & TERMINATED) != 0) {
+                return;
+            }
+            state |= TERMINATED;
+        }
+
+        @Override
+        public void request(long n) {
+            if (Operators.validate(n)) {
+                if (options.isBigFile()) {
+                    md5 = null;
+                } else {
+                    try {
+                        md5 = MessageDigest.getInstance("MD5");
+                    } catch (NoSuchAlgorithmException e) {
+                        onError(e);
+                        return;
+                    }
+                }
+
+                AtomicInteger pending = new AtomicInteger(options.getParallelism());
+                for (int i = 0; i < options.getParallelism(); i++) {
+                    DcId dcId = DcId.upload(clientGroup.mainId().getId(), i);
+
+                    clientGroup.getOrCreateClient(dcId)
+                            .subscribeOn(Schedulers.boundedElastic())
+                            .subscribe(client -> {
+                                if (pending.decrementAndGet() == 0) {
+                                    subscription.request(options.getPartsCount());
+                                }
+                            }, this::onError);
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            if ((state & CANCELLED) != 0) {
+                return;
+            }
+            state |= CANCELLED;
+            subscription.cancel();
+        }
+
+        @Nullable
+        @Override
+        public Object scanUnsafe(Scannable.Attr key) {
+            if (key == Attr.TERMINATED) return (state & TERMINATED) != 0;
+            if (key == Attr.PARENT) return subscription;
+            if (key == Attr.RUN_STYLE) return Attr.RunStyle.ASYNC;
+            if (key == Attr.CANCELLED) return (state & CANCELLED) != 0;
+            if (key == Attr.REQUESTED_FROM_DOWNSTREAM) return options.getPartsCount();
+            if (key == Attr.ACTUAL) return actual;
+            return null;
+        }
+
+        @Override
+        public Context currentContext() {
+            return actual.currentContext();
         }
     }
 }

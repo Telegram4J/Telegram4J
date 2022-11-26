@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import io.netty.buffer.ByteBuf;
 import org.reactivestreams.Publisher;
+import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.InputFileBig;
 
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public class UploadOptions {
     private final int partsCount;
     private final String name;
     private final int parallelism;
+    private final long fileId;
 
     UploadOptions(Builder builder) {
         this.data = builder.data;
@@ -25,6 +27,7 @@ public class UploadOptions {
         this.name = builder.name;
         this.parallelism = builder.parallelism;
         this.partsCount = builder.partsCount;
+        this.fileId = builder.fileId;
     }
 
     UploadOptions(Publisher<? extends ByteBuf> data, long size, String name) {
@@ -34,6 +37,7 @@ public class UploadOptions {
         this.parallelism = UploadService.suggestParallelism(size);
         this.partSize = UploadService.suggestPartSize(size, -1);
         this.partsCount = (int) Math.ceil((double) size / partSize);
+        this.fileId = CryptoUtil.random.nextLong();
     }
 
     /**
@@ -101,6 +105,15 @@ public class UploadOptions {
     }
 
     /**
+     * Gets random file identifier.
+     *
+     * @return The random file identifier.
+     */
+    public long getFileId() {
+        return fileId;
+    }
+
+    /**
      * Creates new {@code UploadOptions} with specified mandatory parameters.
      * All other attributes will initialize depends on specified values.
      *
@@ -123,15 +136,18 @@ public class UploadOptions {
         static final byte INIT_BIT_DATA = 1 << 0;
         static final byte INIT_BIT_SIZE = 1 << 1;
         static final byte INIT_BIT_NAME = 1 << 2;
+        static final byte OPT_BIT_FILE_ID = 1 << 0;
 
         private byte initBits = INIT_BIT_DATA | INIT_BIT_SIZE | INIT_BIT_NAME;
-        private int partsCount;
+        private byte optBits = OPT_BIT_FILE_ID;
 
+        private int partsCount;
         private Publisher<? extends ByteBuf> data;
         private long size;
         private String name;
         private int partSize = -1;
         private int parallelism = -1;
+        private long fileId;
 
         private Builder() {}
 
@@ -169,6 +185,12 @@ public class UploadOptions {
             return this;
         }
 
+        public Builder fileId(long fileId) {
+            this.fileId = fileId;
+            optBits &= ~OPT_BIT_FILE_ID;
+            return this;
+        }
+
         public UploadOptions build() {
             if (initBits != 0) {
                 List<String> attributes = new ArrayList<>(Integer.bitCount(initBits));
@@ -186,6 +208,8 @@ public class UploadOptions {
             }
             if (parallelism == -1)
                 parallelism = UploadService.suggestParallelism(size);
+            if ((optBits & OPT_BIT_FILE_ID) != 0)
+                fileId = CryptoUtil.random.nextLong();
 
             return new UploadOptions(this);
         }
