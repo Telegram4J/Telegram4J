@@ -4,8 +4,10 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
@@ -46,13 +48,14 @@ public class StoreLayoutImpl implements StoreLayout {
     // TODO: make weak or limit by size?
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Integer, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<DcKey, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
 
     private volatile DataCenter dataCenter;
     private volatile long selfId;
     private volatile ImmutableState state;
     private volatile PublicRsaKeyRegister publicRsaKeyRegister;
     private volatile DcOptions dcOptions;
+    private volatile Config config;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
         this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
@@ -383,8 +386,16 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
-        return Mono.fromSupplier(() -> authKeys.get(dc.getId()));
+    public Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc) {
+        return Mono.fromSupplier(() -> authKeys.get(DcKey.create(dc)));
+    }
+
+    @Override
+    public Mono<DataCenter> getWebfileDataCenter() {
+        return Mono.justOrEmpty(config)
+                .zipWith(Mono.justOrEmpty(dcOptions))
+                .flatMap(TupleUtils.function((cfg, dcOpts) -> Mono.justOrEmpty(
+                        dcOpts.find(DcId.download(cfg.webfileDcId(), 0)))));
     }
 
     @Override
@@ -603,7 +614,7 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
         Objects.requireNonNull(dc);
         Objects.requireNonNull(authKey);
-        return Mono.fromRunnable(() -> authKeys.put(dc.getId(), authKey));
+        return Mono.fromRunnable(() -> authKeys.put(DcKey.create(dc), authKey));
     }
 
     @Override
@@ -716,6 +727,11 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> updateDcOptions(DcOptions dcOptions) {
         return Mono.fromRunnable(() -> this.dcOptions = dcOptions);
+    }
+
+    @Override
+    public Mono<Void> onUpdateConfig(Config config) {
+        return Mono.fromRunnable(() -> this.config = config);
     }
 
     @Override
@@ -1161,6 +1177,39 @@ public class StoreLayoutImpl implements StoreLayout {
         PartialFields(M min, @Nullable F full) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
+        }
+    }
+
+    static class DcKey {
+        final int id;
+        final DataCenter.Type type;
+        final boolean test;
+
+        DcKey(int id, DataCenter.Type type, boolean test) {
+            this.id = id;
+            this.type = type;
+            this.test = test;
+        }
+
+        static DcKey create(DataCenter dc) {
+            return new DcKey(dc.getId(), dc.getType(), dc.isTest());
+        }
+
+        @Override
+        public boolean equals(@Nullable Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            DcKey dcKey = (DcKey) o;
+            return id == dcKey.id && test == dcKey.test && type == dcKey.type;
+        }
+
+        @Override
+        public int hashCode() {
+            int h = 5381;
+            h += (h << 5) + id;
+            h += (h << 5) + type.hashCode();
+            h += (h << 5) + Boolean.hashCode(test);
+            return h;
         }
     }
 }

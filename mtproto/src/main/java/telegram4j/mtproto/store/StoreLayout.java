@@ -46,6 +46,8 @@ public interface StoreLayout {
 
     Mono<DcOptions> getDcOptions();
 
+    Mono<DataCenter> getWebfileDataCenter();
+
     Mono<PublicRsaKeyRegister> getPublicRsaKeyRegister();
 
     /**
@@ -55,7 +57,7 @@ public interface StoreLayout {
      * @return A {@link Mono} emitting on successful completion
      * the {@link AuthorizationKeyHolder} object with auth key and id.
      */
-    Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc);
+    Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc);
 
     /**
      * Retrieve self user id.
@@ -159,12 +161,25 @@ public interface StoreLayout {
     /**
      * Retrieve detailed chat information by specified id.
      *
+     * @implSpec Store may fill a {@link ChatFull#users()} with
+     * known chat bots and participants.
+     *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
      * the {@link ChatFull} container with detailed and minimal information about chat.
      */
     Mono<ChatFull> getChatFullById(long chatId);
 
+    /**
+     * Retrieve available chat information by specified id.
+     *
+     * <p> Difference between this method and {@link #getChatFullById(long)} in
+     * the optional full information and users list.
+     *
+     * @param chatId The id of chat.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatData} with available chat information.
+     */
     Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId);
 
     /**
@@ -179,12 +194,24 @@ public interface StoreLayout {
     /**
      * Retrieve detailed channel information by specified id.
      *
+     * @implSpec Store may fill a {@link ChatFull#users()} with known channel bots.
+     *
      * @param channelId The id of channel.
      * @return A {@link Mono} emitting on successful completion
      * the {@link ChatFull} container with detailed and minimal information about channel.
      */
     Mono<ChatFull> getChannelFullById(long channelId);
 
+    /**
+     * Retrieve available channel information by specified id.
+     *
+     * <p> Difference between this method and {@link #getChannelFullById(long)} in
+     * the optional full information and bots users.
+     *
+     * @param channelId The id of channel.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatData} with available channel information.
+     */
     Mono<ChatData<Channel, telegram4j.tl.ChannelFull>> getChannelById(long channelId);
 
     /**
@@ -204,6 +231,16 @@ public interface StoreLayout {
      */
     Mono<UserFull> getUserFullById(long userId);
 
+    /**
+     * Retrieve available user information by specified id.
+     *
+     * <p> Difference between this method and {@link #getUserFullById(long)} in
+     * the optional full information.
+     *
+     * @param userId The id of user.
+     * @return A {@link Mono} emitting on successful completion
+     * the {@link ChatData} with available user information.
+     */
     Mono<PeerData<BaseUser, telegram4j.tl.UserFull>> getUserById(long userId);
 
     /**
@@ -274,9 +311,9 @@ public interface StoreLayout {
     // region state methods
 
     /**
-     * Initializes the local main dc id of the store according to the given {@link DataCenter} id.
+     * Initializes the local temporal main dc id of the store according to the given {@link DataCenter} id.
      *
-     * @param dc The main dc id.
+     * @param dc The temporal main dc id.
      * @return A {@link Mono} completing the operation is done.
      */
     Mono<Void> updateDataCenter(DataCenter dc);
@@ -368,6 +405,8 @@ public interface StoreLayout {
     Mono<Void> onMessages(Messages payload);
 
     Mono<Void> onAuthorization(BaseAuthorization auth);
+
+    Mono<Void> onUpdateConfig(Config config);
 
     // endregion
 }

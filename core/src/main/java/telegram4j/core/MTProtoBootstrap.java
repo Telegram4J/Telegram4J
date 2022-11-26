@@ -39,6 +39,7 @@ import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.api.TlObject;
 import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
@@ -82,6 +83,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private StoreLayout storeLayout;
     private EventDispatcher eventDispatcher;
     private DataCenter dataCenter;
+    private int gzipWrappingSizeThreshold = 16 * 1024;
 
     MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authResources) {
         this.optionsModifier = optionsModifier;
@@ -312,6 +314,19 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
+     * Sets size threshold for gzip packing mtproto queries, by default equals to 16KB.
+     *
+     * @throws IllegalArgumentException if {@code gzipWrappingSizeThreshold} is negative.
+     * @param gzipWrappingSizeThreshold The new request's size threshold.
+     * @return This builder.
+     */
+    public MTProtoBootstrap<O> setGzipWrappingSizeThreshold(int gzipWrappingSizeThreshold) {
+        Preconditions.requireArgument(gzipWrappingSizeThreshold > 0, "Invalid threshold value");
+        this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
+        return this;
+    }
+
+    /**
      * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono} and terminate client with disconnecting.
@@ -374,7 +389,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
                                     .layer(TlInfo.LAYER)
                                     .query(initConnection())
-                                    .build()))
+                                    .build(), gzipWrappingSizeThreshold))
                     .flatMap(opts -> initializeClient(clientFactory, opts, storeLayout))
                     .subscribe(sink::success, sink::error));
 
@@ -472,13 +487,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                             }
                                             // to trigger user auth
                                             return mainClient.sendAwait(GetState.instance())
-                                                    .retryWhen(Retry.indefinitely()
-                                                            .filter(RpcException.isErrorCode(401))
-                                                            // delegate all auth work to the user and trigger authorization only if auth key is new
-                                                            .doBeforeRetryAsync(signal -> Mono.justOrEmpty(authResources.getAuthHandler())
-                                                                    .flatMap(f -> f.apply(telegramClient))
-                                                                    .flatMap(storeLayout::onAuthorization)
-                                                                    .then()));
+                                                    .map(s -> (TlObject) s)
+                                                    .onErrorResume(RpcException.isErrorCode(401),
+                                                            t -> authResources.getAuthHandler()
+                                                                    .orElseThrow().apply(telegramClient)
+                                                                    .flatMap(s -> storeLayout.onAuthorization(s)
+                                                                            .thenReturn(s)));
                                         })
                                         // startup errors must close client
                                         .onErrorResume(e -> mainClient.close()

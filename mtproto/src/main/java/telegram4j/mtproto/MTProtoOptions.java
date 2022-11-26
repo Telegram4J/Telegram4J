@@ -24,13 +24,15 @@ public class MTProtoOptions {
     protected final RetryBackoffSpec authRetry;
     protected final List<ResponseTransformer> responseTransformers;
     protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
+    protected final int gzipWrappingSizeThreshold;
 
     public MTProtoOptions(DataCenter datacenter, TcpClient tcpClient,
                           Supplier<PublicRsaKeyRegister> publicRsaKeyRegister, Supplier<Transport> transport,
                           StoreLayout storeLayout, Sinks.EmitFailureHandler emissionHandler,
                           RetryBackoffSpec connectionRetry, RetryBackoffSpec authRetry,
                           List<ResponseTransformer> responseTransformers,
-                          InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection) {
+                          InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
+                          int gzipWrappingSizeThreshold) {
         this.datacenter = Objects.requireNonNull(datacenter);
         this.tcpClient = Objects.requireNonNull(tcpClient);
         this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
@@ -41,6 +43,7 @@ public class MTProtoOptions {
         this.authRetry = Objects.requireNonNull(authRetry);
         this.responseTransformers = Objects.requireNonNull(responseTransformers);
         this.initConnection = Objects.requireNonNull(initConnection);
+        this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
     }
 
     public DataCenter getDatacenter() {
@@ -81,5 +84,9 @@ public class MTProtoOptions {
 
     public InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> getInitConnection() {
         return initConnection;
+    }
+
+    public int getGzipWrappingSizeThreshold() {
+        return gzipWrappingSizeThreshold;
     }
 }

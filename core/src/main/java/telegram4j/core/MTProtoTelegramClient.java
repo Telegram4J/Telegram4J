@@ -241,12 +241,42 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Request to download file by their reference from Telegram Media DC or
      * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
      *
-     * @param fileReferenceId The serialized {@link FileReferenceId} of file.
+     * @see #downloadFile(FileReferenceId, int, int, boolean)
+     * @param fileRefId The serialized {@link FileReferenceId} of file.
+     * @param offset The number of bytes to be skipped.
+     * @param limit The number of bytes to be returned.
+     * @param precise Disable some checks on limit and offset values, useful for example to stream videos by keyframes.
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
-    public Flux<FilePart> downloadFile(String fileReferenceId) {
-        return Mono.fromCallable(() -> FileReferenceId.deserialize(fileReferenceId))
-                .flatMapMany(this::downloadFile);
+    public Flux<FilePart> downloadFile(String fileRefId, int offset, int limit, boolean precise) {
+        return Mono.fromCallable(() -> FileReferenceId.deserialize(fileRefId))
+                .flatMapMany(deser -> downloadFile(deser, offset, limit, precise));
+    }
+
+    /**
+     * Request to download file by their reference from Telegram Media DC or
+     * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
+     *
+     * <p> File will fully download from zero offset with 1MB limit.
+     *
+     * @param fileRefId The serialized {@link FileReferenceId} of file.
+     * @return A {@link Flux} emitting full or parts of downloading file.
+     */
+    public Flux<FilePart> downloadFile(String fileRefId) {
+        return downloadFile(fileRefId, 0, 1024 * 1024, false);
+    }
+
+    /**
+     * Request to download file by their reference from Telegram Media DC or
+     * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
+     *
+     * <p> File will fully download from zero offset with 1MB limit.
+     *
+     * @param fileRefId The location of file to download.
+     * @return A {@link Flux} emitting full or parts of downloading file.
+     */
+    public Flux<FilePart> downloadFile(FileReferenceId fileRefId) {
+        return downloadFile(fileRefId, 0, 1024 * 1024, false);
     }
 
     /**
@@ -254,13 +284,28 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * if file is {@link Document#isWeb() web} and haven't telegram-proxying or download is invoked on bot account
      * emit {@link IllegalStateException} exception.
      *
-     * @param loc The location of file.
+     * <h3> Chunk parameters must meet the following requirements: </h3>
+     * <p> if {@code precise} flag is set then
+     *   <li>{@code offset % 1024 == 0}.</li>
+     *   <li>{@code limit % 1024 == 0}.</li>
+     *   <li>{@code limit <= 1024 * 1024}.</li>
+     * <p> In other case
+     *   <li>{@code offset % (4 * 1024) == 0}.</li>
+     *   <li>{@code limit % (4 * 1024) == 0}.</li>
+     *   <li>{@code (1024 * 1024) %  limit == 0}.</li>
+     *
+     * @see <a href="https://core.telegram.org/api/files#downloading-files">File Downloading</a>
+     * @param fileRefId The location of file.
+     * @param offset The number of bytes to be skipped.
+     * @param limit The number of bytes to be returned.
+     * @param precise Disable some checks on limit and offset values, useful for example to stream videos by keyframes.
+     * Ignored if downloading file is web.
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
-    public Flux<FilePart> downloadFile(FileReferenceId loc) {
+    public Flux<FilePart> downloadFile(FileReferenceId fileRefId, int offset, int limit, boolean precise) {
         return Flux.defer(() -> {
-            if (loc.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-                if (loc.getAccessHash() == -1) {
+            if (fileRefId.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
+                if (fileRefId.getAccessHash() == -1) {
                     return Flux.error(new IllegalStateException("Web document without access hash"));
                 }
 
@@ -268,11 +313,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     return Flux.error(new IllegalStateException("Bot accounts can't download web files"));
                 }
                 return serviceHolder.getUploadService()
-                        .getWebFile(loc.asWebLocation().orElseThrow())
+                        .getWebFile(fileRefId.asWebLocation().orElseThrow(), offset, limit)
                         .map(FilePart::ofWebFile);
             }
 
-            return serviceHolder.getUploadService().getFile(loc)
+            return serviceHolder.getUploadService().getFile(fileRefId, offset, limit, precise)
                     .map(FilePart::ofFile);
         });
     }

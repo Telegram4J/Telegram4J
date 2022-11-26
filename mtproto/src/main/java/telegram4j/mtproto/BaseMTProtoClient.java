@@ -120,7 +120,7 @@ class BaseMTProtoClient implements MTProtoClient {
         this.pingEmitter = new ResettableInterval(Schedulers.parallel());
     }
 
-    private Mono<Void> acquireConnection(MonoSink<Void> sink) {
+    private Mono<Void> acquireConnection(MonoSink<Void> readyTrigger) {
         return tcpClient.connect().flatMap(connection -> {
             this.connection = connection;
 
@@ -161,7 +161,7 @@ class BaseMTProtoClient implements MTProtoClient {
                                         .onErrorResume(t -> Mono.empty())
                                         .then(Mono.error(RETRY));
                             case READY:
-                                sink.success();
+                                readyTrigger.success();
                                 return Mono.empty();
                             case CONNECTED:
                                 Mono<Void> deletePrevSession = Mono.defer(() -> {
@@ -324,7 +324,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                     .then();
 
-            // Pings will send with MsgsAck in and MsgsStateReq container
+            // Pings will send with MsgsAck and MsgsStateReq in container
             Mono<Void> ping = pingEmitter.ticks()
                     .flatMap(tick -> {
                         if (inflightPing.compareAndSet(false, true)) {
@@ -363,7 +363,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             .thenReturn(key));
 
             Mono<Void> loadAuthKey = Mono.justOrEmpty(authKey)
-                    .switchIfEmpty(options.getStoreLayout().getAuthorizationKey(dataCenter))
+                    .switchIfEmpty(options.getStoreLayout().getAuthKey(dataCenter))
                     .doOnNext(key -> onAuthSink.emitValue(key, FAIL_FAST))
                     .switchIfEmpty(startAuth)
                     .doOnNext(key -> this.authKey = key)
@@ -506,18 +506,28 @@ class BaseMTProtoClient implements MTProtoClient {
     private Function<RpcRequest, ByteBuf> serializePacket(ByteBufAllocator alloc) {
         return req -> {
             if (log.isTraceEnabled() && !requests.isEmpty()) {
-                log.trace(requests.entrySet().stream()
+                log.trace("[C:0x{}] {}", id, requests.entrySet().stream()
                         .map(e -> "0x" + Long.toHexString(e.getKey()) + ": " + e.getValue())
                         .collect(Collectors.toList())
                         .toString());
             }
 
+            TlObject method = req.method;
+            int size = TlSerializer.sizeOf(req.method);
+            if (size >= options.getGzipWrappingSizeThreshold()) {
+                ByteBuf serialized = alloc.ioBuffer(size);
+                TlSerializer.serialize(serialized, method);
+                ByteBuf gzipped = TlSerialUtil.compressGzip(alloc, 9, serialized);
+
+                method = ImmutableGzipPacked.of(gzipped);
+                gzipped.release();
+
+                size = TlSerializer.sizeOf(method);
+            }
+
             long containerMsgId = -1;
-            int requestSize = -1;
             // server returns -404 transport error when this packet placed in container
-            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID &&
-                    (requestSize = TlSerializer.sizeOf(req.method)) < MAX_CONTAINER_LENGTH;
-            var messages = List.<ContainerMessage>of();
+            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
 
             Request containerOrRequest = req;
             long requestMessageId = getMessageId();
@@ -525,6 +535,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
             ByteBuf message;
             List<Long> statesIds = new ArrayList<>();
+            List<ContainerMessage> messages = new ArrayList<>();
             if (canContainerize) {
                 for (var e : requests.entrySet()) {
                     long key = e.getKey();
@@ -534,13 +545,12 @@ class BaseMTProtoClient implements MTProtoClient {
                     }
 
                     statesIds.add(key);
-                    if (statesIds.size() >= MAX_IDS_SIZE) {
+                    if (statesIds.size() == MAX_IDS_SIZE) {
                         break;
                     }
                 }
             }
 
-            messages = new ArrayList<>();
             if (!statesIds.isEmpty())
                 messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false),
                         ImmutableMsgsStateReq.of(statesIds)));
@@ -550,9 +560,9 @@ class BaseMTProtoClient implements MTProtoClient {
             canContainerize &= !messages.isEmpty();
 
             if (canContainerize) {
-                messages.add(new ContainerMessage(requestMessageId, requestSeqNo, req.method, requestSize));
-                containerMsgId = getMessageId();
+                messages.add(new ContainerMessage(requestMessageId, requestSeqNo, method, size));
 
+                containerMsgId = getMessageId();
                 int containerSeqNo = updateSeqNo(false);
                 int payloadSize = messages.stream().mapToInt(c -> c.size + 16).sum();
                 message = alloc.buffer(24 + payloadSize);
@@ -571,7 +581,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     var c = messages.get(i);
                     msgIds[i] = c.messageId;
                     if (c.messageId != requestMessageId) {
-                        requests.put(c.messageId, new RpcContainerRequest(c.method, containerMsgId));
+                        requests.put(c.messageId, new RpcContainerRequest((TlMethod<?>) c.method, containerMsgId));
                     }
 
                     message.writeLongLE(c.messageId);
@@ -584,13 +594,11 @@ class BaseMTProtoClient implements MTProtoClient {
                 requests.put(containerMsgId, containerOrRequest);
             } else {
                 requests.put(requestMessageId, req);
-                if (requestSize == -1)
-                    requestSize = TlSerializer.sizeOf(req.method);
-                message = alloc.buffer(16 + requestSize)
+                message = alloc.buffer(16 + size)
                         .writeLongLE(requestMessageId)
                         .writeIntLE(requestSeqNo)
-                        .writeIntLE(requestSize);
-                TlSerializer.serialize(message, req.method);
+                        .writeIntLE(size);
+                TlSerializer.serialize(message, method);
             }
 
             int minPadding = 12;
@@ -737,22 +745,6 @@ class BaseMTProtoClient implements MTProtoClient {
                                 .map(l -> String.format("0x%x", l))
                                 .collect(Collectors.joining(", ")));
             }
-
-            // for (long msgId : msgsAck.msgIds()) {
-            //     var req = requests.get(msgId);
-                // if (req instanceof ContainerRequest) {
-                //     var container = (ContainerRequest) req;
-                    // for (var cmsgId : container.msgIds) {
-                    //     var msg = requests.get(cmsgId);
-                    //     if (msg != null) {
-                    //         msg.markState(s -> s | ACKNOWLEDGED);
-                    //     }
-                    // }
-                // }
-                // else if (req != null) {
-                //     req.markState(s -> s | ACKNOWLEDGED);
-                // }
-            // }
             return true;
         }
         return false;
@@ -871,15 +863,6 @@ class BaseMTProtoClient implements MTProtoClient {
             serverSalt = newSession.serverSalt();
             lastMessageId = newSession.firstMsgId();
 
-            // requests.forEach((k, v) -> {
-            //     if (k > newSession.firstMsgId()) {
-            //         resend will process on msgsStateReq request
-            //         v.setState(SENT);
-            //     }
-            // });
-
-            // updates.emitNext(UpdatesTooLong.instance(), options.getEmissionHandler());
-
             acknowledgments.add(messageId);
             return Mono.empty();
         }
@@ -890,10 +873,10 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         if (obj instanceof BadMsgNotification) {
-            BadMsgNotification badMsgNotification = (BadMsgNotification) obj;
+            var badMsgNotification = (BadMsgNotification) obj;
             if (rpcLog.isDebugEnabled()) {
-                if (badMsgNotification.errorCode() == 48) {
-                    BadServerSalt badServerSalt = (BadServerSalt) badMsgNotification;
+                if (badMsgNotification instanceof BadServerSalt) {
+                    var badServerSalt = (BadServerSalt) badMsgNotification;
                     rpcLog.debug("[C:0x{}, M:0x{}] Updating server salt, seqno: {}, new server salt: 0x{}", id,
                             Long.toHexString(badServerSalt.badMsgId()), badServerSalt.badMsgSeqno(),
                             Long.toHexString(badServerSalt.newServerSalt()));
@@ -920,7 +903,7 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         if (obj instanceof MsgsStateInfo) {
-            MsgsStateInfo inf = (MsgsStateInfo) obj;
+            var inf = (MsgsStateInfo) obj;
 
             var req = (RpcRequest) requests.remove(inf.reqMsgId());
             if (req != null) {
@@ -956,13 +939,12 @@ class BaseMTProtoClient implements MTProtoClient {
                         case 3: // not received, resend
                             emitUnwrapped(msgId);
                             break;
-                        case 4:
+                        case 4: // acknowledged
                             var sub = (RpcRequest) requests.get(msgId);
                             if (sub == null) {
                                 continue;
                             }
 
-                            // sub.markState(s -> s | ACKNOWLEDGED);
                             if (!isResultAwait(sub.method)) {
                                 requests.remove(msgId);
                                 decContainer(sub);
@@ -977,7 +959,7 @@ class BaseMTProtoClient implements MTProtoClient {
         }
 
         if (obj instanceof MsgDetailedInfo) {
-            MsgDetailedInfo info = (MsgDetailedInfo) obj;
+            var info = (MsgDetailedInfo) obj;
 
             if (info instanceof BaseMsgDetailedInfo) {
                 BaseMsgDetailedInfo base = (BaseMsgDetailedInfo) info;
@@ -985,11 +967,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     rpcLog.debug("[C:0x{}] Handling message info. msgId: 0x{}, answerId: 0x{}", id,
                             Long.toHexString(base.msgId()), Long.toHexString(base.answerMsgId()));
                 }
-
-                // var req = requests.get(base.msgId());
-                // if (req != null) {
-                //     req.markState(s -> s | ACKNOWLEDGED);
-                // }
+                // acknowledge for base.msgId()
             } else {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.debug("[C:0x{}] Handling message info. answerId: 0x{}", id, Long.toHexString(info.answerMsgId()));
@@ -1036,7 +1014,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 } else {
                     RpcRequest single;
                     if (inner instanceof QueryContainerRequest) {
-                        var query = (RpcQuery) inner;
+                        var query = (QueryContainerRequest) inner;
                         single = new RpcQuery(query.method, query.sink);
                     } else {
                         single = new RpcRequest(inner.method);
@@ -1059,7 +1037,7 @@ class BaseMTProtoClient implements MTProtoClient {
             if (cnt != null) {
                 emitUnwrappedContainer(cnt);
             }
-        } else if (request != null) {
+        } else if (request instanceof RpcRequest) {
             outbound.emitNext((RpcRequest) request, options.getEmissionHandler());
         }
     }
@@ -1131,7 +1109,7 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     // name in format: 'users.getFullUser'
-    static String prettyMethodName(TlMethod<?> method) {
+    static String prettyMethodName(TlObject method) {
         String name = method.getClass().getSimpleName();
         if (name.startsWith("Immutable"))
             name = name.substring(9);
@@ -1301,16 +1279,16 @@ class BaseMTProtoClient implements MTProtoClient {
         final long messageId;
         final int seqNo;
         final int size;
-        final TlMethod<?> method;
+        final TlObject method;
 
-        ContainerMessage(long messageId, int seqNo, TlMethod<?> method, int size) {
+        ContainerMessage(long messageId, int seqNo, TlObject method, int size) {
             this.messageId = messageId;
             this.seqNo = seqNo;
             this.method = method;
             this.size = size;
         }
 
-        ContainerMessage(long messageId, int seqNo, TlMethod<?> method) {
+        ContainerMessage(long messageId, int seqNo, TlObject method) {
             this(messageId, seqNo, method, TlSerializer.sizeOf(method));
         }
     }
@@ -1356,6 +1334,11 @@ class BaseMTProtoClient implements MTProtoClient {
         @Override
         public int getQueriesCount() {
             return queriesCount;
+        }
+
+        @Override
+        public Stats copy() {
+            return new ImmutableStats(lastQueryTimestamp, queriesCount);
         }
 
         @Override

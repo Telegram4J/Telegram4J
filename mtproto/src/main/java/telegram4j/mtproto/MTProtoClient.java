@@ -55,7 +55,7 @@ public interface MTProtoClient {
     DataCenter getDatacenter();
 
     /**
-     * Gets statistic for client.
+     * Gets mutable statistic for client.
      *
      * @return The statistic for client.
      */
@@ -111,5 +111,14 @@ public interface MTProtoClient {
          * @return The current count of pending queries.
          */
         int getQueriesCount();
+
+        /**
+         * Creates new immutable copy of this statistics.
+         *
+         * @return A new immutable copy of this statistics.
+         */
+        default Stats copy() {
+            return new ImmutableStats(getLastQueryTimestamp().orElse(null), getQueriesCount());
+        }
     }
 }

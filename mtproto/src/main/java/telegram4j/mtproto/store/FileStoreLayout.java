@@ -197,6 +197,26 @@ public class FileStoreLayout implements StoreLayout {
         return selfId != 0;
     }
 
+    private Mono<Void> save() {
+        return Mono.fromCallable(() -> {
+            if (!isAssociatedToUser()) {
+                return null;
+            }
+
+            if (SAVING.compareAndSet(this, false, true)) {
+                var settings = copySettings();
+
+                log.debug("Saving information for DC {}", settings.mainDcId);
+                ByteBuf data = Unpooled.buffer();
+                settings.serialize(data);
+                Files.write(dataFile, CryptoUtil.toByteArray(data), StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+
+                SAVING.setVolatile(this, false);
+            }
+            return null;
+        });
+    }
+
     @Override
     public Mono<Void> initialize() {
         return Mono.fromCallable(() -> {
@@ -217,26 +237,6 @@ public class FileStoreLayout implements StoreLayout {
         })
         .subscribeOn(Schedulers.boundedElastic())
         .then();
-    }
-
-    private Mono<Void> save() {
-        return Mono.fromCallable(() -> {
-            if (!isAssociatedToUser()) {
-                return null;
-            }
-
-            if (SAVING.compareAndSet(this, false, true)) {
-                var settings = copySettings();
-
-                log.debug("Saving information for DC {}", settings.mainDcId);
-                ByteBuf data = Unpooled.buffer();
-                settings.serialize(data);
-                Files.write(dataFile, CryptoUtil.toByteArray(data), StandardOpenOption.WRITE, StandardOpenOption.CREATE);
-
-                SAVING.setVolatile(this, false);
-            }
-            return null;
-        });
     }
 
     @Override
@@ -262,7 +262,7 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<AuthorizationKeyHolder> getAuthorizationKey(DataCenter dc) {
+    public Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authKeys.get(dc.getId()));
     }
 
@@ -277,6 +277,10 @@ public class FileStoreLayout implements StoreLayout {
         return entityDelegate.updateDataCenter(dc)
                 .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
+                    if (dc.getId() == mainDcId) {
+                        return Mono.empty();
+                    }
+
                     this.mainDcId = dc.getId();
                     return save();
                 }));
@@ -287,6 +291,9 @@ public class FileStoreLayout implements StoreLayout {
         return entityDelegate.updateState(state)
                 .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
+                    if (state.equals(this.state)) {
+                        return Mono.empty();
+                    }
                     this.state = state;
                     return save();
                 }));
@@ -297,6 +304,9 @@ public class FileStoreLayout implements StoreLayout {
         return entityDelegate.updateDcOptions(dcOptions)
                 .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
+                    if (dcOptions.equals(this.dcOptions)) {
+                        return Mono.empty();
+                    }
                     this.dcOptions = dcOptions;
                     return save();
                 }));
@@ -307,6 +317,9 @@ public class FileStoreLayout implements StoreLayout {
         return entityDelegate.updatePublicRsaKeyRegister(publicRsaKeyRegister)
                 .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
+                    if (publicRsaKeyRegister.equals(this.publicRsaKeyRegister)) {
+                        return Mono.empty();
+                    }
                     this.publicRsaKeyRegister = publicRsaKeyRegister;
                     return save();
                 }));
@@ -333,6 +346,19 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     // delegation
+    // TODO: persist in Settings
+
+    @Override
+    public Mono<Void> onUpdateConfig(Config config) {
+        return entityDelegate.onUpdateConfig(config);
+    }
+
+    @Override
+    public Mono<DataCenter> getWebfileDataCenter() {
+        return entityDelegate.getWebfileDataCenter();
+    }
+
+    //////
 
     @Override
     public Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId) {

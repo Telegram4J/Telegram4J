@@ -17,6 +17,7 @@ import telegram4j.tl.InputFileLocation;
 import telegram4j.tl.InputWebFileLocation;
 import telegram4j.tl.request.auth.ImmutableExportAuthorization;
 import telegram4j.tl.request.auth.ImmutableImportAuthorization;
+import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.upload.ImmutableGetFile;
 import telegram4j.tl.request.upload.ImmutableGetFileHashes;
 import telegram4j.tl.request.upload.ImmutableGetWebFile;
@@ -35,7 +36,6 @@ public class UploadService extends RpcService {
     public static final int MIN_PART_SIZE = 1024;
     public static final int MAX_PART_SIZE = 512 * 1024;
 
-    public static final int PRECISE_LIMIT = 1024 * 1024;
     public static final int BIG_FILE_THRESHOLD = 10 * 1024 * 1024;
 
     static final int MAX_PARTS_COUNT = 4000; // it's for users with tg premium; for other users limit is 3000
@@ -78,12 +78,12 @@ public class UploadService extends RpcService {
     // upload namespace
     // =========================
 
-    private Flux<BaseFile> getFile0(MTProtoClient client, FileReferenceId fileRefId) {
-        AtomicInteger offset = new AtomicInteger();
+    private Flux<BaseFile> getFile0(MTProtoClient client, FileReferenceId fileRefId,
+                                    int baseOffset, int limit, boolean precise) {
+        AtomicInteger offset = new AtomicInteger(baseOffset);
         AtomicBoolean complete = new AtomicBoolean();
-        int limit = PRECISE_LIMIT;
-        ImmutableGetFile request = ImmutableGetFile.of(ImmutableGetFile.PRECISE_MASK,
-                fileRefId.asLocation().orElseThrow(), 0, limit);
+        ImmutableGetFile request = ImmutableGetFile.of(precise ? ImmutableGetFile.PRECISE_MASK : 0,
+                fileRefId.asLocation().orElseThrow(), baseOffset, limit);
 
         return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
                 .cast(BaseFile.class)
@@ -100,33 +100,52 @@ public class UploadService extends RpcService {
     }
 
     @Compatible(Type.BOTH)
-    public Flux<BaseFile> getFile(FileReferenceId location) {
-        if (location.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
-            return Flux.error(new IllegalArgumentException("Web documents can not be downloaded as normal files"));
+    public Flux<BaseFile> getFile(FileReferenceId location,
+                                  int offset, int limit, boolean precise) {
+        if (offset < 0) return Flux.error(new IllegalArgumentException("offset is negative"));
+        if (limit < 0) return Flux.error(new IllegalArgumentException("limit is negative"));
+
+        if (!precise) {
+            if (offset % (4*1024) != 0)
+                return Flux.error(new IllegalArgumentException("offset must be divisible by 4KB"));
+            if (limit % (4*1024) != 0)
+                return Flux.error(new IllegalArgumentException("limit must be divisible by 4KB"));
+            if ((1024*1024) % limit != 0)
+                return Flux.error(new IllegalArgumentException("1MB must be divisible by limit"));
+        } else {
+            if (offset % 1024 != 0)
+                return Flux.error(new IllegalArgumentException("offset must be divisible by 1KB"));
+            if (limit % 1024 != 0)
+                return Flux.error(new IllegalArgumentException("limit must be divisible by 1KB"));
+            if (limit > 1024*1024)
+                return Flux.error(new IllegalArgumentException("limit must not exceed 1MB"));
         }
+
+        if (location.getFileType() == FileReferenceId.Type.WEB_DOCUMENT)
+            return Flux.error(new IllegalArgumentException("Web documents can not be downloaded as normal files"));
 
         DcId dcId = DcId.download(location.getDcId(), DcId.AUTO_SHIFT);
         if (dcId.getId() != clientGroup.mainId().getId()) {
             return sendMain(ImmutableExportAuthorization.of(dcId.getId()))
                     .zipWith(clientGroup.getOrCreateClient(dcId))
                     .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
-                            ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
+                                    ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
                             .thenReturn(client)))
-                    .flatMapMany(client -> getFile0(client, location));
+                    .flatMapMany(client -> getFile0(client, location, offset, limit, precise));
         }
         return clientGroup.getOrCreateClient(dcId)
-                .flatMapMany(client -> getFile0(client, location));
+                .flatMapMany(client -> getFile0(client, location, offset, limit, precise));
     }
 
-    public Flux<WebFile> getWebFile(InputWebFileLocation location) {
+    private Flux<WebFile> getWebFile0(MTProtoClient client, InputWebFileLocation location,
+                                      int baseOffset, int limit) {
         return Flux.defer(() -> {
-            AtomicInteger offset = new AtomicInteger();
+            AtomicInteger offset = new AtomicInteger(baseOffset);
             AtomicBoolean complete = new AtomicBoolean();
-            int limit = PRECISE_LIMIT;
 
-            ImmutableGetWebFile request = ImmutableGetWebFile.of(location, 0, limit);
+            ImmutableGetWebFile request = ImmutableGetWebFile.of(location, baseOffset, limit);
 
-            return Flux.defer(() -> sendMain(request.withOffset(offset.get())))
+            return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
                     .mapNotNull(part -> {
                         offset.addAndGet(limit);
                         if (part.fileType() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
@@ -138,6 +157,20 @@ public class UploadService extends RpcService {
                     })
                     .repeat(() -> !complete.get());
         });
+    }
+
+    public Flux<WebFile> getWebFile(InputWebFileLocation location, int offset, int limit) {
+        return storeLayout.getWebfileDataCenter()
+                .map(dc -> DcId.download(dc.getId(), DcId.AUTO_SHIFT))
+                .switchIfEmpty(sendMain(GetConfig.instance())
+                        .flatMap(c -> storeLayout.onUpdateConfig(c)
+                                .thenReturn(DcId.download(c.webfileDcId(), DcId.AUTO_SHIFT))))
+                .flatMap(dc -> sendMain(ImmutableExportAuthorization.of(dc.getId()))
+                        .zipWith(clientGroup.getOrCreateClient(dc)))
+                .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
+                        ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
+                        .thenReturn(client)))
+                .flatMapMany(client -> getWebFile0(client, location, offset, limit));
     }
 
     @Compatible(Type.BOTH)
