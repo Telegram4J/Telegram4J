@@ -3,7 +3,6 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.Peer;
-import telegram4j.tl.TlSerializer;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
@@ -31,9 +30,12 @@ public class BotInfoContext extends Context {
 
     @Override
     void serialize(ByteBuf buf) {
-        TlSerializer.serialize(buf, chatPeer);
+        serializePeer(buf, chatPeer);
         if (botId != -1) {
+            buf.writeByte(1);
             buf.writeLongLE(botId);
+        } else {
+            buf.writeByte(0);
         }
     }
 

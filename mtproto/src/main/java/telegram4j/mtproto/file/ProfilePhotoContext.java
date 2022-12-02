@@ -3,7 +3,6 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.InputPeer;
-import telegram4j.tl.TlSerializer;
 
 public class ProfilePhotoContext extends Context {
     protected final InputPeer peer;
@@ -17,13 +16,21 @@ public class ProfilePhotoContext extends Context {
         return Type.PROFILE_PHOTO;
     }
 
+    /**
+     * Gets peer to which profile photo associated.
+     *
+     * <p> Returned {@code InputPeer} may contain access hash which valid
+     * only for downloading profile photo, do not use this peer in other requests.
+     *
+     * @return The peer of profile photo.
+     */
     public InputPeer getPeer() {
         return peer;
     }
 
     @Override
     void serialize(ByteBuf buf) {
-        TlSerializer.serialize(buf, peer);
+        serializeInputPeer(buf, peer);
     }
 
     @Override

@@ -3,7 +3,6 @@ package telegram4j.mtproto.file;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.Peer;
-import telegram4j.tl.TlSerializer;
 
 public class MessageMediaContext extends Context {
     private final Peer chatPeer;
@@ -29,7 +28,7 @@ public class MessageMediaContext extends Context {
 
     @Override
     void serialize(ByteBuf buf) {
-        TlSerializer.serialize(buf, chatPeer);
+        serializePeer(buf, chatPeer);
         buf.writeIntLE(messageId);
     }
 

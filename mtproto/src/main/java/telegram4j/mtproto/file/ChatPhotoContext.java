@@ -6,6 +6,7 @@ import telegram4j.tl.InputPeer;
 
 import java.util.Optional;
 
+/** Type of {@code ProfilePhotoContext} which represents a profile photo received from message. */
 public class ChatPhotoContext extends ProfilePhotoContext {
     private final int messageId; // can be -1 for absent values
 
@@ -27,7 +28,10 @@ public class ChatPhotoContext extends ProfilePhotoContext {
     void serialize(ByteBuf buf) {
         super.serialize(buf);
         if (messageId != -1) {
+            buf.writeByte(1);
             buf.writeIntLE(messageId);
+        } else {
+            buf.writeByte(0);
         }
     }
 

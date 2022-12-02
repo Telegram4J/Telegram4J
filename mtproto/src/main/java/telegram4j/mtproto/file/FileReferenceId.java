@@ -75,9 +75,10 @@ public final class FileReferenceId {
     }
 
     private static char asChar(String type) {
-        if (type.length() != 1)
-            throw new IllegalArgumentException("unknown format of the photo size type: '" + type + "'");
-        return type.charAt(0);
+        char c;
+        if (type.length() != 1 || (c = type.charAt(0)) > 0xff)
+            throw new IllegalArgumentException("Unknown format of the photo size type: '" + type + "'");
+        return c;
     }
 
     /**
@@ -262,11 +263,11 @@ public final class FileReferenceId {
         if (!str.startsWith(PREFIX))
             throw new IllegalArgumentException("Incorrect file reference id format: '" + str + "'");
 
-        var buf = Unpooled.wrappedBuffer(Base64.getUrlDecoder().decode(
+        ByteBuf buf = Unpooled.wrappedBuffer(Base64.getUrlDecoder().decode(
                 ByteBuffer.wrap(str.getBytes(StandardCharsets.US_ASCII))
                         .position(PREFIX.length())));
 
-        short rev = buf.readShortLE();
+        short rev = buf.readUnsignedByte();
         Version ver = Version.of(rev);
         return ver.handler.deserialize(buf, str);
     }
@@ -280,7 +281,7 @@ public final class FileReferenceId {
     public String serialize() {
         ByteBuf buf = Unpooled.buffer(); // TODO: presize
 
-        buf.writeShortLE(Version.CURRENT.rev);
+        buf.writeByte(Version.CURRENT.rev);
         Version.CURRENT.handler.serialize(this, buf);
 
         return PREFIX + new String(Base64.getUrlEncoder()
@@ -531,7 +532,7 @@ public final class FileReferenceId {
         h += (h << 5) + fileType.hashCode();
         h += (h << 5) + Objects.hashCode(documentType);
         h += (h << 5) + sizeType;
-        h += (h << 5) + Short.hashCode(dcId);
+        h += (h << 5) + dcId;
         h += (h << 5) + Long.hashCode(documentId);
         h += (h << 5) + Long.hashCode(accessHash);
         h += (h << 5) + Objects.hashCode(fileReference);
@@ -557,7 +558,7 @@ public final class FileReferenceId {
                 }
                 break;
             case DOCUMENT:
-                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
                 builder.append(", ").append("accessHash=").append(accessHash);
                 builder.append(", ").append("documentType=").append(documentType);
@@ -568,10 +569,10 @@ public final class FileReferenceId {
             case STICKER_SET_THUMB:
                 builder.append(", ").append("stickerSet=").append(stickerSet);
                 builder.append(", ").append("thumbVersion=").append(thumbVersion);
-                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 break;
             case CHAT_PHOTO:
-                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
 
                 if (sizeType == SIZE_TYPE_ABSENT) {
@@ -584,7 +585,7 @@ public final class FileReferenceId {
                 }
                 break;
             case PHOTO:
-                builder.append(", ").append("dcId=").append(dcId);
+                builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
                 builder.append(", ").append("accessHash=").append(accessHash);
                 Objects.requireNonNull(fileReference);
@@ -684,7 +685,7 @@ public final class FileReferenceId {
         CURRENT(REVISION_0);
 
         final RevisionHandler handler;
-        final short rev;
+        final byte rev;
 
         Version(Version other) {
             this.handler = other.handler;
@@ -693,11 +694,11 @@ public final class FileReferenceId {
 
         Version(RevisionHandler handler) {
             this.handler = handler;
-            this.rev = (short) ordinal();
+            this.rev = (byte) ordinal();
         }
 
         public short getRevision() {
-            return rev;
+            return (short) (rev & 0xFF);
         }
 
         public static Version of(short version) {
