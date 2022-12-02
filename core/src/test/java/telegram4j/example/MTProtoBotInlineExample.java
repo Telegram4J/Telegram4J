@@ -1,9 +1,10 @@
-package telegram4j.core;
+package telegram4j.example;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageMedia;

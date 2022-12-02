@@ -1,4 +1,4 @@
-package telegram4j.core.command;
+package telegram4j.example.command;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

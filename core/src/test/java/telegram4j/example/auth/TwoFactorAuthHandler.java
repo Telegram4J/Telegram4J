@@ -1,15 +1,17 @@
-package telegram4j;
+package telegram4j.example.auth;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.mtproto.MTProtoClientGroup;
 import telegram4j.tl.ImmutableBaseInputCheckPasswordSRP;
 import telegram4j.tl.PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow;
 import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.auth.BaseAuthorization;
+import telegram4j.tl.request.account.GetPassword;
+import telegram4j.tl.request.auth.ImmutableCheckPassword;
 
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -23,26 +25,25 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Scanner;
 
-import static telegram4j.CodeAuthorization.delimiter;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
-public class TwoFactorAuthHandler {
+class TwoFactorAuthHandler {
 
-    final MTProtoTelegramClient client;
+    final MTProtoClientGroup clientGroup;
     final Scanner sc = new Scanner(System.in);
     final MonoSink<BaseAuthorization> completeSink;
 
     boolean first2fa = true;
 
-    TwoFactorAuthHandler(MTProtoTelegramClient client, MonoSink<BaseAuthorization> completeSink) {
-        this.client = client;
+    TwoFactorAuthHandler(MTProtoClientGroup clientGroup, MonoSink<BaseAuthorization> completeSink) {
+        this.clientGroup = clientGroup;
         this.completeSink = completeSink;
     }
 
     // Ported version of https://gist.github.com/andrew-ld/524332536dbc8c525ed80d281855a0d4 and
     // https://github.com/DrKLO/Telegram/blob/abb896635f849a93968a2ba35a944c91b4978be4/TMessagesProj/src/main/java/org/telegram/messenger/SRPHelper.java#L29
     Mono<Authorization> begin2FA() {
-        return client.getServiceHolder().getAccountService().getPassword().flatMap(pswrd -> {
+        return clientGroup.main().sendAwait(GetPassword.instance()).flatMap(pswrd -> {
             if (!pswrd.hasPassword()) {
                 return Mono.error(new IllegalStateException("?".repeat(1 << 4)));
             }
@@ -53,7 +54,7 @@ public class TwoFactorAuthHandler {
             }
 
             synchronized (System.out) {
-                System.out.println(delimiter);
+                System.out.println(CodeAuthorization.delimiter);
                 if (first2fa) {
                     first2fa = false;
                     System.out.print("The account is protected by 2FA, please write password");
@@ -120,8 +121,7 @@ public class TwoFactorAuthHandler {
             long srpId = Objects.requireNonNull(pswrd.srpId());
             var icpsrp = ImmutableBaseInputCheckPasswordSRP.of(srpId, gABytes, m1);
 
-            return client.getServiceHolder().getAuthService()
-                    .checkPassword(icpsrp);
+            return clientGroup.main().sendAwait(ImmutableCheckPassword.of(icpsrp));
         });
     }
 

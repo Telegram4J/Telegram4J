@@ -99,7 +99,7 @@ public final class AuthorizationContext {
         this.serverTime = serverTime;
     }
 
-    public void clear() {
+    public void reset() {
         safeRelease(nonce);
         safeRelease(newNonce);
         safeRelease(serverNonce);

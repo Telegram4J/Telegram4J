@@ -1,11 +1,10 @@
-package telegram4j.core;
+package telegram4j.example;
 
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import telegram4j.core.command.Command;
-import telegram4j.core.command.TelegramCommand;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.inline.CallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineCallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
@@ -23,6 +22,8 @@ import telegram4j.core.spec.markup.InlineButtonSpec;
 import telegram4j.core.spec.markup.ReplyButtonSpec;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.util.parser.EntityParserFactory;
+import telegram4j.example.command.Command;
+import telegram4j.example.command.TelegramCommand;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 

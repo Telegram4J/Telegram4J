@@ -8,6 +8,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
+import reactor.core.Scannable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
@@ -39,6 +40,7 @@ import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.mtproto.*;
+import telegram4j.tl.request.upload.GetFile;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -83,7 +85,6 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private final String id = Integer.toHexString(hashCode());
     private final DataCenter dataCenter;
-    private final DcId.Type type;
 
     protected final MTProtoOptions options;
     protected final InnerStats stats = new InnerStats();
@@ -104,8 +105,7 @@ class BaseMTProtoClient implements MTProtoClient {
     private final Queue<Long> acknowledgments = new ConcurrentLinkedQueue<>();
     private final ConcurrentHashMap<Long, Request> requests = new ConcurrentHashMap<>();
 
-    BaseMTProtoClient(DcId.Type type, DataCenter dataCenter, MTProtoOptions options) {
-        this.type = type;
+    BaseMTProtoClient(DataCenter dataCenter, MTProtoOptions options) {
         this.dataCenter = dataCenter;
         this.tcpClient = initTcpClient(options.getTcpClient());
         this.transport = options.getTransport().get();
@@ -355,7 +355,7 @@ class BaseMTProtoClient implements MTProtoClient {
                     .doOnNext(auth -> {
                         serverSalt = authHandler.getContext().getServerSalt(); // apply temporal salt
                         updateTimeOffset(authHandler.getContext().getServerTime());
-                        authHandler.getContext().clear();
+                        authHandler.getContext().reset();
                         state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                     })
                     .flatMap(key -> options.getStoreLayout()
@@ -370,17 +370,23 @@ class BaseMTProtoClient implements MTProtoClient {
                     .then();
 
             Mono<Void> startSchedule = Mono.defer(() -> {
-                log.info("[C:0x{}] Connected to datacenter.", id);
+                if (this instanceof MainMTProtoClient) {
+                    log.info("[C:0x{}] Connected to main DC {}.", id, dataCenter.getId());
+                } else {
+                    log.info("[C:0x{}] Connected to {} DC {}.", id,
+                            dataCenter.getType().name().toLowerCase(Locale.US),
+                            dataCenter.getId());
+                }
+
                 state.emitNext(State.CONNECTED, options.getEmissionHandler());
                 Duration period;
-                switch (type) {
-                    case MAIN:
+                switch (dataCenter.getType()) {
+                    case MEDIA:
+                    case CDN:
+                        period = PING_QUERY_PERIOD_MEDIA;
+                        break;
                     case REGULAR:
                         period = PING_QUERY_PERIOD;
-                        break;
-                    case UPLOAD:
-                    case DOWNLOAD:
-                        period = PING_QUERY_PERIOD_MEDIA;
                         break;
                     default: throw new IllegalStateException();
                 }
@@ -452,9 +458,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 stats.lastQueryTimestamp = Instant.now();
             }
 
-            Sinks.One<R> res = Sinks.one();
-            outbound.emitNext(new RpcQuery(method, res), options.getEmissionHandler());
-            return res.asMono();
+            return Mono.<R>create(sink -> outbound.emitNext(new RpcQuery(method, sink), options.getEmissionHandler()));
         })
         .transform(options.getResponseTransformers().stream()
                 .map(tr -> tr.transform(method))
@@ -527,7 +531,8 @@ class BaseMTProtoClient implements MTProtoClient {
 
             long containerMsgId = -1;
             // server returns -404 transport error when this packet placed in container
-            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
+            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID &&
+                    req.method.identifier() != GetFile.ID && size < MAX_CONTAINER_LENGTH;
 
             Request containerOrRequest = req;
             long requestMessageId = getMessageId();
@@ -551,15 +556,14 @@ class BaseMTProtoClient implements MTProtoClient {
                 }
             }
 
-            if (!statesIds.isEmpty())
+            if (canContainerize && !statesIds.isEmpty())
                 messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false),
                         ImmutableMsgsStateReq.of(statesIds)));
-            if (!acknowledgments.isEmpty())
+            if (canContainerize && !acknowledgments.isEmpty())
                 messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false), collectAcks()));
 
-            canContainerize &= !messages.isEmpty();
-
-            if (canContainerize) {
+            boolean containerize = canContainerize && !messages.isEmpty();
+            if (containerize) {
                 messages.add(new ContainerMessage(requestMessageId, requestSeqNo, method, size));
 
                 containerMsgId = getMessageId();
@@ -621,7 +625,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
             boolean quickAck = false;
             int quickAckToken = -1;
-            if (!canContainerize && isContentRelated(req) && transport.supportQuickAck()) {
+            if (!containerize && isContentRelated(req) && transport.supportQuickAck()) {
                 quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
                 quickAck = true;
             }
@@ -705,7 +709,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 .doAfterRetry(signal -> {
                     log.debug("[C:0x{}] Retrying regenerate auth key (attempts: {})",
                             id, signal.totalRetriesInARow());
-                    authHandler.getContext().clear();
+                    authHandler.getContext().reset();
                 });
     }
 
@@ -766,10 +770,8 @@ class BaseMTProtoClient implements MTProtoClient {
 
             obj = ungzip(obj);
 
-            boolean needAck = !handleMsgsAck(obj, messageId);
-
-            var req = (RpcRequest) requests.get(messageId);
-            if (req == null) {
+            var query = (RpcQuery) requests.remove(messageId);
+            if (query == null) {
                 return Mono.empty();
             }
 
@@ -781,7 +783,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             id, Long.toHexString(messageId), rpcError.errorCode(), rpcError.errorMessage());
                 }
 
-                obj = createRpcException(rpcError, req);
+                obj = createRpcException(rpcError, query);
             } else {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
@@ -789,11 +791,21 @@ class BaseMTProtoClient implements MTProtoClient {
             }
 
             stats.decrementQueriesCount();
-            resolveQuery(messageId, obj);
-            decContainer(req);
+            decContainer(query);
+            acknowledgments.add(messageId);
 
-            if (needAck) {
-                acknowledgments.add(messageId);
+            @SuppressWarnings("unchecked")
+            var sink = (MonoSink<Object>) query.sink;
+            Scannable scn = Scannable.from(sink);
+            if (scn.scan(Scannable.Attr.CANCELLED) == Boolean.TRUE) {
+                return Mono.empty();
+            }
+
+            if (obj instanceof RpcException) {
+                var e = (RpcException) obj;
+                sink.error(e);
+            } else {
+                sink.success(obj);
             }
             return Mono.empty();
         }
@@ -828,16 +840,24 @@ class BaseMTProtoClient implements MTProtoClient {
             var pong = (Pong) obj;
             messageId = pong.msgId();
 
-            inflightPing.set(false);
             if (rpcLog.isDebugEnabled()) {
                 long nanoTime = System.nanoTime();
                 rpcLog.debug("[C:0x{}, M:0x{}] Receiving pong after {}", id, Long.toHexString(messageId),
                         Duration.ofNanos(nanoTime - pong.pingId()));
             }
 
-            var req = (RpcQuery) requests.get(messageId);
-            resolveQuery(messageId, pong);
-            decContainer(req);
+            var query = (RpcQuery) requests.remove(messageId);
+            decContainer(query);
+            inflightPing.set(false);
+
+            @SuppressWarnings("unchecked")
+            var sink = (MonoSink<Pong>) query.sink;
+            Scannable scn = Scannable.from(sink);
+            if (scn.scan(Scannable.Attr.CANCELLED) == Boolean.TRUE) {
+                return Mono.empty();
+            }
+
+            sink.success(pong);
             return Mono.empty();
         }
 
@@ -862,8 +882,8 @@ class BaseMTProtoClient implements MTProtoClient {
 
             serverSalt = newSession.serverSalt();
             lastMessageId = newSession.firstMsgId();
-
             acknowledgments.add(messageId);
+
             return Mono.empty();
         }
 
@@ -1063,21 +1083,6 @@ class BaseMTProtoClient implements MTProtoClient {
         return acks.build();
     }
 
-    @SuppressWarnings("unchecked")
-    private void resolveQuery(long messageId, Object value) {
-        requests.computeIfPresent(messageId, (k, v) -> {
-            var query = (RpcQuery) v;
-            var sink = (Sinks.One<Object>) query.sink;
-            if (value instanceof Throwable) {
-                Throwable value0 = (Throwable) value;
-                sink.emitError(value0, FAIL_FAST);
-            } else {
-                sink.emitValue(value, FAIL_FAST);
-            }
-            return null;
-        });
-    }
-
     static boolean isRetryException(Throwable t) {
         return t == RETRY || t instanceof AbortedException || t instanceof IOException;
     }
@@ -1151,9 +1156,9 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     static class RpcQuery extends RpcRequest {
-        final Sinks.One<?> sink;
+        final MonoSink<?> sink;
 
-        RpcQuery(TlMethod<?> method, Sinks.One<?> sink) {
+        RpcQuery(TlMethod<?> method, MonoSink<?> sink) {
             super(method);
             this.sink = sink;
         }

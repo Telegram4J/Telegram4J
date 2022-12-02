@@ -6,6 +6,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
+import reactor.function.TupleUtils;
 import reactor.netty.tcp.TcpClient;
 import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
@@ -39,7 +40,7 @@ import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
 import telegram4j.tl.api.TlMethod;
-import telegram4j.tl.api.TlObject;
+import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
@@ -62,6 +63,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
 
     private final Function<MTProtoOptions, ? extends O> optionsModifier;
     private final AuthorizationResources authResources;
+    @Nullable
+    private final AuthorisationHandler authHandler;
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TcpClient tcpClient;
@@ -75,7 +78,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new Options(c));
     private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = options ->
-            new DefaultMTProtoClientGroup(options, new DefaultMTProtoClientGroup.Options());
+            new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private PublicRsaKeyRegister publicRsaKeyRegister;
     private DcOptions dcOptions;
@@ -88,6 +91,15 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authResources) {
         this.optionsModifier = optionsModifier;
         this.authResources = authResources;
+        this.authHandler = null;
+    }
+
+    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier,
+                     AuthorizationResources authResources,
+                     AuthorisationHandler authHandler) {
+        this.optionsModifier = optionsModifier;
+        this.authResources = authResources;
+        this.authHandler = authHandler;
     }
 
     /**
@@ -368,8 +380,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     // Here the subscription order is important
                     // and therefore need to make sure that initialization blocks
                     .subscribeOn(Schedulers.immediate())
-                    .subscribe(null, t -> log.error("Store layout terminated with an error", t),
-                            () -> log.debug("Store layout completed")));
+                    .subscribe(null, t -> log.error("Store layout terminated with an error", t)));
 
             var loadDcOptions = storeLayout.getDcOptions()
                     .switchIfEmpty(Mono.defer(() -> { // no DcOptions present in store - use default
@@ -378,35 +389,76 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                 .thenReturn(dcOptions);
                     }));
             var loadMainDc = loadDcOptions
-                    .flatMap(dcOptions -> storeLayout.getDataCenter()
+                    .zipWhen(dcOptions -> storeLayout.getDataCenter()
                             .switchIfEmpty(Mono.fromSupplier(() -> initDataCenter(dcOptions))));
             composite.add(loadMainDc
-                    .map(mainDc -> new MTProtoOptions(
-                            mainDc, initTcpClient(), this::initPublicRsaKeyRegister,
-                            transport, storeLayout, EmissionHandlers.DEFAULT_PARKING,
-                            initConnectionRetry(), initAuthRetry(),
-                            List.copyOf(responseTransformers),
-                            InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
-                                    .layer(TlInfo.LAYER)
-                                    .query(initConnection())
-                                    .build(), gzipWrappingSizeThreshold))
-                    .flatMap(opts -> initializeClient(clientFactory, opts, storeLayout))
+                    .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
+                        var options = new MTProtoOptions(
+                                mainDc, initTcpClient(), this::initPublicRsaKeyRegister,
+                                transport, storeLayout, EmissionHandlers.DEFAULT_PARKING,
+                                initConnectionRetry(), initAuthRetry(),
+                                List.copyOf(responseTransformers),
+                                InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
+                                        .layer(TlInfo.LAYER)
+                                        .query(initConnection())
+                                        .build(), gzipWrappingSizeThreshold);
+
+                        MainMTProtoClient mainClient = clientFactory.apply(optionsModifier.apply(options));
+                        MTProtoClientGroup clientGroup = clientGroupFactory.apply(
+                                new MTProtoClientGroupOptions(mainClient, storeLayout, dcOptions));
+
+                        return tryConnect(clientGroup, storeLayout, dcOptions)
+                                .flatMap(client -> initializeClient(clientGroup, storeLayout));
+                    }))
                     .subscribe(sink::success, sink::error));
 
             sink.onCancel(composite);
         });
     }
 
-    private Mono<MTProtoTelegramClient> initializeClient(Function<? super O, ? extends MainMTProtoClient> clientFactory,
-                                                         MTProtoOptions opts, StoreLayout storeLayout) {
+    private Mono<MTProtoClientGroup> tryConnect(MTProtoClientGroup clientGroup,
+                                                StoreLayout storeLayout, DcOptions dcOptions) {
+        return Mono.create(sink -> {
+            var client = clientGroup.main();
+
+            sink.onCancel(client.connect()
+                    .onErrorResume(e -> clientGroup.close()
+                            .then(Mono.fromRunnable(() -> sink.error(e)))
+                            .then(Mono.never()))
+                    .then(Mono.defer(() -> {
+                        if (authHandler == null) {
+                            return client.sendAwait(ImmutableImportBotAuthorization.of(0,
+                                            authResources.getApiId(), authResources.getApiHash(),
+                                            authResources.getBotAuthToken().orElseThrow()))
+                                    .onErrorResume(RpcException.isErrorCode(303),
+                                            e -> redirectToDc((RpcException) e, client,
+                                                    clientGroup, storeLayout, dcOptions))
+                                    .cast(BaseAuthorization.class)
+                                    .flatMap(auth -> storeLayout.onAuthorization(auth)
+                                            .doOnSuccess(ign -> sink.success(clientGroup)));
+                        }
+                        // to trigger user auth
+                        return client.sendAwait(GetState.instance())
+                                .doOnNext(ign -> sink.success(clientGroup))
+                                .onErrorResume(RpcException.isErrorCode(401), t ->
+                                        authHandler.process(clientGroup, storeLayout, authResources)
+                                        // users can emit empty signals if they want to gracefully destroy the client
+                                        .switchIfEmpty(Mono.defer(clientGroup::close)
+                                                .then(Mono.fromRunnable(sink::success)))
+                                        .flatMap(auth -> storeLayout.onAuthorization(auth)
+                                                .doOnSuccess(ign -> sink.success(clientGroup)))
+                                        .then(Mono.empty()));
+                    }))
+                    .onErrorResume(e -> clientGroup.close()
+                            .then(Mono.fromRunnable(() -> sink.error(e))))
+                    .subscribe());
+        });
+    }
+
+    private Mono<MTProtoTelegramClient> initializeClient(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
         return Mono.create(sink -> {
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
-
-            var mainClient = clientFactory.apply(optionsModifier.apply(opts));
-
-            MTProtoClientGroup clientGroup = clientGroupFactory.apply(
-                    new MTProtoClientGroupOptions(mainClient, storeLayout, dcOptions));
 
             MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
                     defaultEntityParserFactory, unavailableChatPolicy);
@@ -432,12 +484,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                     .subscribe(null, t -> log.error("MTProto client group terminated with an error", t),
                             () -> log.debug("MTProto client group completed")));
 
-            composite.add(mainClient.connect()
-                    .takeUntilOther(onDisconnect.asMono())
-                    .doOnError(sink::error)
-                    .subscribe(null, t -> log.error("MTProto client terminated with an error", t)));
-
-            composite.add(mainClient.updates().asFlux()
+            composite.add(clientGroup.main().updates().asFlux()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
@@ -450,14 +497,14 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             () -> log.debug("Updates manager completed")));
 
             AtomicBoolean emit = new AtomicBoolean(true);
-            composite.add(mainClient.state()
+            composite.add(clientGroup.main().state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> {
                         switch (state) {
                             case CLOSED:
                                 return Mono.fromRunnable(disconnect);
                             case READY:
-                                Mono<Void> fetchSelfId = Mono.defer(() -> {
+                                return Mono.defer(() -> {
                                             // bot user id writes before ':' char
                                             if (parseBotIdFromToken && authResources.isBot()) {
                                                 return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
@@ -473,37 +520,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                                                     long ac = Objects.requireNonNull(self.accessHash());
                                                     return Id.ofUser(user.fullUser().id(), ac);
                                                 }))
-                                        .doOnNext(id -> selfId[0] = id)
-                                        .then();
-
-                                return Mono.defer(() -> {
-                                            if (authResources.isBot()) {
-                                                return mainClient.sendAwait(ImmutableImportBotAuthorization.of(0,
-                                                                authResources.getApiId(), authResources.getApiHash(),
-                                                                authResources.getBotAuthToken().orElseThrow()))
-                                                        .cast(BaseAuthorization.class)
-                                                        .flatMap(s -> storeLayout.onAuthorization(s)
-                                                                .thenReturn(s));
-                                            }
-                                            // to trigger user auth
-                                            return mainClient.sendAwait(GetState.instance())
-                                                    .map(s -> (TlObject) s)
-                                                    .onErrorResume(RpcException.isErrorCode(401),
-                                                            t -> authResources.getAuthHandler()
-                                                                    .orElseThrow().apply(telegramClient)
-                                                                    .flatMap(s -> storeLayout.onAuthorization(s)
-                                                                            .thenReturn(s)));
-                                        })
-                                        // startup errors must close client
-                                        .onErrorResume(e -> mainClient.close()
-                                                .then(onDisconnect.asMono())
-                                                .then(Mono.fromRunnable(() -> sink.error(e))))
-                                        .flatMap(res -> fetchSelfId.then(telegramClient.getUpdatesManager().fillGap()))
-                                        .doOnSuccess(any -> {
+                                        .doOnNext(id -> {
                                             if (emit.compareAndSet(true, false)) {
+                                                selfId[0] = id;
                                                 sink.success(telegramClient);
                                             }
-                                        });
+                                        })
+                                        .then(telegramClient.getUpdatesManager().fillGap());
                             default:
                                 return Mono.empty();
                         }
@@ -512,6 +535,33 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
                             () -> log.debug("State handler completed")));
 
             sink.onCancel(composite);
+        });
+    }
+
+    private Mono<Authorization> redirectToDc(RpcException rpcExc,
+                                             MainMTProtoClient tmpClient, MTProtoClientGroup clientGroup,
+                                             StoreLayout storeLayout, DcOptions dcOptions) {
+        return Mono.defer(() -> {
+            String msg = rpcExc.getError().errorMessage();
+            if (!msg.startsWith("USER_MIGRATE_"))
+                return Mono.error(new IllegalStateException("Unexpected type of DC redirection", rpcExc));
+
+            int dcId = Integer.parseInt(msg.substring(13));
+            log.info("Redirecting to the DC {}", dcId);
+
+            return Mono.justOrEmpty(dcOptions.find(DataCenter.Type.REGULAR, dcId))
+                    // We used default DcOptions which may be outdated.
+                    // Well, let's request dc config and store it
+                    .switchIfEmpty(tmpClient.sendAwait(GetConfig.instance())
+                            .flatMap(cfg -> storeLayout.onUpdateConfig(cfg)
+                                    .then(storeLayout.getDcOptions()))
+                            .flatMap(newOpts -> Mono.justOrEmpty(newOpts.find(DataCenter.Type.REGULAR, dcId))
+                                    .switchIfEmpty(Mono.error(() -> new IllegalStateException(
+                                            "Could not find DC " + dcId + " for redirecting main client in received options: " + newOpts)))))
+                    .flatMap(clientGroup::setMain)
+                    .flatMap(client -> client.sendAwait(ImmutableImportBotAuthorization.of(0,
+                            authResources.getApiId(), authResources.getApiHash(),
+                            authResources.getBotAuthToken().orElseThrow())));
         });
     }
 
@@ -574,7 +624,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (dcOptions != null) {
             return dcOptions;
         }
-        return DcOptions.createDefault(false, false);
+        return DcOptions.createDefault(false, Boolean.getBoolean("java.net.preferIPv6Addresses"));
     }
 
     private RetryBackoffSpec initConnectionRetry() {

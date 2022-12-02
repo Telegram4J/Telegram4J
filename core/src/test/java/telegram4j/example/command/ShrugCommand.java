@@ -1,4 +1,4 @@
-package telegram4j.core.command;
+package telegram4j.example.command;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;

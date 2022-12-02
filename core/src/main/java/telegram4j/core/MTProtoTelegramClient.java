@@ -34,7 +34,6 @@ import telegram4j.mtproto.service.UploadOptions;
 import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
-import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.messages.AffectedMessages;
 
 import java.nio.file.Files;
@@ -91,12 +90,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @see <a href="https://core.telegram.org/api/obtaining_api_id#obtaining-api-id">Obtaining Api Id</a>
      * @param apiId The api id.
      * @param apiHash The api hash.
-     * @param authHandler The user authorization implementation. QR or code handler.
+     * @param authHandler The user authorization implementation. QR or phone code handler.
      * @return The new {@link MTProtoBootstrap} client builder.
      */
-    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash,
-                                                          Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, authHandler));
+    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, AuthorisationHandler authHandler) {
+        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash), authHandler);
     }
 
     /**

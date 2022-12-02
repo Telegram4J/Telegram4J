@@ -1,12 +1,9 @@
 package telegram4j.core;
 
-import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
-import telegram4j.tl.auth.BaseAuthorization;
 
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Function;
 
 /** Settings of user and bot auth resources. */
 public final class AuthorizationResources {
@@ -14,21 +11,17 @@ public final class AuthorizationResources {
     private final String apiHash;
     @Nullable
     private final String botAuthToken;
-    @Nullable
-    private final Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler;
+
+    AuthorizationResources(int apiId, String apiHash) {
+        this.apiId = apiId;
+        this.apiHash = Objects.requireNonNull(apiHash);
+        this.botAuthToken = null;
+    }
 
     AuthorizationResources(int apiId, String apiHash, String botAuthToken) {
         this.apiId = apiId;
         this.apiHash = Objects.requireNonNull(apiHash);
         this.botAuthToken = Objects.requireNonNull(botAuthToken);
-        this.authHandler = null;
-    }
-
-    AuthorizationResources(int apiId, String apiHash, Function<MTProtoTelegramClient, Mono<BaseAuthorization>> authHandler) {
-        this.apiId = apiId;
-        this.apiHash = Objects.requireNonNull(apiHash);
-        this.authHandler = Objects.requireNonNull(authHandler);
-        this.botAuthToken = null;
     }
 
     /**
@@ -56,16 +49,6 @@ public final class AuthorizationResources {
      */
     public Optional<String> getBotAuthToken() {
         return Optional.ofNullable(botAuthToken);
-    }
-
-    /**
-     * Gets the authorization handlers that's implements
-     * user authorization via phone or qr code.
-     *
-     * @return The authorization handler.
-     */
-    public Optional<Function<MTProtoTelegramClient, Mono<BaseAuthorization>>> getAuthHandler() {
-        return Optional.ofNullable(authHandler);
     }
 
     /**

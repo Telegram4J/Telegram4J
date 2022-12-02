@@ -15,6 +15,8 @@ public interface MTProtoClientGroup {
      */
     MainMTProtoClient main();
 
+    Mono<MainMTProtoClient> setMain(DataCenter dcId);
+
     /**
      * Gets {@link DcId} of {@link #main()} client.
      *
@@ -35,14 +37,7 @@ public interface MTProtoClientGroup {
     <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method);
 
     /**
-     * Gets current list of DC options which used to create clients.
-     *
-     * @return The list of DC options which used to create clients.
-     */
-    DcOptions getDcOptions();
-
-    /**
-     * Starts all service tasks and loads {@link #getDcOptions()} from {@link StoreLayout}.
+     * Starts all service tasks from {@link StoreLayout}.
      *
      * @return A {@link Mono} emitting empty signals on group close.
      */
@@ -54,15 +49,6 @@ public interface MTProtoClientGroup {
      * @return A {@link Mono} emitting empty signals on completion.
      */
     Mono<Void> close();
-
-    /**
-     * Updates DC options list to specified container. This method will
-     * persist new options list to {@link StoreLayout}.
-     *
-     * @param dcOptions The new options list.
-     * @return A {@link Mono} emitting empty signals after list saving.
-     */
-    Mono<Void> setDcOptions(DcOptions dcOptions);
 
     /**
      * Searches for the client by specified id and if no result found

@@ -2,9 +2,12 @@ package telegram4j.mtproto;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple3;
 import reactor.util.function.Tuples;
 import telegram4j.mtproto.store.StoreLayout;
+import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.api.TlMethod;
 
 import java.time.Duration;
@@ -23,11 +26,10 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             new ClientCategory(DcId.Type.DOWNLOAD)
     };
 
-    private final StoreLayout storeLayout;
-    private final MainMTProtoClient main;
     private final Options options;
+    private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.parallel());
 
-    private volatile DcOptions dcOptions;
+    private volatile MainMTProtoClient main;
 
     static class ClientCategory {
         final DcId.Type type;
@@ -39,16 +41,22 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         }
     }
 
-    public DefaultMTProtoClientGroup(MTProtoClientGroupOptions options, Options options1) {
-        this.storeLayout = options.storeLayout;
+    public DefaultMTProtoClientGroup(Options options) {
         this.main = options.mainClient;
-        this.dcOptions = options.dcOptions;
-        this.options = options1;
+        this.options = options;
     }
 
     @Override
     public MainMTProtoClient main() {
         return main;
+    }
+
+    @Override
+    public Mono<MainMTProtoClient> setMain(DataCenter dc) {
+        var old = main;
+        var upd = old.create(dc);
+        main = upd;
+        return upd.connect().thenReturn(upd);
     }
 
     @Override
@@ -84,6 +92,8 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     @Override
     public Mono<Void> close() {
+        activityMonitoring.dispose();
+
         return Mono.whenDelayError(Stream.concat(Arrays.stream(categories)
                         .flatMap(c -> c.clients.stream())
                         .map(Tuple3::getT3), Stream.of(main))
@@ -93,16 +103,9 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     @Override
     public Mono<Void> start() {
-        var initDcOptions = Mono.defer(() -> {
-            var curr = dcOptions;
-            if (curr != null) {
-                return storeLayout.updateDcOptions(dcOptions);
-            }
-            return storeLayout.getDcOptions()
-                    .doOnNext(opts -> dcOptions = opts);
-        });
+        activityMonitoring.start(options.checkinPeriod);
 
-        var inactivitySchedule = Flux.interval(options.checkinPeriod)
+        return activityMonitoring.ticks()
                 .flatMap(tick -> {
                     List<Mono<Void>> toClose = new LinkedList<>();
 
@@ -119,7 +122,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                                 inactivity = options.inactiveDownloadPeriod;
                                 break;
                             default:
-                                throw new IllegalStateException();
+                                return Flux.error(new IllegalStateException());
                         }
 
                         for (var it = category.clients.iterator(); it.hasNext();) {
@@ -138,15 +141,6 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                     return Mono.whenDelayError(toClose);
                 })
                 .then();
-
-        return Mono.when(initDcOptions, inactivitySchedule);
-    }
-
-    @Override
-    public Mono<Void> setDcOptions(DcOptions dcOptions) {
-        var old = this.dcOptions;
-        this.dcOptions = Objects.requireNonNull(dcOptions);
-        return old == null ? Mono.empty() : storeLayout.updateDcOptions(dcOptions);
     }
 
     @Override
@@ -159,42 +153,38 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             return Mono.just(main);
 
         var cat = categories[id.getType().ordinal() - 1];
-
         if (id.getShift() == DcId.AUTO_SHIFT) {
             return Mono.justOrEmpty(cat.clients.stream()
                             .filter(e -> e.getT1() == id.getId())
                             .min(Comparator.comparingInt(c -> c.getT3().getStats().getQueriesCount()))
                             .map(Tuple3::getT3))
-                    .switchIfEmpty(Mono.defer(() -> {
-                        var dc = dcOptions.find(id)
-                                .orElseThrow(() -> new IllegalArgumentException(
-                                        "No dc found for specified id: " + id));
-                        var c = main.createChildClient(id.getType(), dc);
-                        cat.clients.add(Tuples.of(id.getId(), cat.counter.getAndIncrement(), c));
-                        return c.connect().thenReturn(c);
-                    }));
+                    .switchIfEmpty(Mono.defer(() -> options.storeLayout.getDcOptions()
+                            .map(dcOpts -> dcOpts.find(id)
+                                    .orElseThrow(() -> new IllegalArgumentException(
+                                            "No dc found for specified id: " + id)))
+                            .flatMap(dc -> {
+                                MTProtoClient c = main.createChildClient(dc);
+                                cat.clients.add(Tuples.of(id.getId(), cat.counter.getAndIncrement(), c));
+                                return c.connect().thenReturn(c);
+                            })));
         }
 
         return Mono.justOrEmpty(cat.clients.stream()
                         .filter(e -> e.getT1() == id.getId() && e.getT2() == id.getShift())
                         .findFirst()
                         .map(Tuple3::getT3))
-                .switchIfEmpty(Mono.defer(() -> {
-                    var dc = dcOptions.find(id)
-                            .orElseThrow(() -> new IllegalArgumentException(
-                                    "No dc found for specified id: " + id));
-                    var c = main.createChildClient(id.getType(), dc);
-                    cat.clients.add(Tuples.of(id.getId(), id.getShift(), c));
-                    return c.connect().thenReturn(c);
-                }));
+                .switchIfEmpty(Mono.defer(() -> options.storeLayout.getDcOptions()
+                        .map(dcOpts -> dcOpts.find(id)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                        "No dc found for specified id: " + id)))
+                        .flatMap(dc -> {
+                            MTProtoClient c = main.createChildClient(dc);
+                            cat.clients.add(Tuples.of(id.getId(), id.getShift(), c));
+                            return c.connect().thenReturn(c);
+                        })));
     }
 
-    @Override
-    public DcOptions getDcOptions() {
-        return dcOptions;
-    }
-
-    public static class Options {
+    public static class Options extends MTProtoClientGroupOptions {
 
         static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
         static final Duration INACTIVE_REGULAR_DURATION = Duration.ofMinutes(15);
@@ -206,15 +196,22 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         public final Duration inactiveUploadPeriod;
         public final Duration inactiveDownloadPeriod;
 
-        public Options() {
+        public Options(MTProtoClientGroupOptions options) {
+            this(options.mainClient, options.storeLayout, options.dcOptions);
+        }
+
+        public Options(MainMTProtoClient mainClient, StoreLayout storeLayout, @Nullable DcOptions dcOptions) {
+            super(mainClient, storeLayout, dcOptions);
             this.checkinPeriod = DEFAULT_CHECKIN;
             this.inactiveRegularPeriod = INACTIVE_REGULAR_DURATION;
             this.inactiveUploadPeriod = INACTIVE_UPLOAD_DURATION;
             this.inactiveDownloadPeriod = INACTIVE_DOWNLOAD_DURATION;
         }
 
-        public Options(Duration checkinPeriod, Duration inactiveRegularPeriod,
+        public Options(MainMTProtoClient mainClient, StoreLayout storeLayout, @Nullable DcOptions dcOptions,
+                       Duration checkinPeriod, Duration inactiveRegularPeriod,
                        Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod) {
+            super(mainClient, storeLayout, dcOptions);
             this.checkinPeriod = checkinPeriod;
             this.inactiveRegularPeriod = inactiveRegularPeriod;
             this.inactiveUploadPeriod = inactiveUploadPeriod;

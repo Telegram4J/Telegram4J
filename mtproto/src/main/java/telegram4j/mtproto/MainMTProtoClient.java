@@ -9,10 +9,11 @@ public interface MainMTProtoClient extends MTProtoClient {
     /**
      * Create child client, associated with given datacenter.
      *
-     * @param dc The datacenter.
      * @return The new child client.
      */
-    MTProtoClient createChildClient(DcId.Type type, DataCenter dc);
+    MTProtoClient createChildClient(DataCenter dc);
+
+    MainMTProtoClient create(DataCenter dc);
 
     /**
      * Gets a {@link Sinks.Many} which redistributes api updates to subscribers and

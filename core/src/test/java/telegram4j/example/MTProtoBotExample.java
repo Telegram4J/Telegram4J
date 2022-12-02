@@ -1,27 +1,25 @@
-package telegram4j.core;
+package telegram4j.example;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.core.command.Command;
-import telegram4j.core.command.EchoCommand;
-import telegram4j.core.command.PingCommand;
-import telegram4j.core.command.ShrugCommand;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever.Setting;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.spec.BotCommandScopeSpec.Type;
+import telegram4j.example.command.Command;
+import telegram4j.example.command.EchoCommand;
+import telegram4j.example.command.PingCommand;
+import telegram4j.example.command.ShrugCommand;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
-import telegram4j.tl.json.TlModule;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -37,9 +35,6 @@ public class MTProtoBotExample {
     private static final List<Command> commands = List.of(new EchoCommand(), new ShrugCommand(), new PingCommand());
     private static final Map<String, Command> commandsMap = commands.stream()
             .collect(Collectors.toMap(c -> c.getInfo().command().toLowerCase(Locale.ROOT), Function.identity()));
-
-    private static final ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new TlModule());
 
     public static void main(String[] args) {
 
@@ -73,12 +68,6 @@ public class MTProtoBotExample {
                             })
                             .then();
 
-                    Mono<Void> sandbox = client.getMtProtoClientGroup().main().updates().asFlux()
-                            .publishOn(Schedulers.boundedElastic())
-                            .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
-                            .doOnNext(log::info)
-                            .then();
-
                     Mono<Void> listenMessages = client.on(SendMessageEvent.class)
                             .flatMap(e -> Mono.just(e.getMessage().getEntities())
                                     .filter(list -> !list.isEmpty() && list.get(0).getType() == MessageEntity.Type.BOT_COMMAND)
@@ -95,7 +84,7 @@ public class MTProtoBotExample {
                                     }))
                             .then();
 
-                    return Mono.when(updateCommands, listenMessages, sandbox);
+                    return Mono.when(updateCommands, listenMessages);
                 })
                 .block();
     }

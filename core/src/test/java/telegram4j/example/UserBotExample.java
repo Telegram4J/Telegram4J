@@ -1,19 +1,21 @@
-package telegram4j.core;
+package telegram4j.example;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.CodeAuthorization;
-import telegram4j.QrCodeAuthorization;
+import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever;
+import telegram4j.example.auth.CodeAuthorization;
+import telegram4j.example.auth.QrCodeAuthorization;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
@@ -33,12 +35,14 @@ public class UserBotExample {
     public static void main(String[] args) {
 
         // only for testing
+        Hooks.onOperatorDebug();
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+        //
 
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new TlModule());
 
-        int apiId      = Integer.parseInt(System.getenv("TEST_API_ID"));
+        int apiId = Integer.parseInt(System.getenv("TEST_API_ID"));
         String apiHash = System.getenv("TEST_API_HASH");
 
         MTProtoTelegramClient.create(apiId, apiHash,

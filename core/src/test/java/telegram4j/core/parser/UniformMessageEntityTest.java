@@ -1,4 +1,4 @@
-package telegram4j.util.parser;
+package telegram4j.core.parser;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
