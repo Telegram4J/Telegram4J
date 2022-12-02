@@ -317,6 +317,32 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
+     * Creates a new {@code Id} with specified access hash, or if
+     * it equals to current context info returns this object.
+     *
+     * @param accessHash The new access hash for this id.
+     * @return A new {@code Id} with specified access hash or if it
+     * equals to current returns this object.
+     */
+    public Id withAccessHash(@Nullable Long accessHash) {
+        if (Objects.equals(context, accessHash)) return this;
+        return new Id(type, value, accessHash);
+    }
+
+    /**
+     * Creates a new {@code Id} with specified min information, or if
+     * it equals to current context info returns this object.
+     *
+     * @param minInformation The new min information for this id.
+     * @return A new {@code Id} with specified min information or if it
+     * equals to current returns this object.
+     */
+    public Id withMinInformation(@Nullable MinInformation minInformation) {
+        if (Objects.equals(context, minInformation)) return this;
+        return new Id(type, value, minInformation);
+    }
+
+    /**
      * Compares this id with the specified id.
      * <p>
      * The comparison is based on the {@link #getType()} and after {@link #asLong()}.

@@ -263,7 +263,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
     public Flux<FilePart> downloadFile(String fileRefId) {
-        return downloadFile(fileRefId, 0, 1024 * 1024, false);
+        return downloadFile(fileRefId, 0, 1024 * 1024, true);
     }
 
     /**
@@ -276,7 +276,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
     public Flux<FilePart> downloadFile(FileReferenceId fileRefId) {
-        return downloadFile(fileRefId, 0, 1024 * 1024, false);
+        return downloadFile(fileRefId, 0, 1024 * 1024, true);
     }
 
     /**
@@ -459,7 +459,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 case CHAT_PHOTO: {
                     var chatCtx = (ProfilePhotoContext) fileRefId.getContext();
 
-                    Id peerId = Id.of(chatCtx.getPeer(), getSelfId());
+                    Id peerId = Id.of(chatCtx.getPeer(), getSelfId())
+                            // The access hash must be invalided because it may be
+                            // received from min users which have a special access hash, valid only for downloading
+                            .withAccessHash(null);
                     return asInputPeer(peerId)
                             .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
                             .flatMap(peer -> {
