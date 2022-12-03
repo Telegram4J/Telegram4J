@@ -56,7 +56,9 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         var old = main;
         var upd = old.create(dc);
         main = upd;
-        return upd.connect().thenReturn(upd);
+        return old.close()
+                .then(upd.connect())
+                .thenReturn(upd);
     }
 
     @Override

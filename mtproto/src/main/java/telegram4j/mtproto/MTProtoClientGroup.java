@@ -1,7 +1,6 @@
 package telegram4j.mtproto;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.api.TlMethod;
 
 /** The group of MTProto clients which associated to one user.  */
@@ -15,7 +14,13 @@ public interface MTProtoClientGroup {
      */
     MainMTProtoClient main();
 
-    Mono<MainMTProtoClient> setMain(DataCenter dcId);
+    /**
+     * Configures a new main client for this group. Old client will be closed.
+     *
+     * @param dc The dc to which main client will associate.
+     * @return A {@link Mono} emitting on successful completion new main client.
+     */
+    Mono<MainMTProtoClient> setMain(DataCenter dc);
 
     /**
      * Gets {@link DcId} of {@link #main()} client.
@@ -37,7 +42,7 @@ public interface MTProtoClientGroup {
     <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method);
 
     /**
-     * Starts all service tasks from {@link StoreLayout}.
+     * Starts a service task to automatically disconnect inactive clients
      *
      * @return A {@link Mono} emitting empty signals on group close.
      */
