@@ -40,7 +40,6 @@ import telegram4j.tl.api.TlObject;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.mtproto.*;
-import telegram4j.tl.request.upload.GetFile;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -274,8 +273,6 @@ class BaseMTProtoClient implements MTProtoClient {
                             return Mono.error(new IllegalStateException("Data isn't aligned by 4 bytes"));
                         }
 
-                        updateTimeOffset((int) (messageId >> 32));
-
                         ByteBuf payload = decrypted.readSlice(length);
                         try {
                             TlObject obj = TlDeserializer.deserialize(payload);
@@ -308,7 +305,7 @@ class BaseMTProtoClient implements MTProtoClient {
                         int size = TlSerializer.sizeOf(method);
                         ByteBuf payload = alloc.buffer(20 + size)
                                 .writeLongLE(0) // auth key id
-                                .writeLongLE(getMessageId()) // Message id in the auth requests doesn't allow receiving payload
+                                .writeLongLE(nextMessageId()) // Message id in the auth requests doesn't allow receiving payload
                                 .writeIntLE(size);
                         TlSerializer.serialize(payload, method);
 
@@ -354,7 +351,7 @@ class BaseMTProtoClient implements MTProtoClient {
                             .then(onAuthSink.asMono().retryWhen(authRetry(authHandler))))
                     .doOnNext(auth -> {
                         serverSalt = authHandler.getContext().getServerSalt(); // apply temporal salt
-                        updateTimeOffset(authHandler.getContext().getServerTime());
+                        timeOffset = authHandler.getContext().getServerTimeDiff();
                         authHandler.getContext().reset();
                         state.emitNext(State.AUTHORIZATION_END, options.getEmissionHandler());
                     })
@@ -531,12 +528,11 @@ class BaseMTProtoClient implements MTProtoClient {
 
             long containerMsgId = -1;
             // server returns -404 transport error when this packet placed in container
-            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID &&
-                    req.method.identifier() != GetFile.ID && size < MAX_CONTAINER_LENGTH;
+            boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
 
             Request containerOrRequest = req;
-            long requestMessageId = getMessageId();
-            int requestSeqNo = updateSeqNo(req.method);
+            long requestMessageId = nextMessageId();
+            int requestSeqNo = nextSeqNo(req.method);
 
             ByteBuf message;
             List<Long> statesIds = new ArrayList<>();
@@ -557,17 +553,17 @@ class BaseMTProtoClient implements MTProtoClient {
             }
 
             if (canContainerize && !statesIds.isEmpty())
-                messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false),
+                messages.add(new ContainerMessage(nextMessageId(), nextSeqNo(false),
                         ImmutableMsgsStateReq.of(statesIds)));
             if (canContainerize && !acknowledgments.isEmpty())
-                messages.add(new ContainerMessage(getMessageId(), updateSeqNo(false), collectAcks()));
+                messages.add(new ContainerMessage(nextMessageId(), nextSeqNo(false), collectAcks()));
 
             boolean containerize = canContainerize && !messages.isEmpty();
             if (containerize) {
                 messages.add(new ContainerMessage(requestMessageId, requestSeqNo, method, size));
 
-                containerMsgId = getMessageId();
-                int containerSeqNo = updateSeqNo(false);
+                containerMsgId = nextMessageId();
+                int containerSeqNo = nextSeqNo(false);
                 int payloadSize = messages.stream().mapToInt(c -> c.size + 16).sum();
                 message = alloc.buffer(24 + payloadSize);
                 message.writeLongLE(containerMsgId);
@@ -659,7 +655,7 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     private void updateTimeOffset(int serverTime) {
-        int now = (int) (System.currentTimeMillis() / 1000);
+        int now = Math.toIntExact(System.currentTimeMillis() / 1000);
         int updated = serverTime - now;
         if (Math.abs(timeOffset - updated) > 3) {
             lastMessageId = 0;
@@ -713,7 +709,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 });
     }
 
-    private long getMessageId() {
+    private long nextMessageId() {
         long millis = System.currentTimeMillis();
         long seconds = millis / 1000;
         long mod = millis % 1000;
@@ -728,11 +724,11 @@ class BaseMTProtoClient implements MTProtoClient {
         return messageId;
     }
 
-    private int updateSeqNo(TlMethod<?> object) {
-        return updateSeqNo(isContentRelated(object));
+    private int nextSeqNo(TlMethod<?> object) {
+        return nextSeqNo(isContentRelated(object));
     }
 
-    private int updateSeqNo(boolean content) {
+    private int nextSeqNo(boolean content) {
         if (content) {
             return seqNo.getAndIncrement() * 2 + 1;
         }
@@ -907,17 +903,12 @@ class BaseMTProtoClient implements MTProtoClient {
                 }
             }
 
-            switch (badMsgNotification.errorCode()) {
-                case 16: // msg_id too low
-                case 17: // msg_id too high
-                    updateTimeOffset((int) (messageId >> 32));
-                    break;
-                case 48:
-                    var badServerSalt = (BadServerSalt) badMsgNotification;
-                    serverSalt = badServerSalt.newServerSalt();
-                    break;
+            if (badMsgNotification instanceof BadServerSalt) {
+                var badServerSalt = (BadServerSalt) badMsgNotification;
+                serverSalt = badServerSalt.newServerSalt();
             }
 
+            updateTimeOffset((int) (messageId >> 32));
             emitUnwrapped(badMsgNotification.badMsgId());
             return Mono.empty();
         }

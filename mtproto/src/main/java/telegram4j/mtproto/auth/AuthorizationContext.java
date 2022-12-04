@@ -20,7 +20,7 @@ public final class AuthorizationContext {
     private volatile long serverSalt;
     private volatile ByteBuf authAuxHash;
     private volatile ServerDHParams serverDHParams;
-    private volatile int serverTime;
+    private volatile int serverTimeDiff;
     private final AtomicInteger retry = new AtomicInteger();
 
     public AuthorizationContext(PublicRsaKeyRegister publicRsaKeyRegister) {
@@ -87,16 +87,16 @@ public final class AuthorizationContext {
         return retry;
     }
 
-    public int getServerTime() {
-        return serverTime;
+    public int getServerTimeDiff() {
+        return serverTimeDiff;
     }
 
     public PublicRsaKeyRegister getPublicRsaKeyRegister() {
         return publicRsaKeyRegister;
     }
 
-    public void setServerTime(int serverTime) {
-        this.serverTime = serverTime;
+    public void setServerTimeDiff(int serverTimeDiff) {
+        this.serverTimeDiff = serverTimeDiff;
     }
 
     public void reset() {
@@ -111,7 +111,7 @@ public final class AuthorizationContext {
         serverNonce = null;
         authKey = null;
         serverSalt = 0;
-        serverTime = 0;
+        serverTimeDiff = 0;
         authAuxHash = null;
         serverDHParams = null;
         retry.set(0);

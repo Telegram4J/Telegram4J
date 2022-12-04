@@ -223,7 +223,7 @@ public final class AuthorizationHandler {
 
         BigInteger authKey = ga.modPow(b, dhPrime);
 
-        context.setServerTime(serverDHInnerData.serverTime());
+        context.setServerTimeDiff(serverDHInnerData.serverTime() - Math.toIntExact(System.currentTimeMillis()/1000));
         context.setAuthKey(alignKeyZero(toByteBuf(authKey), 256));
         context.setAuthAuxHash(sha1Digest(context.getAuthKey()).slice(0, 8));
 
