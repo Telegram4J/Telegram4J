@@ -59,6 +59,7 @@ class UploadMono extends Mono<InputFile> {
         final MTProtoClientGroup clientGroup;
         final UploadOptions options;
         final AtomicInteger received = new AtomicInteger();
+        final AtomicInteger requested = new AtomicInteger();
 
         Subscription subscription;
         int state;
@@ -69,6 +70,8 @@ class UploadMono extends Mono<InputFile> {
             this.actual = actual;
             this.clientGroup = clientGroup;
             this.options = options;
+
+            this.requested.setRelease(options.getParallelism());
         }
 
         void send(ByteBuf buf) {
@@ -104,8 +107,14 @@ class UploadMono extends Mono<InputFile> {
                                     part.filePart() + 1, cnt, options.getPartsCount());
                         }
 
+                        int d = requested.decrementAndGet();
                         if (cnt == options.getPartsCount()) {
                             completeInner();
+                        } else if (d == 0) {
+                            int remain = options.getPartsCount() - readParts;
+                            int r = Math.min(options.getParallelism(), remain);
+                            requested.set(r);
+                            subscription.request(r);
                         }
                     }, this::onError);
         }
@@ -203,7 +212,7 @@ class UploadMono extends Mono<InputFile> {
                             .subscribeOn(Schedulers.boundedElastic())
                             .subscribe(client -> {
                                 if (pending.decrementAndGet() == 0) {
-                                    subscription.request(options.getPartsCount());
+                                    subscription.request(Math.min(options.getParallelism(), options.getPartsCount()));
                                 }
                             }, this::onError);
                 }
