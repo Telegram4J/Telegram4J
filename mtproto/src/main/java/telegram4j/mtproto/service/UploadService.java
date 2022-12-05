@@ -40,6 +40,7 @@ public class UploadService extends RpcService {
 
     static final int MAX_PARTS_COUNT = 4000; // it's for users with tg premium; for other users limit is 3000
     static final long MAX_FILE_SIZE = 4L * 1000 * 1024 * 1024; // 4gb for premium users; for other = 2gb
+    static final int MAX_INFLIGHT_REQUESTS = 3; // optimal count of pending upload.getFile requests
 
     public UploadService(MTProtoClientGroup groupManager, StoreLayout storeLayout) {
         super(groupManager, storeLayout);
@@ -85,25 +86,24 @@ public class UploadService extends RpcService {
         ImmutableGetFile request = ImmutableGetFile.of(precise ? ImmutableGetFile.PRECISE_MASK : 0,
                 fileRefId.asLocation().orElseThrow(), baseOffset, limit);
 
-        return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
+        return Flux.defer(() -> Flux.range(0, MAX_INFLIGHT_REQUESTS))
+                .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
+                .repeat(() -> !complete.get())
                 .cast(BaseFile.class)
                 .mapNotNull(part -> {
-                    offset.addAndGet(limit);
                     if (part.type() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
                         complete.set(true);
                         return null;
                     }
-
                     return part;
-                })
-                .repeat(() -> !complete.get());
+                });
     }
 
     @Compatible(Type.BOTH)
     public Flux<BaseFile> getFile(FileReferenceId location,
                                   int offset, int limit, boolean precise) {
         if (offset < 0) return Flux.error(new IllegalArgumentException("offset is negative"));
-        if (limit < 0) return Flux.error(new IllegalArgumentException("limit is negative"));
+        if (limit <= 0) return Flux.error(new IllegalArgumentException("limit is not positive"));
 
         if (!precise) {
             if (offset % (4*1024) != 0)
@@ -145,7 +145,9 @@ public class UploadService extends RpcService {
 
             ImmutableGetWebFile request = ImmutableGetWebFile.of(location, baseOffset, limit);
 
-            return Flux.defer(() -> client.sendAwait(request.withOffset(offset.get())))
+            return Flux.defer(() -> Flux.range(0, MAX_INFLIGHT_REQUESTS))
+                    .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
+                    .repeat(() -> !complete.get())
                     .mapNotNull(part -> {
                         offset.addAndGet(limit);
                         if (part.fileType() == FileType.UNKNOWN || !part.bytes().isReadable()) { // download completed
