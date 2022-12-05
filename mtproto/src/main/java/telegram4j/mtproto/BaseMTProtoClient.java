@@ -6,7 +6,6 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
 import reactor.core.Scannable;
 import reactor.core.publisher.Flux;
@@ -318,7 +317,6 @@ class BaseMTProtoClient implements MTProtoClient {
 
             Mono<Void> outboundHandler = Flux.merge(authFlux, outboundFlux)
                     .flatMap(b -> FutureMono.from(connection.channel().writeAndFlush(b)))
-                    .doOnDiscard(ByteBuf.class, ReferenceCountUtil::safeRelease)
                     .then();
 
             // Pings will send with MsgsAck and MsgsStateReq in container
@@ -335,7 +333,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
             Mono<AuthorizationHandler> initializeAuthHandler = options.getStoreLayout().getPublicRsaKeyRegister()
                     .switchIfEmpty(Mono.defer(() -> {
-                        var pubRsaKeyReg = options.publicRsaKeyRegister.get();
+                        var pubRsaKeyReg = options.getPublicRsaKeyRegister().get();
                         return options.getStoreLayout().updatePublicRsaKeyRegister(pubRsaKeyReg)
                                 .thenReturn(pubRsaKeyReg);
                     }))
@@ -665,7 +663,7 @@ class BaseMTProtoClient implements MTProtoClient {
 
     private TcpClient initTcpClient(TcpClient tcpClient) {
         return tcpClient
-                .remoteAddress(() -> new InetSocketAddress(dataCenter.getAddress(), dataCenter.getPort()))
+                .remoteAddress(() -> InetSocketAddress.createUnresolved(dataCenter.getAddress(), dataCenter.getPort()))
                 .observe((con, st) -> {
                     if (st == ConnectionObserver.State.CONFIGURED) {
                         if (log.isDebugEnabled()) {
@@ -930,9 +928,10 @@ class BaseMTProtoClient implements MTProtoClient {
 
                 if (rpcLog.isDebugEnabled()) {
                     StringJoiner st = new StringJoiner(", ");
-                    int i = 0;
-                    for (long msgId : original.msgIds()) {
-                        st.add("0x" + Long.toHexString(msgId) + "/" + (c.getByte(i++) & 7));
+                    List<Long> msgIds = original.msgIds();
+                    for (int i = 0; i < msgIds.size(); i++) {
+                        long msgId = msgIds.get(i);
+                        st.add("0x" + Long.toHexString(msgId) + "/" + (c.getByte(i) & 7));
                     }
 
                     rpcLog.debug("[C:0x{}, M:0x{}] Received states: [{}]", id, Long.toHexString(inf.reqMsgId()), st);
@@ -1038,9 +1037,10 @@ class BaseMTProtoClient implements MTProtoClient {
     }
 
     private void emitUnwrapped(long possibleCntMsgId) {
-        Request request = requests.remove(possibleCntMsgId);
+        Request request = requests.get(possibleCntMsgId);
         if (request instanceof ContainerRequest) {
             var container = (ContainerRequest) request;
+            requests.remove(possibleCntMsgId);
             emitUnwrappedContainer(container);
         } else if (request instanceof ContainerizedRequest) {
             var cntMessage = (ContainerizedRequest) request;
@@ -1049,6 +1049,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 emitUnwrappedContainer(cnt);
             }
         } else if (request instanceof RpcRequest) {
+            requests.remove(possibleCntMsgId);
             outbound.emitNext((RpcRequest) request, options.getEmissionHandler());
         }
     }
@@ -1130,7 +1131,7 @@ class BaseMTProtoClient implements MTProtoClient {
                 prettyMethodName(request.method), error.errorCode(),
                 error.errorMessage());
 
-        return new RpcException(format, error);
+        return new RpcException(format, error, request.method);
     }
 
     static class RpcRequest implements Request {
