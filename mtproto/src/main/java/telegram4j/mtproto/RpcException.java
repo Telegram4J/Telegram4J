@@ -1,5 +1,6 @@
 package telegram4j.mtproto;
 
+import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
 import java.util.Objects;
@@ -11,10 +12,12 @@ public class RpcException extends MTProtoException {
     private static final long serialVersionUID = 909166276209425603L;
 
     private final RpcError error;
+    private final TlMethod<?> method;
 
-    public RpcException(String message, RpcError error) {
+    public RpcException(String message, RpcError error, TlMethod<?> method) {
         super(message);
         this.error = Objects.requireNonNull(error);
+        this.method = Objects.requireNonNull(method);
     }
 
     /**
@@ -76,5 +79,14 @@ public class RpcException extends MTProtoException {
      */
     public RpcError getError() {
         return error;
+    }
+
+    /**
+     * Gets original request which received this error.
+     *
+     * @return The original {@link TlMethod} request.
+     */
+    public TlMethod<?> getMethod() {
+        return method;
     }
 }
