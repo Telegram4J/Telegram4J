@@ -10,10 +10,8 @@ public interface AuthorisationHandler {
 
     /**
      * Begins user authorization with specified resources.
-     *
-     * <p> Implementation may emit empty signals to disconnect client and
-     * cancel bootstrap. This method may be invoked again after redirecting to correct DC.
-     * All RPC errors with code 303 should not be handled.
+     * Implementation may emit empty signals to disconnect client and
+     * cancel bootstrap.
      *
      * @return A {@link Mono} which emits {@link BaseAuthorization} on successful completion or empty signals
      * to disconnect client.

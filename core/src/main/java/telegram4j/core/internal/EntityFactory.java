@@ -479,16 +479,13 @@ public class EntityFactory {
 
         if (stickerData != null || emojiData != null) {
             var stickerInfo = Variant2.of(stickerData, emojiData);
-            if (emojiData != null) {
-                context = Context.noOpContext();
-            } else if (!(context instanceof StickerSetContext)) {
+            if (!(context instanceof StickerSetContext)) {
                 // This context is more reliable, because even after deleting
                 // the context message with sticker, sticker will remain available
                 context = Context.createStickerSetContext(stickerInfo
                         .map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset));
             }
-            return new Sticker(client, data, fileName, context,
-                    Variant2.of(stickerData, emojiData), Variant2.of(sizeData, videoData));
+            return new Sticker(client, data, fileName, context, stickerInfo, Variant2.of(sizeData, videoData));
         }
 
         if (audioData != null) {

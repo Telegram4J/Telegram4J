@@ -60,4 +60,4 @@ public class ExampleReplyBot {
 }
 ```
 
-For additional examples, check [this packages](https://github.com/Telegram4J/Telegram4J/tree/master/core/src/test/java/telegram4j/core) in the repository
+For additional examples, check [this packages](https://github.com/Telegram4J/Telegram4J/tree/master/core/src/test/java/telegram4j/example) in the repository

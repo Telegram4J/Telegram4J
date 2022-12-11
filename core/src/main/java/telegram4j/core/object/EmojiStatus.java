@@ -1,20 +1,38 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Representation of premium user status with custom emoji. */
-public class EmojiStatus {
+public class EmojiStatus implements TelegramObject {
+    private final MTProtoTelegramClient client;
     private final long documentId;
     @Nullable
     private final Instant untilTimestamp;
 
-    public EmojiStatus(long documentId, @Nullable Instant untilTimestamp) {
+    public EmojiStatus(MTProtoTelegramClient client, long documentId, @Nullable Instant untilTimestamp) {
+        this.client = Objects.requireNonNull(client);
         this.documentId = documentId;
         this.untilTimestamp = untilTimestamp;
+    }
+
+    @Override
+    public MTProtoTelegramClient getClient() {
+        return client;
+    }
+
+    /**
+     * Requests to retrieve {@link Sticker custom emoji} represented by this status.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+     */
+    public Mono<Sticker> getCustomEmoji() {
+        return client.getCustomEmoji(documentId);
     }
 
     /**

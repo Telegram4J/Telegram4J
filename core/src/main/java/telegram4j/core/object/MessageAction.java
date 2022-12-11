@@ -1204,6 +1204,35 @@ public class MessageAction implements TelegramObject {
             return Duration.ofSeconds(data.period());
         }
 
+        /**
+         * Gets id of user from which default setting was automatically applied, if present.
+         *
+         * @return The id of user from which default setting was automatically applied, if present.
+         */
+        public Optional<Id> getAutoSettingFromUserId() {
+            return Optional.ofNullable(data.autoSettingFrom()).map(Id::ofUser);
+        }
+
+        /**
+         * Requests to retrieve user from which default setting was automatically applied.
+         *
+         * @return A {@link Mono} emitting on successful completion user.
+         */
+        public Mono<User> getAutoSettingFromUser() {
+            return getAutoSettingFromUser(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve user from which default setting was automatically applied
+         * using specified retrieval strategy.
+         *
+         * @return A {@link Mono} emitting on successful completion user.
+         */
+        public Mono<User> getAutoSettingFromUser(EntityRetrievalStrategy strategy) {
+            return Mono.justOrEmpty(getAutoSettingFromUserId())
+                    .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
+        }
+
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
@@ -1331,6 +1360,11 @@ public class MessageAction implements TelegramObject {
          */
         public Optional<Boolean> isClosed() {
             return Optional.ofNullable(data.closed());
+        }
+
+        // TODO: docs
+        public Optional<Boolean> isHidden() {
+            return Optional.ofNullable(data.hidden());
         }
     }
 }

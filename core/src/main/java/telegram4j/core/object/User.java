@@ -203,10 +203,10 @@ public class User implements MentionablePeer {
                     switch (e.identifier()) {
                         case BaseEmojiStatus.ID:
                             BaseEmojiStatus base = (BaseEmojiStatus) e;
-                            return new EmojiStatus(base.documentId(), null);
+                            return new EmojiStatus(client, base.documentId(), null);
                         case EmojiStatusUntil.ID:
                             EmojiStatusUntil until = (EmojiStatusUntil) e;
-                            return new EmojiStatus(until.documentId(), Instant.ofEpochSecond(until.until()));
+                            return new EmojiStatus(client, until.documentId(), Instant.ofEpochSecond(until.until()));
                         default: throw new IllegalStateException("Unknown EmojiStatus type: " + e);
                     }
                 });

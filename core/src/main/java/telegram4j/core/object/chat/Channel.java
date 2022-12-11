@@ -503,7 +503,9 @@ public interface Channel extends Chat, MentionablePeer {
 
         // ChannelFull flags2
 
-        CAN_DELETE_CHANNEL(CAN_DELETE_CHANNEL_POS);
+        CAN_DELETE_CHANNEL(CAN_DELETE_CHANNEL_POS),
+
+        ANTISPAM(ANTISPAM_POS);
 
         private final byte position;
 
