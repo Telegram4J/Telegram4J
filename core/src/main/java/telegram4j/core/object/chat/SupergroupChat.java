@@ -182,9 +182,14 @@ public final class SupergroupChat extends BaseChannel {
                         .setStickers(channel, stickerSetId));
     }
 
-    @Override
-    public Mono<AffectedHistory> unpinAllMessages(@Nullable Integer topMessageId) {
-        return super.unpinAllMessages(topMessageId);
+    /**
+     * Requests to unpin all messages in forum topic.
+     *
+     * @param topMessageId The message id of the top message of topic.
+     * @return A {@link Mono} emitting on successful completion {@link AffectedHistory} with affected history range.
+     */
+    public Mono<AffectedHistory> unpinAllMessages(int topMessageId) {
+        return unpinAllMessages0(topMessageId);
     }
 
     @Override

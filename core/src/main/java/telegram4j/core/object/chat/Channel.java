@@ -427,15 +427,12 @@ public interface Channel extends Chat, MentionablePeer {
         /** Is this channel verified by telegram? */
         VERIFIED(VERIFIED_POS),
 
-        /** Whether viewing/writing in this channel for a reason (see {@link Channel#getRestrictionReason()}) */
-        RESTRICTED(RESTRICTED_POS),
-
-        /** Whether signatures are enabled (channels). */
+        /** Whether signatures are enabled for channel posts. */
         SIGNATURES(SIGNATURES_POS),
 
         MIN(MIN_POS),
 
-        /** This channel/supergroup is probably a scam. */
+        /** Whether this channel is probably a scam. */
         SCAM(CREATOR_POS),
 
         /** Whether this channel has a private join link. */
@@ -453,10 +450,7 @@ public interface Channel extends Chat, MentionablePeer {
         /** Whether there's anyone in the group call or livestream. */
         CALL_NOT_EMPTY(CALL_NOT_EMPTY_POS),
 
-        /**
-         * If set, this supergroup/channel was reported by many users
-         * as a fake or scam: be careful when interacting with it.
-         */
+        /** Whether this channel is marked as a fake. */
         FAKE(FAKE_POS),
 
         /** Whether this supergroup is a gigagroup. */
@@ -465,8 +459,10 @@ public interface Channel extends Chat, MentionablePeer {
         /** Whether this channel or group is protected, thus does not allow forwarding messages from it. */
         NO_FORWARDS(NOFORWARDS_POS),
 
-        JOIN_TO_SEND(JOIN_TO_SEND_POS),
+        /** Whether user must join to the discussion group to comment channel posts. */
+        JOIN_TO_SEND_MESSAGE(JOIN_TO_SEND_POS),
 
+        /** Whether a user's join request will have to be approved by admins of channel. */
         JOIN_REQUEST(JOIN_REQUEST_POS),
 
         // ChannelFull flags
@@ -483,13 +479,13 @@ public interface Channel extends Chat, MentionablePeer {
         /** Is the history before we joined hidden to us? */
         HIDDEN_PREHISTORY(HIDDEN_PREHISTORY_POS),
 
-        /** Can we set the geolocation of this group (for geogroups)? */
+        /** Can we set the geolocation of this supergroup? */
         CAN_SET_LOCATION(CAN_SET_LOCATION_POS),
 
         /** Whether scheduled messages are available. */
         HAS_SCHEDULED(HAS_SCHEDULED_POS),
 
-        /** Can the user view <a href="https://core.telegram.org/api/stats">channel/supergroup statistics</a>. */
+        /** Can the user view <a href="https://core.telegram.org/api/stats">channel statistics</a>. */
         CAN_VIEW_STATS(CAN_VIEW_STATS_POS),
 
         /**
@@ -503,6 +499,7 @@ public interface Channel extends Chat, MentionablePeer {
 
         // ChannelFull flags2
 
+        /** Can we delete this channel? */
         CAN_DELETE_CHANNEL(CAN_DELETE_CHANNEL_POS),
 
         ANTISPAM(ANTISPAM_POS);
@@ -532,6 +529,8 @@ public interface Channel extends Chat, MentionablePeer {
 
                 int flags = fullData.flags();
                 // well done, telegram, good solution
+                // upd: I expected this to be a temporary solution...
+                //  But no, they are going nothing to improve their Type Language
                 int flags2 = fullData.flags2();
 
                 set.removeIf(value -> value.ordinal() < CAN_VIEW_PARTICIPANTS.ordinal() ||

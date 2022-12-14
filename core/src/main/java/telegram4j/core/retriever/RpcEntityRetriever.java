@@ -12,6 +12,7 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.util.Id;
@@ -232,13 +233,13 @@ public class RpcEntityRetriever implements EntityRetriever {
                     return client.asInputChannel(chatId)
                             .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
                             .flatMapMany(channel -> {
-                                var channelId = Id.of(channel, client.getSelfId());
+                                Id channelId = Id.of(channel, client.getSelfId());
                                 return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
                                                         .getParticipants(channel, ImmutableChannelParticipantsSearch.of(""), o, 200, 0),
                                                 BaseChannelParticipants::count, 0, 200)
                                         .flatMap(data -> {
                                             var chats = data.chats().stream()
-                                                    .map(c -> EntityFactory.createChat(client, c, null))
+                                                    .map(c -> (Channel) EntityFactory.createChat(client, c, null))
                                                     .filter(Objects::nonNull)
                                                     .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
                                             var users = data.users().stream()
@@ -255,7 +256,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                                                                 peer = users.get(peerId);
                                                                 break;
                                                             case CHANNEL:
-                                                                peer = (MentionablePeer) chats.get(peerId);
+                                                                peer = chats.get(peerId);
                                                                 break;
                                                             default:
                                                                 throw new IllegalStateException();

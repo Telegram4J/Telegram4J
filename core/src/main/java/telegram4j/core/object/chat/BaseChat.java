@@ -149,10 +149,10 @@ abstract class BaseChat implements Chat {
 
     @Override
     public Mono<AffectedHistory> unpinAllMessages() {
-        return unpinAllMessages(null);
+        return unpinAllMessages0(null);
     }
 
-    protected Mono<AffectedHistory> unpinAllMessages(@Nullable Integer topMessageId) {
+    protected Mono<AffectedHistory> unpinAllMessages0(@Nullable Integer topMessageId) {
         Id id = getId();
         return client.asInputPeer(id)
                 .switchIfEmpty(MappingUtil.unresolvedPeer(id))

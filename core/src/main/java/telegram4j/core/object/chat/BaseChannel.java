@@ -389,7 +389,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                 .getParticipants(channel, filter, o, limit, 0), BaseChannelParticipants::count, offset, limit)
                         .flatMap(data -> {
                             var chats = data.chats().stream()
-                                    .map(c -> EntityFactory.createChat(client, c, null))
+                                    .map(c -> (Channel) EntityFactory.createChat(client, c, null))
                                     .filter(Objects::nonNull)
                                     .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
                             var users = data.users().stream()
@@ -406,7 +406,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                                 peer = users.get(peerId);
                                                 break;
                                             case CHANNEL:
-                                                peer = (MentionablePeer) chats.get(peerId);
+                                                peer = chats.get(peerId);
                                                 break;
                                             default:
                                                 throw new IllegalStateException();

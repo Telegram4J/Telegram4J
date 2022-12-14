@@ -142,7 +142,7 @@ public interface Chat extends PeerEntity {
     Flux<Message> forwardMessages(ForwardMessagesSpec spec, PeerId toPeer);
 
     /**
-     * Requests tp unpin all messages in chat.
+     * Requests to unpin all messages in chat.
      *
      * @return A {@link Mono} emitting on successful completion {@link AffectedHistory} with affected history range.
      */
