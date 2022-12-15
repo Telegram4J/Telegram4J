@@ -6,6 +6,7 @@ import io.netty.buffer.Unpooled;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
+import telegram4j.tl.request.upload.GetFile;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -345,6 +346,9 @@ public final class FileReferenceId {
 
     /**
      * Gets the thumbnail transformation type, if file has it.
+     * @apiNote {@link GetFile} will return a thumb at the first instead
+     * of the file itself if file has it and has {@link Type#DOCUMENT} type. To download only file content
+     * you should update this id via {@code fileRefId.withThumbSizeType('\0')} before downloading.
      *
      * @return The thumbnail transformation type, if applicable, otherwise {@code '\0'}.
      */
@@ -395,9 +399,8 @@ public final class FileReferenceId {
 
     /**
      * Creates a {@link InputFileLocation} from this reference,
-     * which used in {@link telegram4j.tl.request.upload.GetFile} method.
-     * <p>
-     * Web files would be ignored, use {@link #asWebLocation()}.
+     * which used in {@link GetFile} method.
+     * <p> Web files would be ignored, use {@link #asWebLocation()}.
      *
      * @return The new {@link InputFileLocation} from this reference.
      */

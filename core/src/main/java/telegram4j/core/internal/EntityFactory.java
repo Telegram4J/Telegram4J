@@ -481,7 +481,9 @@ public class EntityFactory {
             var stickerInfo = Variant2.of(stickerData, emojiData);
             if (!(context instanceof StickerSetContext)) {
                 // This context is more reliable, because even after deleting
-                // the context message with sticker, sticker will remain available
+                // the context message with sticker, sticker will remain available.
+                // And this assignment doesn't contradict the concept of context, which
+                // consist in providing 'the most reliable way to update a file reference'
                 context = Context.createStickerSetContext(stickerInfo
                         .map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset));
             }

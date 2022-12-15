@@ -68,6 +68,9 @@ public class MTProtoBotExample {
                             })
                             .then();
 
+                    // If your bot doesn't respond to any message in the group,
+                    // then try to disable a privacy mode in the BotFather's settings:
+                    // /setprivacy -> <choose your bot> -> Disable
                     Mono<Void> listenMessages = client.on(SendMessageEvent.class)
                             .flatMap(e -> Mono.just(e.getMessage().getEntities())
                                     .filter(list -> !list.isEmpty() && list.get(0).getType() == MessageEntity.Type.BOT_COMMAND)

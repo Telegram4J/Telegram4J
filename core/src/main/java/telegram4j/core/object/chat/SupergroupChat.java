@@ -57,10 +57,12 @@ public final class SupergroupChat extends BaseChannel {
     // ChannelFull fields
 
     /**
-     * Gets id of the group chat from which this supergroup was migrated, if full data about chat is available and present.
+     * Gets id of the group chat from which this supergroup was migrated,
+     * if full data about chat is available and present.
      *
      * @see <a href="https://core.telegram.org/api/channel#migration">Chat Migration</a>
-     * @return The id of the group chat from which this supergroup was migrated, if full data about chat is available and present.
+     * @return The id of the group chat from which this supergroup was migrated,
+     * if full data about chat is available and present.
      */
     public Optional<Id> getMigratedFromChatId() {
         return Optional.ofNullable(fullData)
@@ -90,10 +92,12 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     /**
-     * Gets id of the latest message from which chat been migrated to the supergroup, if full data about chat is available and present.
+     * Gets id of the latest message from which chat been migrated to the supergroup,
+     * if full data about chat is available and present.
      *
      * @see <a href="https://core.telegram.org/api/channel#migration">Chat Migration</a>
-     * @return The id of the latest message from which chat been migrated to the supergroup, if full data about chat is available and present.
+     * @return The id of the latest message from which chat been migrated to the supergroup,
+     * if full data about chat is available and present.
      */
     public Optional<Integer> getMigratedFromMaxId() {
         return Optional.ofNullable(fullData).map(ChannelFull::migratedFromMaxId);
@@ -169,7 +173,7 @@ public final class SupergroupChat extends BaseChannel {
     }
 
     /**
-     * Requests to associate new stickerset with this channel.
+     * Requests to associate new stickerset with this group.
      *
      * @param stickerSetId The id of sticker set to associate.
      * @return A {@link Mono} emitting on successful completion boolean, indicates result.
@@ -185,7 +189,7 @@ public final class SupergroupChat extends BaseChannel {
     /**
      * Requests to unpin all messages in forum topic.
      *
-     * @param topMessageId The message id of the top message of topic.
+     * @param topMessageId The id of the top message in topic.
      * @return A {@link Mono} emitting on successful completion {@link AffectedHistory} with affected history range.
      */
     public Mono<AffectedHistory> unpinAllMessages(int topMessageId) {

@@ -55,6 +55,7 @@ public class ExampleReplyBot {
                                 .withReplyTo(e.getMessage()))))
                 .subscribe();
 
+        // wait until the client is stopped through `client.disconnect()`
         client.onDisconnect().block();
     }
 }
