@@ -3,11 +3,13 @@ package telegram4j.core.event;
 import reactor.bool.BooleanUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
+import reactor.util.concurrent.Queues;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.dispatcher.UpdateContext;
@@ -50,7 +52,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     protected final MTProtoTelegramClient client;
     protected final Options options;
-    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel());
+    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel(),
+            Sinks.many().unicast().onBackpressureBuffer(Queues.<Long>get(Queues.XS_BUFFER_SIZE).get()));
 
     protected volatile int pts = -1;
     protected volatile int qts = -1;
@@ -257,11 +260,6 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     protected Mono<Void> saveStateIf(boolean needSave) {
         if (!needSave) {
-            return Mono.empty();
-        }
-
-        // TODO: fix
-        if (pts == -1 || qts == -1 || date == -1 || seq == -1) {
             return Mono.empty();
         }
 
@@ -630,7 +628,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         Flux<Event> mapUpdate = UpdatesMapper.instance.handle(ctx);
 
         if (ctx.getUpdate() instanceof PtsUpdate) {
-            PtsUpdate ptsUpdate = (PtsUpdate) ctx.getUpdate();
+            var ptsUpdate = (PtsUpdate) ctx.getUpdate();
 
             long channelId = -1;
             switch (ptsUpdate.identifier()) {
@@ -730,8 +728,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                     id, ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
 
                             return client.getMtProtoResources().getStoreLayout().resolveChannel(id)
-                                    .flatMapMany(c -> getChannelDifference(c, pts))
-                                    .concatWith(mapUpdate);
+                                    .flatMapMany(c -> getChannelDifference(c, pts));
                         } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
                             return Flux.empty();
                         }
@@ -744,7 +741,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
 
         if (ctx.getUpdate() instanceof QtsUpdate) {
-            QtsUpdate qtsUpdate = (QtsUpdate) ctx.getUpdate();
+            var qtsUpdate = (QtsUpdate) ctx.getUpdate();
             boolean botQtsUpdate = qtsUpdate.identifier() != UpdateNewEncryptedMessage.ID;
 
             int qts = this.qts;

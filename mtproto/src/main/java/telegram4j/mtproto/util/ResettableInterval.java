@@ -8,15 +8,21 @@ import reactor.core.scheduler.Scheduler;
 import reactor.util.concurrent.Queues;
 
 import java.time.Duration;
+import java.util.Objects;
 
 public final class ResettableInterval implements Disposable {
     private final Scheduler timerScheduler;
     private final Disposable.Swap swap = Disposables.swap();
-    private final Sinks.Many<Long> ticks = Sinks.many().multicast()
-            .onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false);
+    private final Sinks.Many<Long> sink;
 
     public ResettableInterval(Scheduler timerScheduler) {
-        this.timerScheduler = timerScheduler;
+        this(timerScheduler, Sinks.many().multicast()
+                .onBackpressureBuffer(Queues.XS_BUFFER_SIZE, false));
+    }
+
+    public ResettableInterval(Scheduler timerScheduler, Sinks.Many<Long> sink) {
+        this.timerScheduler = Objects.requireNonNull(timerScheduler);
+        this.sink = Objects.requireNonNull(sink);
     }
 
     public void start(Duration period) {
@@ -25,24 +31,20 @@ public final class ResettableInterval implements Disposable {
 
     public void start(Duration delay, Duration period) {
         swap.update(Flux.interval(delay, period, timerScheduler)
-                .subscribe(tick -> ticks.emitNext(tick, Sinks.EmitFailureHandler.FAIL_FAST)));
+                .subscribe(tick -> sink.emitNext(tick, Sinks.EmitFailureHandler.FAIL_FAST)));
     }
 
     public Flux<Long> ticks() {
-        return ticks.asFlux();
+        return sink.asFlux();
     }
 
     @Override
     public void dispose() {
-        Disposable d = swap.get();
-        if (d != null) {
-            d.dispose();
-        }
+        swap.dispose();
     }
 
     @Override
     public boolean isDisposed() {
-        Disposable d = swap.get();
-        return d != null && d.isDisposed();
+        return swap.isDisposed();
     }
 }
