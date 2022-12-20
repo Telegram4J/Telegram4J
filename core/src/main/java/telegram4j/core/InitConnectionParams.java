@@ -99,9 +99,9 @@ public final class InitConnectionParams {
      * Gets the client OS ISO 639-1 language code.
      *
      * <p>Example to get ISO 639-1 lang codes.
-     * <pre>
+     * <pre>{@code
      * String langCode = Locale.getDefault().getLanguage().toLowerCase(Locale.ROOT).
-     * </pre>
+     * }</pre>
      *
      * @return The ISO 639-1 lang code of the client.
      */
@@ -158,11 +158,11 @@ public final class InitConnectionParams {
      * for specifying timezone offset in seconds.
      *
      * <p>Example of getting time zone offset
-     * <pre>
+     * <pre>{@code
      * JsonNode node = JsonNodeFactory.instance.objectNode()
      *         .put("tz_offset", java.util.TimeZone.getDefault()
      *                 .getRawOffset() / 1000d);
-     * </pre>
+     * }</pre>
      *
      * @return The json object node with additional {@literal double} property {@code tz_offset}, if present
      */

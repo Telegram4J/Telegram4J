@@ -109,6 +109,7 @@ public class MessageReplies implements TelegramObject {
 
     /**
      * Gets id of discussion supergroup, if present.
+     * Always present when {@link #isComments()} flag is set.
      *
      * @see <a href="https://core.telegram.org/api/discussion">Discussion Supergroups</a>
      * @return The id of discussion supergroup, if present.

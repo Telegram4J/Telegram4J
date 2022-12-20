@@ -58,6 +58,7 @@ public interface Channel extends Chat, MentionablePeer {
      *
      * @return The list of reasons for why access to this channel must be restricted, if present.
      */
+    @Override
     Optional<List<RestrictionReason>> getRestrictionReason();
 
     /**

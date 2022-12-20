@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * Low-quality chat profile photo.
  *
- * <p>There are 2 versions available for download: small ({@link ProfilePhoto#getSmallFileReferenceId()})
+ * <p> There are 2 versions available for download: small ({@link ProfilePhoto#getSmallFileReferenceId()})
  * and big ({@link ProfilePhoto#getBigFileReferenceId()}).
  */
 public class ProfilePhoto implements TelegramObject {
@@ -56,9 +56,9 @@ public class ProfilePhoto implements TelegramObject {
     }
 
     /**
-     * Gets whether chat has animated photo.
+     * Gets whether peer has animated profile photo.
      *
-     * @return {@code true} if chat has animated photo.
+     * @return {@code true} if peer has animated profile photo.
      */
     public boolean hasVideo() {
         return data.hasVideo();

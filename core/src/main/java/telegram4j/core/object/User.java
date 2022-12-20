@@ -129,6 +129,7 @@ public class User implements MentionablePeer {
      *
      * @return The {@link ProfilePhoto photo} of user, if present.
      */
+    @Override
     public Optional<ProfilePhoto> getMinPhoto() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
                 .map(c -> new ProfilePhoto(client, c, photoInputPeer(minData)));
@@ -140,6 +141,7 @@ public class User implements MentionablePeer {
      *
      * @return The {@link Photo photo} of user, if present.
      */
+    @Override
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
@@ -170,6 +172,7 @@ public class User implements MentionablePeer {
      *
      * @return The list of reasons for why access to this user must be restricted, if present.
      */
+    @Override
     public Optional<List<RestrictionReason>> getRestrictionReason() {
         return Optional.ofNullable(minData.restrictionReason());
     }
@@ -219,6 +222,7 @@ public class User implements MentionablePeer {
      *
      * @return The user's bio text, if full information available and present.
      */
+    @Override
     public Optional<String> getAbout() {
         return Optional.ofNullable(fullData).map(UserFull::about);
     }

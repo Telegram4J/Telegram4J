@@ -91,9 +91,9 @@ public interface Chat extends PeerEntity {
     Optional<PeerNotifySettings> getNotifySettings();
 
     /**
-     * Gets text of channel description or user about field, if present.
+     * Gets text of channel description, if present.
      *
-     * @return The text of channel description or user about field, if present.
+     * @return The text of channel description, if present.
      */
     Optional<String> getAbout();
 
