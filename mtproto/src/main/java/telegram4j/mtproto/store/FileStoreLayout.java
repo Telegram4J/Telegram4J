@@ -419,8 +419,8 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<DataCenter> getWebfileDataCenter() {
-        return entityDelegate.getWebfileDataCenter();
+    public Mono<Config> getConfig() {
+        return entityDelegate.getConfig();
     }
 
     //////

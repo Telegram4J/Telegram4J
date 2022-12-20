@@ -46,7 +46,7 @@ public interface StoreLayout {
 
     Mono<DcOptions> getDcOptions();
 
-    Mono<DataCenter> getWebfileDataCenter();
+    Mono<Config> getConfig();
 
     Mono<PublicRsaKeyRegister> getPublicRsaKeyRegister();
 

@@ -10,8 +10,9 @@ import reactor.util.Loggers;
 import reactor.util.retry.Retry;
 import telegram4j.core.AuthorizationResources;
 import telegram4j.mtproto.DataCenter;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.mtproto.util.ResettableInterval;
@@ -49,13 +50,14 @@ public class QrCodeAuthorization {
 
             int apiId = authResources.getApiId();
             String apiHash = authResources.getApiHash();
-            ResettableInterval inter = new ResettableInterval(Schedulers.parallel());
+            ResettableInterval inter = new ResettableInterval(Schedulers.boundedElastic());
 
             var listenTokens = clientGroup.main().updates().asFlux()
                     .takeUntil(u -> complete.get())
                     .ofType(UpdateShort.class)
                     .filter(u -> u.update().identifier() == UpdateLoginToken.ID)
-                    .flatMap(l -> clientGroup.main().sendAwait(ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
+                    .publishOn(Schedulers.boundedElastic()) // do not block to wait 2FA password
+                    .flatMap(l -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
                     .flatMap(token -> {
                         switch (token.identifier()) {
                             case LoginTokenSuccess.ID:
@@ -66,6 +68,7 @@ public class QrCodeAuthorization {
 
                                 log.info("Redirecting to the DC {}", migrate.dcId());
                                 return storeLayout.getDcOptions()
+                                        // TODO: request help.GetConfig if DC not found
                                         .map(dcOpts -> dcOpts.find(DataCenter.Type.REGULAR, migrate.dcId())
                                                 .orElseThrow(() -> new IllegalStateException("Could not find DC " + migrate.dcId()
                                                         + " for redirecting main client")))
@@ -99,7 +102,7 @@ public class QrCodeAuthorization {
             inter.start(Duration.ofMinutes(1)); // stub period
 
             var qrDisplay = inter.ticks()
-                    .flatMap(tick -> clientGroup.main().sendAwait(ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
+                    .flatMap(tick -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
                     .cast(BaseLoginToken.class)
                     .doOnNext(b -> {
                         Duration dur = Duration.ofSeconds(b.expires() - (System.currentTimeMillis() / 1000));

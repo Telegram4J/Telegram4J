@@ -5,7 +5,8 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.MonoSink;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.tl.ImmutableBaseInputCheckPasswordSRP;
 import telegram4j.tl.PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow;
 import telegram4j.tl.auth.Authorization;
@@ -43,7 +44,7 @@ class TwoFactorAuthHandler {
     // Ported version of https://gist.github.com/andrew-ld/524332536dbc8c525ed80d281855a0d4 and
     // https://github.com/DrKLO/Telegram/blob/abb896635f849a93968a2ba35a944c91b4978be4/TMessagesProj/src/main/java/org/telegram/messenger/SRPHelper.java#L29
     Mono<Authorization> begin2FA() {
-        return clientGroup.main().sendAwait(GetPassword.instance()).flatMap(pswrd -> {
+        return clientGroup.send(DcId.main(), GetPassword.instance()).flatMap(pswrd -> {
             if (!pswrd.hasPassword()) {
                 return Mono.error(new IllegalStateException("?".repeat(1 << 4)));
             }
@@ -121,7 +122,7 @@ class TwoFactorAuthHandler {
             long srpId = Objects.requireNonNull(pswrd.srpId());
             var icpsrp = ImmutableBaseInputCheckPasswordSRP.of(srpId, gABytes, m1);
 
-            return clientGroup.main().sendAwait(ImmutableCheckPassword.of(icpsrp));
+            return clientGroup.send(DcId.main(), ImmutableCheckPassword.of(icpsrp));
         });
     }
 

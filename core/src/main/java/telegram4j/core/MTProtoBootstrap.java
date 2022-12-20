@@ -17,7 +17,6 @@ import reactor.util.retry.Retry;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
-import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
@@ -29,13 +28,14 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.*;
+import telegram4j.mtproto.client.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.mtproto.transport.IntermediateTransport;
 import telegram4j.mtproto.transport.Transport;
-import telegram4j.mtproto.util.EmissionHandlers;
+import telegram4j.mtproto.transport.TransportFactory;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
@@ -54,21 +54,20 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
-public final class MTProtoBootstrap<O extends MTProtoOptions> {
+public final class MTProtoBootstrap {
 
     private static final boolean parseBotIdFromToken = Boolean.getBoolean("telegram4j.core.parseBotIdFromToken");
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
-    private final Function<MTProtoOptions, ? extends O> optionsModifier;
     private final AuthorizationResources authResources;
     @Nullable
     private final AuthorisationHandler authHandler;
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TcpClient tcpClient;
-    private Supplier<Transport> transport = () -> new IntermediateTransport(true);
+    private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
+    private Function<MTProtoOptions, ClientFactory> clientFactory = DefaultClientFactory::new;
     private RetryBackoffSpec connectionRetry;
     private RetryBackoffSpec authRetry;
 
@@ -76,7 +75,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private EntityParserFactory defaultEntityParserFactory;
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
-            new DefaultUpdatesManager(c, new Options(c));
+            new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options(c));
     private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = options ->
             new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
@@ -88,29 +87,9 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     private DataCenter dataCenter;
     private int gzipWrappingSizeThreshold = 16 * 1024;
 
-    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier, AuthorizationResources authResources) {
-        this.optionsModifier = optionsModifier;
-        this.authResources = authResources;
-        this.authHandler = null;
-    }
-
-    MTProtoBootstrap(Function<MTProtoOptions, ? extends O> optionsModifier,
-                     AuthorizationResources authResources,
-                     AuthorisationHandler authHandler) {
-        this.optionsModifier = optionsModifier;
+    MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorisationHandler authHandler) {
         this.authResources = authResources;
         this.authHandler = authHandler;
-    }
-
-    /**
-     * Creates new {@code MTProtoBootstrap} with new option modifier step.
-     *
-     * @param optionsModifier A new option mapper for composing.
-     * @param <O1> A new type of options.
-     * @return This new builder with new option modifier.
-     */
-    public <O1 extends MTProtoOptions> MTProtoBootstrap<O1> setExtraOptions(Function<? super O, ? extends O1> optionsModifier) {
-        return new MTProtoBootstrap<>(this.optionsModifier.andThen(optionsModifier), authResources);
     }
 
     /**
@@ -121,7 +100,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param clientGroupFactory A new factory for client group.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setClientGroupManager(Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory) {
+    public MTProtoBootstrap setClientGroupManager(Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory) {
         this.clientGroupFactory = Objects.requireNonNull(clientGroupFactory);
         return this;
     }
@@ -134,7 +113,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param storeLayout A new store layout implementation for client.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setStoreLayout(StoreLayout storeLayout) {
+    public MTProtoBootstrap setStoreLayout(StoreLayout storeLayout) {
         this.storeLayout = Objects.requireNonNull(storeLayout);
         return this;
     }
@@ -144,12 +123,12 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * <p>
      * If custom transport factory doesn't set, {@link IntermediateTransport} factory will be used as threshold.
      *
-     * @param transport A new {@link Transport} factory for clients.
+     * @param transportFactory A new {@link Transport} factory for clients.
      * @return This builder.
      * @see <a href="https://core.telegram.org/mtproto/mtproto-transports">MTProto Transport</a>
      */
-    public MTProtoBootstrap<O> setTransport(Supplier<Transport> transport) {
-        this.transport = Objects.requireNonNull(transport);
+    public MTProtoBootstrap setTransportFactory(TransportFactory transportFactory) {
+        this.transportFactory = Objects.requireNonNull(transportFactory);
         return this;
     }
 
@@ -161,7 +140,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param tcpClient A new netty's {@link TcpClient} for MTProto clients.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setTcpClient(TcpClient tcpClient) {
+    public MTProtoBootstrap setTcpClient(TcpClient tcpClient) {
         this.tcpClient = Objects.requireNonNull(tcpClient);
         return this;
     }
@@ -175,7 +154,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param initConnectionParams A new connection identity parameters.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setInitConnectionParams(InitConnectionParams initConnectionParams) {
+    public MTProtoBootstrap setInitConnectionParams(InitConnectionParams initConnectionParams) {
         this.initConnectionParams = Objects.requireNonNull(initConnectionParams);
         return this;
     }
@@ -188,7 +167,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param eventDispatcher A new event dispatcher.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setEventDispatcher(EventDispatcher eventDispatcher) {
+    public MTProtoBootstrap setEventDispatcher(EventDispatcher eventDispatcher) {
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         return this;
     }
@@ -203,7 +182,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @return This builder.
      * @throws IllegalArgumentException if type of specified option is not {@link DataCenter.Type#REGULAR}.
      */
-    public MTProtoBootstrap<O> setDataCenter(DataCenter dataCenter) {
+    public MTProtoBootstrap setDataCenter(DataCenter dataCenter) {
         Preconditions.requireArgument(dataCenter.getType() == DataCenter.Type.REGULAR, "Invalid type for main DC");
         this.dataCenter = dataCenter;
         return this;
@@ -217,7 +196,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param updatesManagerFactory A new factory for creating {@link UpdatesManager}.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setUpdatesManager(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
+    public MTProtoBootstrap setUpdatesManager(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
         this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory);
         return this;
     }
@@ -230,7 +209,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param connectionRetry A new retry strategy for mtproto client reconnection.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setConnectionRetry(RetryBackoffSpec connectionRetry) {
+    public MTProtoBootstrap setConnectionRetry(RetryBackoffSpec connectionRetry) {
         this.connectionRetry = Objects.requireNonNull(connectionRetry);
         return this;
     }
@@ -243,7 +222,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param authRetry A new retry strategy for auth key generation.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setAuthRetry(RetryBackoffSpec authRetry) {
+    public MTProtoBootstrap setAuthRetry(RetryBackoffSpec authRetry) {
         this.authRetry = Objects.requireNonNull(authRetry);
         return this;
     }
@@ -256,7 +235,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param strategy A new default strategy for creating {@link EntityRetriever}.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setEntityRetrieverStrategy(EntityRetrievalStrategy strategy) {
+    public MTProtoBootstrap setEntityRetrieverStrategy(EntityRetrievalStrategy strategy) {
         this.entityRetrievalStrategy = Objects.requireNonNull(strategy);
         return this;
     }
@@ -269,7 +248,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param policy A new policy for unavailable chats and channels.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setUnavailableChatPolicy(UnavailableChatPolicy policy) {
+    public MTProtoBootstrap setUnavailableChatPolicy(UnavailableChatPolicy policy) {
         this.unavailableChatPolicy = Objects.requireNonNull(policy);
         return this;
     }
@@ -280,7 +259,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param defaultEntityParserFactory A new default {@link EntityParserFactory} for text parsing.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setDefaultEntityParserFactory(EntityParserFactory defaultEntityParserFactory) {
+    public MTProtoBootstrap setDefaultEntityParserFactory(EntityParserFactory defaultEntityParserFactory) {
         this.defaultEntityParserFactory = Objects.requireNonNull(defaultEntityParserFactory);
         return this;
     }
@@ -294,7 +273,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param publicRsaKeyRegister A new register with known public RSA keys.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setPublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister) {
+    public MTProtoBootstrap setPublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister) {
         this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
         return this;
     }
@@ -308,7 +287,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param dcOptions A new list of known dc options.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setDcOptions(DcOptions dcOptions) {
+    public MTProtoBootstrap setDcOptions(DcOptions dcOptions) {
         this.dcOptions = Objects.requireNonNull(dcOptions);
         return this;
     }
@@ -319,9 +298,8 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param responseTransformer The new {@link ResponseTransformer} to add.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> addResponseTransformer(ResponseTransformer responseTransformer) {
-        Objects.requireNonNull(responseTransformer);
-        responseTransformers.add(responseTransformer);
+    public MTProtoBootstrap addResponseTransformer(ResponseTransformer responseTransformer) {
+        responseTransformers.add(Objects.requireNonNull(responseTransformer));
         return this;
     }
 
@@ -332,14 +310,25 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
      * @param gzipWrappingSizeThreshold The new request's size threshold.
      * @return This builder.
      */
-    public MTProtoBootstrap<O> setGzipWrappingSizeThreshold(int gzipWrappingSizeThreshold) {
+    public MTProtoBootstrap setGzipWrappingSizeThreshold(int gzipWrappingSizeThreshold) {
         Preconditions.requireArgument(gzipWrappingSizeThreshold > 0, "Invalid threshold value");
         this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
         return this;
     }
 
     /**
-     * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
+     * Sets client factory for creating mtproto clients, by default {@link DefaultClientFactory} is used.
+     *
+     * @param clientFactory The new client factory constructor.
+     * @return This builder.
+     */
+    public MTProtoBootstrap setClientFactory(Function<MTProtoOptions, ClientFactory> clientFactory) {
+        this.clientFactory = Objects.requireNonNull(clientFactory);
+        return this;
+    }
+
+    /**
+     * Prepare and connect {@link MTProtoClient} to the specified Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono} and terminate client with disconnecting.
      *
@@ -353,25 +342,13 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
     }
 
     /**
-     * Prepare and connect {@link DefaultMTProtoClient} to the specified Telegram DC and
+     * Prepare and connect MTProto client to the specified Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono}.
      *
      * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
      */
     public Mono<MTProtoTelegramClient> connect() {
-        return connect(DefaultMTProtoClient::new);
-    }
-
-    /**
-     * Prepare and connect MTProto client to the specified Telegram DC and
-     * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
-     * Any errors caused on connection time will be emitted to a {@link Mono}.
-     *
-     * @param clientFactory A new factory for constructing main MTProto client.
-     * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
-     */
-    public Mono<MTProtoTelegramClient> connect(Function<? super O, ? extends MainMTProtoClient> clientFactory) {
         return Mono.create(sink -> {
             StoreLayout storeLayout = initStoreLayout();
 
@@ -394,21 +371,21 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             composite.add(loadMainDc
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
                         var options = new MTProtoOptions(
-                                mainDc, initTcpClient(), this::initPublicRsaKeyRegister,
-                                transport, storeLayout, EmissionHandlers.DEFAULT_PARKING,
-                                initConnectionRetry(), initAuthRetry(),
+                                initTcpClient(), publicRsaKeyRegister,
+                                transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
                                 List.copyOf(responseTransformers),
                                 InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
                                         .layer(TlInfo.LAYER)
                                         .query(initConnection())
                                         .build(), gzipWrappingSizeThreshold);
 
-                        MainMTProtoClient mainClient = clientFactory.apply(optionsModifier.apply(options));
+                        ClientFactory clientFactory = this.clientFactory.apply(options);
+                        MainMTProtoClient mainClient = clientFactory.createMain(mainDc);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
-                                new MTProtoClientGroupOptions(mainClient, storeLayout, dcOptions));
+                                new MTProtoClientGroupOptions(mainClient, clientFactory, storeLayout));
 
                         return tryConnect(clientGroup, storeLayout, dcOptions)
-                                .flatMap(client -> initializeClient(clientGroup, storeLayout));
+                                .flatMap(ign -> initializeClient(clientGroup, storeLayout));
                     }))
                     .subscribe(sink::success, sink::error));
 
@@ -602,7 +579,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         }
         return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events", 4),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                EmissionHandlers.DEFAULT_PARKING);
+                Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     private StoreLayout initStoreLayout() {
@@ -624,7 +601,7 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
         if (dcOptions != null) {
             return dcOptions;
         }
-        return DcOptions.createDefault(false, Boolean.getBoolean("java.net.preferIPv6Addresses"));
+        return DcOptions.createDefault(false);
     }
 
     private RetryBackoffSpec initConnectionRetry() {
@@ -632,13 +609,6 @@ public final class MTProtoBootstrap<O extends MTProtoOptions> {
             return connectionRetry;
         }
         return Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5));
-    }
-
-    private PublicRsaKeyRegister initPublicRsaKeyRegister() {
-        if (publicRsaKeyRegister != null) {
-            return publicRsaKeyRegister;
-        }
-        return PublicRsaKeyRegister.createDefault();
     }
 
     private RetryBackoffSpec initAuthRetry() {

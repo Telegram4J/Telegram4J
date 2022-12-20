@@ -2,7 +2,7 @@ package telegram4j.mtproto.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;

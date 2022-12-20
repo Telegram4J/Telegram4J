@@ -1,7 +1,8 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
 import telegram4j.tl.api.TlMethod;
@@ -26,7 +27,7 @@ public abstract class RpcService {
     }
 
     protected <R, M extends TlMethod<R>> Mono<R> sendMain(M method) {
-        return clientGroup.main().sendAwait(method);
+        return clientGroup.send(DcId.main(), method);
     }
 
     protected Mono<Peer> toPeer(InputPeer inputPeer) {
@@ -69,81 +70,4 @@ public abstract class RpcService {
         }
         return hash;
     }
-
-    // TODO: I want to develop the following approach
-    // ==============================================
-
-    // protected <R, M extends TlMethod<R>> MTProtoResponseMono<R, M> send(M method) {
-    //     return MTProtoMono.create(groupManager, groupManager.mainId(), method);
-    // }
-
-    // protected <T, R, M extends TlMethod<R>> MTProtoMono<T, R, M> send(M method, Function<Mono<R>, Mono<T>> mapper) {
-    //     return MTProtoMono.create(groupManager, groupManager.mainId(), method, mapper);
-    // }
-
-    // public class MTProtoMono<T, R, M extends TlMethod<R>> extends Mono<T> {
-    //     protected final MTProtoClientGroup clientGroup;
-    //     protected final DcId dcId;
-    //     protected final M method;
-    //     protected final Mono<T> inner;
-    //
-    //     protected MTProtoMono(MTProtoClientGroup clientGroup, DcId dcId, M method, Mono<T> inner) {
-    //         this.clientGroup = clientGroup;
-    //         this.dcId = dcId;
-    //         this.method = method;
-    //         this.inner = inner;
-    //     }
-    //
-    //     public MTProtoClientGroup clientGroup() {
-    //         return clientGroup;
-    //     }
-    //
-    //     public DcId dcId() {
-    //         return dcId;
-    //     }
-    //
-    //     public M method() {
-    //         return method;
-    //     }
-    //
-    //     public MTProtoMono<T, R, M> withDcId(DcId value) {
-    //         Objects.requireNonNull(value);
-    //         if (dcId.equals(value)) return this;
-    //         return new MTProtoMono<>(clientGroup, value, method, inner);
-    //     }
-    //
-    //     public static <T, R, M extends TlMethod<R>> MTProtoMono<T, R, M> create(MTProtoClientGroup clientGroup, DcId dcId, M method,
-    //                                                                             Function<Mono<R>, Mono<T>> mapper) {
-    //         Objects.requireNonNull(clientGroup);
-    //         Objects.requireNonNull(dcId);
-    //         Objects.requireNonNull(method);
-    //         return new MTProtoMono<>(clientGroup, dcId, method, clientGroup.send(dcId, method).transform(mapper));
-    //     }
-    //
-    //     public static <R, M extends TlMethod<R>> MTProtoResponseMono<R, M> create(MTProtoClientGroup clientGroup, DcId dcId, M method) {
-    //         Objects.requireNonNull(clientGroup);
-    //         Objects.requireNonNull(dcId);
-    //         Objects.requireNonNull(method);
-    //         return new MTProtoResponseMono<>(clientGroup, dcId, method, clientGroup.send(dcId, method));
-    //     }
-    //
-    //     @Override
-    //     public void subscribe(CoreSubscriber<? super T> actual) {
-    //         inner.subscribe(actual);
-    //     }
-    // }
-
-    // public class MTProtoResponseMono<R, M extends TlMethod<R>> extends MTProtoMono<R, R, M> {
-    //
-    //     protected MTProtoResponseMono(MTProtoClientGroup clientGroup, DcId dcId, M method, Mono<R> inner) {
-    //         super(clientGroup, dcId, method, inner);
-    //     }
-    //
-    //     @Override
-    //     public MTProtoResponseMono<R, M> withDcId(DcId value) {
-    //         Objects.requireNonNull(value);
-    //         if (dcId.equals(value)) return this;
-    //         return new MTProtoResponseMono<>(clientGroup, value, method, inner);
-    //     }
-    // }
 }

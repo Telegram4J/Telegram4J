@@ -4,10 +4,8 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
-import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
@@ -391,11 +389,8 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<DataCenter> getWebfileDataCenter() {
-        return Mono.justOrEmpty(config)
-                .zipWith(Mono.justOrEmpty(dcOptions))
-                .flatMap(TupleUtils.function((cfg, dcOpts) -> Mono.justOrEmpty(
-                        dcOpts.find(DcId.Type.DOWNLOAD, cfg.webfileDcId()))));
+    public Mono<Config> getConfig() {
+        return Mono.justOrEmpty(config);
     }
 
     @Override

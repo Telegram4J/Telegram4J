@@ -1,4 +1,4 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.client;
 
 import reactor.util.annotation.Nullable;
 

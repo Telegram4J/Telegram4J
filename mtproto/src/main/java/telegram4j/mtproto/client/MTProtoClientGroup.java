@@ -1,6 +1,8 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.client;
 
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcId;
 import telegram4j.tl.api.TlMethod;
 
 /** The group of MTProto clients which associated to one user.  */
@@ -21,13 +23,6 @@ public interface MTProtoClientGroup {
      * @return A {@link Mono} emitting on successful completion new main client.
      */
     Mono<MainMTProtoClient> setMain(DataCenter dc);
-
-    /**
-     * Gets {@link DcId} of {@link #main()} client.
-     *
-     * @return The {@code DcId} of lead client.
-     */
-    DcId mainId();
 
     /**
      * Sends TL method to specified datacenter.
@@ -59,7 +54,6 @@ public interface MTProtoClientGroup {
      * Searches for the client by specified id and if no result found
      * creates a new one and awaits for him connection.
      *
-     * @throws IllegalArgumentException if {@code id} have type {@link DcId.Type#MAIN} and isn't equal to {@link #mainId()}.
      * @param id The id of client.
      */
     Mono<MTProtoClient> getOrCreateClient(DcId id);

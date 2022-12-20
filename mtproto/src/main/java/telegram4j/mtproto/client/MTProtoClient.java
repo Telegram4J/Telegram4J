@@ -1,7 +1,8 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.client;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import telegram4j.mtproto.DataCenter;
 import telegram4j.tl.api.MTProtoObject;
 import telegram4j.tl.api.TlMethod;
 

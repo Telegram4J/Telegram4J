@@ -7,7 +7,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -37,7 +37,7 @@ import telegram4j.tl.request.messages.*;
 import java.util.List;
 import java.util.Objects;
 
-import static telegram4j.mtproto.util.EmissionHandlers.DEFAULT_PARKING;
+import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 
 /** Rpc service with chat and channel related methods. */
 public class ChatService extends RpcService {
@@ -49,13 +49,6 @@ public class ChatService extends RpcService {
     // additional methods
     // =========================
 
-    /**
-     * Retrieve minimal chat by given id.
-     * This method can return only {@link BaseChat}, {@link ChatForbidden} or {@link ChatEmpty} objects.
-     *
-     * @param id The id of chat
-     * @return A {@link Mono} emitting on successful completion minimal information about chat
-     */
     @Compatible(Type.BOTH)
     public Mono<Chat> getChat(long id) {
         return getChats(List.of(id))
@@ -63,13 +56,6 @@ public class ChatService extends RpcService {
                 .mapNotNull(c -> c.chats().isEmpty() ? null : c.chats().get(0));
     }
 
-    /**
-     * Retrieve minimal channel by given id.
-     * This method can return only {@link Channel} or {@link ChannelForbidden} objects.
-     *
-     * @param id The id of channel
-     * @return A {@link Mono} emitting on successful completion minimal information about channel
-     */
     @Compatible(Type.BOTH)
     public Mono<Chat> getChannel(InputChannel id) {
         return getChannels(List.of(id))
@@ -206,7 +192,7 @@ public class ChatService extends RpcService {
         return sendMain(request)
                 .ofType(BaseUpdates.class)
                 .flatMapMany(updates -> {
-                    clientGroup.main().updates().emitNext(updates, DEFAULT_PARKING);
+                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
 
                     return Flux.fromIterable(updates.updates())
                             .ofType(UpdateNewMessageFields.class)
@@ -552,7 +538,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
         return sendMain(request)
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<? extends ByteBuf> options) {
@@ -743,7 +729,7 @@ public class ChatService extends RpcService {
     public Mono<Void> setHistoryTtl(InputPeer peer, int period) {
         return sendMain(ImmutableSetHistoryTTL.of(peer, period))
                 // Typically: UpdatePeerHistoryTTL, UpdateNewMessage(service message)
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     public Mono<CheckedHistoryImportPeer> checkHistoryImportPeer(InputPeer peer) {
@@ -776,11 +762,10 @@ public class ChatService extends RpcService {
     public Mono<BaseMessageFields> sendMessage(SendMessage request) {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
-                .map(updates -> {
-                    clientGroup.main().updates().emitNext(updates.getT2(), DEFAULT_PARKING);
-
-                    return updates.getT1();
-                });
+                .map(TupleUtils.function((message, updates) -> {
+                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                    return message;
+                }));
     }
 
     @Compatible(Type.BOTH)
@@ -800,19 +785,18 @@ public class ChatService extends RpcService {
 
                     return pollSaving.thenReturn(tuple);
                 })
-                .map(updates -> {
-                    clientGroup.main().updates().emitNext(updates.getT2(), DEFAULT_PARKING);
-
-                    return updates.getT1();
-                });
+                .map(TupleUtils.function((message, updates) -> {
+                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                    return message;
+                }));
     }
 
     @Compatible(Type.BOTH)
     public Mono<BaseMessageFields> editMessage(EditMessage request) {
         return sendMain(request)
                 .flatMap(updates -> {
-                    if (updates.identifier() == BaseUpdates.ID) {
-                        BaseUpdates casted = (BaseUpdates) updates;
+                    if (updates instanceof BaseUpdates) {
+                        var casted = (BaseUpdates) updates;
 
                         // also can receive UpdateMessagePoll
                         UpdateEditMessageFields newMessage = null;
@@ -822,7 +806,7 @@ public class ChatService extends RpcService {
                             }
                         }
 
-                        clientGroup.main().updates().emitNext(updates, DEFAULT_PARKING);
+                        clientGroup.main().updates().emitNext(updates, FAIL_FAST);
                         return Mono.justOrEmpty(newMessage)
                                 .map(UpdateEditMessageFields::message)
                                 .cast(BaseMessageFields.class);
@@ -831,15 +815,6 @@ public class ChatService extends RpcService {
                 });
     }
 
-    /**
-     * Retrieve minimal chats by their ids.
-     * This method can return container which contains only {@link BaseChat},
-     * {@link ChatForbidden} or {@link ChatEmpty} objects.
-     *
-     * @param ids An iterable of chat id elements
-     * @return A {@link Mono} emitting on successful completion a list of
-     * minimal chats or slice of list if there are a lot of chats
-     */
     @Compatible(Type.BOTH)
     public Mono<Chats> getChats(Iterable<Long> ids) {
         return Mono.defer(() -> sendMain(ImmutableGetChats.of(ids)))
@@ -847,13 +822,6 @@ public class ChatService extends RpcService {
                         .thenReturn(c));
     }
 
-    /**
-     * Retrieve detailed information about chat by their id and update cache.
-     *
-     * @param chatId The id of the chat.
-     * @return A {@link Mono} emitting on successful completion an object contains
-     * detailed info about chat and auxiliary data
-     */
     @Compatible(Type.BOTH)
     public Mono<ChatFull> getFullChat(long chatId) {
         return sendMain(ImmutableGetFullChat.of(chatId))
@@ -863,13 +831,13 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editChatTitle(long chatId, String title) {
         return sendMain(ImmutableEditChatTitle.of(chatId, title))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     @Compatible(Type.BOTH)
     public Mono<Void> editChatPhoto(long chatId, InputChatPhoto photo) {
         return sendMain(ImmutableEditChatPhoto.of(chatId, photo))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     public Mono<Updates> addChatUser(long chatId, InputUser user, int forwardLimit) {
@@ -879,7 +847,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> deleteChatUser(long chatId, InputUser userId, boolean revokeHistory) {
         return sendMain(ImmutableDeleteChatUser.builder().revokeHistory(revokeHistory).chatId(chatId).userId(userId).build())
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     public Mono<Updates> createChat(Iterable<? extends InputUser> users, String title) {
@@ -940,14 +908,6 @@ public class ChatService extends RpcService {
                 .flatMap(p -> storeLayout.onChannelParticipant(TlEntityUtil.getRawPeerId(channel), p).thenReturn(p));
     }
 
-    /**
-     * Retrieve minimal channels by their ids.
-     * This method can return container which contains only {@link Channel} or {@link ChannelForbidden} objects.
-     *
-     * @param ids An iterable of channel id elements
-     * @return A {@link Mono} emitting on successful completion a list of
-     * minimal channels or slice of list if there are a lot of channels
-     */
     @Compatible(Type.BOTH)
     public Mono<Chats> getChannels(Iterable<? extends InputChannel> ids) {
         return Mono.defer(() -> sendMain(ImmutableGetChannels.of(ids)))
@@ -955,12 +915,6 @@ public class ChatService extends RpcService {
                         .thenReturn(c));
     }
 
-    /**
-     * Retrieve detailed channel by given id and update cache.
-     *
-     * @param id The id of channel
-     * @return A {@link Mono} emitting on successful completion detailed information about channel
-     */
     @Compatible(Type.BOTH)
     public Mono<ChatFull> getFullChannel(InputChannel id) {
         return sendMain(ImmutableGetFullChannel.of(id))
@@ -972,7 +926,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableEditAdmin.of(channel, user, rights, rank))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
-                    clientGroup.main().updates().emitNext(u, DEFAULT_PARKING);
+                    clientGroup.main().updates().emitNext(u, FAIL_FAST);
                     return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
@@ -980,7 +934,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editTitle(InputChannel channel, String title) {
         return sendMain(ImmutableEditTitle.of(channel, title))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     @Compatible(Type.BOTH)
@@ -988,7 +942,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableEditBanned.of(channel, participant, rights))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
-                    clientGroup.main().updates().emitNext(u, DEFAULT_PARKING);
+                    clientGroup.main().updates().emitNext(u, FAIL_FAST);
                     return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
@@ -996,13 +950,13 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editPhoto(InputChannel channel, InputChatPhoto photo) {
         return sendMain(ImmutableEditPhoto.of(channel, photo))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     @Compatible(Type.BOTH)
     public Mono<Void> leaveChannel(InputChannel channel) {
         return sendMain(ImmutableLeaveChannel.of(channel))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, DEFAULT_PARKING)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
     }
 
     @Compatible(Type.BOTH)
@@ -1035,24 +989,10 @@ public class ChatService extends RpcService {
         return sendMain(request);
     }
 
-    /**
-     * Check if a username is free and can be assigned to a channel/supergroup.
-     *
-     * @param channel the channel/supergroup that will assign the specified username
-     * @param username the username to check
-     * @return A {@link Mono} emitting on successful completion {@code true}
-     */
     public Mono<Boolean> checkUsername(InputChannel channel, String username) {
         return sendMain(ImmutableCheckUsername.of(channel, username));
     }
 
-    /**
-     * Change the username of a supergroup/channel.
-     *
-     * @param channel the channel/supergroup that will assign the specified username
-     * @param username the username to update
-     * @return A {@link Mono} emitting on successful completion {@code true}
-     */
     public Mono<Boolean> updateUsername(InputChannel channel, String username) {
         return sendMain(ImmutableUpdateUsername.of(channel, username));
     }
@@ -1150,7 +1090,7 @@ public class ChatService extends RpcService {
 
                     switch (updates.identifier()) {
                         case UpdateShortSentMessage.ID: {
-                            UpdateShortSentMessage casted = (UpdateShortSentMessage) updates;
+                            var casted = (UpdateShortSentMessage) updates;
                             Integer replyToMsgId = request.replyToMsgId();
                             var message = BaseMessage.builder()
                                     .flags(request.flags() | casted.flags())
@@ -1178,7 +1118,7 @@ public class ChatService extends RpcService {
                             return Tuples.of(message, upds);
                         }
                         case UpdateShortMessage.ID: {
-                            UpdateShortMessage casted = (UpdateShortMessage) updates;
+                            var casted = (UpdateShortMessage) updates;
 
                             var message = BaseMessage.builder()
                                     .flags(request.flags() | casted.flags())
@@ -1207,7 +1147,7 @@ public class ChatService extends RpcService {
                             return Tuples.of(message, upds);
                         }
                         case UpdateShortChatMessage.ID: {
-                            UpdateShortChatMessage casted = (UpdateShortChatMessage) updates;
+                            var casted = (UpdateShortChatMessage) updates;
 
                             var message = BaseMessage.builder()
                                     .flags(request.flags() | casted.flags())
@@ -1236,17 +1176,17 @@ public class ChatService extends RpcService {
                             return Tuples.of(message, upds);
                         }
                         case BaseUpdates.ID: {
-                            BaseUpdates casted = (BaseUpdates) updates;
+                            var casted = (BaseUpdates) updates;
 
-                            UpdateMessageID updateMessageID = casted.updates().stream()
+                            var updateMessageId = casted.updates().stream()
                                     .filter(u -> u.identifier() == UpdateMessageID.ID)
                                     .findFirst()
                                     .map(upd -> (UpdateMessageID) upd)
                                     .orElseThrow();
 
-                            if (updateMessageID.randomId() != request.randomId()) {
+                            if (updateMessageId.randomId() != request.randomId()) {
                                 throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
-                                        + ", received: " + updateMessageID.randomId());
+                                        + ", received: " + updateMessageId.randomId());
                             }
 
                             var message = casted.updates().stream()

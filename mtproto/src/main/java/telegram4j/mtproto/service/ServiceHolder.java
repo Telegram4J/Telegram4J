@@ -1,6 +1,6 @@
 package telegram4j.mtproto.service;
 
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 
 public final class ServiceHolder {

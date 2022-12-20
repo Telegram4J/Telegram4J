@@ -1,7 +1,7 @@
 package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -30,12 +30,6 @@ public class UserService extends RpcService {
     // additional methods
     // ======================
 
-    /**
-     * Retrieve minimal information about user and update cache.
-     *
-     * @param userId The id of user
-     * @return A {@link Mono} emitting on successful completion minimal information about user
-     */
     @Compatible(Type.BOTH)
     public Mono<User> getUser(InputUser userId) {
         return getUsers(List.of(userId)).mapNotNull(u -> u.isEmpty() ? null : u.get(0));
@@ -44,12 +38,6 @@ public class UserService extends RpcService {
     // user namespace
     // ======================
 
-    /**
-     * Retrieve minimal information about list of users and update cache.
-     *
-     * @param userIds An iterable of user id elements
-     * @return A {@link Mono} emitting list with minimal users
-     */
     @Compatible(Type.BOTH)
     public Mono<List<User>> getUsers(Iterable<? extends InputUser> userIds) {
         return Mono.defer(() -> sendMain(ImmutableGetUsers.of(userIds)))
@@ -57,13 +45,6 @@ public class UserService extends RpcService {
                         .thenReturn(u));
     }
 
-    /**
-     * Retrieve detailed information about user and update cache.
-     *
-     * @param id The id of the user
-     * @return A {@link Mono} emitting on successful completion an object contains
-     * detailed info about user and auxiliary data
-     */
     @Compatible(Type.BOTH)
     public Mono<UserFull> getFullUser(InputUser id) {
         return sendMain(ImmutableGetFullUser.of(id))
@@ -118,13 +99,6 @@ public class UserService extends RpcService {
         return sendMain(ImmutableSearch.of(query, limit));
     }
 
-    /**
-     * Search peers by substring of query and update cache.
-     *
-     * @param username The peer full username
-     * @return A {@link Mono} emitting on successful completion an object contains
-     * info on users found by username and auxiliary data
-     */
     @Compatible(Type.BOTH)
     public Mono<ResolvedPeer> resolveUsername(String username) {
         return sendMain(ImmutableResolveUsername.of(username))

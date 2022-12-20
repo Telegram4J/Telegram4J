@@ -31,11 +31,10 @@ public interface Transport {
 
     /**
      * Gets unwrapped payload if readable.
-     *
-     * @apiNote This method is called only on one thread.
+     * This method is called only on one thread.
      *
      * @param payload The wrapped buffer payload.
-     * @return The unwrapped payload if readable or {@code null} for cases when more bytes are needed.
+     * @return The unwrapped slice of payload if readable or {@code null} for cases when more bytes are needed.
      */
     @Nullable
     ByteBuf decode(ByteBuf payload);

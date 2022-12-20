@@ -44,7 +44,6 @@ public final class DcOptions {
         .thenComparing(dc -> {
             switch (type) {
                 case MAIN:
-                case REGULAR:
                     return dc.getType() == Type.REGULAR ? -1 : 1;
                 case UPLOAD:
                 case DOWNLOAD:
@@ -180,11 +179,6 @@ public final class DcOptions {
      */
     public Optional<DataCenter> find(DcId.Type type, int dcId) {
         return find(type, dcId, isPreferIpv6());
-    }
-
-    // TODO: delete
-    public Optional<DataCenter> find(DcId id) {
-        return find(id.getType(), id.getId(), isPreferIpv6());
     }
 
     /**

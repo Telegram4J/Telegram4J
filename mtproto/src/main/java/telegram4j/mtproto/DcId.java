@@ -1,39 +1,63 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.client.MainMTProtoClient;
+
+import java.util.Locale;
+import java.util.Optional;
 
 /** Value-based Data Center identifier which allows to associate several clients to one DC. */
 public final class DcId implements Comparable<DcId> {
 
+    private static final int maxDcId = 1000;
+    private static final DcId mainDcId = of(Type.MAIN, 0, 0, false);
+
+    private static final int AUTO_SHIFT = 1 << 7;
+
+    // [ 16 bits of DC id | 8 bits of shift value | `is auto shift` flag | 7-0 bits of type ]
+    private final int value;
+
+    DcId(int value) {
+        this.value = value;
+    }
+
+    private static DcId shifted(Type type, int id, int shift) {
+        return of(type, id, shift, false);
+    }
+
+    private static DcId autoShift(Type type, int id) {
+        return of(type, id, 0, true);
+    }
+
+    private static DcId of(Type type, int id, int shift, boolean autoShift) {
+        if (id > maxDcId || id < 0)
+            throw new IllegalArgumentException("Dc id out of range: " + id);
+        if (shift > 0xff || shift < 0)
+            throw new IllegalArgumentException("Dc shift out of range: " + shift);
+        int value = id << 16 | shift << 8 | (autoShift ? AUTO_SHIFT : 0) | type.ordinal();
+        return new DcId(value);
+    }
+
     /**
-     * Special value of client {@link #getShift()} to get
-     * the most unloaded client or create new using auto-incremented
-     * shift value.
+     * Gets common instance for {@code DcId} which indicates a main client.
+     *
+     * <p> This id doesn't have a {@link #getId()} and {@link #getShift()}
+     * and should be used as marker id.
+     *
+     * @return A common instance for {@code DcId} which indicates a main client.
      */
-    public static final int AUTO_SHIFT = -1;
-
-    private final byte type;
-    private final int id;
-    private final int shift;
-
-    DcId(byte type, int id, int shift) {
-        this.type = type;
-        this.id = id;
-        this.shift = shift;
-    }
-
-    private static DcId of(Type type, int id, int shift) {
-        return new DcId((byte) type.ordinal(), id, shift);
+    public static DcId main() {
+        return mainDcId;
     }
 
     /**
-     * Creates new {@code DcId} which indicates a main client.
+     * Creates new {@code DcId} which indicates an upload client with automatic sequence number.
      *
      * @param id The DC identifier.
-     * @return A new {@code DcId} with specified parameters.
+     * @return A new {@code DcId} with specified dc id.
      */
-    public static DcId main(int id) {
-        return of(Type.MAIN, id, 0);
+    public static DcId upload(int id) {
+        return autoShift(Type.MAIN, id);
     }
 
     /**
@@ -44,18 +68,17 @@ public final class DcId implements Comparable<DcId> {
      * @return A new {@code DcId} with specified parameters.
      */
     public static DcId upload(int id, int shift) {
-        return of(Type.UPLOAD, id, shift);
+        return shifted(Type.UPLOAD, id, shift);
     }
 
     /**
-     * Creates new {@code DcId} which indicates a non-media client with specified sequence number.
+     * Creates new {@code DcId} which indicates a download client with automatic sequence number.
      *
      * @param id The DC identifier.
-     * @param shift The sequence number of client.
-     * @return A new {@code DcId} with specified parameters.
+     * @return A new {@code DcId} with specified dc id.
      */
-    public static DcId regular(int id, int shift) {
-        return of(Type.REGULAR, id, shift);
+    public static DcId download(int id) {
+        return autoShift(Type.DOWNLOAD, id);
     }
 
     /**
@@ -66,25 +89,37 @@ public final class DcId implements Comparable<DcId> {
      * @return A new {@code DcId} with specified parameters.
      */
     public static DcId download(int id, int shift) {
-        return of(Type.DOWNLOAD, id, shift);
+        return shifted(Type.DOWNLOAD, id, shift);
     }
 
     /**
-     * Gets id of DC.
+     * Gets id of DC, if it is not with type {@link Type#MAIN}.
      *
-     * @return The internal representation of DC's id.
+     * @return The id of DC, if present.
      */
-    public int getId() {
-        return id;
+    public Optional<Integer> getId() {
+        return value == 0 ? Optional.empty() : Optional.of(value >> 16);
     }
 
     /**
-     * Gets sequence number of connected client, zero-based.
+     * Gets whether this id doesn't have an exact shift value for client,
+     * and if it is, client should be selected by client group
+     * with counting load and other parameters.
      *
-     * @return The sequence number of connected client.
+     * @return {@code true} if this id is pointing to the auto-selected client.
      */
-    public int getShift() {
-        return shift;
+    public boolean isAutoShift() {
+        return (value & AUTO_SHIFT) != 0;
+    }
+
+    /**
+     * Gets sequence number of connected client, zero-based, if {@link #isAutoShift()} is {@code false}.
+     * For id with type {@link Type#MAIN} will return empty object.
+     *
+     * @return The sequence number of connected client, if present.
+     */
+    public Optional<Integer> getShift() {
+        return isAutoShift() ? Optional.empty() : Optional.of((value & 0xffff) >> 8);
     }
 
     /**
@@ -93,42 +128,27 @@ public final class DcId implements Comparable<DcId> {
      * @return The type of connection for specified dc.
      */
     public Type getType() {
-        return Type.of(type);
-    }
-
-    /**
-     * Constructs new {@code DcId} with shift which equals to {@code shift + delta}.
-     *
-     * @param delta The value to be added to current shift.
-     * @return A new {@code DcId} with new shift value, or if {@code delta} is 0 returns current id.
-     */
-    public DcId shift(int delta) {
-        if (getType() == Type.MAIN)
-            throw new IllegalStateException("Main clients can't have a shift");
-        int newShift = Math.addExact(this.shift, delta);
-        if (newShift < 0)
-            throw new IllegalArgumentException("Invalid shift: " + delta);
-        if (newShift == this.shift) return this;
-        return new DcId(type, id, newShift);
+        return Type.of(value & 0x7f);
     }
 
     /**
      * Compares this id to the specified id.
      * <p>
-     * The comparison is based on the {@link #getId() internal} representation of id
-     * and after {@link #getShift() sequence number} at natural order.
+     * The comparison is based on the {@link #getType() type}
+     * and after {@link #getId() id} and {@link #getShift() shift} (if present) at natural order.
      *
      * @param o the other instant to compare to, not null.
      * @return the comparator value, negative if less, positive if greater.
-     * @throws NullPointerException if {@code o} is null
      */
     @Override
     public int compareTo(DcId o) {
-        int d = Byte.compare(type, o.type);
+        int d = Integer.compare(value & 0x7f, o.value & 0x7f); // type
         if (d != 0) return d;
-        d = Integer.compare(id, o.id);
+        d = Integer.compare(value >> 16, o.value >> 16); // id
         if (d != 0) return d;
-        return Integer.compare(shift, o.shift);
+        d = Boolean.compare(isAutoShift(), o.isAutoShift());
+        if (d != 0) return d;
+        return Integer.compare((value & 0xffff) >> 8, (o.value & 0xffff) >> 8); // shift
     }
 
     @Override
@@ -136,16 +156,12 @@ public final class DcId implements Comparable<DcId> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DcId dcId = (DcId) o;
-        return type == dcId.type && id == dcId.id && shift == dcId.shift;
+        return value == dcId.value;
     }
 
     @Override
     public int hashCode() {
-        int h = 5381;
-        h += (h << 5) + type;
-        h += (h << 5) + id;
-        h += (h << 5) + shift;
-        return h;
+        return value;
     }
 
     /**
@@ -155,25 +171,32 @@ public final class DcId implements Comparable<DcId> {
      */
     @Override
     public String toString() {
-        return id + "+" + shift;
+        Type type = getType();
+        switch (type) {
+            case MAIN: return "main";
+            case UPLOAD:
+            case DOWNLOAD:
+                return type.name().toLowerCase(Locale.US) +
+                    ":" + getId().orElseThrow() + "+" +
+                        getShift().map(Object::toString).orElse("auto");
+            default: throw new IllegalStateException();
+        }
     }
 
+    /** Types of purpose of the mtproto client. */
     public enum Type {
-        /** Represents a {@link MainMTProtoClient}. {@link DcId#getShift()} will always is 0. */
+        /** Represents a {@link MainMTProtoClient}. */
         MAIN,
-        /** Represents any non-media client exclude main clients. */
-        REGULAR,
         /** Represents an upload client. */
         UPLOAD,
         /** Represents a download client. */
         DOWNLOAD;
 
-        private static Type of(byte type) {
+        private static Type of(int type) {
             switch (type) {
                 case 0: return MAIN;
-                case 1: return REGULAR;
-                case 2: return UPLOAD;
-                case 3: return DOWNLOAD;
+                case 1: return UPLOAD;
+                case 2: return DOWNLOAD;
                 default: throw new IllegalArgumentException("Unknown type: " + type);
             }
         }

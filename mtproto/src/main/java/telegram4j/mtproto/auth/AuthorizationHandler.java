@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.MTProtoClient;
+import telegram4j.mtproto.client.MTProtoClient;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
@@ -257,8 +257,8 @@ public final class AuthorizationHandler {
     }
 
     private Mono<Void> handleDhGenOk(DhGenOk dhGenOk) {
-        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), Unpooled.wrappedBuffer(new byte[]{1}),
-                context.getAuthAuxHash()).slice(4, 16);
+        ByteBuf newNonceHash = sha1Digest(context.getNewNonce(), Unpooled.wrappedBuffer(new byte[]{1}), context.getAuthAuxHash())
+                .slice(4, 16);
 
         if (!dhGenOk.nonce().equals(context.getNonce())) return emitError("Nonce mismatch");
         if (!dhGenOk.serverNonce().equals(context.getServerNonce())) return emitError("Server nonce mismatch");

@@ -1,19 +1,17 @@
-package telegram4j.mtproto;
+package telegram4j.mtproto.client;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.store.StoreLayout;
 
 import java.util.Objects;
 
 public class MTProtoClientGroupOptions {
     public final MainMTProtoClient mainClient;
+    public final ClientFactory clientFactory;
     public final StoreLayout storeLayout;
-    @Nullable
-    public final DcOptions dcOptions;
 
-    public MTProtoClientGroupOptions(MainMTProtoClient mainClient, StoreLayout storeLayout, @Nullable DcOptions dcOptions) {
+    public MTProtoClientGroupOptions(MainMTProtoClient mainClient, ClientFactory clientFactory, StoreLayout storeLayout) {
         this.mainClient = Objects.requireNonNull(mainClient);
+        this.clientFactory = Objects.requireNonNull(clientFactory);
         this.storeLayout = Objects.requireNonNull(storeLayout);
-        this.dcOptions = dcOptions;
     }
 }

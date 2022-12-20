@@ -26,8 +26,7 @@ import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
-import telegram4j.mtproto.MTProtoClientGroup;
-import telegram4j.mtproto.MTProtoOptions;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.file.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.service.UploadOptions;
@@ -79,8 +78,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @param botAuthToken The bot auth token from BotFather DM.
      * @return The new {@link MTProtoBootstrap} client builder.
      */
-    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, String botAuthToken) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash, botAuthToken));
+    public static MTProtoBootstrap create(int apiId, String apiHash, String botAuthToken) {
+        return new MTProtoBootstrap(new AuthorizationResources(apiId, apiHash, botAuthToken), null);
     }
 
     /**
@@ -93,8 +92,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @param authHandler The user authorization implementation. QR or phone code handler.
      * @return The new {@link MTProtoBootstrap} client builder.
      */
-    public static MTProtoBootstrap<MTProtoOptions> create(int apiId, String apiHash, AuthorisationHandler authHandler) {
-        return new MTProtoBootstrap<>(Function.identity(), new AuthorizationResources(apiId, apiHash), authHandler);
+    public static MTProtoBootstrap create(int apiId, String apiHash, AuthorisationHandler authHandler) {
+        return new MTProtoBootstrap(new AuthorizationResources(apiId, apiHash), authHandler);
     }
 
     /**
@@ -459,7 +458,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
                     Id peerId = Id.of(chatCtx.getPeer(), getSelfId())
                             // The access hash must be invalided because it may be
-                            // received from min users which have a special access hash, valid only for downloading
+                            // received from min users which have a special access hash
+                            // which valid only for downloading
                             .withAccessHash(null);
                     return asInputPeer(peerId)
                             .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
@@ -495,14 +495,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                 }
                             });
                 }
-                case WEB_DOCUMENT:
                 case DOCUMENT:
-                    var docType = fileRefId.getDocumentType().orElseThrow();
-                    if (docType == FileReferenceId.DocumentType.EMOJI) {
-                        return getCustomEmoji(fileRefId.getDocumentId())
-                                .map(Sticker::getFileReferenceId);
+                    if (fileRefId.getDocumentType().orElseThrow() == FileReferenceId.DocumentType.EMOJI) {
+                        return getCustomEmoji(fileRefId.getDocumentId()).map(Sticker::getFileReferenceId);
                     }
-
+                case WEB_DOCUMENT:
                 case PHOTO: // message id must be present
                     switch (fileRefId.getContext().getType()) {
                         case MESSAGE_MEDIA: {

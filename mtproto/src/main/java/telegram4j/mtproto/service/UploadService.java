@@ -6,8 +6,8 @@ import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.mtproto.DcId;
-import telegram4j.mtproto.MTProtoClient;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClient;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
@@ -86,7 +86,7 @@ public class UploadService extends RpcService {
         ImmutableGetFile request = ImmutableGetFile.of(precise ? ImmutableGetFile.PRECISE_MASK : 0,
                 fileRefId.asLocation().orElseThrow(), baseOffset, limit);
 
-        return Flux.defer(() -> Flux.range(0, MAX_INFLIGHT_REQUESTS))
+        return Flux.range(0, MAX_INFLIGHT_REQUESTS)
                 .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
                 .repeat(() -> !complete.get())
                 .cast(BaseFile.class)
@@ -124,9 +124,9 @@ public class UploadService extends RpcService {
         if (location.getFileType() == FileReferenceId.Type.WEB_DOCUMENT)
             return Flux.error(new IllegalArgumentException("Web documents can not be downloaded as normal files"));
 
-        DcId dcId = DcId.download(location.getDcId(), DcId.AUTO_SHIFT);
-        if (dcId.getId() != clientGroup.mainId().getId()) {
-            return sendMain(ImmutableExportAuthorization.of(dcId.getId()))
+        DcId dcId = DcId.download(location.getDcId());
+        if (location.getDcId() != clientGroup.main().getDatacenter().getId()) {
+            return sendMain(ImmutableExportAuthorization.of(location.getDcId()))
                     .zipWith(clientGroup.getOrCreateClient(dcId))
                     .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
                                     ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
@@ -145,7 +145,7 @@ public class UploadService extends RpcService {
 
             ImmutableGetWebFile request = ImmutableGetWebFile.of(location, baseOffset, limit);
 
-            return Flux.defer(() -> Flux.range(0, MAX_INFLIGHT_REQUESTS))
+            return Flux.range(0, MAX_INFLIGHT_REQUESTS)
                     .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
                     .repeat(() -> !complete.get())
                     .mapNotNull(part -> {
@@ -162,13 +162,15 @@ public class UploadService extends RpcService {
     }
 
     public Flux<WebFile> getWebFile(InputWebFileLocation location, int offset, int limit) {
-        return storeLayout.getWebfileDataCenter()
-                .map(dc -> DcId.download(dc.getId(), DcId.AUTO_SHIFT))
+        return storeLayout.getConfig()
                 .switchIfEmpty(sendMain(GetConfig.instance())
-                        .flatMap(c -> storeLayout.onUpdateConfig(c)
-                                .thenReturn(DcId.download(c.webfileDcId(), DcId.AUTO_SHIFT))))
-                .flatMap(dc -> sendMain(ImmutableExportAuthorization.of(dc.getId()))
-                        .zipWith(clientGroup.getOrCreateClient(dc)))
+                        .flatMap(cfg -> storeLayout.onUpdateConfig(cfg)
+                                .thenReturn(cfg)))
+                .flatMap(cfg -> {
+                    DcId dc = DcId.download(cfg.webfileDcId());
+                    return sendMain(ImmutableExportAuthorization.of(cfg.webfileDcId()))
+                            .zipWith(clientGroup.getOrCreateClient(dc));
+                })
                 .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
                         ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
                         .thenReturn(client)))

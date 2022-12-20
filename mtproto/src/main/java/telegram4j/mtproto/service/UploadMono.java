@@ -14,7 +14,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.annotation.Nullable;
 import reactor.util.context.Context;
 import telegram4j.mtproto.DcId;
-import telegram4j.mtproto.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.tl.ImmutableBaseInputFile;
 import telegram4j.tl.ImmutableInputFileBig;
 import telegram4j.tl.InputFile;
@@ -90,7 +90,7 @@ class UploadMono extends Mono<InputFile> {
                 roundRobin = 0;
             }
 
-            DcId dcId = DcId.upload(clientGroup.mainId().getId(), idx);
+            DcId dcId = DcId.upload(clientGroup.main().getDatacenter().getId(), idx);
             if (log.isDebugEnabled()) {
                 log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, options.getFileId(),
                         part.filePart() + 1, options.getPartsCount());
@@ -206,7 +206,7 @@ class UploadMono extends Mono<InputFile> {
 
                 AtomicInteger pending = new AtomicInteger(options.getParallelism());
                 for (int i = 0; i < options.getParallelism(); i++) {
-                    DcId dcId = DcId.upload(clientGroup.mainId().getId(), i);
+                    DcId dcId = DcId.upload(clientGroup.main().getDatacenter().getId(), i);
 
                     clientGroup.getOrCreateClient(dcId)
                             .subscribeOn(Schedulers.boundedElastic())

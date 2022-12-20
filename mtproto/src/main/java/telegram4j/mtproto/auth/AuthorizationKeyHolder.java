@@ -2,12 +2,13 @@ package telegram4j.mtproto.auth;
 
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.client.MTProtoClient;
 
 import static telegram4j.mtproto.util.CryptoUtil.sha1Digest;
 
 /**
  * Authorization key holder with precomputed id, that's can be
- * used in {@link telegram4j.mtproto.MTProtoClient} implementation.
+ * used in {@link MTProtoClient} implementation.
  */
 public class AuthorizationKeyHolder {
     private final ByteBuf value;
