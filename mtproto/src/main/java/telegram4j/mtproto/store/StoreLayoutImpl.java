@@ -395,7 +395,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.justOrEmpty(config)
                 .zipWith(Mono.justOrEmpty(dcOptions))
                 .flatMap(TupleUtils.function((cfg, dcOpts) -> Mono.justOrEmpty(
-                        dcOpts.find(DcId.download(cfg.webfileDcId(), 0)))));
+                        dcOpts.find(DcId.Type.DOWNLOAD, cfg.webfileDcId()))));
     }
 
     @Override
@@ -731,7 +731,10 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Void> onUpdateConfig(Config config) {
-        return Mono.fromRunnable(() -> this.config = config);
+        return Mono.fromRunnable(() -> {
+            this.config = config;
+            this.dcOptions = DcOptions.from(config);
+        });
     }
 
     @Override

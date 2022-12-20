@@ -35,14 +35,14 @@ public final class DcOptions {
                 .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
     }
 
-    static Comparator<DataCenter> dcIdComparator(DcId dcId, boolean preferIpv6) {
+    static Comparator<DataCenter> dcIdComparator(DcId.Type type, int dcId, boolean preferIpv6) {
         // filter options with other ids
         return Comparator.<DataCenter>comparingInt(dc -> {
-            int d = Integer.compare(dcId.getId(), dc.getId());
+            int d = Integer.compare(dcId, dc.getId());
             return d == 0 ? -1 : 1;
         })
         .thenComparing(dc -> {
-            switch (dcId.getType()) {
+            switch (type) {
                 case MAIN:
                 case REGULAR:
                     return dc.getType() == Type.REGULAR ? -1 : 1;
@@ -80,6 +80,18 @@ public final class DcOptions {
 
     /**
      * Creates a new {@code DcOptions} list containing predefined options.
+     * The IPv6 preference will be decided by {@code java.net.preferIPv6Addresses} property.
+     * Do not rely on this list, because it may have outdated options.
+     *
+     * @param test {@code true} for creating options for test env.
+     * @return A new {@code DcOptions} list containing predefined options.
+     */
+    public static DcOptions createDefault(boolean test) {
+        return createDefault(test, Boolean.getBoolean("java.net.preferIPv6Addresses"));
+    }
+
+    /**
+     * Creates a new {@code DcOptions} list containing predefined options.
      * Do not rely on this list, because it may have outdated options.
      *
      * @param test {@code true} for creating options for test env.
@@ -87,55 +99,55 @@ public final class DcOptions {
      * @return A new {@code DcOptions} list containing predefined options.
      */
     public static DcOptions createDefault(boolean test, boolean preferIpv6) {
-        // These options retrieved from GetConfig.dcOptions()
+        // These options retrieved from Config.dcOptions()
         List<DataCenter> opts;
         if (test) {
             var commonSecret = Unpooled.wrappedBuffer(ByteBufUtil.decodeHexDump("ddfdda254c78d9fa202ac536079e88b808"));
             opts = List.of(
-                    test(Type.REGULAR, 1, "149.154.175.10", 80, false, false, null),
-                    test(Type.REGULAR, 1, "149.154.175.10", 80, false, true, null),
-                    test(Type.REGULAR, 1, "2001:0b28:f23d:f001:0000:0000:0000:000e", 443, false, false, null),
+                    test(Type.REGULAR, 1, "149.154.175.10", 80, false, false, false, null),
+                    test(Type.REGULAR, 1, "149.154.175.10", 80, false, true, false, null),
+                    test(Type.REGULAR, 1, "2001:0b28:f23d:f001:0000:0000:0000:000e", 443, false, false, false, null),
 
-                    test(Type.REGULAR, 2, "149.154.167.40", 443, false, true, null),
-                    test(Type.REGULAR, 2, "2001:067c:04e8:f002:0000:0000:0000:000e", 443, false, false, null),
-                    test(Type.REGULAR, 2, "207.154.241.73", 14543, true, true, commonSecret),
+                    test(Type.REGULAR, 2, "149.154.167.40", 443, false, true, false, null),
+                    test(Type.REGULAR, 2, "2001:067c:04e8:f002:0000:0000:0000:000e", 443, false, false, false, null),
+                    test(Type.REGULAR, 2, "207.154.241.73", 14543, true, true, false, commonSecret),
 
-                    test(Type.MEDIA, 2, "207.154.241.73", 14543, true, false, commonSecret),
+                    test(Type.MEDIA, 2, "207.154.241.73", 14543, true, false, false, commonSecret),
 
-                    test(Type.REGULAR, 3, "149.154.175.117", 443, false, true, null),
-                    test(Type.REGULAR, 3, "207.154.241.73", 14543, true, false, commonSecret),
-                    test(Type.REGULAR, 3, "2001:0b28:f23d:f003:0000:0000:0000:000e", 443, false, false, null)
+                    test(Type.REGULAR, 3, "149.154.175.117", 443, false, true, false, null),
+                    test(Type.REGULAR, 3, "207.154.241.73", 14543, true, false, false, commonSecret),
+                    test(Type.REGULAR, 3, "2001:0b28:f23d:f003:0000:0000:0000:000e", 443, false, false, false, null)
             );
         } else {
             opts = List.of(
-                    production(Type.REGULAR, 1, "149.154.175.54", 443, false, false, null),
-                    production(Type.REGULAR, 1, "149.154.175.54", 443, false, true, null),
-                    production(Type.REGULAR, 1, "2001:0b28:f23d:f001:0000:0000:0000:000a", 443, false, false, null),
+                    production(Type.REGULAR, 1, "149.154.175.54", 443, false, false, false, null),
+                    production(Type.REGULAR, 1, "149.154.175.54", 443, false, true, false, null),
+                    production(Type.REGULAR, 1, "2001:0b28:f23d:f001:0000:0000:0000:000a", 443, false, false, false, null),
 
-                    production(Type.REGULAR, 2, "149.154.167.41", 443, false, false, null),
-                    production(Type.REGULAR, 2, "149.154.167.41", 443, false, true, null),
-                    production(Type.REGULAR, 2, "2001:067c:04e8:f002:0000:0000:0000:000a", 443, false, false, null),
+                    production(Type.REGULAR, 2, "149.154.167.41", 443, false, false, false, null),
+                    production(Type.REGULAR, 2, "149.154.167.41", 443, false, true, false, null),
+                    production(Type.REGULAR, 2, "2001:067c:04e8:f002:0000:0000:0000:000a", 443, false, false, false, null),
 
-                    production(Type.MEDIA, 2, "149.154.167.151", 443, false, false, null),
-                    production(Type.MEDIA, 2, "2001:067c:04e8:f002:0000:0000:0000:000b", 443, false, false, null),
+                    production(Type.MEDIA, 2, "149.154.167.151", 443, false, false, false, null),
+                    production(Type.MEDIA, 2, "2001:067c:04e8:f002:0000:0000:0000:000b", 443, false, false, false, null),
 
-                    production(Type.REGULAR, 3, "149.154.175.100", 443, false, false, null),
-                    production(Type.REGULAR, 3, "149.154.175.100", 443, false, true, null),
-                    production(Type.REGULAR, 3, "2001:0b28:f23d:f003:0000:0000:0000:000a", 443, false, false, null),
+                    production(Type.REGULAR, 3, "149.154.175.100", 443, false, false, false, null),
+                    production(Type.REGULAR, 3, "149.154.175.100", 443, false, true, false, null),
+                    production(Type.REGULAR, 3, "2001:0b28:f23d:f003:0000:0000:0000:000a", 443, false, false, false, null),
 
-                    production(Type.REGULAR, 4, "149.154.167.92", 443, false, false, null),
-                    production(Type.REGULAR, 4, "149.154.167.92", 443, false, true, null),
-                    production(Type.REGULAR, 4, "2001:067c:04e8:f004:0000:0000:0000:000a", 443, false, false, null),
+                    production(Type.REGULAR, 4, "149.154.167.92", 443, false, false, false, null),
+                    production(Type.REGULAR, 4, "149.154.167.92", 443, false, true, false, null),
+                    production(Type.REGULAR, 4, "2001:067c:04e8:f004:0000:0000:0000:000a", 443, false, false, false, null),
 
-                    production(Type.MEDIA, 4, "149.154.167.43", 443, false, false, null),
-                    production(Type.MEDIA, 4, "2001:067c:04e8:f004:0000:0000:0000:000b", 443, false, false, null),
+                    production(Type.MEDIA, 4, "149.154.167.43", 443, false, false, false, null),
+                    production(Type.MEDIA, 4, "2001:067c:04e8:f004:0000:0000:0000:000b", 443, false, false, false, null),
 
-                    production(Type.REGULAR, 5, "91.108.56.116", 443, false, false, null),
-                    production(Type.REGULAR, 5, "91.108.56.116", 443, false, true, null),
-                    production(Type.REGULAR, 5, "2001:0b28:f23f:f005:0000:0000:0000:000a", 443, false, false, null),
+                    production(Type.REGULAR, 5, "91.108.56.116", 443, false, false, false, null),
+                    production(Type.REGULAR, 5, "91.108.56.116", 443, false, true, false, null),
+                    production(Type.REGULAR, 5, "2001:0b28:f23f:f005:0000:0000:0000:000a", 443, false, false, false, null),
 
-                    production(Type.CDN, 203, "91.105.192.100", 443, false, false, null),
-                    production(Type.CDN, 203, "2a0a:f280:0203:000a:5000:0000:0000:0100", 443, false, false, null)
+                    production(Type.CDN, 203, "91.105.192.100", 443, false, false, false, null),
+                    production(Type.CDN, 203, "2a0a:f280:0203:000a:5000:0000:0000:0100", 443, false, false, false, null)
             );
         }
 
@@ -162,22 +174,29 @@ public final class DcOptions {
      * Finds a DC option by specified {@code DcId} identifier.
      * Result will prefer with IPv6 version according to {@link #isPreferIpv6()} setting.
      *
-     * @param id The DC identifier.
+     * @param type The type of client.
+     * @param dcId The DC identifier.
      * @return A dc option found by specified id, if present.
      */
+    public Optional<DataCenter> find(DcId.Type type, int dcId) {
+        return find(type, dcId, isPreferIpv6());
+    }
+
+    // TODO: delete
     public Optional<DataCenter> find(DcId id) {
-        return find(id, isPreferIpv6());
+        return find(id.getType(), id.getId(), isPreferIpv6());
     }
 
     /**
      * Finds a DC option by specified {@code DcId} identifier.
      *
-     * @param id The DC identifier.
+     * @param type The type of client.
+     * @param dcId The DC identifier.
      * @param preferIpv6 The preference of DC option, if {@code true} IPv6 variant of DC will be returned if present.
      * @return A dc option found by specified id, if present.
      */
-    public Optional<DataCenter> find(DcId id, boolean preferIpv6) {
-        return find0(dcIdComparator(id, preferIpv6));
+    public Optional<DataCenter> find(DcId.Type type, int dcId, boolean preferIpv6) {
+        return find0(dcIdComparator(type, dcId, preferIpv6));
     }
 
     /**

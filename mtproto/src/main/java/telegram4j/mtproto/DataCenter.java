@@ -19,6 +19,7 @@ public final class DataCenter {
     private static final byte TEST_MASK = 1 << 0;
     private static final byte STATIC_MASK = 1 << 1;
     private static final byte TCPO_ONLY_MASK = 1 << 2;
+    private static final byte THIS_PORT_ONLY_MASK = 1 << 3;
 
     private final Type type;
     private final int id;
@@ -40,31 +41,47 @@ public final class DataCenter {
     /**
      * Create new datacenter identifier from given id, address and port.
      *
+     * @throws IllegalArgumentException if {@code id} or {@code port} value is negative or greater than {@code 0xFFFF}.
      * @param type The type of dc.
      * @param test The type of environment in dc, {@code true} for test and {@code false} for production
      * @param id The identifier of server.
      * @param address The ipv4/ipv6 address of server.
      * @param port The port of server.
+     * @param tcpoOnly Whether DC only supports connection with transport obfuscation.
+     * @param isStatic Whether this IP should be used when connecting through a proxy.
+     * @param thisPortOnly Whether clients must connect using only the specified port.
+     * @param secret The secret for transport obfuscation, if present.
+     * @see <a href="https://core.telegram.org/mtproto/mtproto-transports#transport-obfuscation">Transport Obfuscation</a>
      * @return The new datacenter identifier.
      */
+    // TODO: replace parameters with builder
     public static DataCenter create(Type type, boolean test, int id, String address, int port,
-                                    boolean tcpoOnly, boolean isStatic, @Nullable ByteBuf secret) {
+                                    boolean tcpoOnly, boolean isStatic, boolean thisPortOnly,
+                                    @Nullable ByteBuf secret) {
+        if (port < 0 || port > 0xFFFF)
+            throw new IllegalArgumentException("Port out of range: " + port);
+        if (id < 0 || id > 0xFFFF)
+            throw new IllegalArgumentException("Id out of range: " + port);
+
         byte flags = test ? TEST_MASK : 0;
         flags |= tcpoOnly ? TCPO_ONLY_MASK : 0;
         flags |= isStatic ? STATIC_MASK : 0;
+        flags |= thisPortOnly ? THIS_PORT_ONLY_MASK : 0;
 
         var secretCopy = secret != null ? TlEncodingUtil.copyAsUnpooled(secret) : null;
         return new DataCenter(type, id, address, port, flags, secretCopy);
     }
 
     public static DataCenter production(Type type, int id, String address, int port,
-                                        boolean tcpoOnly, boolean isStatic, @Nullable ByteBuf secret) {
-        return create(type, false, id, address, port, tcpoOnly, isStatic, secret);
+                                        boolean tcpoOnly, boolean isStatic, boolean thisPortOnly,
+                                        @Nullable ByteBuf secret) {
+        return create(type, false, id, address, port, tcpoOnly, isStatic, thisPortOnly, secret);
     }
 
     public static DataCenter test(Type type, int id, String address, int port,
-                                  boolean tcpoOnly, boolean isStatic, @Nullable ByteBuf secret) {
-        return create(type, true, id, address, port, tcpoOnly, isStatic, secret);
+                                  boolean tcpoOnly, boolean isStatic, boolean thisPortOnly,
+                                  @Nullable ByteBuf secret) {
+        return create(type, true, id, address, port, tcpoOnly, isStatic, thisPortOnly, secret);
     }
 
     /**
@@ -80,6 +97,7 @@ public final class DataCenter {
         byte flags = config.testMode() ? TEST_MASK : 0;
         flags |= dc.tcpoOnly() ? TCPO_ONLY_MASK : 0;
         flags |= dc.isStatic() ? STATIC_MASK : 0;
+        flags |= dc.thisPortOnly() ? THIS_PORT_ONLY_MASK : 0;
         return new DataCenter(type, dc.id(), dc.ipAddress(), dc.port(), flags, dc.secret());
     }
 
@@ -168,6 +186,15 @@ public final class DataCenter {
     }
 
     /**
+     * Gets whether client must connect using only the specified port.
+     *
+     * @return {@code true} if client must connect using only the specified port.
+     */
+    public boolean isThisPortOnly() {
+        return (flags & THIS_PORT_ONLY_MASK) != 0;
+    }
+
+    /**
      * Gets internal representation of datacenter id.
      *
      * <p> This id can be used for {@link PQInnerDataDc#dc()}.
@@ -214,6 +241,7 @@ public final class DataCenter {
                 ", test=" + isTest() +
                 ", static=" + isStatic() +
                 ", tcpoOnly=" + isTcpObfuscatedOnly() +
+                ", thisPortOnly=" + isThisPortOnly() +
                 ", secret=" + (secret != null ? ByteBufUtil.hexDump(secret) : null) +
                 '}';
     }
