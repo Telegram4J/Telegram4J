@@ -283,11 +283,96 @@ public final class FileReferenceId {
         ByteBuf buf = Unpooled.buffer(); // TODO: presize
 
         buf.writeByte(Version.CURRENT.rev);
-        Version.CURRENT.handler.serialize(this, buf);
+        serialize(buf);
 
         return PREFIX + new String(Base64.getUrlEncoder()
                 .encode(buf.nioBuffer())
                 .array(), StandardCharsets.US_ASCII);
+    }
+
+    private void serialize(ByteBuf buf) {
+        buf.writeByte((byte) fileType.ordinal());
+
+        byte flags = 0;
+        if (context.getType() != Context.Type.UNKNOWN) {
+            flags |= CONTEXT_TYPE_MASK;
+        }
+        if (fileType == Type.WEB_DOCUMENT && accessHash != -1) {
+            flags |= ACCESS_HASH_MASK;
+        }
+        if (sizeType != SIZE_TYPE_ABSENT) {
+            flags |= sizeType;
+        }
+        if (thumbSizeType != '\0') {
+            flags |= THUMB_SIZE_TYPE_MASK;
+        }
+
+        buf.writeByte(flags);
+
+        if ((flags & CONTEXT_TYPE_MASK) != 0) {
+            buf.writeByte(context.getType().ordinal());
+        }
+
+        switch (fileType) {
+            case WEB_DOCUMENT:
+                Objects.requireNonNull(documentType);
+                buf.writeByte((byte) documentType.ordinal());
+
+                Objects.requireNonNull(url);
+                TlSerialUtil.serializeString(buf, url);
+
+                if ((flags & ACCESS_HASH_MASK) != 0) {
+                    buf.writeLongLE(accessHash);
+                }
+                break;
+            case DOCUMENT:
+                Objects.requireNonNull(documentType);
+                buf.writeByte((byte) documentType.ordinal());
+
+            case PHOTO: {
+                buf.writeShortLE(dcId);
+                buf.writeLongLE(documentId);
+                buf.writeLongLE(accessHash);
+
+                Objects.requireNonNull(fileReference);
+                TlSerialUtil.serializeBytes(buf, fileReference);
+
+                if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                    buf.writeByte(thumbSizeType);
+                }
+
+                break;
+            }
+            case CHAT_PHOTO:
+                buf.writeShortLE(dcId);
+                buf.writeLongLE(documentId);
+
+                if (sizeType == SIZE_TYPE_ABSENT) {
+                    buf.writeLongLE(accessHash);
+
+                    Objects.requireNonNull(fileReference);
+                    TlSerialUtil.serializeBytes(buf, fileReference);
+
+                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
+                        buf.writeByte(thumbSizeType);
+                    }
+                }
+
+                break;
+            case STICKER_SET_THUMB:
+                buf.writeShortLE(dcId);
+                buf.writeIntLE(thumbVersion);
+
+                Objects.requireNonNull(stickerSet);
+                TlSerializer.serialize(buf, stickerSet);
+                break;
+            default:
+                throw new IllegalStateException();
+        }
+
+        if (context.getType() != Context.Type.UNKNOWN) {
+            context.serialize(buf);
+        }
     }
 
     /**
@@ -612,7 +697,10 @@ public final class FileReferenceId {
         /** Default type for all other documents. */
         GENERAL,
 
-        /** Represents photo sent as document. */
+        /**
+         * Represents photo sent as document.
+         * This documents will always have a {@link DocumentAttributeImageSize} attribute.
+         */
         PHOTO,
 
         /** Represents document with {@link DocumentAttributeVideo} attribute. */
@@ -684,10 +772,10 @@ public final class FileReferenceId {
     }
 
     public enum Version {
-        REVISION_0(new Revision0Handler()),
+        REVISION_0(new Revision0Deserializer()),
         CURRENT(REVISION_0);
 
-        final RevisionHandler handler;
+        final RevisionDeserializer handler;
         final byte rev;
 
         Version(Version other) {
@@ -695,7 +783,7 @@ public final class FileReferenceId {
             this.rev = other.rev;
         }
 
-        Version(RevisionHandler handler) {
+        Version(RevisionDeserializer handler) {
             this.handler = handler;
             this.rev = (byte) ordinal();
         }
@@ -712,14 +800,12 @@ public final class FileReferenceId {
         }
     }
 
-    static abstract class RevisionHandler {
+    static abstract class RevisionDeserializer {
 
         abstract FileReferenceId deserialize(ByteBuf buf, String str);
-
-        abstract void serialize(FileReferenceId fileRefId, ByteBuf buf);
     }
 
-    static class Revision0Handler extends RevisionHandler {
+    static class Revision0Deserializer extends RevisionDeserializer {
 
         @Override
         FileReferenceId deserialize(ByteBuf buf, String str) {
@@ -799,92 +885,6 @@ public final class FileReferenceId {
             buf.release();
             return new FileReferenceId(fileType, documentType, sizeType, dcId, documentId, accessHash,
                     fileReference, thumbSizeType, url, stickerSet, thumbVersion, ctx);
-        }
-
-        @Override
-        void serialize(FileReferenceId fileRefId, ByteBuf buf) {
-            buf.writeByte((byte) fileRefId.fileType.ordinal());
-
-            byte flags = 0;
-            if (fileRefId.context.getType() != Context.Type.UNKNOWN) {
-                flags |= CONTEXT_TYPE_MASK;
-            }
-            if (fileRefId.fileType == Type.WEB_DOCUMENT && fileRefId.accessHash != -1) {
-                flags |= ACCESS_HASH_MASK;
-            }
-            if (fileRefId.sizeType != SIZE_TYPE_ABSENT) {
-                flags |= fileRefId.sizeType;
-            }
-            if (fileRefId.thumbSizeType != '\0') {
-                flags |= THUMB_SIZE_TYPE_MASK;
-            }
-
-            buf.writeByte(flags);
-
-            if ((flags & CONTEXT_TYPE_MASK) != 0) {
-                buf.writeByte(fileRefId.context.getType().ordinal());
-            }
-
-            switch (fileRefId.fileType) {
-                case WEB_DOCUMENT:
-                    Objects.requireNonNull(fileRefId.documentType);
-                    buf.writeByte((byte) fileRefId.documentType.ordinal());
-
-                    Objects.requireNonNull(fileRefId.url);
-                    TlSerialUtil.serializeString(buf, fileRefId.url);
-
-                    if ((flags & ACCESS_HASH_MASK) != 0) {
-                        buf.writeLongLE(fileRefId.accessHash);
-                    }
-                    break;
-                case DOCUMENT:
-                    Objects.requireNonNull(fileRefId.documentType);
-                    buf.writeByte((byte) fileRefId.documentType.ordinal());
-
-                case PHOTO: {
-                    buf.writeShortLE(fileRefId.dcId);
-                    buf.writeLongLE(fileRefId.documentId);
-                    buf.writeLongLE(fileRefId.accessHash);
-
-                    Objects.requireNonNull(fileRefId.fileReference);
-                    TlSerialUtil.serializeBytes(buf, fileRefId.fileReference);
-
-                    if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                        buf.writeByte(fileRefId.thumbSizeType);
-                    }
-
-                    break;
-                }
-                case CHAT_PHOTO:
-                    buf.writeShortLE(fileRefId.dcId);
-                    buf.writeLongLE(fileRefId.documentId);
-
-                    if (fileRefId.sizeType == SIZE_TYPE_ABSENT) {
-                        buf.writeLongLE(fileRefId.accessHash);
-
-                        Objects.requireNonNull(fileRefId.fileReference);
-                        TlSerialUtil.serializeBytes(buf, fileRefId.fileReference);
-
-                        if ((flags & THUMB_SIZE_TYPE_MASK) != 0) {
-                            buf.writeByte(fileRefId.thumbSizeType);
-                        }
-                    }
-
-                    break;
-                case STICKER_SET_THUMB:
-                    buf.writeShortLE(fileRefId.dcId);
-                    buf.writeIntLE(fileRefId.thumbVersion);
-
-                    Objects.requireNonNull(fileRefId.stickerSet);
-                    TlSerializer.serialize(buf, fileRefId.stickerSet);
-                    break;
-                default:
-                    throw new IllegalStateException();
-            }
-
-            if (fileRefId.context.getType() != Context.Type.UNKNOWN) {
-                fileRefId.context.serialize(buf);
-            }
         }
     }
 }
