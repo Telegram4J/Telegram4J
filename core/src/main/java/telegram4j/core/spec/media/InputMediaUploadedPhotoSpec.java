@@ -142,7 +142,6 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
          * @return {@code this} builder for use in a chained invocation
          */
         public Builder from(InputMediaUploadedPhotoSpec instance) {
-            Objects.requireNonNull(instance);
             file(instance.file);
             stickers(instance.stickers);
             autoDeleteDuration(instance.autoDeleteDuration);

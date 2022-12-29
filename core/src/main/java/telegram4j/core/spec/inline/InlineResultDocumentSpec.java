@@ -1,6 +1,8 @@
 package telegram4j.core.spec.inline;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.FileReferenceId.DocumentType;
 
 import java.time.Duration;
@@ -12,7 +14,7 @@ import java.util.Optional;
 /**
  * Spec for documents and photos inline results.
  *
- * <p>To create audio file inline result these fields must be present:
+ * <p> To create audio file inline result these fields must be present:
  * <ol>
  *   <li>{@link #type()} to {@link DocumentType#AUDIO} if it's web file</li>
  *   <li>{@link #title()} - the title of audio file</li>
@@ -34,7 +36,10 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
     private final Duration duration;
     @Nullable
     private final WebDocumentFields.Size size;
-    private final String file;
+    @Nullable
+    private final FileReferenceId documentFri;
+    @Nullable
+    private final String documentUrl;
     @Nullable
     private final String mimeType;
     @Nullable
@@ -44,10 +49,27 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
     private final String id;
     private final InlineMessageSpec message;
 
-    private InlineResultDocumentSpec(String file, String id, InlineMessageSpec message) {
-        this.file = Objects.requireNonNull(file);
+    private InlineResultDocumentSpec(FileReferenceId documentFri, String id, InlineMessageSpec message) {
+        this.documentFri = Objects.requireNonNull(documentFri);
         this.id = Objects.requireNonNull(id);
         this.message = Objects.requireNonNull(message);
+        this.documentUrl = null;
+        this.type = null;
+        this.title = null;
+        this.performer = null;
+        this.description = null;
+        this.duration = null;
+        this.size = null;
+        this.mimeType = null;
+        this.thumb = null;
+        this.filename = null;
+    }
+
+    private InlineResultDocumentSpec(String documentUrl, String id, InlineMessageSpec message) {
+        this.documentUrl = Objects.requireNonNull(documentUrl);
+        this.id = Objects.requireNonNull(id);
+        this.message = Objects.requireNonNull(message);
+        this.documentFri = null;
         this.type = null;
         this.title = null;
         this.performer = null;
@@ -62,7 +84,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
     private InlineResultDocumentSpec(@Nullable DocumentType type, @Nullable String title,
                                      @Nullable String performer, @Nullable String description,
                                      @Nullable Duration duration, @Nullable WebDocumentFields.Size size,
-                                     String file, @Nullable String mimeType, @Nullable WebDocumentSpec thumb,
+                                     @Nullable FileReferenceId documentFri, @Nullable String documentUrl,
+                                     @Nullable String mimeType, @Nullable WebDocumentSpec thumb,
                                      @Nullable String filename, String id, InlineMessageSpec message) {
         this.type = type;
         this.title = title;
@@ -70,7 +93,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         this.description = description;
         this.duration = duration;
         this.size = size;
-        this.file = file;
+        this.documentUrl = documentUrl;
+        this.documentFri = documentFri;
         this.mimeType = mimeType;
         this.thumb = thumb;
         this.filename = filename;
@@ -106,11 +130,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         return Optional.ofNullable(size);
     }
 
-    /**
-     * @return The serialized {@link telegram4j.mtproto.file.FileReferenceId} of file or URL.
-     */
-    public String file() {
-        return file;
+    public Variant2<String, FileReferenceId> document() {
+        return Variant2.of(documentUrl, documentFri);
     }
 
     /**
@@ -140,7 +161,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withType(@Nullable DocumentType value) {
         if (type == value) return this;
-        return new InlineResultDocumentSpec(value, title, performer, description, duration, size, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(value, title, performer, description, duration, size,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withType(Optional<DocumentType> opt) {
@@ -149,7 +171,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withTitle(@Nullable String value) {
         if (Objects.equals(title, value)) return this;
-        return new InlineResultDocumentSpec(type, value, performer, description, duration, size, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, value, performer, description, duration, size,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withTitle(Optional<String> opt) {
@@ -158,7 +181,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withPerformer(@Nullable String value) {
         if (Objects.equals(performer, value)) return this;
-        return new InlineResultDocumentSpec(type, title, value, description, duration, size, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, value, description, duration, size,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withPerformer(Optional<String> opt) {
@@ -167,7 +191,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withDescription(@Nullable String value) {
         if (Objects.equals(description, value)) return this;
-        return new InlineResultDocumentSpec(type, title, performer, value, duration, size, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, performer, value, duration, size,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withDescription(Optional<String> opt) {
@@ -176,7 +201,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withDuration(@Nullable Duration value) {
         if (duration == value) return this;
-        return new InlineResultDocumentSpec(type, title, performer, description, value, size, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, performer, description, value, size,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withDuration(Optional<Duration> opt) {
@@ -193,22 +219,30 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withSize(@Nullable WebDocumentFields.Size value) {
         if (size == value) return this;
-        return new InlineResultDocumentSpec(type, title, performer, description, duration, value, file, mimeType, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, performer, description, duration, value,
+                documentFri, documentUrl, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withSize(Optional<WebDocumentFields.Size> opt) {
         return withSize(opt.orElse(null));
     }
 
-    public InlineResultDocumentSpec withFile(String value) {
-        Objects.requireNonNull(value);
-        if (file.equals(value)) return this;
-        return new InlineResultDocumentSpec(type, title, performer, description, duration, size, value, mimeType, thumb, filename, id, message);
+    public InlineResultDocumentSpec withDocument(FileReferenceId value) {
+        if (value.equals(documentFri)) return this;
+        return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
+                documentFri, null, mimeType, thumb, filename, id, message);
+    }
+
+    public InlineResultDocumentSpec withDocument(String value) {
+        if (value.equals(documentUrl)) return this;
+        return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
+                null, value, mimeType, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withMimeType(@Nullable String value) {
         if (Objects.equals(mimeType, value)) return this;
-        return new InlineResultDocumentSpec(type, title, performer, description, duration, size, file, value, thumb, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
+                documentFri, documentUrl, value, thumb, filename, id, message);
     }
 
     public InlineResultDocumentSpec withMimeType(Optional<String> opt) {
@@ -217,7 +251,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
     public InlineResultDocumentSpec withThumb(@Nullable WebDocumentSpec value) {
         if (thumb == value) return this;
-        return new InlineResultDocumentSpec(type, title, performer, description, duration, size, file, mimeType, value, filename, id, message);
+        return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
+                documentFri, documentUrl, mimeType, value, filename, id, message);
     }
 
     public InlineResultDocumentSpec withThumb(Optional<WebDocumentSpec> opt) {
@@ -228,14 +263,14 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         Objects.requireNonNull(value);
         if (id.equals(value)) return this;
         return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
-                file, mimeType, thumb, filename, value, message);
+                documentFri, documentUrl, mimeType, thumb, filename, value, message);
     }
 
     public InlineResultDocumentSpec withMessage(InlineMessageSpec value) {
         Objects.requireNonNull(value);
         if (message == value) return this;
         return new InlineResultDocumentSpec(type, title, performer, description, duration, size,
-                file, mimeType, thumb, filename, id, value);
+                documentFri, documentUrl, mimeType, thumb, filename, id, value);
     }
 
     @Override
@@ -245,7 +280,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         InlineResultDocumentSpec that = (InlineResultDocumentSpec) o;
         return type == that.type && Objects.equals(title, that.title) && Objects.equals(performer, that.performer) &&
                 Objects.equals(description, that.description) && Objects.equals(duration, that.duration) &&
-                Objects.equals(size, that.size) && file.equals(that.file) && Objects.equals(mimeType, that.mimeType) &&
+                Objects.equals(size, that.size) && Objects.equals(documentFri, that.documentFri) &&
+                Objects.equals(documentUrl, that.documentUrl) && Objects.equals(mimeType, that.mimeType) &&
                 Objects.equals(thumb, that.thumb) && id.equals(that.id) && message.equals(that.message);
     }
 
@@ -258,7 +294,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         h += (h << 5) + Objects.hashCode(description);
         h += (h << 5) + Objects.hashCode(duration);
         h += (h << 5) + Objects.hashCode(size);
-        h += (h << 5) + file.hashCode();
+        h += (h << 5) + Objects.hashCode(documentFri);
+        h += (h << 5) + Objects.hashCode(documentUrl);
         h += (h << 5) + Objects.hashCode(mimeType);
         h += (h << 5) + Objects.hashCode(thumb);
         h += (h << 5) + id.hashCode();
@@ -275,7 +312,7 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
                 ", description='" + description + '\'' +
                 ", duration=" + duration +
                 ", size=" + size +
-                ", file='" + file + '\'' +
+                ", document=" + (documentFri != null ? documentFri : documentUrl) +
                 ", mimeType='" + mimeType + '\'' +
                 ", thumb=" + thumb +
                 ", id='" + id + '\'' +
@@ -283,8 +320,12 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
                 '}';
     }
 
-    public static InlineResultDocumentSpec of(String file, String id, InlineMessageSpec message) {
-        return new InlineResultDocumentSpec(file, id, message);
+    public static InlineResultDocumentSpec of(FileReferenceId documentFri, String id, InlineMessageSpec message) {
+        return new InlineResultDocumentSpec(documentFri, id, message);
+    }
+
+    public static InlineResultDocumentSpec of(String documentUrl, String id, InlineMessageSpec message) {
+        return new InlineResultDocumentSpec(documentUrl, id, message);
     }
 
     public static Builder builder() {
@@ -292,10 +333,9 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
     }
 
     public static final class Builder {
-        private static final byte INIT_BIT_FILE = 0x1;
-        private static final byte INIT_BIT_ID = 0x2;
-        private static final byte INIT_BIT_MESSAGE = 0x4;
-        private byte initBits = 0x7;
+        private static final byte INIT_BIT_ID = 0x1;
+        private static final byte INIT_BIT_MESSAGE = 0x2;
+        private byte initBits = 0x3;
 
         private DocumentType type;
         private String title;
@@ -303,7 +343,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
         private String description;
         private Duration duration;
         private WebDocumentFields.Size size;
-        private String file;
+        private FileReferenceId documentFri;
+        private String documentUrl;
         private String mimeType;
         private WebDocumentSpec thumb;
         private String filename;
@@ -326,7 +367,8 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
             if (object instanceof InlineResultDocumentSpec) {
                 InlineResultDocumentSpec instance = (InlineResultDocumentSpec) object;
                 duration(instance.duration);
-                file(instance.file);
+                documentFri = instance.documentFri;
+                documentUrl = instance.documentUrl;
                 size(instance.size);
                 thumb(instance.thumb);
                 filename(instance.filename);
@@ -415,9 +457,15 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
             return this;
         }
 
-        public Builder file(String file) {
-            this.file = Objects.requireNonNull(file);
-            initBits &= ~INIT_BIT_FILE;
+        public Builder document(String documentUrl) {
+            this.documentUrl = Objects.requireNonNull(documentUrl);
+            this.documentFri = null;
+            return this;
+        }
+
+        public Builder document(FileReferenceId documentFri) {
+            this.documentFri = Objects.requireNonNull(documentFri);
+            this.documentUrl = null;
             return this;
         }
 
@@ -468,12 +516,13 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
                 throw incompleteInitialization();
             }
             return new InlineResultDocumentSpec(type, title, performer, description,
-                    duration, size, file, mimeType, thumb, filename, id, message);
+                    duration, size, documentFri, documentUrl,
+                    mimeType, thumb, filename, id, message);
         }
 
         private IllegalStateException incompleteInitialization() {
             List<String> attributes = new ArrayList<>(Integer.bitCount(initBits));
-            if ((initBits & INIT_BIT_FILE) != 0) attributes.add("file");
+            if (documentFri == null && documentUrl == null) attributes.add("document");
             if ((initBits & INIT_BIT_ID) != 0) attributes.add("id");
             if ((initBits & INIT_BIT_MESSAGE) != 0) attributes.add("message");
             return new IllegalStateException("Cannot build InlineResultDocumentSpec, some of required attributes are not set " + attributes);

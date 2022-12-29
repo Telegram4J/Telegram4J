@@ -3,37 +3,49 @@ package telegram4j.core.spec.media;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.FileReferenceId;
-import telegram4j.tl.InputDocument;
 import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaDocument;
 import telegram4j.tl.InputMediaDocumentExternal;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
 public final class InputMediaDocumentSpec implements InputMediaSpec {
-    private final String document;
+    @Nullable
+    private final FileReferenceId documentFri;
+    @Nullable
+    private final String documentUrl;
+    @Nullable
     private final String query;
     private final Duration autoDeleteDuration;
 
-    private InputMediaDocumentSpec(String document) {
-        this.document = Objects.requireNonNull(document);
-        this.query = null;
+    private InputMediaDocumentSpec(FileReferenceId documentFri) {
+        this.documentFri = Objects.requireNonNull(documentFri);
+        this.documentUrl = null;
         this.autoDeleteDuration = null;
+        this.query = null;
     }
 
-    private InputMediaDocumentSpec(String document, @Nullable String query, @Nullable Duration autoDeleteDuration) {
-        this.document = document;
+    private InputMediaDocumentSpec(String documentUrl) {
+        this.documentUrl = Objects.requireNonNull(documentUrl);
+        this.autoDeleteDuration = null;
+        this.documentFri = null;
+        this.query = null;
+    }
+
+    private InputMediaDocumentSpec(@Nullable FileReferenceId documentFri, @Nullable String documentUrl,
+                                   @Nullable String query, @Nullable Duration autoDeleteDuration) {
+        this.documentFri = documentFri;
+        this.documentUrl = documentUrl;
         this.query = query;
         this.autoDeleteDuration = autoDeleteDuration;
     }
 
-    public String document() {
-        return document;
+    public Variant2<String, FileReferenceId> document() {
+        return Variant2.of(documentUrl, documentFri);
     }
 
     public Optional<String> query() {
@@ -52,67 +64,84 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
                     .map(Math::toIntExact)
                     .orElse(null);
 
-            try {
-                InputDocument doc = FileReferenceId.deserialize(document()).asInputDocument();
-
+            if (documentFri != null) {
                 return InputMediaDocument.builder()
-                        .id(doc)
-                        .query(query().orElse(null))
-                        .ttlSeconds(ttlSeconds)
-                        .build();
-            } catch (IllegalArgumentException t) {
-                return InputMediaDocumentExternal.builder()
-                        .url(document())
+                        .id(documentFri.asInputDocument())
+                        .query(query)
                         .ttlSeconds(ttlSeconds)
                         .build();
             }
+            return InputMediaDocumentExternal.builder()
+                    .url(Objects.requireNonNull(documentUrl))
+                    .ttlSeconds(ttlSeconds)
+                    .build();
         });
     }
 
-    public InputMediaDocumentSpec withDocument(String value) {
-        Objects.requireNonNull(value);
-        if (this.document.equals(value)) return this;
-        return new InputMediaDocumentSpec(value, this.query, this.autoDeleteDuration);
+    public InputMediaDocumentSpec withDocument(String photoUrl) {
+        if (photoUrl.equals(this.documentUrl)) return this;
+        return new InputMediaDocumentSpec(null, photoUrl, query, autoDeleteDuration);
+    }
+
+    public InputMediaDocumentSpec withDocument(FileReferenceId photoFri) {
+        if (photoFri.equals(this.documentFri)) return this;
+        return new InputMediaDocumentSpec(photoFri, null, query, autoDeleteDuration);
     }
 
     public InputMediaDocumentSpec withQuery(@Nullable String value) {
         if (Objects.equals(this.query, value)) return this;
-        return new InputMediaDocumentSpec(this.document, value, this.autoDeleteDuration);
+        return new InputMediaDocumentSpec(documentFri, documentUrl, value, autoDeleteDuration);
     }
 
-    public InputMediaDocumentSpec withQuery(Optional<String> opt) {
-        return withQuery(opt.orElse(null));
+    public InputMediaDocumentSpec withQuery(Optional<String> optional) {
+        return withQuery(optional.orElse(null));
     }
 
     public InputMediaDocumentSpec withAutoDeleteDuration(@Nullable Duration value) {
         if (Objects.equals(this.autoDeleteDuration, value)) return this;
-        return new InputMediaDocumentSpec(this.document, this.query, value);
+        return new InputMediaDocumentSpec(documentFri, documentUrl, query, value);
     }
 
-    public InputMediaDocumentSpec withAutoDeleteDuration(Optional<Duration> opt) {
-        return withAutoDeleteDuration(opt.orElse(null));
+    public InputMediaDocumentSpec withAutoDeleteDuration(Optional<Duration> optional) {
+        return withAutoDeleteDuration(optional.orElse(null));
     }
 
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof InputMediaDocumentSpec)) return false;
         InputMediaDocumentSpec that = (InputMediaDocumentSpec) o;
-        return document.equals(that.document) && Objects.equals(query, that.query) &&
+        return Objects.equals(documentFri, that.documentFri) &&
+                Objects.equals(documentUrl, that.documentUrl) &&
+                Objects.equals(query, that.query) &&
                 Objects.equals(autoDeleteDuration, that.autoDeleteDuration);
     }
 
     @Override
     public int hashCode() {
         int h = 5381;
-        h += (h << 5) + document.hashCode();
+        h += (h << 5) + Objects.hashCode(documentFri);
+        h += (h << 5) + Objects.hashCode(documentUrl);
         h += (h << 5) + Objects.hashCode(query);
         h += (h << 5) + Objects.hashCode(autoDeleteDuration);
         return h;
     }
 
-    public static InputMediaDocumentSpec of(String document) {
-        return new InputMediaDocumentSpec(document);
+    @Override
+    public String toString() {
+        return "InputMediaDocumentSpec{" +
+                "document=" + (documentFri != null ? documentFri : documentUrl) +
+                ", query='" + query +
+                "', autoDeleteDuration=" + autoDeleteDuration +
+                '}';
+    }
+
+    public static InputMediaDocumentSpec of(FileReferenceId documentFri) {
+        return new InputMediaDocumentSpec(documentFri);
+    }
+
+    public static InputMediaDocumentSpec of(String documentUrl) {
+        return new InputMediaDocumentSpec(documentUrl);
     }
 
     public static Builder builder() {
@@ -120,10 +149,8 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
     }
 
     public static final class Builder {
-        private static final byte INIT_BIT_DOCUMENT = 0x1;
-        private byte initBits = 0x1;
-
-        private String document;
+        private FileReferenceId documentFri;
+        private String documentUrl;
         private String query;
         private Duration autoDeleteDuration;
 
@@ -131,16 +158,22 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         }
 
         public Builder from(InputMediaDocumentSpec instance) {
-            Objects.requireNonNull(instance);
-            document(instance.document);
-            query(instance.query);
-            autoDeleteDuration(instance.autoDeleteDuration);
+            documentUrl = instance.documentUrl;
+            documentFri = instance.documentFri;
+            query = instance.query;
+            autoDeleteDuration = instance.autoDeleteDuration;
             return this;
         }
 
-        public Builder document(String document) {
-            this.document = Objects.requireNonNull(document);
-            initBits &= ~INIT_BIT_DOCUMENT;
+        public Builder document(FileReferenceId documentFri) {
+            this.documentFri = Objects.requireNonNull(documentFri);
+            this.documentUrl = null;
+            return this;
+        }
+
+        public Builder document(String documentUrl) {
+            this.documentUrl = Objects.requireNonNull(documentUrl);
+            this.documentFri = null;
             return this;
         }
 
@@ -165,16 +198,10 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         }
 
         public InputMediaDocumentSpec build() {
-            if (initBits != 0) {
-                throw incompleteInitialization();
+            if (documentFri == null && documentUrl == null) {
+                throw new IllegalStateException("Cannot build InputMediaDocumentSpec, 'document' attribute is not set");
             }
-            return new InputMediaDocumentSpec(document, query, autoDeleteDuration);
-        }
-
-        private IllegalStateException incompleteInitialization() {
-            List<String> attributes = new ArrayList<>();
-            if ((initBits & INIT_BIT_DOCUMENT) != 0) attributes.add("document");
-            return new IllegalStateException("Cannot build InputMediaDocumentSpec, some of required attributes are not set " + attributes);
+            return new InputMediaDocumentSpec(documentFri, documentUrl, query, autoDeleteDuration);
         }
     }
 }

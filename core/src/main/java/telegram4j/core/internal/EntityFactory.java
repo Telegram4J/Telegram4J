@@ -296,10 +296,9 @@ public class EntityFactory {
 
     @Nullable
     public static User createUser(MTProtoTelegramClient client, telegram4j.tl.users.UserFull userFull) {
-        var minData = userFull.users().stream()
+        var minData = (BaseUser) userFull.users().stream()
                 .filter(u -> u.identifier() == BaseUser.ID &&
                         u.id() == userFull.fullUser().id())
-                .map(u -> (BaseUser) u)
                 .findFirst()
                 .orElse(null);
 
@@ -314,7 +313,7 @@ public class EntityFactory {
         switch (anyUser.identifier()) {
             case UserEmpty.ID: return null;
             case BaseUser.ID:
-                BaseUser baseUser = (BaseUser) anyUser;
+                var baseUser = (BaseUser) anyUser;
 
                 return new User(client, baseUser, null);
             default:
@@ -535,40 +534,8 @@ public class EntityFactory {
             DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
             String type = documentType == DocumentType.GENERAL ? "file" : documentType.name().toLowerCase(Locale.ROOT);
 
-            try {
-                FileReferenceId fileRefId = FileReferenceId.deserialize(r.file());
-
-                var fileRefIdType = fileRefId.getDocumentType()
-                        .or(() -> fileRefId.getFileType() == FileReferenceId.Type.PHOTO
-                                ? Optional.of(DocumentType.PHOTO) : Optional.empty()) // possible jpeg photo
-                        .orElseThrow();
-                if (r.type().map(t -> fileRefIdType != t).orElse(false)) {
-                    throw new IllegalArgumentException("Document type mismatch. File ref id: "
-                            + fileRefIdType + ", type: " + documentType);
-                }
-
-                if (fileRefIdType == DocumentType.PHOTO) {
-                    InputPhoto photo = fileRefId.asInputPhoto();
-                    var builder = InputBotInlineResultPhoto.builder()
-                            .type("photo")
-                            .photo(photo)
-                            .id(r.id());
-
-                    return sendMessage.map(builder::sendMessage)
-                            .map(ImmutableInputBotInlineResultPhoto.Builder::build);
-                }
-
-                InputDocument document = fileRefId.asInputDocument();
-                var builder = InputBotInlineResultDocument.builder()
-                        .type(type)
-                        .title(r.title().orElse(null))
-                        .description(r.description().orElse(null))
-                        .document(document)
-                        .id(r.id());
-
-                return sendMessage.map(builder::sendMessage)
-                        .map(ImmutableInputBotInlineResultDocument.Builder::build);
-            } catch (IllegalArgumentException e) { // may be just an url
+            String url = r.document().getT1().orElse(null);
+            if (url != null) {
                 String mimeType = r.mimeType()
                         .or(() -> documentType == DocumentType.PHOTO ? Optional.of("image/jpeg") : Optional.empty())
                         .orElseThrow(() -> new IllegalArgumentException("Mime type must be included with urls."));
@@ -584,10 +551,10 @@ public class EntityFactory {
                         .title(r.title().orElse(null))
                         .description(r.description().orElse(null))
                         .id(r.id())
-                        .url(r.file());
+                        .url(url);
 
                 var contentBuilder = InputWebDocument.builder()
-                        .url(r.file())
+                        .url(url)
                         .size(0)
                         .attributes(List.of())
                         .mimeType(mimeType);
@@ -644,6 +611,38 @@ public class EntityFactory {
                 return sendMessage.map(builder::sendMessage)
                         .map(ImmutableBaseInputBotInlineResult.Builder::build);
             }
+
+            FileReferenceId fileRefId = r.document().getT2().orElseThrow();
+            var fileRefIdType = fileRefId.getDocumentType()
+                    .or(() -> fileRefId.getFileType() == FileReferenceId.Type.PHOTO
+                            ? Optional.of(DocumentType.PHOTO) : Optional.empty()) // possible jpeg photo
+                    .orElseThrow();
+            if (r.type().map(t -> fileRefIdType != t).orElse(false)) {
+                throw new IllegalArgumentException("Document type mismatch. File ref id: "
+                        + fileRefIdType + ", type: " + documentType);
+            }
+
+            if (fileRefIdType == DocumentType.PHOTO) {
+                InputPhoto photo = fileRefId.asInputPhoto();
+                var builder = InputBotInlineResultPhoto.builder()
+                        .type("photo")
+                        .photo(photo)
+                        .id(r.id());
+
+                return sendMessage.map(builder::sendMessage)
+                        .map(ImmutableInputBotInlineResultPhoto.Builder::build);
+            }
+
+            InputDocument document = fileRefId.asInputDocument();
+            var builder = InputBotInlineResultDocument.builder()
+                    .type(type)
+                    .title(r.title().orElse(null))
+                    .description(r.description().orElse(null))
+                    .document(document)
+                    .id(r.id());
+
+            return sendMessage.map(builder::sendMessage)
+                    .map(ImmutableInputBotInlineResultDocument.Builder::build);
         } else if (spec instanceof InlineResultGameSpec) {
             InlineResultGameSpec r = (InlineResultGameSpec) spec;
 
@@ -661,10 +660,10 @@ public class EntityFactory {
     public static Reaction createReaction(telegram4j.tl.Reaction reaction) {
         switch (reaction.identifier()) {
             case ReactionCustomEmoji.ID:
-                ReactionCustomEmoji custom = (ReactionCustomEmoji) reaction;
+                var custom = (ReactionCustomEmoji) reaction;
                 return new Reaction(custom.documentId());
             case ReactionEmoji.ID:
-                ReactionEmoji emoticon = (ReactionEmoji) reaction;
+                var emoticon = (ReactionEmoji) reaction;
                 return new Reaction(emoticon.emoticon());
             // and ReactionEmpty
             default:
@@ -676,10 +675,10 @@ public class EntityFactory {
     public static Variant2<Boolean, List<Reaction>> createChatReactions(ChatReactions data) {
         switch (data.identifier()) {
             case ChatReactionsAll.ID:
-                ChatReactionsAll all = (ChatReactionsAll) data;
+                var all = (ChatReactionsAll) data;
                 return Variant2.ofT1(all.allowCustom());
             case ChatReactionsSome.ID:
-                ChatReactionsSome some = (ChatReactionsSome) data;
+                var some = (ChatReactionsSome) data;
                 return Variant2.ofT2(some.reactions().stream()
                         .map(EntityFactory::createReaction)
                         .collect(Collectors.toUnmodifiableList()));

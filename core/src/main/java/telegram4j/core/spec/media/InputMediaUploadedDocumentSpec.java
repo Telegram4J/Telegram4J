@@ -22,7 +22,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     private final InputFile thumb;
     private final String mimeType;
     private final List<DocumentAttribute> attributes;
-    private final List<String> stickers;
+    private final List<FileReferenceId> stickers;
     private final Duration autoDeleteDuration;
 
     private InputMediaUploadedDocumentSpec(InputFile file, String mimeType,
@@ -50,7 +50,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
 
     private InputMediaUploadedDocumentSpec(boolean noSoundVideo, boolean forceFile,
                                            InputFile file, @Nullable InputFile thumb, String mimeType,
-                                           List<DocumentAttribute> attributes, @Nullable List<String> stickers,
+                                           List<DocumentAttribute> attributes, @Nullable List<FileReferenceId> stickers,
                                            @Nullable Duration autoDeleteDuration) {
         this.noSoundVideo = noSoundVideo;
         this.forceFile = forceFile;
@@ -86,7 +86,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         return attributes;
     }
 
-    public Optional<List<String>> stickers() {
+    public Optional<List<FileReferenceId>> stickers() {
         return Optional.ofNullable(stickers);
     }
 
@@ -97,16 +97,15 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     @Override
     public Mono<InputMedia> asData(MTProtoTelegramClient client) {
         return Mono.fromSupplier(() -> InputMediaUploadedDocument.builder()
-                .nosoundVideo(noSoundVideo())
-                .forceFile(forceFile())
-                .file(file())
-                .thumb(thumb().orElse(null))
-                .mimeType(mimeType())
-                .attributes(attributes())
+                .nosoundVideo(noSoundVideo)
+                .forceFile(forceFile)
+                .file(file)
+                .thumb(thumb)
+                .mimeType(mimeType)
+                .attributes(attributes)
                 .stickers(stickers()
                         .map(list -> list.stream()
-                                .map(s -> FileReferenceId.deserialize(s)
-                                        .asInputDocument())
+                                .map(FileReferenceId::asInputDocument)
                                 .collect(Collectors.toList()))
                         .orElse(null))
                 .ttlSeconds(autoDeleteDuration()
@@ -169,15 +168,15 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
                 newValue, stickers, autoDeleteDuration);
     }
 
-    public InputMediaUploadedDocumentSpec withStickers(@Nullable Iterable<String> value) {
+    public InputMediaUploadedDocumentSpec withStickers(@Nullable Iterable<FileReferenceId> value) {
         if (stickers == value) return this;
-        List<String> newValue = value != null ? TlEncodingUtil.copyList(value) : null;
-        if (stickers == newValue) return this;
+        var newStickers = value != null ? TlEncodingUtil.copyList(value) : null;
+        if (stickers == newStickers) return this;
         return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb, mimeType,
-                attributes, newValue, autoDeleteDuration);
+                attributes, newStickers, autoDeleteDuration);
     }
 
-    public InputMediaUploadedDocumentSpec withStickers(Optional<? extends List<String>> opt) {
+    public InputMediaUploadedDocumentSpec withStickers(Optional<? extends Iterable<FileReferenceId>> opt) {
         return withStickers(opt.orElse(null));
     }
 
@@ -255,7 +254,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         private InputFile thumb;
         private String mimeType;
         private List<DocumentAttribute> attributes;
-        private List<String> stickers;
+        private List<FileReferenceId> stickers;
         private Duration autoDeleteDuration;
 
         private Builder() {
@@ -350,13 +349,13 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
             return this;
         }
 
-        public Builder stickers(@Nullable List<String> stickers) {
-            this.stickers = stickers;
+        public Builder stickers(@Nullable Iterable<FileReferenceId> stickers) {
+            this.stickers = stickers != null ? TlEncodingUtil.copyList(stickers) : null;
             return this;
         }
 
-        public Builder stickers(Optional<? extends List<String>> stickers) {
-            this.stickers = stickers.orElse(null);
+        public Builder stickers(Optional<? extends Iterable<FileReferenceId>> stickers) {
+            this.stickers = stickers.map(TlEncodingUtil::copyList).orElse(null);
             return this;
         }
 

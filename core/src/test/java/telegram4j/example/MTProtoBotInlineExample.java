@@ -2,8 +2,6 @@ package telegram4j.example;
 
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
-import reactor.util.Logger;
-import reactor.util.Loggers;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
 import telegram4j.core.event.domain.message.SendMessageEvent;
@@ -26,12 +24,10 @@ import java.util.function.Function;
 
 public class MTProtoBotInlineExample {
 
-    private static final Logger log = Loggers.getLogger(MTProtoBotInlineExample.class);
-
     private static final Duration CACHE_TIME = Duration.ofSeconds(30);
     private static final Duration PHOTO_CACHE_TIME = Duration.ofSeconds(5);
 
-    private static volatile String lastPhotoId;
+    private static volatile FileReferenceId lastPhotoId;
 
     public static void main(String[] args) {
 
@@ -54,9 +50,7 @@ public class MTProtoBotInlineExample {
                             .flatMap(s -> Mono.justOrEmpty(s.getMessage().getMedia()))
                             .ofType(MessageMedia.Document.class)
                             .flatMap(d -> Mono.justOrEmpty(d.getDocument()))
-                            .map(d -> d.getFileReferenceId().serialize())
-                            .doOnNext(s -> lastPhotoId = s)
-                            .doOnNext(log::debug)
+                            .doOnNext(s -> lastPhotoId = s.getFileReferenceId())
                             .then();
 
                     return Mono.when(listenInline, listenIncomingFri);
@@ -84,7 +78,7 @@ public class MTProtoBotInlineExample {
                                 .id("4")
                                 .type(FileReferenceId.DocumentType.GIF)
                                 .title("Niko caramelldansen!")
-                                .file("https://media.tenor.com/VqUFZ4uNMCoAAAAC/niko-dance-one-shot-dancing.gif")
+                                .document("https://media.tenor.com/VqUFZ4uNMCoAAAAC/niko-dance-one-shot-dancing.gif")
                                 .size(498, 373)
                                 .mimeType("image/gif")
                                 .duration(Duration.ofMillis(800))
@@ -102,12 +96,12 @@ public class MTProtoBotInlineExample {
                                 .id("5")
                                 .type(FileReferenceId.DocumentType.PHOTO)
                                 .size(256)
-                                .file("https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon256%402x.png")
+                                .document("https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/Telegram/Resources/art/icon256%402x.png")
                                 .message(InlineMessageSpec.mediaAuto("Icon of TDesktop"))
                                 .build())
                         .build());
             case "lastphoto":
-                String photoId = lastPhotoId;
+                FileReferenceId photoId = lastPhotoId;
                 if (photoId == null) {
                     return Mono.empty();
                 }
@@ -115,7 +109,7 @@ public class MTProtoBotInlineExample {
                         .cacheTime(PHOTO_CACHE_TIME)
                         .addResult(InlineResultDocumentSpec.builder()
                                 .id("4")
-                                .file(photoId)
+                                .document(photoId)
                                 .message(InlineMessageSpec.mediaAuto("_Hmm... It's a last photo which I saw_")
                                         .withParser(EntityParserFactory.MARKDOWN_V2))
                                 .build())
