@@ -2,7 +2,6 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.client.MTProtoClientGroup;
-import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.service.Compatible.Type;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.*;
@@ -12,7 +11,7 @@ import telegram4j.tl.photos.Photos;
 import telegram4j.tl.request.contacts.*;
 import telegram4j.tl.request.photos.ImmutableDeletePhotos;
 import telegram4j.tl.request.photos.ImmutableGetUserPhotos;
-import telegram4j.tl.request.photos.ImmutableUpdateProfilePhoto;
+import telegram4j.tl.request.photos.UpdateProfilePhoto;
 import telegram4j.tl.request.photos.UploadProfilePhoto;
 import telegram4j.tl.request.users.ImmutableGetFullUser;
 import telegram4j.tl.request.users.ImmutableGetUsers;
@@ -148,13 +147,8 @@ public class UserService extends RpcService {
     // photos namespace
     // ======================
 
-    public Mono<Photo> updateProfilePhoto(InputPhoto photo) {
-        return sendMain(ImmutableUpdateProfilePhoto.of(photo));
-    }
-
-    public Mono<Photo> updateProfilePhoto(String photoFileReferenceId) {
-        return Mono.defer(() -> updateProfilePhoto(
-                FileReferenceId.deserialize(photoFileReferenceId).asInputPhoto()));
+    public Mono<Photo> updateProfilePhoto(UpdateProfilePhoto request) {
+        return sendMain(request);
     }
 
     public Mono<Photo> uploadProfilePhoto(UploadProfilePhoto request) {
