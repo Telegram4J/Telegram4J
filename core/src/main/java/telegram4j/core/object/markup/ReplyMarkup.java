@@ -118,7 +118,9 @@ public final class ReplyMarkup implements TelegramObject {
          * Whether this keyboard is only for specific users selected
          * via @mention in the {@link Message#getContent() text} or via {@link Message#getReplyTo() message reply}.
          */
-        SELECTIVE(ReplyKeyboardMarkup.SELECTIVE_POS);
+        SELECTIVE(ReplyKeyboardMarkup.SELECTIVE_POS),
+
+        PERSISTENT(ReplyKeyboardMarkup.PERSISTENT_POS);
 
         private final byte position;
 
@@ -135,7 +137,6 @@ public final class ReplyMarkup implements TelegramObject {
             if (data.identifier() == ReplyInlineMarkup.ID)
                 return EnumSet.noneOf(Flag.class);
 
-            var set = EnumSet.allOf(Flag.class);
             int flags;
             switch (data.identifier()) {
                 case ReplyKeyboardForceReply.ID:
@@ -150,6 +151,7 @@ public final class ReplyMarkup implements TelegramObject {
                 default: throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
             }
 
+            var set = EnumSet.allOf(Flag.class);
             set.removeIf(f -> (flags & f.mask()) == 0);
             return set;
         }

@@ -55,6 +55,10 @@ public class Sticker extends Document {
         return stickerData.map(d -> false, DocumentAttributeCustomEmoji::free);
     }
 
+    public boolean isTextColor() {
+        return stickerData.map(d -> false, DocumentAttributeCustomEmoji::textColor);
+    }
+
     /**
      * Gets width of sticker.
      *

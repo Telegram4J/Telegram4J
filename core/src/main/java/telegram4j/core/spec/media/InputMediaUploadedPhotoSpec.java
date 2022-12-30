@@ -20,17 +20,21 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
     private final InputFile file;
     private final List<FileReferenceId> stickers;
     private final Duration autoDeleteDuration;
+    private final boolean spoiler;
 
     private InputMediaUploadedPhotoSpec(InputFile file) {
         this.file = Objects.requireNonNull(file);
         this.stickers = null;
         this.autoDeleteDuration = null;
+        this.spoiler = false;
     }
 
-    private InputMediaUploadedPhotoSpec(InputFile file, @Nullable Iterable<FileReferenceId> stickers, @Nullable Duration autoDeleteDuration) {
+    private InputMediaUploadedPhotoSpec(InputFile file, @Nullable List<FileReferenceId> stickers,
+                                        @Nullable Duration autoDeleteDuration, boolean spoiler) {
         this.file = file;
-        this.stickers = stickers != null ? TlEncodingUtil.copyList(stickers) : null;
+        this.stickers = stickers;
         this.autoDeleteDuration = autoDeleteDuration;
+        this.spoiler = spoiler;
     }
 
     public InputFile file() {
@@ -43,6 +47,10 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
 
     public Optional<Duration> autoDeleteDuration() {
         return Optional.ofNullable(autoDeleteDuration);
+    }
+
+    public boolean spoiler() {
+        return spoiler;
     }
 
     @Override
@@ -58,20 +66,26 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
                         .map(Duration::getSeconds)
                         .map(Math::toIntExact)
                         .orElse(null))
+                .spoiler(spoiler)
                 .build());
+    }
+
+    public InputMediaUploadedPhotoSpec withSpoiler(boolean spoiler) {
+        if (this.spoiler == spoiler) return this;
+        return new InputMediaUploadedPhotoSpec(file, stickers, autoDeleteDuration, spoiler);
     }
 
     public InputMediaUploadedPhotoSpec withFile(InputFile value) {
         Objects.requireNonNull(value);
         if (file == value) return this;
-        return new InputMediaUploadedPhotoSpec(value, stickers, autoDeleteDuration);
+        return new InputMediaUploadedPhotoSpec(value, stickers, autoDeleteDuration, spoiler);
     }
 
     public InputMediaUploadedPhotoSpec withStickers(@Nullable Iterable<FileReferenceId> value) {
         if (stickers == value) return this;
         var newStickers = value != null ? TlEncodingUtil.copyList(value) : null;
         if (stickers == newStickers) return this;
-        return new InputMediaUploadedPhotoSpec(file, newStickers, autoDeleteDuration);
+        return new InputMediaUploadedPhotoSpec(file, newStickers, autoDeleteDuration, spoiler);
     }
 
     public InputMediaUploadedPhotoSpec withStickers(Optional<? extends Iterable<FileReferenceId>> opt) {
@@ -80,7 +94,7 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
 
     public InputMediaUploadedPhotoSpec withAutoDeleteDuration(@Nullable Duration value) {
         if (Objects.equals(autoDeleteDuration, value)) return this;
-        return new InputMediaUploadedPhotoSpec(file, stickers, value);
+        return new InputMediaUploadedPhotoSpec(file, stickers, value, spoiler);
     }
 
     public InputMediaUploadedPhotoSpec withAutoDeleteDuration(Optional<? extends Duration> opt) {
@@ -92,7 +106,8 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         InputMediaUploadedPhotoSpec that = (InputMediaUploadedPhotoSpec) o;
-        return file.equals(that.file) && Objects.equals(stickers, that.stickers) &&
+        return spoiler == that.spoiler &&
+                file.equals(that.file) && Objects.equals(stickers, that.stickers) &&
                 Objects.equals(autoDeleteDuration, that.autoDeleteDuration);
     }
 
@@ -102,6 +117,7 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
         h += (h << 5) + file.hashCode();
         h += (h << 5) + Objects.hashCode(stickers);
         h += (h << 5) + Objects.hashCode(autoDeleteDuration);
+        h += (h << 5) + Boolean.hashCode(spoiler);
         return h;
     }
 
@@ -111,6 +127,7 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
                 "file=" + file +
                 ", stickers=" + stickers +
                 ", autoDeleteDuration=" + autoDeleteDuration +
+                ", spoiler=" + spoiler +
                 '}';
     }
 
@@ -129,6 +146,7 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
         private InputFile file;
         private List<FileReferenceId> stickers;
         private Duration autoDeleteDuration;
+        private boolean spoiler;
 
         private Builder() {
         }
@@ -142,9 +160,10 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
          * @return {@code this} builder for use in a chained invocation
          */
         public Builder from(InputMediaUploadedPhotoSpec instance) {
-            file(instance.file);
+            file = instance.file;
             stickers(instance.stickers);
-            autoDeleteDuration(instance.autoDeleteDuration);
+            autoDeleteDuration = instance.autoDeleteDuration;
+            spoiler = instance.spoiler;
             return this;
         }
 
@@ -174,6 +193,11 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
             return this;
         }
 
+        public Builder spoiler(boolean spoiler) {
+            this.spoiler = spoiler;
+            return this;
+        }
+
         /**
          * Builds a new {@link InputMediaUploadedPhotoSpec InputMediaUploadedPhotoSpec}.
          *
@@ -182,15 +206,11 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
          */
         public InputMediaUploadedPhotoSpec build() {
             if (initBits != 0) {
-                throw new IllegalStateException(formatRequiredAttributesMessage());
+                List<String> attributes = new ArrayList<>();
+                if ((initBits & INIT_BIT_FILE) != 0) attributes.add("file");
+                throw new IllegalStateException("Cannot build InputMediaUploadedPhotoSpec, some of required attributes are not set " + attributes);
             }
-            return new InputMediaUploadedPhotoSpec(file, stickers, autoDeleteDuration);
-        }
-
-        private String formatRequiredAttributesMessage() {
-            List<String> attributes = new ArrayList<>();
-            if ((initBits & INIT_BIT_FILE) != 0) attributes.add("file");
-            return "Cannot build InputMediaUploadedPhotoSpec, some of required attributes are not set " + attributes;
+            return new InputMediaUploadedPhotoSpec(file, stickers, autoDeleteDuration, spoiler);
         }
     }
 }

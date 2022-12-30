@@ -275,13 +275,14 @@ public final class KeyboardButton implements TelegramObject {
         /**
          * Button to force a user to switch to inline mode Pressing the button
          * will prompt the user to select one of their chats, open that chat and
-         * insert the bot‘s username and the specified inline query in the input field.
+         * insert the bot's username and the specified inline query in the input field.
          */
         SWITCH_INLINE,
 
         /** URL embedded button. */
         URL,
 
+        /** An inline button that opens user profile which specified by {@link #getUserId()}. */
         USER_PROFILE,
 
         /**

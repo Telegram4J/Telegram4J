@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.BaseUserProfilePhoto;
 import telegram4j.tl.ChatPhotoFields;
 import telegram4j.tl.InputPeer;
 
@@ -62,6 +63,11 @@ public class ProfilePhoto implements TelegramObject {
      */
     public boolean hasVideo() {
         return data.hasVideo();
+    }
+
+    // TODO: docs
+    public boolean isPersonal() {
+        return data instanceof BaseUserProfilePhoto && ((BaseUserProfilePhoto) data).personal();
     }
 
     /**

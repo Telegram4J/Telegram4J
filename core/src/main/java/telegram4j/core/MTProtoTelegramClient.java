@@ -487,9 +487,12 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                                                     Context.createChatPhotoContext(peer, -1)));
                                         }
 
+                                        int msgIdRaw = messageChatCtx.getMessageId().orElseThrow();
                                         return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                                 .getMessages(Id.of(peer, getSelfId()), msgId)
-                                                .flatMap(c -> findChatPhoto(c, peer, messageChatCtx.getMessageId().orElseThrow()));
+                                                .flatMap(c -> findMessageAction(c, msgIdRaw)
+                                                        .map(f -> f.withContext(Context.createChatPhotoContext(
+                                                                peer, msgIdRaw))));
                                     default:
                                         return Mono.error(new IllegalStateException());
                                 }
@@ -508,6 +511,13 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                             return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
                                     .getMessages(chatPeer, List.of(ImmutableInputMessageID.of(ctx.getMessageId())))
                                     .flatMap(b -> findMessageMedia(b, fileRefId, ctx));
+                        }
+                        case MESSAGE_ACTION: {
+                            var ctx = (MessageActionContext) fileRefId.getContext();
+                            Id chatPeer = Id.of(ctx.getChatPeer());
+                            return withRetrievalStrategy(EntityRetrievalStrategy.RPC)
+                                    .getMessages(chatPeer, List.of(ImmutableInputMessageID.of(ctx.getMessageId())))
+                                    .flatMap(b -> findMessageAction(b, ctx.getMessageId()));
                         }
                         case BOT_INFO: {
                             var ctx = (BotInfoContext) fileRefId.getContext();
@@ -839,7 +849,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     // Internal methods
     // ===========================
 
-    private Mono<FileReferenceId> findChatPhoto(AuxiliaryMessages messages, InputPeer resolvedPeer, int messageId) {
+    private Mono<FileReferenceId> findMessageAction(AuxiliaryMessages messages, int messageId) {
         return Mono.justOrEmpty(messages.getMessages().stream()
                         .filter(msg -> msg.getId() == messageId)
                         .findFirst())
@@ -848,12 +858,14 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     if (action instanceof MessageAction.UpdateChatPhoto) {
                         var cast = (MessageAction.UpdateChatPhoto) action;
                         return Mono.justOrEmpty(cast.getCurrentPhoto());
+                    } else if (action instanceof MessageAction.SuggestProfilePhoto) {
+                        var cast = (MessageAction.SuggestProfilePhoto) action;
+                        return Mono.justOrEmpty(cast.getPhoto());
                     } else {
                         return Mono.error(new IllegalStateException("Unexpected MessageAction type: " + action));
                     }
                 })
-                .map(Document::getFileReferenceId)
-                .map(f -> f.withContext(Context.createChatPhotoContext(resolvedPeer, messageId)));
+                .map(Document::getFileReferenceId);
     }
 
     private Mono<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, FileReferenceId original,

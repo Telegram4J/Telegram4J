@@ -19,24 +19,28 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
     @Nullable
     private final String photoUrl;
     private final Duration autoDeleteDuration;
+    private final boolean spoiler;
 
     private InputMediaPhotoSpec(FileReferenceId photoFri) {
         this.photoFri = Objects.requireNonNull(photoFri);
         this.photoUrl = null;
         this.autoDeleteDuration = null;
+        this.spoiler = false;
     }
 
     private InputMediaPhotoSpec(String photoUrl) {
         this.photoUrl = Objects.requireNonNull(photoUrl);
         this.autoDeleteDuration = null;
         this.photoFri = null;
+        this.spoiler = false;
     }
 
     private InputMediaPhotoSpec(@Nullable FileReferenceId photoFri, @Nullable String photoUrl,
-                                @Nullable Duration autoDeleteDuration) {
+                                @Nullable Duration autoDeleteDuration, boolean spoiler) {
         this.photoFri = photoFri;
         this.photoUrl = photoUrl;
         this.autoDeleteDuration = autoDeleteDuration;
+        this.spoiler = spoiler;
     }
 
     public Variant2<String, FileReferenceId> photo() {
@@ -45,6 +49,10 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
 
     public Optional<Duration> autoDeleteDuration() {
         return Optional.ofNullable(autoDeleteDuration);
+    }
+
+    public boolean spoiler() {
+        return spoiler;
     }
 
     @Override
@@ -59,32 +67,39 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
                 return InputMediaPhoto.builder()
                         .id(photoFri.asInputPhoto())
                         .ttlSeconds(ttlSeconds)
+                        .spoiler(spoiler)
                         .build();
             }
             return InputMediaPhotoExternal.builder()
                     .url(Objects.requireNonNull(photoUrl))
                     .ttlSeconds(ttlSeconds)
+                    .spoiler(spoiler)
                     .build();
         });
     }
 
     public InputMediaPhotoSpec withPhoto(String photoUrl) {
         if (photoUrl.equals(this.photoUrl)) return this;
-        return new InputMediaPhotoSpec(null, photoUrl, this.autoDeleteDuration);
+        return new InputMediaPhotoSpec(null, photoUrl, autoDeleteDuration, spoiler);
     }
 
     public InputMediaPhotoSpec withPhoto(FileReferenceId photoFri) {
         if (photoFri.equals(this.photoFri)) return this;
-        return new InputMediaPhotoSpec(photoFri, null, this.autoDeleteDuration);
+        return new InputMediaPhotoSpec(photoFri, null, autoDeleteDuration, spoiler);
     }
 
     public InputMediaPhotoSpec withAutoDeleteDuration(@Nullable Duration value) {
         if (Objects.equals(this.autoDeleteDuration, value)) return this;
-        return new InputMediaPhotoSpec(photoFri, photoUrl, value);
+        return new InputMediaPhotoSpec(photoFri, photoUrl, value, spoiler);
     }
 
     public InputMediaPhotoSpec withAutoDeleteDuration(Optional<Duration> optional) {
         return withAutoDeleteDuration(optional.orElse(null));
+    }
+
+    public InputMediaPhotoSpec withAutoDeleteDuration(boolean value) {
+        if (this.spoiler == spoiler) return this;
+        return new InputMediaPhotoSpec(photoFri, photoUrl, autoDeleteDuration, value);
     }
 
     @Override
@@ -92,7 +107,8 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
         if (this == o) return true;
         if (!(o instanceof InputMediaPhotoSpec)) return false;
         InputMediaPhotoSpec that = (InputMediaPhotoSpec) o;
-        return Objects.equals(photoFri, that.photoFri) &&
+        return spoiler == that.spoiler &&
+                Objects.equals(photoFri, that.photoFri) &&
                 Objects.equals(photoUrl, that.photoUrl) &&
                 Objects.equals(autoDeleteDuration, that.autoDeleteDuration);
     }
@@ -103,6 +119,7 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
         h += (h << 5) + Objects.hashCode(photoFri);
         h += (h << 5) + Objects.hashCode(photoUrl);
         h += (h << 5) + Objects.hashCode(autoDeleteDuration);
+        h += (h << 5) + Boolean.hashCode(spoiler);
         return h;
     }
 
@@ -111,6 +128,7 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
         return "InputMediaPhotoSpec{" +
                 "photo=" + (photoFri != null ? photoFri : photoUrl) +
                 ", autoDeleteDuration=" + autoDeleteDuration +
+                ", spoiler=" + spoiler +
                 '}';
     }
 
@@ -130,6 +148,7 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
         private FileReferenceId photoFri;
         private String photoUrl;
         private Duration autoDeleteDuration;
+        private boolean spoiler;
 
         private Builder() {
         }
@@ -138,6 +157,7 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
             photoUrl = instance.photoUrl;
             photoFri = instance.photoFri;
             autoDeleteDuration = instance.autoDeleteDuration;
+            spoiler = instance.spoiler;
             return this;
         }
 
@@ -163,11 +183,16 @@ public final class InputMediaPhotoSpec implements InputMediaSpec {
             return this;
         }
 
+        public Builder spoiler(boolean spoiler) {
+            this.spoiler = spoiler;
+            return this;
+        }
+
         public InputMediaPhotoSpec build() {
             if (photoFri == null && photoUrl == null) {
                 throw new IllegalStateException("Cannot build InputMediaPhotoSpec, 'photo' attribute is not set");
             }
-            return new InputMediaPhotoSpec(photoFri, photoUrl, autoDeleteDuration);
+            return new InputMediaPhotoSpec(photoFri, photoUrl, autoDeleteDuration, spoiler);
         }
     }
 }

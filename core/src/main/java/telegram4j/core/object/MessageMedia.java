@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.media.GeoPoint;
@@ -31,19 +30,6 @@ public class MessageMedia implements TelegramObject {
 
     public Type getType() {
         return type;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        MessageMedia that = (MessageMedia) o;
-        return type == that.type;
-    }
-
-    @Override
-    public int hashCode() {
-        return type.hashCode();
     }
 
     @Override
@@ -103,19 +89,6 @@ public class MessageMedia implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Geo that = (Geo) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "MessageMediaGeo{" +
                     "data=" + data +
@@ -135,7 +108,17 @@ public class MessageMedia implements TelegramObject {
         }
 
         public boolean isNoPremium() {
-            return data.identifier() == MessageMediaDocument.ID && ((MessageMediaDocument) data).nopremium();
+            return data instanceof MessageMediaDocument && ((MessageMediaDocument) data).nopremium();
+        }
+
+        public boolean hasSpoiler() {
+            if (data instanceof MessageMediaDocument) {
+                return ((MessageMediaDocument) data).spoiler();
+            } else if (data instanceof MessageMediaPhoto) {
+                return ((MessageMediaPhoto) data).spoiler();
+            } else {
+                throw new IllegalStateException();
+            }
         }
 
         /**
@@ -168,19 +151,6 @@ public class MessageMedia implements TelegramObject {
                     return Optional.ofNullable(((MessageMediaPhoto) data).ttlSeconds()).map(Duration::ofSeconds);
                 default: throw new IllegalStateException();
             }
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Document that = (Document) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -225,19 +195,6 @@ public class MessageMedia implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Venue that = (Venue) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "MessageMediaVenue{" +
                     "data=" + data +
@@ -261,19 +218,6 @@ public class MessageMedia implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Game that = (Game) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "MessageMediaGame{" +
                     "data=" + data +
@@ -293,19 +237,6 @@ public class MessageMedia implements TelegramObject {
         // TODO
         public telegram4j.tl.WebPage webpage() {
             return data.webpage();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            WebPage that = (WebPage) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -346,19 +277,6 @@ public class MessageMedia implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Contact that = (Contact) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "MessageMediaContact{" +
                     "data=" + data +
@@ -389,19 +307,6 @@ public class MessageMedia implements TelegramObject {
 
         public Optional<Integer> getProximityNotificationRadius() {
             return Optional.ofNullable(data.proximityNotificationRadius());
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GeoLive that = (GeoLive) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -439,19 +344,6 @@ public class MessageMedia implements TelegramObject {
          */
         public PollResults getResults() {
             return new PollResults(client, data.results());
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Poll that = (Poll) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -511,19 +403,6 @@ public class MessageMedia implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Invoice that = (Invoice) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "MessageMediaInvoice{" +
                     "data=" + data +
@@ -557,19 +436,6 @@ public class MessageMedia implements TelegramObject {
          */
         public String getEmoticon() {
             return data.emoticon();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Dice that = (Dice) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override

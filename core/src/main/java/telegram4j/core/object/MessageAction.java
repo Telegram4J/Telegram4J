@@ -12,6 +12,7 @@ import telegram4j.core.object.chat.SupergroupChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.ChatPhotoContext;
+import telegram4j.mtproto.file.MessageActionContext;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
@@ -40,19 +41,6 @@ public class MessageAction implements TelegramObject {
 
     public final Type getType() {
         return type;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        MessageAction that = (MessageAction) o;
-        return type == that.type;
-    }
-
-    @Override
-    public int hashCode() {
-        return type.hashCode();
     }
 
     @Override
@@ -157,7 +145,11 @@ public class MessageAction implements TelegramObject {
 
         TOPIC_EDIT,
         /** The chat theme was changed. */
-        SET_CHAT_THEME
+        SET_CHAT_THEME,
+
+        SUGGEST_PROFILE_PHOTO,
+
+        ATTACH_MENU_BOT_ALLOWED
     }
 
     public static class BotAllowed extends MessageAction {
@@ -171,19 +163,6 @@ public class MessageAction implements TelegramObject {
 
         public String getDomain() {
             return data.domain();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            BotAllowed that = (BotAllowed) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -211,19 +190,6 @@ public class MessageAction implements TelegramObject {
          */
         public String getTitle() {
             return data.title();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChannelCreate that = (ChannelCreate) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -284,19 +250,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChannelMigrateFrom that = (ChannelMigrateFrom) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "ChannelMigrateFrom{" +
                     "data=" + data +
@@ -345,19 +298,6 @@ public class MessageAction implements TelegramObject {
             return Flux.fromIterable(data.users())
                     .map(Id::ofUser)
                     .flatMap(retriever::getUserById);
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatJoinUsers that = (ChatJoinUsers) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -421,19 +361,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatCreate that = (ChatCreate) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "ChatCreate{" +
                     "data=" + data +
@@ -480,19 +407,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatLeftUser that = (ChatLeftUser) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "ChatDeleteUser{" +
                     "data=" + data +
@@ -531,20 +445,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            if (!super.equals(o)) return false;
-            UpdateChatPhoto that = (UpdateChatPhoto) o;
-            return Objects.equals(data, that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(super.hashCode(), data);
-        }
-
-        @Override
         public String toString() {
             return "ChatEditPhoto{" +
                     "type=" + type +
@@ -569,19 +469,6 @@ public class MessageAction implements TelegramObject {
          */
         public String getCurrentTitle() {
             return data.title();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatEditTitle that = (ChatEditTitle) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -628,19 +515,6 @@ public class MessageAction implements TelegramObject {
          */
         public Mono<User> getInviter(EntityRetrievalStrategy strategy) {
             return client.withRetrievalStrategy(strategy).getUserById(getInviterId());
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatJoinedByLink that = (ChatJoinedByLink) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -692,19 +566,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            ChatMigrateTo that = (ChatMigrateTo) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "ChatMigrateTo{" +
                     "data=" + data +
@@ -723,19 +584,6 @@ public class MessageAction implements TelegramObject {
 
         public String getMessage() {
             return data.message();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Custom that = (Custom) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -761,19 +609,6 @@ public class MessageAction implements TelegramObject {
 
         public int getScore() {
             return data.score();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GameScore that = (GameScore) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -806,19 +641,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GeoProximityReached that = (GeoProximityReached) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "GeoProximityReached{" +
                     "data=" + data +
@@ -844,19 +666,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GroupCall that = (GroupCall) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "GroupCall{" +
                     "data=" + data +
@@ -879,19 +688,6 @@ public class MessageAction implements TelegramObject {
 
         public Instant getScheduleTimestamp() {
             return Instant.ofEpochSecond(data.scheduleDate());
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            GroupCallScheduled that = (GroupCallScheduled) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -922,19 +718,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            InviteToGroupCall that = (InviteToGroupCall) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "InviteToGroupCall{" +
                     "data=" + data +
@@ -957,19 +740,6 @@ public class MessageAction implements TelegramObject {
 
         public long getTotalAmount() {
             return data.totalAmount();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PaymentSent that = (PaymentSent) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -1014,19 +784,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PaymentSentMe that = (PaymentSentMe) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "PaymentSentMe{" +
                     "data=" + data +
@@ -1060,19 +817,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            PhoneCall that = (PhoneCall) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "PhoneCall{" +
                     "data=" + data +
@@ -1091,19 +835,6 @@ public class MessageAction implements TelegramObject {
 
         public List<SecureValueType> getTypes() {
             return data.types();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SecureValuesSent that = (SecureValuesSent) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -1132,19 +863,6 @@ public class MessageAction implements TelegramObject {
         }
 
         @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SecureValuesSentMe that = (SecureValuesSentMe) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
-        }
-
-        @Override
         public String toString() {
             return "SecureValuesSentMe{" +
                     "data=" + data +
@@ -1168,19 +886,6 @@ public class MessageAction implements TelegramObject {
          */
         public String getCurrentEmoticon() {
             return data.emoticon();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SetChatTheme that = (SetChatTheme) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -1231,19 +936,6 @@ public class MessageAction implements TelegramObject {
         public Mono<User> getAutoSettingFromUser(EntityRetrievalStrategy strategy) {
             return Mono.justOrEmpty(getAutoSettingFromUserId())
                     .flatMap(client.withRetrievalStrategy(strategy)::getUserById);
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            SetMessagesTtl that = (SetMessagesTtl) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override
@@ -1365,6 +1057,23 @@ public class MessageAction implements TelegramObject {
         // TODO: docs
         public Optional<Boolean> isHidden() {
             return Optional.ofNullable(data.hidden());
+        }
+    }
+
+    public static class SuggestProfilePhoto extends MessageAction {
+        private final MessageActionSuggestProfilePhoto data;
+        private final MessageActionContext context;
+
+        public SuggestProfilePhoto(MTProtoTelegramClient client,
+                                   MessageActionSuggestProfilePhoto data,
+                                   MessageActionContext context) {
+            super(client, Type.SUGGEST_PROFILE_PHOTO);
+            this.data = data;
+            this.context = context;
+        }
+
+        public Photo getPhoto() {
+            return new Photo(client, (BasePhoto) data.photo(), context);
         }
     }
 }

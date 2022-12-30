@@ -24,7 +24,8 @@ public abstract class Context {
         BOT_INFO, // UserFull#botInfo() or ChatFull#botInfo()
         PROFILE_PHOTO, // BaseUser#photo() and other
         CHAT_PHOTO,  // UserFull#profilePhoto() and other
-        STICKER_SET;
+        STICKER_SET,
+        MESSAGE_ACTION; // MessageActionSuggestProfilePhoto
 
         static final Type[] ALL = values();
     }
@@ -101,6 +102,21 @@ public abstract class Context {
     }
 
     /**
+     * Creates new context which corresponding to {@link MessageAction} object.
+     *
+     * @throws IllegalArgumentException if specified message id is negative.
+     * @param chatPeer The id of chat peer where media was found.
+     * @param messageId The id of message where media was found.
+     * @return A new {@code MessageActionContext} context.
+     */
+    public static MessageActionContext createActionContext(Peer chatPeer, int messageId) {
+        Objects.requireNonNull(chatPeer);
+        if (messageId < 0)
+            throw new IllegalArgumentException("Message id must be positive");
+        return new MessageActionContext(chatPeer, messageId);
+    }
+
+    /**
      * Gets common instance for documents with empty context.
      *
      * @return The common instance for documents with empty context.
@@ -118,6 +134,11 @@ public abstract class Context {
                 Peer peer = deserializePeer(buf);
                 int messageId = buf.readIntLE();
                 return new MessageMediaContext(peer, messageId);
+            }
+            case MESSAGE_ACTION: {
+                Peer peer = deserializePeer(buf);
+                int messageId = buf.readIntLE();
+                return new MessageActionContext(peer, messageId);
             }
             case BOT_INFO:
                 Peer chatPeer = deserializePeer(buf);

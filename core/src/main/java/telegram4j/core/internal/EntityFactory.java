@@ -386,6 +386,10 @@ public class EntityFactory {
                 return new MessageAction.TopicCreate(client, (telegram4j.tl.MessageActionTopicCreate) data);
             case MessageActionTopicEdit.ID:
                 return new MessageAction.TopicEdit(client, (telegram4j.tl.MessageActionTopicEdit) data);
+            case MessageActionSuggestProfilePhoto.ID:
+                return new MessageAction.SuggestProfilePhoto(client, (MessageActionSuggestProfilePhoto) data,
+                        Context.createActionContext(peer.asPeer(), messageId));
+            case MessageActionAttachMenuBotAllowed.ID: return new MessageAction(client, MessageAction.Type.ATTACH_MENU_BOT_ALLOWED);
             default:
                 throw new IllegalArgumentException("Unknown MessageAction type: " + data);
         }

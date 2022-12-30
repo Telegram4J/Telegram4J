@@ -3,6 +3,8 @@ package telegram4j.core.spec.media;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.BitFlag;
+import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.DocumentAttribute;
 import telegram4j.tl.InputFile;
@@ -16,14 +18,13 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
-    private final boolean noSoundVideo;
-    private final boolean forceFile;
     private final InputFile file;
     private final InputFile thumb;
     private final String mimeType;
     private final List<DocumentAttribute> attributes;
     private final List<FileReferenceId> stickers;
     private final Duration autoDeleteDuration;
+    private final ImmutableEnumSet<Flag> flags;
 
     private InputMediaUploadedDocumentSpec(InputFile file, String mimeType,
                                            Iterable<? extends DocumentAttribute> attributes) {
@@ -33,8 +34,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         this.attributes = TlEncodingUtil.copyList(attributes);
         this.stickers = null;
         this.autoDeleteDuration = null;
-        this.noSoundVideo = false;
-        this.forceFile = false;
+        this.flags = ImmutableEnumSet.of(Flag.class, 0);
     }
 
     private InputMediaUploadedDocumentSpec(Builder builder) {
@@ -44,16 +44,14 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         this.attributes = List.copyOf(builder.attributes);
         this.stickers = builder.stickers != null ? List.copyOf(builder.stickers) : null;
         this.autoDeleteDuration = builder.autoDeleteDuration;
-        this.noSoundVideo = builder.noSoundVideo;
-        this.forceFile = builder.forceFile;
+        this.flags = ImmutableEnumSet.of(Flag.class, builder.flags);
     }
 
-    private InputMediaUploadedDocumentSpec(boolean noSoundVideo, boolean forceFile,
+    private InputMediaUploadedDocumentSpec(ImmutableEnumSet<Flag> flags,
                                            InputFile file, @Nullable InputFile thumb, String mimeType,
                                            List<DocumentAttribute> attributes, @Nullable List<FileReferenceId> stickers,
                                            @Nullable Duration autoDeleteDuration) {
-        this.noSoundVideo = noSoundVideo;
-        this.forceFile = forceFile;
+        this.flags = flags;
         this.file = file;
         this.thumb = thumb;
         this.mimeType = mimeType;
@@ -62,12 +60,8 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         this.autoDeleteDuration = autoDeleteDuration;
     }
 
-    public boolean noSoundVideo() {
-        return noSoundVideo;
-    }
-
-    public boolean forceFile() {
-        return forceFile;
+    public ImmutableEnumSet<Flag> flags() {
+        return flags;
     }
 
     public InputFile file() {
@@ -97,8 +91,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     @Override
     public Mono<InputMedia> asData(MTProtoTelegramClient client) {
         return Mono.fromSupplier(() -> InputMediaUploadedDocument.builder()
-                .nosoundVideo(noSoundVideo)
-                .forceFile(forceFile)
+                .flags(flags.getValue())
                 .file(file)
                 .thumb(thumb)
                 .mimeType(mimeType)
@@ -115,29 +108,21 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
                 .build());
     }
 
-    public InputMediaUploadedDocumentSpec withNoSoundVideo(boolean value) {
-        if (noSoundVideo == value) return this;
-        return new InputMediaUploadedDocumentSpec(value, forceFile, file, thumb, mimeType,
-                attributes, stickers, autoDeleteDuration);
-    }
-
-    public InputMediaUploadedDocumentSpec withForceFile(boolean value) {
-        if (forceFile == value) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, value, file, thumb, mimeType,
-                attributes, stickers, autoDeleteDuration);
+    public InputMediaUploadedDocumentSpec withFile(Iterable<Flag> value) {
+        if (value.equals(flags)) return this;
+        var newFlags = ImmutableEnumSet.of(Flag.class, value);
+        return new InputMediaUploadedDocumentSpec(newFlags, file, thumb, mimeType, attributes, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withFile(InputFile value) {
         Objects.requireNonNull(value);
         if (file == value) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, value, thumb, mimeType,
-                attributes, stickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, value, thumb, mimeType, attributes, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withThumb(@Nullable InputFile value) {
         if (thumb == value) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, value, mimeType,
-                attributes, stickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, file, value, mimeType, attributes, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withThumb(Optional<? extends InputFile> opt) {
@@ -147,16 +132,13 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     public InputMediaUploadedDocumentSpec withMimeType(String value) {
         Objects.requireNonNull(value);
         if (mimeType.equals(value)) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb,
-                value, attributes, stickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, file, thumb, value, attributes, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withAttributes(DocumentAttribute... elements) {
-        Objects.requireNonNull(elements);
         var newValue = List.of(elements);
         if (attributes == newValue) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb, mimeType,
-                newValue, stickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, file, thumb, mimeType, newValue, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withAttributes(Iterable<? extends DocumentAttribute> elements) {
@@ -164,16 +146,14 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         if (attributes == elements) return this;
         List<DocumentAttribute> newValue = TlEncodingUtil.copyList(elements);
         if (attributes == newValue) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb, mimeType,
-                newValue, stickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, file, thumb, mimeType, newValue, stickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withStickers(@Nullable Iterable<FileReferenceId> value) {
         if (stickers == value) return this;
         var newStickers = value != null ? TlEncodingUtil.copyList(value) : null;
         if (stickers == newStickers) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb, mimeType,
-                attributes, newStickers, autoDeleteDuration);
+        return new InputMediaUploadedDocumentSpec(flags, file, thumb, mimeType, attributes, newStickers, autoDeleteDuration);
     }
 
     public InputMediaUploadedDocumentSpec withStickers(Optional<? extends Iterable<FileReferenceId>> opt) {
@@ -182,8 +162,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
 
     public InputMediaUploadedDocumentSpec withAutoDeleteDuration(@Nullable Duration value) {
         if (Objects.equals(autoDeleteDuration, value)) return this;
-        return new InputMediaUploadedDocumentSpec(noSoundVideo, forceFile, file, thumb, mimeType,
-                attributes, stickers, value);
+        return new InputMediaUploadedDocumentSpec(flags, file, thumb, mimeType, attributes, stickers, value);
     }
 
     public InputMediaUploadedDocumentSpec withAutoDeleteDuration(Optional<? extends Duration> opt) {
@@ -195,8 +174,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         if (this == o) return true;
         if (!(o instanceof InputMediaUploadedDocumentSpec)) return false;
         InputMediaUploadedDocumentSpec that = (InputMediaUploadedDocumentSpec) o;
-        return noSoundVideo == that.noSoundVideo
-                && forceFile == that.forceFile
+        return flags.equals(that.flags)
                 && file.equals(that.file)
                 && Objects.equals(thumb, that.thumb)
                 && mimeType.equals(that.mimeType)
@@ -208,8 +186,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     @Override
     public int hashCode() {
         int h = 5381;
-        h += (h << 5) + Boolean.hashCode(noSoundVideo);
-        h += (h << 5) + Boolean.hashCode(forceFile);
+        h += (h << 5) + flags.hashCode();
         h += (h << 5) + file.hashCode();
         h += (h << 5) + Objects.hashCode(thumb);
         h += (h << 5) + mimeType.hashCode();
@@ -222,8 +199,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     @Override
     public String toString() {
         return "InputMediaUploadedDocumentSpec{" +
-                "noSoundVideo=" + noSoundVideo +
-                ", forceFile=" + forceFile +
+                "flags=" + flags +
                 ", file=" + file +
                 ", thumb=" + thumb +
                 ", mimeType='" + mimeType + '\'' +
@@ -246,10 +222,10 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         private static final byte INIT_BIT_FILE = 0x1;
         private static final byte INIT_BIT_MIME_TYPE = 0x2;
         private static final byte INIT_BIT_ATTRIBUTES = 0x4;
+
         private byte initBits = 0x7;
 
-        private boolean noSoundVideo;
-        private boolean forceFile;
+        private Set<Flag> flags = EnumSet.noneOf(Flag.class);
         private InputFile file;
         private InputFile thumb;
         private String mimeType;
@@ -261,9 +237,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
         }
 
         public Builder from(InputMediaUploadedDocumentSpec instance) {
-            Objects.requireNonNull(instance);
-            noSoundVideo(instance.noSoundVideo);
-            forceFile(instance.forceFile);
+            flags(instance.flags);
             file(instance.file);
             thumb(instance.thumb);
             mimeType(instance.mimeType);
@@ -273,13 +247,25 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
             return this;
         }
 
-        public Builder noSoundVideo(boolean noSoundVideo) {
-            this.noSoundVideo = noSoundVideo;
+        public Builder flags(Set<Flag> flags) {
+            this.flags = EnumSet.copyOf(flags);
             return this;
         }
 
-        public Builder forceFile(boolean forceFile) {
-            this.forceFile = forceFile;
+        public Builder addFlag(Flag flag) {
+            flags.add(flag);
+            return this;
+        }
+
+        public Builder addFlags(Flag... flags) {
+            Collections.addAll(this.flags, flags);
+            return this;
+        }
+
+        public Builder addFlags(Iterable<Flag> flags) {
+            for (Flag flag : flags) {
+                this.flags.add(flag);
+            }
             return this;
         }
 
@@ -382,6 +368,23 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
             if ((initBits & INIT_BIT_MIME_TYPE) != 0) attributes.add("mimeType");
             if ((initBits & INIT_BIT_ATTRIBUTES) != 0) attributes.add("attributes");
             return "Cannot build InputMediaUploadedDocumentSpec, some of required attributes are not set " + attributes;
+        }
+    }
+
+    public enum Flag implements BitFlag {
+        NO_SOUND_VIDEO(InputMediaUploadedDocument.NOSOUND_VIDEO_POS),
+        FORCE_FILE(InputMediaUploadedDocument.FORCE_FILE_POS),
+        SPOILER(InputMediaUploadedDocument.SPOILER_POS);
+
+        private final byte position;
+
+        Flag(byte position) {
+            this.position = position;
+        }
+
+        @Override
+        public byte position() {
+            return position;
         }
     }
 }

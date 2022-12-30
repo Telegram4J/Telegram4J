@@ -558,7 +558,7 @@ public final class FileReferenceId {
      */
     public ImmutableBaseInputPhoto asInputPhoto() {
         if (fileType != Type.PHOTO) {
-            throw new IllegalStateException("Cant create input photo from file reference id: " + this);
+            throw new IllegalStateException("Cant create input photo from file ref id: " + this);
         }
 
         Objects.requireNonNull(fileReference);

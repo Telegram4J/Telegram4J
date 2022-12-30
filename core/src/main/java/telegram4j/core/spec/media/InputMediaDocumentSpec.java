@@ -21,12 +21,14 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
     @Nullable
     private final String query;
     private final Duration autoDeleteDuration;
+    private final boolean spoiler;
 
     private InputMediaDocumentSpec(FileReferenceId documentFri) {
         this.documentFri = Objects.requireNonNull(documentFri);
         this.documentUrl = null;
         this.autoDeleteDuration = null;
         this.query = null;
+        this.spoiler = false;
     }
 
     private InputMediaDocumentSpec(String documentUrl) {
@@ -34,14 +36,17 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         this.autoDeleteDuration = null;
         this.documentFri = null;
         this.query = null;
+        this.spoiler = false;
     }
 
     private InputMediaDocumentSpec(@Nullable FileReferenceId documentFri, @Nullable String documentUrl,
-                                   @Nullable String query, @Nullable Duration autoDeleteDuration) {
+                                   @Nullable String query, @Nullable Duration autoDeleteDuration,
+                                   boolean spoiler) {
         this.documentFri = documentFri;
         this.documentUrl = documentUrl;
         this.query = query;
         this.autoDeleteDuration = autoDeleteDuration;
+        this.spoiler = spoiler;
     }
 
     public Variant2<String, FileReferenceId> document() {
@@ -54,6 +59,10 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
 
     public Optional<Duration> autoDeleteDuration() {
         return Optional.ofNullable(autoDeleteDuration);
+    }
+
+    public boolean spoiler() {
+        return spoiler;
     }
 
     @Override
@@ -69,28 +78,30 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
                         .id(documentFri.asInputDocument())
                         .query(query)
                         .ttlSeconds(ttlSeconds)
+                        .spoiler(spoiler)
                         .build();
             }
             return InputMediaDocumentExternal.builder()
                     .url(Objects.requireNonNull(documentUrl))
                     .ttlSeconds(ttlSeconds)
+                    .spoiler(spoiler)
                     .build();
         });
     }
 
     public InputMediaDocumentSpec withDocument(String photoUrl) {
         if (photoUrl.equals(this.documentUrl)) return this;
-        return new InputMediaDocumentSpec(null, photoUrl, query, autoDeleteDuration);
+        return new InputMediaDocumentSpec(null, photoUrl, query, autoDeleteDuration, spoiler);
     }
 
     public InputMediaDocumentSpec withDocument(FileReferenceId photoFri) {
         if (photoFri.equals(this.documentFri)) return this;
-        return new InputMediaDocumentSpec(photoFri, null, query, autoDeleteDuration);
+        return new InputMediaDocumentSpec(photoFri, null, query, autoDeleteDuration, spoiler);
     }
 
     public InputMediaDocumentSpec withQuery(@Nullable String value) {
         if (Objects.equals(this.query, value)) return this;
-        return new InputMediaDocumentSpec(documentFri, documentUrl, value, autoDeleteDuration);
+        return new InputMediaDocumentSpec(documentFri, documentUrl, value, autoDeleteDuration, spoiler);
     }
 
     public InputMediaDocumentSpec withQuery(Optional<String> optional) {
@@ -99,11 +110,16 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
 
     public InputMediaDocumentSpec withAutoDeleteDuration(@Nullable Duration value) {
         if (Objects.equals(this.autoDeleteDuration, value)) return this;
-        return new InputMediaDocumentSpec(documentFri, documentUrl, query, value);
+        return new InputMediaDocumentSpec(documentFri, documentUrl, query, value, spoiler);
     }
 
     public InputMediaDocumentSpec withAutoDeleteDuration(Optional<Duration> optional) {
         return withAutoDeleteDuration(optional.orElse(null));
+    }
+
+    public InputMediaDocumentSpec withSpoiler(boolean spoiler) {
+        if (this.spoiler == spoiler) return this;
+        return new InputMediaDocumentSpec(documentFri, documentUrl, query, autoDeleteDuration, spoiler);
     }
 
     @Override
@@ -111,7 +127,8 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         if (this == o) return true;
         if (!(o instanceof InputMediaDocumentSpec)) return false;
         InputMediaDocumentSpec that = (InputMediaDocumentSpec) o;
-        return Objects.equals(documentFri, that.documentFri) &&
+        return spoiler == that.spoiler &&
+                Objects.equals(documentFri, that.documentFri) &&
                 Objects.equals(documentUrl, that.documentUrl) &&
                 Objects.equals(query, that.query) &&
                 Objects.equals(autoDeleteDuration, that.autoDeleteDuration);
@@ -124,6 +141,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         h += (h << 5) + Objects.hashCode(documentUrl);
         h += (h << 5) + Objects.hashCode(query);
         h += (h << 5) + Objects.hashCode(autoDeleteDuration);
+        h += (h << 5) + Boolean.hashCode(spoiler);
         return h;
     }
 
@@ -133,6 +151,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
                 "document=" + (documentFri != null ? documentFri : documentUrl) +
                 ", query='" + query +
                 "', autoDeleteDuration=" + autoDeleteDuration +
+                ", spoiler=" + spoiler +
                 '}';
     }
 
@@ -153,6 +172,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
         private String documentUrl;
         private String query;
         private Duration autoDeleteDuration;
+        private boolean spoiler;
 
         private Builder() {
         }
@@ -162,6 +182,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
             documentFri = instance.documentFri;
             query = instance.query;
             autoDeleteDuration = instance.autoDeleteDuration;
+            spoiler = instance.spoiler;
             return this;
         }
 
@@ -197,11 +218,16 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
             return this;
         }
 
+        public Builder spoiler(boolean spoiler) {
+            this.spoiler = spoiler;
+            return this;
+        }
+
         public InputMediaDocumentSpec build() {
             if (documentFri == null && documentUrl == null) {
                 throw new IllegalStateException("Cannot build InputMediaDocumentSpec, 'document' attribute is not set");
             }
-            return new InputMediaDocumentSpec(documentFri, documentUrl, query, autoDeleteDuration);
+            return new InputMediaDocumentSpec(documentFri, documentUrl, query, autoDeleteDuration, spoiler);
         }
     }
 }

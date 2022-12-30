@@ -503,7 +503,9 @@ public interface Channel extends Chat, MentionablePeer {
         /** Can we delete this channel? */
         CAN_DELETE_CHANNEL(CAN_DELETE_CHANNEL_POS),
 
-        ANTISPAM(ANTISPAM_POS);
+        ANTISPAM(ANTISPAM_POS),
+
+        PARTICIPANTS_HIDDEN(PARTICIPANTS_HIDDEN_POS);
 
         private final byte position;
 
