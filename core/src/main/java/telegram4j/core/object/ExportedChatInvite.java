@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 
 import java.time.Instant;
@@ -111,19 +110,6 @@ public class ExportedChatInvite implements TelegramObject {
     @Override
     public MTProtoTelegramClient getClient() {
         return client;
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ExportedChatInvite that = (ExportedChatInvite) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

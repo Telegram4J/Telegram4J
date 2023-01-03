@@ -1,7 +1,5 @@
 package telegram4j.core.object.media;
 
-import reactor.util.annotation.Nullable;
-
 import java.util.List;
 import java.util.Objects;
 
@@ -28,19 +26,6 @@ public class PhotoSizeProgressive implements PhotoSize {
 
     public List<Integer> getSizes() {
         return data.sizes();
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PhotoSizeProgressive that = (PhotoSizeProgressive) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

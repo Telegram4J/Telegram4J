@@ -1,6 +1,5 @@
 package telegram4j.core.object.media;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.Photo;
@@ -95,19 +94,6 @@ public final class Game implements TelegramObject {
     public Optional<Video> getDocument() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
                 .map(d -> (Video) EntityFactory.createDocument(client, d, context));
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Game game = (Game) o;
-        return data.equals(game.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

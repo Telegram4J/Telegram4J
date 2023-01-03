@@ -53,20 +53,6 @@ public class UserStatus {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        UserStatus that = (UserStatus) o;
-        return type == that.type && Objects.equals(expiresTimestamp, that.expiresTimestamp) &&
-                Objects.equals(wasOnlineTimestamp, that.wasOnlineTimestamp);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(type, expiresTimestamp, wasOnlineTimestamp);
-    }
-
-    @Override
     public String toString() {
         return "UserStatus{" +
                 "type=" + type +

@@ -1,7 +1,5 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
-
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,19 +35,6 @@ public class PeerNotifySettings {
     // public Optional<NotificationSound> getOtherSound() {
     //     return Optional.empty();
     // }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PeerNotifySettings that = (PeerNotifySettings) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
-    }
 
     @Override
     public String toString() {

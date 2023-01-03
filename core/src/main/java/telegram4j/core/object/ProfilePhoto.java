@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import io.netty.buffer.ByteBuf;
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.util.TlEntityUtil;
@@ -104,19 +103,6 @@ public class ProfilePhoto implements TelegramObject {
      */
     public int getDcId() {
         return data.dcId();
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ProfilePhoto profilePhoto = (ProfilePhoto) o;
-        return data.equals(profilePhoto.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

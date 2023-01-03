@@ -17,7 +17,7 @@ public class Reaction {
 
     public Reaction(String emoticon) {
         this.emoticon = Objects.requireNonNull(emoticon);
-        this.documentId = -1;
+        this.documentId = 0;
     }
 
     /**

@@ -191,19 +191,6 @@ public class StickerSet implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        StickerSet that = (StickerSet) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
-    }
-
-    @Override
     public String toString() {
         return "StickerSet{" +
                 "data=" + data +

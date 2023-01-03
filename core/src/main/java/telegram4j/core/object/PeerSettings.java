@@ -1,6 +1,5 @@
 package telegram4j.core.object;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.util.BitFlag;
 
 import java.time.Instant;
@@ -32,19 +31,6 @@ public class PeerSettings {
     public Optional<Instant> getRequestChatTimestamp() {
         return Optional.ofNullable(data.requestChatDate())
                 .map(Instant::ofEpochSecond);
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PeerSettings that = (PeerSettings) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

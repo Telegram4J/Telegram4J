@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Mono;
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
@@ -95,19 +94,6 @@ public class MessageReplyHeader implements TelegramObject {
      */
     public Optional<Integer> getReplyToTopId() {
         return Optional.ofNullable(data.replyToTopId());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        MessageReplyHeader that = (MessageReplyHeader) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

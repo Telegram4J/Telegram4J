@@ -118,19 +118,6 @@ public class BotInfo implements TelegramObject {
     }
 
     @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        BotInfo botInfo = (BotInfo) o;
-        return data.equals(botInfo.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
-    }
-
-    @Override
     public String toString() {
         return "BotInfo{" +
                 "data=" + data +

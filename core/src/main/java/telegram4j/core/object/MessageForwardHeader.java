@@ -1,7 +1,6 @@
 package telegram4j.core.object;
 
 import reactor.core.publisher.Mono;
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
@@ -203,19 +202,6 @@ public class MessageForwardHeader implements TelegramObject {
      */
     public Optional<String> getPsaType() {
         return Optional.ofNullable(data.psaType());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        MessageForwardHeader that = (MessageForwardHeader) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

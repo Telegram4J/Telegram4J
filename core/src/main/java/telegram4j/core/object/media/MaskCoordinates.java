@@ -1,7 +1,5 @@
 package telegram4j.core.object.media;
 
-import reactor.util.annotation.Nullable;
-
 import java.util.Objects;
 
 public final class MaskCoordinates {
@@ -25,19 +23,6 @@ public final class MaskCoordinates {
 
     public double getZoom() {
         return data.zoom();
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        MaskCoordinates that = (MaskCoordinates) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

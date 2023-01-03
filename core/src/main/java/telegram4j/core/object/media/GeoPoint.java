@@ -1,7 +1,5 @@
 package telegram4j.core.object.media;
 
-import reactor.util.annotation.Nullable;
-
 import java.util.Objects;
 import java.util.Optional;
 
@@ -48,19 +46,6 @@ public final class GeoPoint {
      */
     public Optional<Integer> getAccuracyRadius() {
         return Optional.ofNullable(data.accuracyRadius());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        GeoPoint geoPoint = (GeoPoint) o;
-        return data.equals(geoPoint.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

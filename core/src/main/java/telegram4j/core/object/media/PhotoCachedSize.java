@@ -1,7 +1,6 @@
 package telegram4j.core.object.media;
 
 import io.netty.buffer.ByteBuf;
-import reactor.util.annotation.Nullable;
 
 import java.util.Objects;
 
@@ -28,19 +27,6 @@ public class PhotoCachedSize implements PhotoSize {
 
     public ByteBuf getContent() {
         return data.bytes();
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PhotoCachedSize that = (PhotoCachedSize) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

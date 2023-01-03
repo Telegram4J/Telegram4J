@@ -1,6 +1,5 @@
 package telegram4j.core.object.media;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.TelegramObject;
 
@@ -75,19 +74,6 @@ public final class VideoSize implements TelegramObject {
      */
     public Optional<Double> getVideoStartTimestamp() {
         return Optional.ofNullable(data.videoStartTs());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        VideoSize videoSize = (VideoSize) o;
-        return data.equals(videoSize.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override
