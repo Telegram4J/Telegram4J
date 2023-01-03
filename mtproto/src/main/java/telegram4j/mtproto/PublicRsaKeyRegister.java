@@ -191,8 +191,8 @@ public final class PublicRsaKeyRegister {
         for (PublicRsaKey key : keys) {
             long fingerprint = PublicRsaKey.computeTail(key);
             if (map.put(fingerprint, key) != null) {
-                throw new IllegalArgumentException("Detected public RSA key duplicate, fingerprint: "
-                        + fingerprint + ", key: " + key);
+                throw new IllegalArgumentException("Detected public RSA key duplicate, fingerprint: 0x"
+                        + Long.toHexString(fingerprint) + ", key: " + key);
             }
         }
         return new PublicRsaKeyRegister(Collections.unmodifiableMap(map));
