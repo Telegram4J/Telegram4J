@@ -148,8 +148,18 @@ public final class Id implements Comparable<Id> {
     }
 
     /**
+     * Create new id with specified type and id.
+     *
+     * @param type The type of id.
+     * @param value The value of id.
+     * @return New {@link Id} from with specified type and id.
+     */
+    public static Id of(Type type, long value) {
+        return new Id(type, value, null);
+    }
+
+    /**
      * Create new id from {@link InputUser} object.
-     * If {@code inputUser} parameter is {@link InputUserFromMessage} id will be without access hash and min information.
      *
      * @throws IllegalArgumentException If specified input user identifier is unknown.
      * @param inputUser The {@link InputUser} identifier.
@@ -175,15 +185,13 @@ public final class Id implements Comparable<Id> {
 
     /**
      * Create new id from {@link InputChannel} object.
-     * If {@code inputChannel} parameter is {@link InputChannelFromMessage} id will be without access hash and min information.
      *
-     * @throws IllegalArgumentException If specified input user identifier is unknown.
+     * @throws IllegalArgumentException If specified input channel identifier is unknown.
      * @param inputChannel The {@link InputChannel} identifier.
      * @param selfId The id of <i>current</i> user, used for {@link InputChannelFromMessage} handling.
      * @return New {@link Id} from given {@link InputChannel}.
      */
     public static Id of(InputChannel inputChannel, Id selfId) {
-        Objects.requireNonNull(selfId);
         switch (inputChannel.identifier()) {
             case BaseInputChannel.ID: {
                 BaseInputChannel d = (BaseInputChannel) inputChannel;
@@ -201,8 +209,6 @@ public final class Id implements Comparable<Id> {
 
     /**
      * Create new id from {@link InputPeer} object.
-     * If {@code inputPeer} parameter is {@link InputPeerChannelFromMessage}/{@link InputPeerUserFromMessage}
-     * id will be without access hash and min information.
      *
      * @throws IllegalArgumentException If specified input peer identifier is unknown.
      * @param inputPeer The {@link InputPeer} identifier.
@@ -210,7 +216,6 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputPeer}.
      */
     public static Id of(InputPeer inputPeer, Id selfId) {
-        Objects.requireNonNull(selfId);
         switch (inputPeer.identifier()) {
             case InputPeerChannel.ID: {
                 InputPeerChannel d = (InputPeerChannel) inputPeer;
@@ -413,8 +418,15 @@ public final class Id implements Comparable<Id> {
         private final Id peerId;
         private final int messageId;
 
+        /**
+         * Creates a new {@code MinInformation} with specified peer and message ids.
+         *
+         * @throws IllegalArgumentException if {@code messageId} is negative.
+         * @param peerId The id of chat where this peer was seen.
+         * @param messageId The id of message where this peer was seen.
+         */
         public MinInformation(Id peerId, int messageId) {
-            Preconditions.requireState(messageId > 0);
+            Preconditions.requireArgument(messageId > 0);
             this.peerId = Objects.requireNonNull(peerId);
             this.messageId = messageId;
         }

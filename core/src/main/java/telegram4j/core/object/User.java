@@ -7,8 +7,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.object.chat.AdminRight;
-import telegram4j.core.object.chat.PrivateChat;
+import telegram4j.core.object.chat.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
@@ -136,7 +135,7 @@ public class User implements MentionablePeer {
     }
 
     /**
-     * Gets the normal user photo, if present
+     * Gets the public user photo, if present
      * and if detailed information about user is available.
      *
      * @return The {@link Photo photo} of user, if present.
@@ -145,6 +144,30 @@ public class User implements MentionablePeer {
     public Optional<Photo> getPhoto() {
         return Optional.ofNullable(fullData)
                 .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
+                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
+    }
+
+    /**
+     * Gets the contact photo for this user, if present
+     * and if detailed information about user is available.
+     *
+     * @return The personal {@link Photo photo} for user, if present.
+     */
+    public Optional<Photo> getContactPhoto() {
+        return Optional.ofNullable(fullData)
+                .map(u -> TlEntityUtil.unmapEmpty(u.fallbackPhoto(), BasePhoto.class))
+                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
+    }
+
+    /**
+     * Gets the personal photo for this user, if present
+     * and if detailed information about user is available.
+     *
+     * @return The personal {@link Photo photo} for user, if present.
+     */
+    public Optional<Photo> getPersonalPhoto() {
+        return Optional.ofNullable(fullData)
+                .map(u -> TlEntityUtil.unmapEmpty(u.personalPhoto(), BasePhoto.class))
                 .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
     }
 
@@ -318,12 +341,25 @@ public class User implements MentionablePeer {
         return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
     }
 
+
+    /**
+     * Gets suggested set of admin rights for the bot, to be shown
+     * when adding the bot as admin to a {@link GroupChat} and {@link SupergroupChat}.
+     *
+     * @return The mutable suggested set of admin rights for {@link GroupChat} and {@link SupergroupChat}, if present.
+     */
     public Optional<Set<AdminRight>> getBotGroupAdminRights() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botGroupAdminRights)
                 .map(AdminRight::of);
     }
 
+    /**
+     * Gets suggested set of admin rights for the bot, to be shown
+     * when adding the bot as admin to a {@link BroadcastChannel}.
+     *
+     * @return The mutable suggested set of admin rights for {@link BroadcastChannel}s, if present.
+     */
     public Optional<Set<AdminRight>> getBotBroadcastAdminRights() {
         return Optional.ofNullable(fullData)
                 .map(UserFull::botBroadcastAdminRights)
@@ -361,7 +397,7 @@ public class User implements MentionablePeer {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof User)) return false;
         User that = (User) o;
         return minData.id() == that.minData.id();
     }

@@ -309,11 +309,11 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         return Flux.defer(() -> {
             if (fileRefId.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
                 if (fileRefId.getAccessHash() == -1) {
-                    return Flux.error(new IllegalStateException("Web document without access hash"));
+                    return Flux.error(new IllegalArgumentException("Web document without access hash"));
                 }
 
                 if (authResources.isBot()) {
-                    return Flux.error(new IllegalStateException("Bot accounts can't download web files"));
+                    return Flux.error(new IllegalArgumentException("Bot accounts can't download web files"));
                 }
                 return serviceHolder.getUploadService()
                         .getWebFile(fileRefId.asWebLocation().orElseThrow(), offset, limit)
@@ -604,6 +604,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Converts specified {@link Id} into the low-leveled {@link InputChannel} object and
      * assigns access hash from cache if present.
      *
+     * @throws IllegalArgumentException If given id has min user/channel
+     * information but current client authorized for bot account.
      * @param channelId The id of channel to converting.
      * @return A {@link Mono}, emitting on successful completion resolved {@link InputChannel} object.
      */
@@ -632,6 +634,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Converts specified {@link Id} into the low-leveled {@link InputUser} object and
      * assigns access hash from cache if present.
      *
+     * @throws IllegalArgumentException If given id has min user/channel
+     * information but current client authorized for bot account.
      * @param userId The id of user to converting.
      * @return A {@link Mono}, emitting on successful completion resolved {@link InputUser} object.
      */
@@ -663,8 +667,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Converts specified {@link Id} into the low-leveled {@link InputPeer} object without access hash resolving.
      *
-     * @see #asInputPeer(Id)
-     * @throws NoSuchElementException If access hash is needed and absent.
+     * @throws IllegalArgumentException If given id has min user/channel
+     * information but current client authorized for bot account.
+     * @throws NoSuchElementException If access hash is needed and absent for given id.
      * @param peerId The id of the peer to converting.
      * @return The new {@link InputPeer} from specified {@link Id}.
      */
@@ -702,7 +707,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Converts specified {@link Id} into the low-leveled {@link InputUser} object without access hash resolving.
      *
-     * @throws NoSuchElementException If access hash is needed and absent.
+     * @throws IllegalArgumentException If given id has a type other than {@link Id.Type#USER}
+     * or id has min user/channel information but current client authorized for bot account.
+     * @throws NoSuchElementException If access hash is needed and absent for given id.
      * @param userId The id of user to converting.
      * @return The new {@link InputPeer} from specified {@link Id}.
      */
@@ -727,7 +734,9 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     /**
      * Converts specified {@link Id} into the low-leveled {@link InputChannel} object without access hash resolving.
      *
-     * @throws NoSuchElementException If access hash is needed and absent.
+     * @throws IllegalArgumentException If given id has a type other than {@link Id.Type#CHANNEL}
+     * or id has min user/channel information but current client authorized for bot account.
+     * @throws NoSuchElementException If access hash is needed and absent for given id.
      * @param channelId The id of channel to converting.
      * @return The new {@link InputChannel} from specified {@link Id}.
      */

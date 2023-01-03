@@ -35,7 +35,7 @@ public interface MentionablePeer extends PeerEntity {
     Optional<ProfilePhoto> getMinPhoto();
 
     /**
-     * Gets the normal peer photo, if present
+     * Gets the peer photo, if present
      * and if detailed information about peer is available.
      *
      * @return The {@link Photo photo} of peer, if present.
@@ -46,8 +46,7 @@ public interface MentionablePeer extends PeerEntity {
      * Gets text of channel description or user about field, if present and
      * if detailed information about peer is available.
      *
-     * @return The text of channel description or user about field, if present and
-     * if detailed information about peer is available.
+     * @return The text of channel description or user about field, if present.
      */
     Optional<String> getAbout();
 

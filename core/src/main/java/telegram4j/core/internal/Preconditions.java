@@ -17,6 +17,12 @@ public class Preconditions {
         }
     }
 
+    public static void requireArgument(boolean expression) {
+        if (!expression) {
+            throw new IllegalArgumentException();
+        }
+    }
+
     public static void requireArgument(boolean expression, String message) {
         if (!expression) {
             throw new IllegalArgumentException(message);
