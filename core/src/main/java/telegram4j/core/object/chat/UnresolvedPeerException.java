@@ -20,9 +20,9 @@ public class UnresolvedPeerException extends RuntimeException {
     }
 
     /**
-     * Gets id of peer which couldn't resolve in local storage,
+     * Gets id of peer which couldn't resolve in local storage.
      *
-     * @return The id of peer which couldn't resolve in local storage,
+     * @return The id of peer which couldn't resolve in local storage.
      */
     public Id getPeerId() {
         return peerId;

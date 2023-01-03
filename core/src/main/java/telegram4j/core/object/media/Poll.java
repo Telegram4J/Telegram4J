@@ -93,7 +93,7 @@ public final class Poll implements TelegramObject {
     }
 
     /**
-     * Gets list of answers (2-10) of poll.
+     * Gets list of answers of poll.
      *
      * @return The list of answers.
      */
@@ -186,19 +186,6 @@ public final class Poll implements TelegramObject {
                                 .then(Mono.fromSupplier(builder::build)))
                         .flatMap(data -> client.getServiceHolder().getChatService().editMessage(data))
                         .then());
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Poll poll = (Poll) o;
-        return data.equals(poll.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override

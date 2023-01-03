@@ -6,41 +6,6 @@ import java.util.regex.Matcher;
 
 import static telegram4j.core.util.parser.EntityParserSupport.USER_LINK_ID_PATTERN;
 
-/**
- * Simple markdown markup parser.
- * Tokens with {@link MessageEntity.Type#MENTION_NAME} and {@link MessageEntity.Type#PRE}
- * types parse arguments using {@link String#trim()}
- *
- * <table class="striped">
- * <caption style="display:none">genConv</caption>
- * <thead>
- * <tr><th scope="col" style="vertical-align:bottom"> Prefix/Suffix or Format
- *     <th scope="col" style="vertical-align:bottom"> Token Type
- * </thead>
- * <tbody>
- * <tr><th scope="row" style="vertical-align:top"> {@code ~~}
- *     <td> {@link MessageEntity.Type#STRIKETHROUGH}
- * <tr><th scope="row" style="vertical-align:top"> {@code **}
- *     <td> {@link MessageEntity.Type#BOLD}
- * <tr><th scope="row" style="vertical-align:top"> {@code _}
- *     <td> {@link MessageEntity.Type#ITALIC}
- * <tr><th scope="row" style="vertical-align:top"> {@code __}
- *     <td> {@link MessageEntity.Type#UNDERLINE}
- * <tr><th scope="row" style="vertical-align:top"> {@code [text](url)}
- *     <td> {@link MessageEntity.Type#TEXT_URL} or if url matches
- *     by {@link EntityParserSupport#USER_LINK_ID_PATTERN user link pattern}
- *     will be interpreted as {@link MessageEntity.Type#MENTION_NAME}
- * <tr><th scope="row" style="vertical-align:top"> {@code ||}
- *     <td> {@link MessageEntity.Type#SPOILER}
- * <tr><th scope="row" style="vertical-align:top"> {@code ```language\ntext```}
- *     <td> {@link MessageEntity.Type#PRE} with optional programming/markup language argument
- * <tr><th scope="row" style="vertical-align:top"> {@code `}
- *     <td> {@link MessageEntity.Type#CODE}
- *
- * </tbody>
- * </table>
- *
- */
 class MarkdownV2EntityParser extends BaseEntityParser {
     // TODO: implement CUSTOM_EMOJI parsing
 
@@ -92,7 +57,6 @@ class MarkdownV2EntityParser extends BaseEntityParser {
                             prev.type() == MessageEntity.Type.MENTION_NAME) {
                         type = prev.type();
                         length = urlEnd - cursor;
-                        urlEnd = -1;
                     }
                     break;
                 case '[':

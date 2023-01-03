@@ -7,7 +7,11 @@ import java.util.function.IntBinaryOperator;
 import java.util.function.Predicate;
 import java.util.stream.StreamSupport;
 
-/** Immutable version of {@link EnumSet} which backed as {@code int}.  */
+/**
+ * Immutable version of {@link EnumSet} which backed as {@code int}.
+ * This enum set accepts only enums which implement {@link BitFlag} to
+ * use custom bit masks and positions.
+ */
 public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends AbstractSet<E> {
 
     private final Class<E> elementType;

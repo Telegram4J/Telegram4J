@@ -31,6 +31,8 @@ public interface EntityRetriever {
 
     /**
      * Retrieve user with retriever strategy by the specified id.
+     * By default, this method will retrieve minimal information about user,
+     * but implementation may replace it with more optimal variant.
      *
      * @param userId The id of user.
      * @return A {@link Mono} emitting on successful completion the {@link User}.
@@ -59,8 +61,9 @@ public interface EntityRetriever {
 
     /**
      * Retrieve chat with retriever strategy by the specified id.
-     *
-     * @implNote The implementation may retrieve information about self user for {@link PrivateChat}.
+     * By default, this method will retrieve minimal information about chat,
+     * but implementation may replace it with more optimal variant.
+     * For {@link PrivateChat} implementation may provide optional information about self user.
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion the {@link Chat}.
@@ -112,7 +115,7 @@ public interface EntityRetriever {
 
     /**
      * Retrieve messages from channel or chat with auxiliary data by the specified chat id and message ids.
-     * <p>Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
+     * <p> Not all types of {@code InputMessage} can be processed, for example {@code InputMessagePinned} can't be
      * used for user/group chats.
      *
      * @implSpec Auxiliary data must contain chat and authors of message if available.

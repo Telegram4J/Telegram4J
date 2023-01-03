@@ -38,11 +38,19 @@ public class EmojiStatus implements TelegramObject {
     /**
      * Gets id of {@link Sticker custom emoji}.
      *
-     * @see MTProtoTelegramClient#getCustomEmoji(long)
      * @return id of {@link Sticker custom emoji}.
      */
     public long getDocumentId() {
         return documentId;
+    }
+
+    /**
+     * Requests to retrieve {@link Sticker custom emoji} by {@link #getDocumentId()}.
+     *
+     * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
+     */
+    public Mono<Sticker> getEmoji() {
+        return client.getCustomEmoji(documentId);
     }
 
     /**

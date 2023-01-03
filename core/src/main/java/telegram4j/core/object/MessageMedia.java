@@ -111,6 +111,11 @@ public class MessageMedia implements TelegramObject {
             return data instanceof MessageMediaDocument && ((MessageMediaDocument) data).nopremium();
         }
 
+        /**
+         * Gets whether this media file hidden by spoiler.
+         *
+         * @return {@code true} if media file hidden by spoiler.
+         */
         public boolean hasSpoiler() {
             if (data instanceof MessageMediaDocument) {
                 return ((MessageMediaDocument) data).spoiler();

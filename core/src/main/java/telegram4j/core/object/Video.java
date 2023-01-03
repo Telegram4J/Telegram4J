@@ -70,9 +70,9 @@ public class Video extends Document {
     }
 
     /**
-     * Gets height of video document height.
+     * Gets height of video document.
      *
-     * @return The height of video document height.
+     * @return The height of video document.
      */
     public int getHeight() {
         return videoData.h();
