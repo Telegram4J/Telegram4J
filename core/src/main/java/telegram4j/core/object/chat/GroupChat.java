@@ -12,13 +12,11 @@ import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
-import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -33,7 +31,7 @@ import static telegram4j.tl.BaseChat.*;
 import static telegram4j.tl.BaseChatFull.CAN_SET_USERNAME_POS;
 import static telegram4j.tl.BaseChatFull.HAS_SCHEDULED_POS;
 
-/** Represents a basic group of 0-200 users (must be upgraded to a supergroup to accommodate more than 200 users). */
+/** Represents a basic group of 0-200 users. */
 public final class GroupChat extends BaseChat {
 
     private final telegram4j.tl.BaseChat minData;
@@ -350,15 +348,12 @@ public final class GroupChat extends BaseChat {
     }
 
     /**
-     * Gets {@code boolean} which indicates the availability of any emojis in the group
-     * or list of available reactions, if present
-     * and if detailed information about channel is available.
+     * Gets settings for allowed emojis in the chat.
      *
-     * @return The {@link Variant2} with {@code boolean} which indicates the availability of any emojis in the group
-     * or list of available reactions, if present
-     * and if detailed information about channel is available.
+     * @return The settings for allowed emojis in the chat, if present
+     * and full information about group chat available.
      */
-    public Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions() {
+    public Optional<ChatReactions> getAvailableReactions() {
         return Optional.ofNullable(fullData)
                 .map(BaseChatFull::availableReactions)
                 .map(EntityFactory::createChatReactions);

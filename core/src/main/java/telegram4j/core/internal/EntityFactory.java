@@ -17,6 +17,7 @@ import telegram4j.core.object.UserStatus;
 import telegram4j.core.object.*;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.object.chat.ChatReactions;
 import telegram4j.core.object.chat.*;
 import telegram4j.core.object.media.PhotoCachedSize;
 import telegram4j.core.object.media.PhotoPathSize;
@@ -676,14 +677,14 @@ public class EntityFactory {
     }
 
     @Nullable
-    public static Variant2<Boolean, List<Reaction>> createChatReactions(ChatReactions data) {
+    public static ChatReactions createChatReactions(telegram4j.tl.ChatReactions data) {
         switch (data.identifier()) {
             case ChatReactionsAll.ID:
                 var all = (ChatReactionsAll) data;
-                return Variant2.ofT1(all.allowCustom());
+                return new ChatReactions(all.allowCustom());
             case ChatReactionsSome.ID:
                 var some = (ChatReactionsSome) data;
-                return Variant2.ofT2(some.reactions().stream()
+                return new ChatReactions(some.reactions().stream()
                         .map(EntityFactory::createReaction)
                         .collect(Collectors.toUnmodifiableList()));
             case ChatReactionsNone.ID: return null;

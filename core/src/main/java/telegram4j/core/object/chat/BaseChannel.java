@@ -12,13 +12,11 @@ import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
-import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
 import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PaginationSupport;
-import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
@@ -215,7 +213,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
     }
 
     @Override
-    public Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions() {
+    public Optional<ChatReactions> getAvailableReactions() {
         return Optional.ofNullable(fullData)
                 .map(ChannelFull::availableReactions)
                 .map(EntityFactory::createChatReactions);

@@ -7,13 +7,11 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.ExportedChatInvite;
-import telegram4j.core.object.Reaction;
+import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.User;
-import telegram4j.core.object.*;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.*;
 
@@ -177,14 +175,12 @@ public interface Channel extends Chat, MentionablePeer {
     Flux<User> getRecentRequesters(EntityRetrievalStrategy strategy);
 
     /**
-     * Gets {@code boolean} which indicates the availability of any emojis in the channel
-     * or list of available reactions, if present.
+     * Gets settings for allowed emojis in the channel.
      *
-     * @return The {@link Variant2} with {@code boolean} which indicates the availability of any emojis in the channel
-     * or list of available reactions, if present
-     * and if detailed information about channel is available.
+     * @return The settings for allowed emojis in the channel, if present
+     * and full information about group channel available.
      */
-    Optional<Variant2<Boolean, List<Reaction>>> getAvailableReactions();
+    Optional<ChatReactions> getAvailableReactions();
 
     /**
      * Gets the latest <a href="https://core.telegram.org/api/updates">pts</a> for this channel, if present.
@@ -417,6 +413,8 @@ public interface Channel extends Chat, MentionablePeer {
 
     /** Available channel flags. */
     enum Flag implements BitFlag {
+        // This enum contains more than 32 constants and
+        // BitFlag used only for reading flags from channel data,
         // ChannelMin flags
 
         /** Whether the current user is the creator of this channel. */
@@ -486,7 +484,7 @@ public interface Channel extends Chat, MentionablePeer {
         /** Whether scheduled messages are available. */
         HAS_SCHEDULED(HAS_SCHEDULED_POS),
 
-        /** Can the user view <a href="https://core.telegram.org/api/stats">channel statistics</a>. */
+        /** Whether can the user view <a href="https://core.telegram.org/api/stats">channel statistics</a>. */
         CAN_VIEW_STATS(CAN_VIEW_STATS_POS),
 
         /**
