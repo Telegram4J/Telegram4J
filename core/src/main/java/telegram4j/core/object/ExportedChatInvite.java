@@ -1,13 +1,15 @@
 package telegram4j.core.object;
 
+import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.retriever.EntityRetrievalStrategy;
+import telegram4j.core.util.Id;
 
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
-// TODO: highlight ChatInvitePublicJoinRequests
-public class ExportedChatInvite implements TelegramObject {
+public final class ExportedChatInvite implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.ChatInviteExported data;
@@ -36,12 +38,51 @@ public class ExportedChatInvite implements TelegramObject {
     }
 
     /**
+     * Gets whether users importing this invite link will have to
+     * be approved to join the channel or group.
+     *
+     * @return {@code true} if link has request approving.
+     */
+    public boolean isRequestNeeded() {
+        return data.requestNeeded();
+    }
+
+    /**
      * Gets inline link in string.
      *
      * @return The inline link in string.
      */
     public String getLink() {
         return data.link();
+    }
+
+    /**
+     * Gets id of admin that created this invite link.
+     *
+     * @return The id of admin that created this invite link.
+     */
+    public Id getAdminId() {
+        return Id.ofUser(data.adminId());
+    }
+
+    /**
+     * Retrieve admin that created this invite.
+     *
+     * @return A {@link Mono} emitting on successful completion the {@link User}.
+     */
+    public Mono<User> getAdmin() {
+        return client.getUserById(Id.ofUser(data.adminId()));
+    }
+
+    /**
+     * Retrieve admin that created this invite using specified retrieval strategy.
+     *
+     * @param strategy The strategy to apply.
+     * @return A {@link Mono} emitting on successful completion the {@link User}.
+     */
+    public Mono<User> getAdmin(EntityRetrievalStrategy strategy) {
+        return client.withRetrievalStrategy(strategy)
+                .getUserById(Id.ofUser(data.adminId()));
     }
 
     /**

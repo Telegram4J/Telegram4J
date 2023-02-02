@@ -264,9 +264,7 @@ public final class GroupChat extends BaseChat {
      * @return The {@link ExportedChatInvite invite} for chat, if present.
      */
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.exportedInvite(), ChatInviteExported.class))
-                .map(d -> new ExportedChatInvite(client, d));
+        return Optional.ofNullable(fullData).map(d -> new ExportedChatInvite(client, (ChatInviteExported) d));
     }
 
     /**
