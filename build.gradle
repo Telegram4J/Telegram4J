@@ -56,6 +56,7 @@ subprojects {
 
     tasks.withType(JavaCompile) {
         options.encoding = "UTF-8"
+        options.javaModuleVersion = version
     }
 
     tasks.withType(Javadoc) {
@@ -73,7 +74,7 @@ subprojects {
 
             links = [
                     "https://projectreactor.io/docs/core/release/api/",
-                    "https://fasterxml.github.io/jackson-databind/javadoc/2.13/",
+                    "https://fasterxml.github.io/jackson-databind/javadoc/2.14/",
                     "https://www.reactive-streams.org/reactive-streams-1.0.3-javadoc/",
                     "https://netty.io/4.1/api/"
             ]
