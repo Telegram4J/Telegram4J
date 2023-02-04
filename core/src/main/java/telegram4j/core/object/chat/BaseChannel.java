@@ -292,9 +292,7 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Optional<ExportedChatInvite> getExportedInvite() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.mapCast(d.exportedInvite(), ChatInviteExported.class))
-                .map(d -> new ExportedChatInvite(client, d));
+        return Optional.ofNullable(fullData).map(d -> new ExportedChatInvite(client, (ChatInviteExported) d));
     }
 
     @Override
