@@ -5,19 +5,19 @@ import reactor.util.annotation.Nullable;
 import java.util.Objects;
 import java.util.Optional;
 
-public class Reaction {
-    private final long documentId;
+public final class Reaction {
+    private final long emojiId;
     @Nullable
     private final String emoticon;
 
-    public Reaction(long documentId) {
-        this.documentId = documentId;
+    public Reaction(long emojiId) {
+        this.emojiId = emojiId;
         this.emoticon = null;
     }
 
     public Reaction(String emoticon) {
         this.emoticon = Objects.requireNonNull(emoticon);
-        this.documentId = 0;
+        this.emojiId = 0;
     }
 
     /**
@@ -25,8 +25,8 @@ public class Reaction {
      *
      * @return The id of custom emoji of this reaction, if its custom emoji.
      */
-    public Optional<Long> getDocumentId() {
-        return emoticon == null ? Optional.of(documentId) : Optional.empty();
+    public Optional<Long> getEmojiId() {
+        return emoticon == null ? Optional.of(emojiId) : Optional.empty();
     }
 
     /**
@@ -41,18 +41,17 @@ public class Reaction {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Reaction reaction = (Reaction) o;
-        return documentId == reaction.documentId && Objects.equals(emoticon, reaction.emoticon);
+        if (!(o instanceof Reaction r)) return false;
+        return emojiId == r.emojiId && Objects.equals(emoticon, r.emoticon);
     }
 
     @Override
     public int hashCode() {
-        return Long.hashCode(documentId) + Objects.hashCode(emoticon);
+        return Long.hashCode(emojiId) + Objects.hashCode(emoticon);
     }
 
     @Override
     public String toString() {
-        return "Reaction{" + (emoticon != null ? "emoticon='" + emoticon + '\'' : "documentId=" + documentId) + '}';
+        return "Reaction{" + (emoticon != null ? "emoticon='" + emoticon + '\'' : "emojiId=" + emojiId) + '}';
     }
 }

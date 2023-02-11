@@ -9,15 +9,15 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Representation of premium user status with custom emoji. */
-public class EmojiStatus implements TelegramObject {
+public final class EmojiStatus implements TelegramObject {
     private final MTProtoTelegramClient client;
-    private final long documentId;
+    private final long emojiId;
     @Nullable
     private final Instant untilTimestamp;
 
-    public EmojiStatus(MTProtoTelegramClient client, long documentId, @Nullable Instant untilTimestamp) {
+    public EmojiStatus(MTProtoTelegramClient client, long emojiId, @Nullable Instant untilTimestamp) {
         this.client = Objects.requireNonNull(client);
-        this.documentId = documentId;
+        this.emojiId = emojiId;
         this.untilTimestamp = untilTimestamp;
     }
 
@@ -32,7 +32,7 @@ public class EmojiStatus implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
      */
     public Mono<Sticker> getCustomEmoji() {
-        return client.getCustomEmoji(documentId);
+        return client.getCustomEmoji(emojiId);
     }
 
     /**
@@ -40,17 +40,17 @@ public class EmojiStatus implements TelegramObject {
      *
      * @return id of {@link Sticker custom emoji}.
      */
-    public long getDocumentId() {
-        return documentId;
+    public long getEmojiId() {
+        return emojiId;
     }
 
     /**
-     * Requests to retrieve {@link Sticker custom emoji} by {@link #getDocumentId()}.
+     * Requests to retrieve {@link Sticker custom emoji} by {@link #getEmojiId()}.
      *
      * @return A {@link Mono} emitting on successful completion {@link Sticker custom emoji}.
      */
     public Mono<Sticker> getEmoji() {
-        return client.getCustomEmoji(documentId);
+        return client.getCustomEmoji(emojiId);
     }
 
     /**
@@ -65,7 +65,7 @@ public class EmojiStatus implements TelegramObject {
     @Override
     public String toString() {
         return "EmojiStatus{" +
-                "documentId=" + documentId +
+                "emojiId=" + emojiId +
                 ", untilTimestamp=" + untilTimestamp +
                 '}';
     }
