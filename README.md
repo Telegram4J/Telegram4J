@@ -4,7 +4,7 @@
 [![Javadoc](https://javadoc.io/badge2/com.telegram4j/telegram4j-core/0.1.0/javadoc.svg)](https://javadoc.io/doc/com.telegram4j/telegram4j-core/0.1.0)
 ![Build Status](https://github.com/Telegram4J/Telegram4J/actions/workflows/build.yml/badge.svg?branch=master)
 
-Reactive Java library for Telegram [MTProto](https://core.telegram.org/mtproto) API written with Java 11.
+Reactive Java library for Telegram [MTProto](https://core.telegram.org/mtproto) API written with Java 17.
 
 ## Installation
 
