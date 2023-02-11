@@ -92,13 +92,6 @@ subprojects {
         modularity.inferModulePath = true
     }
 
-    jar {
-        manifest {
-            attributes 'Implementation-Title': archivesBaseName,
-                    'Implementation-Version': archiveVersion
-        }
-    }
-
     publishing {
         publications {
             mavenJava(MavenPublication) {

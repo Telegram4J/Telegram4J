@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.InputClientProxy;
 
+import java.lang.module.ModuleDescriptor;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -30,14 +31,15 @@ public final class InitConnectionParams {
     /**
      * Computes system-dependent init connection params with
      * system version in format {@code Linux 5.10.93-1-MANJARO amd64} and
-     * device model {@code Telegram4J} with lib version from package info and
+     * device model {@code Telegram4J} with lib version from module info and
      * system languages and parameters with extracted from TZ offset seconds.
      *
      * @return The new default computed init connection parameters.
      */
     public static InitConnectionParams getDefault() {
-        var pckg = InitConnectionParams.class.getPackage();
-        String appVersion = (appVersion = pckg.getImplementationVersion()) != null ? appVersion : "0.1.0-SNAPSHOT";
+        String appVersion = Optional.ofNullable(InitConnectionParams.class.getModule().getDescriptor())
+                .flatMap(ModuleDescriptor::rawVersion)
+                .orElse("0.1.0-SNAPSHOT");
         String deviceModel = "Telegram4J";
         String systemVersion = String.join(" ", System.getProperty("os.name"),
                 System.getProperty("os.version"),
@@ -157,7 +159,7 @@ public final class InitConnectionParams {
      * For now, only {@code tz_offset} field is supported,
      * for specifying timezone offset in seconds.
      *
-     * <p>Example of getting time zone offset
+     * <p> Example of getting time zone offset
      * <pre>{@code
      * JsonNode node = JsonNodeFactory.instance.objectNode()
      *         .put("tz_offset", java.util.TimeZone.getDefault()
