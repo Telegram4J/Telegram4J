@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public class AuxiliaryMessagesSlice extends AuxiliaryMessages {
+public final class AuxiliaryMessagesSlice extends AuxiliaryMessages {
 
     private final boolean inexact;
     private final int count;

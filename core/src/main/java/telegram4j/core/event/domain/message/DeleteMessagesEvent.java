@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Event of single or batch delete of ordinal or scheduled messages. */
-public class DeleteMessagesEvent extends MessageEvent {
+public final class DeleteMessagesEvent extends MessageEvent {
 
     @Nullable
     private final Id chatId;
@@ -72,7 +72,7 @@ public class DeleteMessagesEvent extends MessageEvent {
     /**
      * Gets {@link List} with found deleted {@link Message messages}, if present.
      *
-     * @return The list with found deleted messages, if present.
+     * @return The immutable list with found deleted messages, if present.
      */
     public Optional<List<Message>> getDeletedMessages() {
         return Optional.ofNullable(deletedMessages);
@@ -81,7 +81,7 @@ public class DeleteMessagesEvent extends MessageEvent {
     /**
      * Gets {@link List} of deleted message ids.
      *
-     * @return The list of deleted message ids.
+     * @return The immutable list of deleted message ids.
      */
     public List<Integer> getDeleteMessagesIds() {
         return deleteMessagesIds;

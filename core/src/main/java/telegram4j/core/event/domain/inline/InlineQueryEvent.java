@@ -13,7 +13,7 @@ import telegram4j.tl.request.messages.SetInlineBotResults;
 
 import java.util.Optional;
 
-public class InlineQueryEvent extends BotEvent {
+public final class InlineQueryEvent extends BotEvent {
 
     private final long queryId;
     private final User user;

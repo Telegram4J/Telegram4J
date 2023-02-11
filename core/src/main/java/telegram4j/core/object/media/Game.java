@@ -6,7 +6,6 @@ import telegram4j.core.object.Photo;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.Video;
 import telegram4j.mtproto.file.Context;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
 
@@ -81,9 +80,7 @@ public final class Game implements TelegramObject {
      * @return The preview for the game.
      */
     public Photo getPhoto() {
-        BasePhoto p = TlEntityUtil.unmapEmpty(data.photo(), BasePhoto.class);
-        Objects.requireNonNull(p);
-        return new Photo(client, p, context);
+        return new Photo(client, (BasePhoto) data.photo(), context);
     }
 
     /**
@@ -92,8 +89,9 @@ public final class Game implements TelegramObject {
      * @return The attached video document, if present.
      */
     public Optional<Video> getDocument() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.document(), BaseDocument.class))
-                .map(d -> (Video) EntityFactory.createDocument(client, d, context));
+        return data.document() instanceof BaseDocument d
+                ? Optional.of((Video) EntityFactory.createDocument(client, d, context))
+                : Optional.empty();
     }
 
     @Override

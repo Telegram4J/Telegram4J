@@ -1,35 +1,19 @@
 package telegram4j.mtproto.store.object;
 
-import telegram4j.tl.BaseMessageFields;
 import telegram4j.tl.InputPeer;
+import telegram4j.tl.Message;
 
 import java.util.List;
 import java.util.Objects;
 
-/** Container object with found deleted messages and peer id. */
-public class ResolvedDeletedMessages {
+/**
+ * Container object with found deleted messages and
+ * peer id where messages was deleted.
+ */
+public record ResolvedDeletedMessages(InputPeer peer, List<Message> messages) {
 
-    private final InputPeer peer;
-    private final List<BaseMessageFields> messages;
-
-    public ResolvedDeletedMessages(InputPeer peer, List<BaseMessageFields> messages) {
-        this.peer = Objects.requireNonNull(peer);
-        this.messages = Objects.requireNonNull(messages);
-    }
-
-    public InputPeer getPeer() {
-        return peer;
-    }
-
-    public List<BaseMessageFields> getMessages() {
-        return messages;
-    }
-
-    @Override
-    public String toString() {
-        return "ResolvedDeletedMessages{" +
-                "peer=" + peer +
-                ", messages=" + messages +
-                '}';
+    public ResolvedDeletedMessages {
+        Objects.requireNonNull(peer);
+        Objects.requireNonNull(messages);
     }
 }

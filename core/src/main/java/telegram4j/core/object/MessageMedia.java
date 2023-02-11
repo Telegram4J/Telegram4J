@@ -6,14 +6,13 @@ import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.Context;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-public class MessageMedia implements TelegramObject {
+public sealed class MessageMedia implements TelegramObject {
 
     protected final MTProtoTelegramClient client;
     protected final Type type;
@@ -75,7 +74,7 @@ public class MessageMedia implements TelegramObject {
         DICE
     }
 
-    public static class Geo extends MessageMedia {
+    public static final class Geo extends MessageMedia {
 
         private final MessageMediaGeo data;
 
@@ -85,7 +84,9 @@ public class MessageMedia implements TelegramObject {
         }
 
         public Optional<GeoPoint> getGeo() {
-            return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class)).map(GeoPoint::new);
+            return data.geo() instanceof BaseGeoPoint g
+                    ? Optional.of(new GeoPoint(g))
+                    : Optional.empty();
         }
 
         @Override
@@ -96,19 +97,25 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Document extends MessageMedia {
+    public static final class Document extends MessageMedia {
 
         private final telegram4j.tl.MessageMedia data; // MessageMediaDocument/MessageMediaPhoto
         private final Context context;
 
-        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data, Context context) {
+        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMediaDocument data, Context context) {
+            super(client, Type.DOCUMENT);
+            this.data = Objects.requireNonNull(data);
+            this.context = Objects.requireNonNull(context);
+        }
+
+        public Document(MTProtoTelegramClient client, telegram4j.tl.MessageMediaPhoto data, Context context) {
             super(client, Type.DOCUMENT);
             this.data = Objects.requireNonNull(data);
             this.context = Objects.requireNonNull(context);
         }
 
         public boolean isNoPremium() {
-            return data instanceof MessageMediaDocument && ((MessageMediaDocument) data).nopremium();
+            return data instanceof MessageMediaDocument d && d.nopremium();
         }
 
         /**
@@ -117,10 +124,10 @@ public class MessageMedia implements TelegramObject {
          * @return {@code true} if media file hidden by spoiler.
          */
         public boolean hasSpoiler() {
-            if (data instanceof MessageMediaDocument) {
-                return ((MessageMediaDocument) data).spoiler();
-            } else if (data instanceof MessageMediaPhoto) {
-                return ((MessageMediaPhoto) data).spoiler();
+            if (data instanceof MessageMediaDocument d) {
+                return d.spoiler();
+            } else if (data instanceof MessageMediaPhoto p) {
+                return p.spoiler();
             } else {
                 throw new IllegalStateException();
             }
@@ -132,14 +139,16 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link telegram4j.core.object.Document} of the message, if it hasn't expired by timer.
          */
         public Optional<telegram4j.core.object.Document> getDocument() {
-            switch (data.identifier()) {
-                case MessageMediaDocument.ID:
-                    return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaDocument) data).document(), BaseDocument.class))
-                            .map(d -> EntityFactory.createDocument(client, d, context));
-                case MessageMediaPhoto.ID:
-                    return Optional.ofNullable(TlEntityUtil.unmapEmpty(((MessageMediaPhoto) data).photo(), BasePhoto.class))
-                            .map(d -> new telegram4j.core.object.Photo(client, d, context));
-                default: throw new IllegalStateException();
+            if (data instanceof MessageMediaDocument d) {
+                return d.document() instanceof BaseDocument b
+                        ? Optional.of(EntityFactory.createDocument(client, b, context))
+                        : Optional.empty();
+            } else if (data instanceof MessageMediaPhoto p) {
+                return p.photo() instanceof BasePhoto b
+                        ? Optional.of(new Photo(client, b, context))
+                        : Optional.empty();
+            } else {
+                throw new IllegalStateException();
             }
         }
 
@@ -149,13 +158,17 @@ public class MessageMedia implements TelegramObject {
          * @return The {@link Duration} of the document self-destruction, if present.
          */
         public Optional<Duration> getAutoDeleteDuration() {
-            switch (data.identifier()) {
-                case MessageMediaDocument.ID:
-                    return Optional.ofNullable(((MessageMediaDocument) data).ttlSeconds()).map(Duration::ofSeconds);
-                case MessageMediaPhoto.ID:
-                    return Optional.ofNullable(((MessageMediaPhoto) data).ttlSeconds()).map(Duration::ofSeconds);
-                default: throw new IllegalStateException();
+            Integer ttlSeconds;
+            if (data instanceof MessageMediaDocument d) {
+                ttlSeconds = d.ttlSeconds();
+            } else if (data instanceof MessageMediaPhoto p) {
+                ttlSeconds = p.ttlSeconds();
+            } else {
+                throw new IllegalStateException();
             }
+
+            return Optional.ofNullable(ttlSeconds)
+                    .map(Duration::ofSeconds);
         }
 
         @Override
@@ -166,7 +179,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Venue extends MessageMedia {
+    public static final class Venue extends MessageMedia {
 
         private final MessageMediaVenue data;
 
@@ -176,7 +189,9 @@ public class MessageMedia implements TelegramObject {
         }
 
         public Optional<GeoPoint> getGeo() {
-            return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class)).map(GeoPoint::new);
+            return data.geo() instanceof BaseGeoPoint g
+                    ? Optional.of(new GeoPoint(g))
+                    : Optional.empty();
         }
 
         public String getTitle() {
@@ -207,7 +222,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Game extends MessageMedia {
+    public static final class Game extends MessageMedia {
 
         private final MessageMediaGame data;
         private final Context context;
@@ -230,7 +245,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class WebPage extends MessageMedia {
+    public static final class WebPage extends MessageMedia {
 
         private final MessageMediaWebPage data;
 
@@ -252,7 +267,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Contact extends MessageMedia {
+    public static final class Contact extends MessageMedia {
 
         private final MessageMediaContact data;
 
@@ -289,7 +304,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class GeoLive extends MessageMedia {
+    public static final class GeoLive extends MessageMedia {
 
         private final MessageMediaGeoLive data;
 
@@ -299,7 +314,9 @@ public class MessageMedia implements TelegramObject {
         }
 
         public Optional<GeoPoint> getGeo() {
-            return Optional.ofNullable(TlEntityUtil.unmapEmpty(data.geo(), BaseGeoPoint.class)).map(GeoPoint::new);
+            return data.geo() instanceof BaseGeoPoint g
+                    ? Optional.of(new GeoPoint(g))
+                    : Optional.empty();
         }
 
         public Optional<Integer> getHeading() {
@@ -322,7 +339,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Poll extends MessageMedia {
+    public static final class Poll extends MessageMedia {
 
         private final MessageMediaPoll data;
         private final Id peer;
@@ -359,7 +376,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Invoice extends MessageMedia {
+    public static final class Invoice extends MessageMedia {
 
         private final MessageMediaInvoice data;
         private final Context context;
@@ -388,7 +405,7 @@ public class MessageMedia implements TelegramObject {
 
         public Optional<telegram4j.core.object.Document> getPhoto() {
             return Optional.ofNullable(data.photo())
-                    .map(d -> EntityFactory.createDocument(client, (BaseDocumentFields) d, context));
+                    .map(d -> EntityFactory.createDocument(client, d, context));
         }
 
         public Optional<Integer> getReceiptMessageId() {
@@ -415,7 +432,7 @@ public class MessageMedia implements TelegramObject {
         }
     }
 
-    public static class Dice extends MessageMedia {
+    public static final class Dice extends MessageMedia {
 
         private final MessageMediaDice data;
 

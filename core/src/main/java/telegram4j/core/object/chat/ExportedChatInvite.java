@@ -1,7 +1,9 @@
-package telegram4j.core.object;
+package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.TelegramObject;
+import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 

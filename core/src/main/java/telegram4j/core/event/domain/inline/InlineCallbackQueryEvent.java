@@ -16,7 +16,7 @@ import java.util.List;
 import static reactor.function.TupleUtils.function;
 
 /** Event of ordinary inline button triggered from the inline query. */
-public class InlineCallbackQueryEvent extends CallbackEvent {
+public final class InlineCallbackQueryEvent extends CallbackEvent {
 
     private final InlineMessageId messageId;
 

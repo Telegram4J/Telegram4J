@@ -1,9 +1,10 @@
 package telegram4j.core.object;
 
+import telegram4j.core.object.chat.Chat;
 import telegram4j.core.util.Id;
 
 /** An object that can be an author or a chat from where messages are sent. */
-public interface PeerEntity extends TelegramObject {
+public sealed interface PeerEntity extends TelegramObject permits MentionablePeer, Chat {
 
     /**
      * Gets the peer identifier of this entity.

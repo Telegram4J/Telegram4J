@@ -6,7 +6,6 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -29,7 +28,7 @@ import static telegram4j.tl.ChannelFull.*;
  *
  * @see <a href="https://core.telegram.org/api/channel">Telegram Channels</a>
  */
-public interface Channel extends Chat, MentionablePeer {
+public sealed interface Channel extends Chat, MentionablePeer permits BaseChannel {
 
     /**
      * Gets enum set of enabled channel flags.
@@ -414,11 +413,12 @@ public interface Channel extends Chat, MentionablePeer {
     /** Available channel flags. */
     enum Flag implements BitFlag {
         // This enum contains more than 32 constants and
-        // BitFlag used only for reading flags from channel data,
+        // BitFlag used only for reading flags from channel data
+
         // ChannelMin flags
 
-        /** Whether the current user is the creator of this channel. */
-        CREATOR(CREATOR_POS),
+        /** Whether the current user is the owner of this channel. */
+        OWNER(CREATOR_POS),
 
         /** Whether the current user has left this channel. */
         LEFT(LEFT_POS),
@@ -503,7 +503,9 @@ public interface Channel extends Chat, MentionablePeer {
 
         ANTISPAM(ANTISPAM_POS),
 
-        PARTICIPANTS_HIDDEN(PARTICIPANTS_HIDDEN_POS);
+        PARTICIPANTS_HIDDEN(PARTICIPANTS_HIDDEN_POS),
+
+        TRANSLATIONS_DISABLED(TRANSLATIONS_DISABLED_POS);
 
         private final byte position;
 
@@ -526,20 +528,17 @@ public interface Channel extends Chat, MentionablePeer {
         public static Set<Flag> of(@Nullable telegram4j.tl.ChannelFull fullData, telegram4j.tl.Channel minData) {
             var minFlags = of(minData);
             if (fullData != null) {
-                var set = EnumSet.allOf(Flag.class);
+                var set1 = EnumSet.range(CAN_VIEW_PARTICIPANTS, FORUM);
+                int flags1 = fullData.flags();
+                set1.removeIf(value -> (flags1 & value.mask()) == 0);
 
-                int flags = fullData.flags();
-                // well done, telegram, good solution
-                // upd: I expected this to be a temporary solution...
-                //  But no, they are going nothing to improve their Type Language
+                var set2 = EnumSet.range(CAN_DELETE_CHANNEL, TRANSLATIONS_DISABLED);
                 int flags2 = fullData.flags2();
+                set1.removeIf(value -> (flags2 & value.mask()) == 0);
 
-                set.removeIf(value -> value.ordinal() < CAN_VIEW_PARTICIPANTS.ordinal() ||
-                        value.ordinal() >= CAN_DELETE_CHANNEL.ordinal() && (flags2 & value.mask()) == 0 ||
-                        (flags & value.mask()) == 0);
-
-                set.addAll(minFlags);
-                return set;
+                minFlags.addAll(set1);
+                minFlags.addAll(set2);
+                return set2;
             }
 
             return minFlags;
@@ -552,9 +551,9 @@ public interface Channel extends Chat, MentionablePeer {
          * @return The {@link EnumSet} with channel flags.
          */
         public static Set<Flag> of(telegram4j.tl.Channel data) {
-            var set = EnumSet.allOf(Flag.class);
+            var set = EnumSet.range(OWNER, JOIN_REQUEST);
             int flags = data.flags();
-            set.removeIf(value -> value.ordinal() >= CAN_VIEW_PARTICIPANTS.ordinal() || (flags & value.mask()) == 0);
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

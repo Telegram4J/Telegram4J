@@ -5,7 +5,11 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.InputMedia;
 
 // TODO: Implement spec for inputMediaGame
-public interface InputMediaSpec {
+public sealed interface InputMediaSpec
+        permits InputMediaContactSpec, InputMediaDiceSpec, InputMediaDocumentSpec,
+                InputMediaGeoLiveSpec, InputMediaGeoPointSpec, InputMediaPhotoSpec,
+                InputMediaPollSpec, InputMediaUploadedDocumentSpec, InputMediaUploadedPhotoSpec,
+                InputMediaVenueSpec {
 
     Mono<InputMedia> asData(MTProtoTelegramClient client);
 }

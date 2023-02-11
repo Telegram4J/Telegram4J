@@ -4,11 +4,11 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.Objects;
 
-public class PhotoPathSize implements PhotoSize {
+public final class VectorThumbnail implements Thumbnail {
 
     private final telegram4j.tl.PhotoPathSize data;
 
-    public PhotoPathSize(telegram4j.tl.PhotoPathSize data) {
+    public VectorThumbnail(telegram4j.tl.PhotoPathSize data) {
         this.data = Objects.requireNonNull(data);
     }
 

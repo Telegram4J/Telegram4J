@@ -13,7 +13,8 @@ import telegram4j.core.object.chat.Chat;
  * </ul>
  */
 // TODO: docs for ChatParticipantAdminEvent
-public abstract class ChatEvent extends Event {
+public abstract sealed class ChatEvent extends Event
+        permits ChatParticipantUpdateEvent, ChatParticipantsUpdateEvent {
 
     protected ChatEvent(MTProtoTelegramClient client) {
         super(client);

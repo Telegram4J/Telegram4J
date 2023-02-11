@@ -16,12 +16,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
-
 /**
  * Chat bot information.
  */
-public class BotInfo implements TelegramObject {
+public final class BotInfo implements TelegramObject {
 
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.BotInfo data;
@@ -53,7 +51,7 @@ public class BotInfo implements TelegramObject {
                 .or(() -> peer.getType() == Id.Type.USER
                         ? Optional.of(peer)
                         : Optional.empty())
-                .orElseThrow(() -> new IllegalStateException("Peer: " + peer)); // need to verify
+                .orElseThrow(() -> new IllegalStateException("BotInfo.getBotId() is absent")); // TODO: need to verify
     }
 
     /**
@@ -93,19 +91,23 @@ public class BotInfo implements TelegramObject {
         return Optional.ofNullable(data.description());
     }
 
+    /**
+     * Gets bot description photo or gif document, if present.
+     *
+     * @return The bot description {@link Photo} or {@link Video} document, if present.
+     */
     public Optional<Document> getDescriptionDocument() {
-        return Optional.ofNullable(unmapEmpty(data.descriptionDocument(), BaseDocument.class))
-                .map(d -> EntityFactory.createDocument(client, d,
-                        Context.createBotInfoContext(peer.asPeer(), getBotId().asLong())))
-                .or(() -> Optional.ofNullable(unmapEmpty(data.descriptionPhoto(), BasePhoto.class))
-                        .map(e -> new Photo(client, e, Context.createBotInfoContext(peer.asPeer(),
-                                getBotId().asLong()))));
+        if (!(data.descriptionDocument() instanceof BaseDocument b)) {
+            return data.descriptionPhoto() instanceof BasePhoto p
+                    ? Optional.of(new Photo(client, p, Context.createBotInfoContext(peer.asPeer(), getBotId().asLong())))
+                    : Optional.empty();
+        }
+
+        return Optional.of(EntityFactory.createDocument(client, b,
+                Context.createBotInfoContext(peer.asPeer(), getBotId().asLong())));
     }
 
-    // TODO:
-    // public Optional<BotMenuButton> menuButton() {
-    //     return Optional.ofNullable(data.menuButton());
-    // }
+    // TODO bot menu support?
 
     /**
      * Gets immutable list of the bot commands, if present.

@@ -9,7 +9,6 @@ import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
@@ -18,7 +17,6 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.Context;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Duration;
@@ -28,8 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static telegram4j.tl.BaseChat.*;
-import static telegram4j.tl.BaseChatFull.CAN_SET_USERNAME_POS;
-import static telegram4j.tl.BaseChatFull.HAS_SCHEDULED_POS;
+import static telegram4j.tl.BaseChatFull.*;
 
 /** Represents a basic group of 0-200 users. */
 public final class GroupChat extends BaseChat {
@@ -72,16 +69,18 @@ public final class GroupChat extends BaseChat {
 
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ProfilePhoto(client, d, ImmutableInputPeerChat.of(minData.id())));
+        return minData instanceof BaseChatPhoto p
+                ? Optional.of(new ProfilePhoto(client, p, ImmutableInputPeerChat.of(minData.id())))
+                : Optional.empty();
     }
 
     @Override
     public Optional<Photo> getPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, Context.createChatPhotoContext(
-                        ImmutableInputPeerChat.of(minData.id()), -1)));
+        if (fullData == null || !(fullData.chatPhoto() instanceof BasePhoto p)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Photo(client, p, Context.createChatPhotoContext(
+                ImmutableInputPeerChat.of(minData.id()), -1)));
     }
 
     @Override
@@ -222,10 +221,10 @@ public final class GroupChat extends BaseChat {
      * @return The version of participant's list, if present and {@link Flag#CAN_VIEW_PARTICIPANTS} flag is present.
      */
     public Optional<Integer> getParticipantsVersion() {
-        return Optional.ofNullable(fullData)
-                .map(c -> c.participants().identifier() == BaseChatParticipants.ID
-                        ? ((BaseChatParticipants) c.participants()).version()
-                        : null);
+        if (fullData == null || !(fullData.participants() instanceof BaseChatParticipants p)) {
+            return Optional.empty();
+        }
+        return Optional.of(p.version());
     }
 
     /**
@@ -446,8 +445,8 @@ public final class GroupChat extends BaseChat {
     public enum Flag implements BitFlag {
         // MinChat flags
 
-        /** Whether the current user is the creator of the group. */
-        CREATOR(CREATOR_POS),
+        /** Whether the current user is the owner of the group. */
+        OWNER(CREATOR_POS),
 
         /** Whether the current user has left the group. */
         LEFT(LEFT_POS),
@@ -475,6 +474,8 @@ public final class GroupChat extends BaseChat {
         /** Whether <a href="https://core.telegram.org/api/scheduled-messages">scheduled messages</a> are available. */
         HAS_SCHEDULED(HAS_SCHEDULED_POS),
 
+        TRANSLATIONS_DISABLED(TRANSLATIONS_DISABLED_POS),
+
         // non-existent in chat object flags
 
         /** Whether current user can view list of participants. */
@@ -501,13 +502,13 @@ public final class GroupChat extends BaseChat {
         public static Set<Flag> of(@Nullable telegram4j.tl.BaseChatFull fullData, telegram4j.tl.BaseChat minData) {
             var minFlags = of(minData);
             if (fullData != null) {
-                var set = EnumSet.allOf(Flag.class);
+                var set = EnumSet.range(CAN_SET_USERNAME, TRANSLATIONS_DISABLED);
                 int flags = fullData.flags();
-                set.removeIf(value -> value.compareTo(CAN_SET_USERNAME) < 0 || (flags & value.mask()) == 0 ||
-                        value.compareTo(HAS_SCHEDULED) > 0);
+                set.removeIf(value -> (flags & value.mask()) == 0);
                 if (fullData.participants().identifier() == BaseChatParticipants.ID) {
                     set.add(Flag.CAN_VIEW_PARTICIPANTS);
                 }
+
                 set.addAll(minFlags);
                 return set;
             }
@@ -522,9 +523,9 @@ public final class GroupChat extends BaseChat {
          * @return The {@link Set} of chat flags.
          */
         public static Set<Flag> of(telegram4j.tl.BaseChat data) {
-            var set = EnumSet.allOf(Flag.class);
+            var set = EnumSet.range(OWNER, CALL_NOT_EMPTY);
             int flags = data.flags();
-            set.removeIf(value -> value.compareTo(CAN_SET_USERNAME) >= 0 || (flags & value.mask()) == 0);
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

@@ -2,9 +2,7 @@ package telegram4j.core.event.dispatcher;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.util.Logger;
-import reactor.util.Loggers;
-import telegram4j.core.MTProtoTelegramClient;
+import reactor.util.annotation.Nullable;
 import telegram4j.core.event.domain.message.*;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.MentionablePeer;
@@ -14,10 +12,12 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.PollResults;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.store.object.MessagePoll;
 import telegram4j.mtproto.store.object.ResolvedDeletedMessages;
 import telegram4j.tl.*;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -25,42 +25,71 @@ import java.util.stream.Collectors;
 import static telegram4j.core.internal.MappingUtil.getAuthor;
 
 class MessageUpdateHandlers {
-    private static final Logger log = Loggers.getLogger(MessageUpdateHandlers.class);
 
     // State handler
     // =====================
 
-    static Mono<Void> handleStateUpdateNewMessage(UpdateContext<UpdateNewMessageFields> context) {
+    static Mono<Void> persistUpdateNewMessage(UpdateContext<UpdateNewMessage> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onNewMessage(context.getUpdate().message());
     }
 
-    static Mono<telegram4j.tl.Message> handleStateUpdateEditMessage(UpdateContext<UpdateEditMessageFields> context) {
+    static Mono<Void> persistUpdateNewChannelMessage(UpdateContext<UpdateNewChannelMessage> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onNewMessage(context.getUpdate().message());
+    }
+
+    static Mono<telegram4j.tl.Message> persistUpdateEditMessage(UpdateContext<UpdateEditMessage> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onEditMessage(context.getUpdate().message());
     }
 
-    static Mono<ResolvedDeletedMessages> handleStateUpdateDeleteMessages(UpdateContext<UpdateDeleteMessagesFields> context) {
+    static Mono<telegram4j.tl.Message> persistUpdateEditChannelMessage(UpdateContext<UpdateEditChannelMessage> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onEditMessage(context.getUpdate().message());
+    }
+
+    static Mono<ResolvedDeletedMessages> persistUpdateDeleteMessages(UpdateContext<UpdateDeleteMessages> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onDeleteMessages(context.getUpdate());
     }
 
-    static Mono<Void> handleStateUpdatePinnedMessages(UpdateContext<UpdatePinnedMessagesFields> context) {
+    static Mono<ResolvedDeletedMessages> persistUpdateDeleteScheduledMessages(UpdateContext<UpdateDeleteScheduledMessages> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onDeleteMessages(context.getUpdate());
+    }
+
+    static Mono<ResolvedDeletedMessages> persistUpdateDeleteChannelMessages(UpdateContext<UpdateDeleteChannelMessages> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onDeleteMessages(context.getUpdate());
+    }
+
+    static Mono<Void> persistUpdatePinnedMessages(UpdateContext<UpdatePinnedMessages> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .onUpdatePinnedMessages(context.getUpdate());
     }
 
-    static Mono<MessagePoll> handleStateUpdateMessagePoll(UpdateContext<UpdateMessagePoll> context) {
+    static Mono<Void> persistUpdatePinnedChannelMessages(UpdateContext<UpdatePinnedChannelMessages> context) {
+        return context.getClient()
+                .getMtProtoResources().getStoreLayout()
+                .onUpdatePinnedMessages(context.getUpdate());
+    }
+
+    static Mono<MessagePoll> persistUpdateMessagePoll(UpdateContext<UpdateMessagePoll> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .getPollById(context.getUpdate().pollId());
     }
 
-    static Mono<MessagePoll> handleStateUpdateMessagePollVote(UpdateContext<UpdateMessagePollVote> context) {
+    static Mono<MessagePoll> persistUpdateMessagePollVote(UpdateContext<UpdateMessagePollVote> context) {
         return context.getClient()
                 .getMtProtoResources().getStoreLayout()
                 .getPollById(context.getUpdate().pollId());
@@ -69,71 +98,117 @@ class MessageUpdateHandlers {
     // Update handler
     // =====================
 
-    static Flux<SendMessageEvent> handleUpdateNewMessage(StatefulUpdateContext<UpdateNewMessageFields, Void> context) {
-        MTProtoTelegramClient client = context.getClient();
-        BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
+    static Flux<SendMessageEvent> handleUpdateNewMessage0(StatefulUpdateContext<?, ?> ctx,
+                                                          telegram4j.tl.Message m) {
+        Variant2<BaseMessage, MessageService> data;
+        Id peerId;
+        if (m instanceof BaseMessage b) {
+            data = Variant2.ofT1(b);
+            peerId = Id.of(b.peerId());
+        } else if (m instanceof MessageService s) {
+            data = Variant2.ofT2(s);
+            peerId = Id.of(s.peerId());
+        } else {
+            return Flux.error(new IllegalStateException("Received MessageEmpty in UpdateNewMessage"));
+        }
 
-        Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
-        MentionablePeer author = getAuthor(context, message, chat)
+        Chat chat = ctx.getChatEntity(peerId).orElse(null);
+        MentionablePeer author = getAuthor(data, chat, ctx.getClient(), ctx.getChats(), ctx.getUsers())
                 .orElse(null);
-        Id resolvedChatId = Optional.ofNullable(chat)
-                .map(Chat::getId)
-                .orElseGet(() -> Id.of(message.peerId()));
+        Id resolvedChatId = chat != null ? chat.getId() : peerId;
+        Message newMessage = new Message(ctx.getClient(), data, resolvedChatId);
 
-        Message newMessage = EntityFactory.createMessage(client, message, resolvedChatId);
-
-        return Flux.just(new SendMessageEvent(client, newMessage, chat, author));
+        return Flux.just(new SendMessageEvent(ctx.getClient(), newMessage, chat, author));
     }
 
-    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessageFields, telegram4j.tl.Message> context) {
-        MTProtoTelegramClient client = context.getClient();
-        BaseMessageFields message = (BaseMessageFields) context.getUpdate().message();
+    static Flux<SendMessageEvent> handleUpdateNewMessage(StatefulUpdateContext<UpdateNewMessage, Void> context) {
+        return handleUpdateNewMessage0(context, context.getUpdate().message());
+    }
 
+    static Flux<SendMessageEvent> handleUpdateNewChannelMessage(StatefulUpdateContext<UpdateNewChannelMessage, Void> context) {
+        return handleUpdateNewMessage0(context, context.getUpdate().message());
+    }
+
+    static Flux<EditMessageEvent> handleUpdateEditMessage0(StatefulUpdateContext<?, telegram4j.tl.Message> ctx,
+                                                           telegram4j.tl.Message m) {
         // Typically reaction adding on bots accounts
-        if (message.equals(context.getOld())) {
+        if (m.equals(ctx.getOld())) {
             return Flux.empty();
         }
 
-        Chat chat = context.getChatEntity(Id.of(message.peerId())).orElse(null);
-        MentionablePeer author = getAuthor(context, message, chat)
-                .orElse(null);
-        Id resolvedId = Optional.ofNullable(chat)
-                .map(Chat::getId)
-                .orElseGet(() -> Id.of(message.peerId()));
-        Message oldMessage = Optional.ofNullable(context.getOld())
-                .map(d -> EntityFactory.createMessage(client, d, resolvedId))
-                .orElse(null);
-        Message newMessage = EntityFactory.createMessage(client, message, resolvedId);
+        Variant2<BaseMessage, MessageService> data;
+        Id peerId;
+        if (m instanceof BaseMessage b) {
+            data = Variant2.ofT1(b);
+            peerId = Id.of(b.peerId());
+        } else if (m instanceof MessageService s) {
+            data = Variant2.ofT2(s);
+            peerId = Id.of(s.peerId());
+        } else {
+            return Flux.error(new IllegalStateException("Received MessageEmpty in UpdateNewMessage"));
+        }
 
-        return Flux.just(new EditMessageEvent(client, newMessage, oldMessage, chat, author));
+        Chat chat = ctx.getChatEntity(peerId).orElse(null);
+        MentionablePeer author = getAuthor(data, chat, ctx.getClient(), ctx.getChats(), ctx.getUsers())
+                .orElse(null);
+        Id resolvedChatId = chat != null ? chat.getId() : peerId;
+        Message oldMessage = Optional.ofNullable(ctx.getOld())
+                .map(d -> EntityFactory.createMessage(ctx.getClient(), d, resolvedChatId))
+                .orElse(null);
+        Message newMessage = new Message(ctx.getClient(), data, resolvedChatId);
+
+        return Flux.just(new EditMessageEvent(ctx.getClient(), newMessage, oldMessage, chat, author));
     }
 
-    static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessagesFields, ResolvedDeletedMessages> context) {
+    static Flux<EditMessageEvent> handleUpdateEditChannelMessage(StatefulUpdateContext<UpdateEditChannelMessage, telegram4j.tl.Message> context) {
+        return handleUpdateEditMessage0(context, context.getUpdate().message());
+    }
+
+    static Flux<EditMessageEvent> handleUpdateEditMessage(StatefulUpdateContext<UpdateEditMessage, telegram4j.tl.Message> context) {
+        return handleUpdateEditMessage0(context, context.getUpdate().message());
+    }
+
+    static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages0(StatefulUpdateContext<?, ResolvedDeletedMessages> context,
+                                                                 @Nullable Id derivedChatId, List<Integer> messageIds,
+                                                                 boolean scheduled) {
         Id chatId = Optional.ofNullable(context.getOld())
-                .map(r -> Id.of(r.getPeer(), context.getClient().getSelfId()))
-                .orElse(null);
+                .map(r -> Id.of(r.peer(), context.getClient().getSelfId()))
+                .orElse(derivedChatId);
 
         var oldMessages = Optional.ofNullable(context.getOld())
-                .map(ResolvedDeletedMessages::getMessages)
-                .map(l -> l.stream()
+                .map(r -> r.messages().stream()
                         .map(d -> EntityFactory.createMessage(context.getClient(), d,
                                 Objects.requireNonNull(chatId))) // must be present
                         .collect(Collectors.toUnmodifiableList()))
                 .orElse(null);
 
-        boolean scheduled = context.getUpdate().identifier() == UpdateDeleteScheduledMessages.ID;
-
         return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
-                scheduled, oldMessages, context.getUpdate().messages()));
+                scheduled, oldMessages, messageIds));
     }
 
-    static Flux<UpdatePinnedMessagesEvent> handleUpdatePinnedMessages(StatefulUpdateContext<UpdatePinnedMessagesFields, Void> context) {
-        UpdatePinnedMessagesFields upd = context.getUpdate();
+    static Flux<DeleteMessagesEvent> handleUpdateDeleteChannelMessages(StatefulUpdateContext<UpdateDeleteChannelMessages, ResolvedDeletedMessages> context) {
+        return handleUpdateDeleteMessages0(context, Id.ofChannel(context.getUpdate().channelId()),
+                context.getUpdate().messages(), false);
+    }
 
-        Id chatId = upd.identifier() == UpdatePinnedMessages.ID
-                ? Id.of(((UpdatePinnedMessages) upd).peer())
-                : Id.ofChannel(((UpdatePinnedChannelMessages) upd).channelId());
+    static Flux<DeleteMessagesEvent> handleUpdateDeleteScheduledMessages(StatefulUpdateContext<UpdateDeleteScheduledMessages, ResolvedDeletedMessages> context) {
+        return handleUpdateDeleteMessages0(context, Id.of(context.getUpdate().peer()),
+                context.getUpdate().messages(), true);
+    }
 
+    static Flux<DeleteMessagesEvent> handleUpdateDeleteMessages(StatefulUpdateContext<UpdateDeleteMessages, ResolvedDeletedMessages> context) {
+        return handleUpdateDeleteMessages0(context, null, context.getUpdate().messages(), false);
+    }
+
+    static Flux<UpdatePinnedMessagesEvent> handleUpdatePinnedChannelMessages(StatefulUpdateContext<UpdatePinnedChannelMessages, Void> context) {
+        var upd = context.getUpdate();
+        Id chatId = Id.ofChannel(upd.channelId());
+        return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
+    }
+
+    static Flux<UpdatePinnedMessagesEvent> handleUpdatePinnedMessages(StatefulUpdateContext<UpdatePinnedMessages, Void> context) {
+        var upd = context.getUpdate();
+        Id chatId = Id.of(upd.peer());
         return Flux.just(new UpdatePinnedMessagesEvent(context.getClient(), upd.pinned(), chatId, upd.messages()));
     }
 

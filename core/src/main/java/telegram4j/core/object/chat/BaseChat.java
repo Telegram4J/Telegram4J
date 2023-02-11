@@ -30,7 +30,8 @@ import static reactor.function.TupleUtils.function;
 import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
 /** This class provides default implementation of {@link Chat} methods. */
-abstract class BaseChat implements Chat {
+sealed abstract class BaseChat implements Chat
+        permits GroupChat, PrivateChat, BaseChannel {
 
     protected final MTProtoTelegramClient client;
 
@@ -76,33 +77,38 @@ abstract class BaseChat implements Chat {
                     .map(Math::toIntExact)
                     .orElse(null);
 
-            return Mono.justOrEmpty(spec.media())
-                    .flatMap(d -> d.asData(client))
-                    .flatMap(media -> parser.map(function((txt, ent) -> SendMedia.builder()
-                                    .media(media)
-                                    .randomId(CryptoUtil.random.nextLong())
-                                    .peer(peer)
-                                    .flags(spec.flags().getValue())
-                                    .replyToMsgId(spec.replyToMessageId().orElse(null))
-                                    .message(txt)
-                                    .entities(ent.isEmpty() ? null : ent)
-                                    .scheduleDate(scheduleDate)))
-                            .<SendMedia>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                                    .then(sendAs.doOnNext(builder::sendAs))
-                                    .then(Mono.fromSupplier(builder::build)))
-                            .flatMap(client.getServiceHolder().getChatService()::sendMedia))
-                    .switchIfEmpty(parser.map(function((txt, ent) -> SendMessage.builder()
-                                    .randomId(CryptoUtil.random.nextLong())
-                                    .peer(peer)
-                                    .flags(spec.flags().getValue())
-                                    .replyToMsgId(spec.replyToMessageId().orElse(null))
-                                    .message(txt)
-                                    .entities(ent.isEmpty() ? null : ent)
-                                    .scheduleDate(scheduleDate)))
-                            .<SendMessage>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                                    .then(sendAs.doOnNext(builder::sendAs))
-                                    .then(Mono.fromSupplier(builder::build)))
-                            .flatMap(client.getServiceHolder().getChatService()::sendMessage))
+            var media = spec.media().orElse(null);
+            if (media != null) {
+                return Mono.zip(media.asData(client), parser,
+                        (resolvedMedia, tuple) -> Tuples.of(resolvedMedia, tuple.getT1(), tuple.getT2()))
+                        .map(function((resolvedMedia, txt, ent) -> SendMedia.builder()
+                                .media(resolvedMedia)
+                                .randomId(CryptoUtil.random.nextLong())
+                                .peer(peer)
+                                .flags(spec.flags().getValue())
+                                .replyToMsgId(spec.replyToMessageId().orElse(null))
+                                .message(txt)
+                                .entities(ent.isEmpty() ? null : ent)
+                                .scheduleDate(scheduleDate)))
+                        .<SendMedia>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                                .then(sendAs.doOnNext(builder::sendAs))
+                                .then(Mono.fromSupplier(builder::build)))
+                        .flatMap(client.getServiceHolder().getChatService()::sendMedia)
+                        .map(e -> EntityFactory.createMessage(client, e, Id.of(peer, client.getSelfId())));
+            }
+
+            return parser.map(function((txt, ent) -> SendMessage.builder()
+                            .randomId(CryptoUtil.random.nextLong())
+                            .peer(peer)
+                            .flags(spec.flags().getValue())
+                            .replyToMsgId(spec.replyToMessageId().orElse(null))
+                            .message(txt)
+                            .entities(ent.isEmpty() ? null : ent)
+                            .scheduleDate(scheduleDate)))
+                    .<SendMessage>flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
+                            .then(sendAs.doOnNext(builder::sendAs))
+                            .then(Mono.fromSupplier(builder::build)))
+                    .flatMap(client.getServiceHolder().getChatService()::sendMessage)
                     .map(e -> EntityFactory.createMessage(client, e, Id.of(peer, client.getSelfId())));
         });
     }
@@ -162,8 +168,7 @@ abstract class BaseChat implements Chat {
     @Override
     public final boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof BaseChat)) return false;
-        BaseChat that = (BaseChat) o;
+        if (!(o instanceof BaseChat that)) return false;
         return getId().equals(that.getId());
     }
 

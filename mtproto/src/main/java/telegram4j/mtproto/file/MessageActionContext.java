@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.Peer;
 
-public class MessageActionContext extends Context {
+public final class MessageActionContext extends Context {
     private final Peer chatPeer;
     private final int messageId;
 

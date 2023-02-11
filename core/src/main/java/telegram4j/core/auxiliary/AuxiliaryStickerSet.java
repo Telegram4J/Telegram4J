@@ -10,7 +10,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-public class AuxiliaryStickerSet {
+public final class AuxiliaryStickerSet {
+
     private final MTProtoTelegramClient client;
     private final StickerSet stickerSet;
     private final Map<Long, Sticker> stickers;

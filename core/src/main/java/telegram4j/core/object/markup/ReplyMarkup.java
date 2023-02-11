@@ -49,15 +49,12 @@ public final class ReplyMarkup implements TelegramObject {
     public Optional<List<List<KeyboardButton>>> getButtons() {
         List<KeyboardButtonRow> rows;
         switch (data.identifier()) {
-            case ReplyInlineMarkup.ID:
-                rows = ((ReplyInlineMarkup) data).rows();
-                break;
-            case ReplyKeyboardMarkup.ID:
-                rows = ((ReplyKeyboardMarkup) data).rows();
-                break;
-            case ReplyKeyboardForceReply.ID:
-            case ReplyKeyboardHide.ID: return Optional.empty();
-            default: throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
+            case ReplyInlineMarkup.ID -> rows = ((ReplyInlineMarkup) data).rows();
+            case ReplyKeyboardMarkup.ID -> rows = ((ReplyKeyboardMarkup) data).rows();
+            case ReplyKeyboardForceReply.ID, ReplyKeyboardHide.ID -> {
+                return Optional.empty();
+            }
+            default -> throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
         }
 
         return Optional.of(rows.stream()
@@ -75,13 +72,12 @@ public final class ReplyMarkup implements TelegramObject {
      * @return The text which will be displayed in the input field, if present.
      */
     public Optional<String> getPlaceholder() {
-        switch (data.identifier()) {
-            case ReplyKeyboardMarkup.ID: return Optional.ofNullable(((ReplyKeyboardMarkup) data).placeholder());
-            case ReplyKeyboardForceReply.ID: return Optional.ofNullable(((ReplyKeyboardForceReply) data).placeholder());
-            case ReplyInlineMarkup.ID:
-            case ReplyKeyboardHide.ID: return Optional.empty();
-            default: throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
-        }
+        return switch (data.identifier()) {
+            case ReplyKeyboardMarkup.ID -> Optional.ofNullable(((ReplyKeyboardMarkup) data).placeholder());
+            case ReplyKeyboardForceReply.ID -> Optional.ofNullable(((ReplyKeyboardForceReply) data).placeholder());
+            case ReplyInlineMarkup.ID, ReplyKeyboardHide.ID -> Optional.empty();
+            default -> throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
+        };
     }
 
     @Override
@@ -96,13 +92,13 @@ public final class ReplyMarkup implements TelegramObject {
         KEYBOARD;
 
         public static Type of(telegram4j.tl.ReplyMarkup data) {
-            switch (data.identifier()) {
-                case ReplyInlineMarkup.ID: return INLINE;
-                case ReplyKeyboardForceReply.ID: return FORCE_REPLY;
-                case ReplyKeyboardHide.ID: return HIDE;
-                case ReplyKeyboardMarkup.ID: return KEYBOARD;
-                default: throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
-            }
+            return switch (data.identifier()) {
+                case ReplyInlineMarkup.ID -> INLINE;
+                case ReplyKeyboardForceReply.ID -> FORCE_REPLY;
+                case ReplyKeyboardHide.ID -> HIDE;
+                case ReplyKeyboardMarkup.ID -> KEYBOARD;
+                default -> throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
+            };
         }
     }
 
@@ -134,22 +130,15 @@ public final class ReplyMarkup implements TelegramObject {
         }
 
         public static EnumSet<Flag> of(telegram4j.tl.ReplyMarkup data) {
-            if (data.identifier() == ReplyInlineMarkup.ID)
+            if (data instanceof ReplyInlineMarkup)
                 return EnumSet.noneOf(Flag.class);
 
-            int flags;
-            switch (data.identifier()) {
-                case ReplyKeyboardForceReply.ID:
-                    flags = ((ReplyKeyboardForceReply) data).flags();
-                    break;
-                case ReplyKeyboardHide.ID:
-                    flags = ((ReplyKeyboardHide) data).flags();
-                    break;
-                case ReplyKeyboardMarkup.ID:
-                    flags = ((ReplyKeyboardMarkup) data).flags();
-                    break;
-                default: throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
-            }
+            int flags = switch (data.identifier()) {
+                case ReplyKeyboardForceReply.ID -> ((ReplyKeyboardForceReply) data).flags();
+                case ReplyKeyboardHide.ID -> ((ReplyKeyboardHide) data).flags();
+                case ReplyKeyboardMarkup.ID -> ((ReplyKeyboardMarkup) data).flags();
+                default -> throw new IllegalArgumentException("Unexpected ReplyMarkup type: " + data);
+            };
 
             var set = EnumSet.allOf(Flag.class);
             set.removeIf(f -> (flags & f.mask()) == 0);

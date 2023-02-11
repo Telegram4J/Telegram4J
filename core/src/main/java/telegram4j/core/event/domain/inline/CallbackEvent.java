@@ -13,7 +13,9 @@ import telegram4j.tl.request.messages.SetBotCallbackAnswer;
 import java.util.Optional;
 
 /** Subtype of callback events invoking on pushing {@link KeyboardButton} with type {@link KeyboardButton.Type#CALLBACK}. */
-public abstract class CallbackEvent extends BotEvent {
+public abstract sealed class CallbackEvent extends BotEvent
+        permits CallbackQueryEvent, InlineCallbackQueryEvent {
+
     private final long queryId;
     private final User user;
     private final long chatInstance;

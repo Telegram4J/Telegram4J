@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Event of batch modification of group chat participants. */
-public class ChatParticipantsUpdateEvent extends ChatEvent {
+public final class ChatParticipantsUpdateEvent extends ChatEvent {
 
     private final GroupChat chat;
     @Nullable

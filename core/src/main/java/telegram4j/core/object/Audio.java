@@ -3,19 +3,26 @@ package telegram4j.core.object;
 import io.netty.buffer.ByteBuf;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.Context;
-import telegram4j.tl.BaseDocumentFields;
+import telegram4j.tl.BaseDocument;
 import telegram4j.tl.DocumentAttributeAudio;
+import telegram4j.tl.WebDocument;
 
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Inferred from {@link BaseDocumentFields#attributes()} type of audio document or voice message. */
-public class Audio extends Document {
+/** Inferred from document attributes type of audio document or voice message. */
+public final class Audio extends Document {
 
     private final telegram4j.tl.DocumentAttributeAudio audioData;
 
-    public Audio(MTProtoTelegramClient client, BaseDocumentFields data, String fileName,
+    public Audio(MTProtoTelegramClient client, BaseDocument data, String fileName,
+                 Context context, DocumentAttributeAudio audioData) {
+        super(client, data, fileName, context);
+        this.audioData = Objects.requireNonNull(audioData);
+    }
+
+    public Audio(MTProtoTelegramClient client, WebDocument data, String fileName,
                  Context context, DocumentAttributeAudio audioData) {
         super(client, data, fileName, context);
         this.audioData = Objects.requireNonNull(audioData);

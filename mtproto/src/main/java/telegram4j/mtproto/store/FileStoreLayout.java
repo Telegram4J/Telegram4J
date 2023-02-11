@@ -461,11 +461,6 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Boolean> existMessage(BaseMessageFields message) {
-        return entityDelegate.existMessage(message);
-    }
-
-    @Override
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
         return entityDelegate.getMessages(messageIds);
     }
@@ -541,12 +536,32 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update) {
+    public Mono<Boolean> existMessage(Peer peerId, int messageId) {
+        return entityDelegate.existMessage(peerId, messageId);
+    }
+
+    @Override
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessages update) {
         return entityDelegate.onDeleteMessages(update);
     }
 
     @Override
-    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload) {
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteScheduledMessages update) {
+        return entityDelegate.onDeleteMessages(update);
+    }
+
+    @Override
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteChannelMessages update) {
+        return entityDelegate.onDeleteMessages(update);
+    }
+
+    @Override
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessages payload) {
+        return entityDelegate.onUpdatePinnedMessages(payload);
+    }
+
+    @Override
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedChannelMessages payload) {
         return entityDelegate.onUpdatePinnedMessages(payload);
     }
 

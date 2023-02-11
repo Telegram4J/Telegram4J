@@ -12,7 +12,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /** Event of a new vote in the poll. */
-public class MessagePollVoteEvent extends MessageEvent {
+public final class MessagePollVoteEvent extends MessageEvent {
     @Nullable
     private final Poll poll;
     private final User user;

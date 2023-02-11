@@ -123,27 +123,6 @@ public class ChatService extends RpcService {
         return Mono.defer(() -> sendMain(ImmutableGetCustomEmojiDocuments.of(documentIds)));
     }
 
-    public Mono<String> translateText(InputPeer peer, Integer messageId,
-                                      @Nullable String fromLang, String toLang) {
-        Objects.requireNonNull(peer);
-        Objects.requireNonNull(messageId);
-        return sendMain(ImmutableTranslateText.of(toLang)
-                .withPeer(peer)
-                .withMsgId(messageId)
-                .withFromLang(fromLang))
-                .ofType(TranslateResultText.class)
-                .map(TranslateResultText::text);
-    }
-
-    public Mono<String> translateText(String text, @Nullable String fromLang, String toLang) {
-        Objects.requireNonNull(text);
-        return sendMain(ImmutableTranslateText.of(toLang)
-                        .withText(text)
-                        .withFromLang(fromLang))
-                .ofType(TranslateResultText.class)
-                .map(TranslateResultText::text);
-    }
-
     public Mono<AllStickers> getEmojiStickers(long hash) {
         return sendMain(ImmutableGetEmojiStickers.of(hash));
     }
@@ -188,16 +167,28 @@ public class ChatService extends RpcService {
     }
 
     @Compatible(Type.BOTH)
-    public Flux<BaseMessageFields> forwardMessages(ForwardMessages request) {
+    public Flux<Message> forwardMessages(ForwardMessages request) {
         return sendMain(request)
                 .ofType(BaseUpdates.class)
                 .flatMapMany(updates -> {
                     clientGroup.main().updates().emitNext(updates, FAIL_FAST);
 
                     return Flux.fromIterable(updates.updates())
-                            .ofType(UpdateNewMessageFields.class)
-                            .map(UpdateNewMessageFields::message)
-                            .ofType(BaseMessageFields.class);
+                            .mapNotNull(u -> {
+                                Message m;
+                                if (u instanceof UpdateNewMessage n) {
+                                    m = n.message();
+                                } else if (u instanceof UpdateNewChannelMessage n) {
+                                    m = n.message();
+                                } else {
+                                    return null;
+                                }
+
+                                if (m instanceof MessageEmpty) {
+                                    throw new IllegalStateException("Received MessageEmpty on ForwardMessages updates");
+                                }
+                                return m;
+                            });
                 });
     }
 
@@ -759,7 +750,7 @@ public class ChatService extends RpcService {
     // Message interactions
 
     @Compatible(Type.BOTH)
-    public Mono<BaseMessageFields> sendMessage(SendMessage request) {
+    public Mono<Message> sendMessage(SendMessage request) {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
                 .map(TupleUtils.function((message, updates) -> {
@@ -769,7 +760,7 @@ public class ChatService extends RpcService {
     }
 
     @Compatible(Type.BOTH)
-    public Mono<BaseMessageFields> sendMedia(SendMedia request) {
+    public Mono<Message> sendMedia(SendMedia request) {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
                 .flatMap(tuple -> {
@@ -792,24 +783,31 @@ public class ChatService extends RpcService {
     }
 
     @Compatible(Type.BOTH)
-    public Mono<BaseMessageFields> editMessage(EditMessage request) {
+    public Mono<Message> editMessage(EditMessage request) {
         return sendMain(request)
                 .flatMap(updates -> {
-                    if (updates instanceof BaseUpdates) {
-                        var casted = (BaseUpdates) updates;
+                    if (updates instanceof BaseUpdates b) {
+                        // This method may return UpdateMessagePoll
+                        // if message poll was edited.
+                        // And then we need to request current message from the api
+                        for (Update update : b.updates()) {
+                            Message newMessage;
+                            if (update instanceof UpdateEditMessage e) {
+                                newMessage = e.message();
+                            } else if (update instanceof UpdateEditChannelMessage e) {
+                                newMessage = e.message();
+                            } else {
+                                continue;
+                            }
 
-                        // also can receive UpdateMessagePoll
-                        UpdateEditMessageFields newMessage = null;
-                        for (Update update : casted.updates()) {
-                            if (update instanceof UpdateEditMessageFields) {
-                                newMessage = (UpdateEditMessageFields) update;
+                            if (newMessage.id() == request.id()) {
+                                if (newMessage instanceof MessageEmpty) {
+                                    return Mono.error(new IllegalStateException("Received MessageEmpty on EditMessage updates"));
+                                }
+                                clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                                return Mono.just(newMessage);
                             }
                         }
-
-                        clientGroup.main().updates().emitNext(updates, FAIL_FAST);
-                        return Mono.justOrEmpty(newMessage)
-                                .map(UpdateEditMessageFields::message)
-                                .cast(BaseMessageFields.class);
                     }
                     return Mono.error(new IllegalArgumentException("Unknown updates type: " + updates));
                 });
@@ -1081,15 +1079,14 @@ public class ChatService extends RpcService {
     // Short-send related updates object should be transformed to the updateShort or baseUpdates.
     // https://core.telegram.org/api/updates#updates-sequence
 
-    private Mono<Tuple2<BaseMessageFields, Updates>> transformMessageUpdate(BaseSendMessageRequest request, Updates updates) {
+    private Mono<Tuple2<Message, Updates>> transformMessageUpdate(SendMedia request, Updates updates) {
         return toPeer(request.peer())
                 .zipWith(Mono.justOrEmpty(request.sendAs())
                         .defaultIfEmpty(InputPeerSelf.instance())
                         .flatMap(this::toPeer))
                 .map(TupleUtils.function((chat, author) -> {
-
                     switch (updates.identifier()) {
-                        case UpdateShortSentMessage.ID: {
+                        case UpdateShortSentMessage.ID -> {
                             var casted = (UpdateShortSentMessage) updates;
                             Integer replyToMsgId = request.replyToMsgId();
                             var message = BaseMessage.builder()
@@ -1117,7 +1114,7 @@ public class ChatService extends RpcService {
 
                             return Tuples.of(message, upds);
                         }
-                        case UpdateShortMessage.ID: {
+                        case UpdateShortMessage.ID -> {
                             var casted = (UpdateShortMessage) updates;
 
                             var message = BaseMessage.builder()
@@ -1146,7 +1143,7 @@ public class ChatService extends RpcService {
 
                             return Tuples.of(message, upds);
                         }
-                        case UpdateShortChatMessage.ID: {
+                        case UpdateShortChatMessage.ID -> {
                             var casted = (UpdateShortChatMessage) updates;
 
                             var message = BaseMessage.builder()
@@ -1175,7 +1172,7 @@ public class ChatService extends RpcService {
 
                             return Tuples.of(message, upds);
                         }
-                        case BaseUpdates.ID: {
+                        case BaseUpdates.ID -> {
                             var casted = (BaseUpdates) updates;
 
                             var updateMessageId = casted.updates().stream()
@@ -1189,15 +1186,159 @@ public class ChatService extends RpcService {
                                         + ", received: " + updateMessageId.randomId());
                             }
 
-                            var message = casted.updates().stream()
-                                    .filter(upd -> upd instanceof UpdateNewMessageFields)
-                                    .map(upd -> (BaseMessageFields) ((UpdateNewMessageFields) upd).message())
+                            for (Update u : casted.updates()) {
+                                Message m;
+                                if (u instanceof UpdateNewMessage e) {
+                                    m = e.message();
+                                } else if (u instanceof UpdateNewChannelMessage e) {
+                                    m = e.message();
+                                } else {
+                                    continue;
+                                }
+
+                                if (m.id() == updateMessageId.id()) {
+                                    if (m instanceof MessageEmpty) {
+                                        throw new IllegalStateException("Received MessageEmpty on SendMedia updates");
+                                    }
+                                    return Tuples.of(m, casted);
+                                }
+                            }
+
+                            throw new IllegalStateException();
+                        }
+                        default -> throw new IllegalArgumentException("Unknown Updates type: " + updates);
+                    }
+                }));
+    }
+
+    private Mono<Tuple2<Message, Updates>> transformMessageUpdate(SendMessage request, Updates updates) {
+        return toPeer(request.peer())
+                .zipWith(Mono.justOrEmpty(request.sendAs())
+                        .defaultIfEmpty(InputPeerSelf.instance())
+                        .flatMap(this::toPeer))
+                .map(TupleUtils.function((chat, author) -> {
+                    switch (updates.identifier()) {
+                        case UpdateShortSentMessage.ID -> {
+                            var casted = (UpdateShortSentMessage) updates;
+                            Integer replyToMsgId = request.replyToMsgId();
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(0, replyToMsgId) : null)
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .media(casted.media())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
+
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
+
+                            return Tuples.of(message, upds);
+                        }
+                        case UpdateShortMessage.ID -> {
+                            var casted = (UpdateShortMessage) updates;
+
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .replyTo(casted.replyTo())
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .fwdFrom(casted.fwdFrom())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .viaBotId(casted.viaBotId())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
+
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
+
+                            return Tuples.of(message, upds);
+                        }
+                        case UpdateShortChatMessage.ID -> {
+                            var casted = (UpdateShortChatMessage) updates;
+
+                            var message = BaseMessage.builder()
+                                    .flags(request.flags() | casted.flags())
+                                    .peerId(chat)
+                                    .fromId(author)
+                                    .viaBotId(casted.viaBotId())
+                                    .replyTo(casted.replyTo())
+                                    .fwdFrom(casted.fwdFrom())
+                                    .message(request.message())
+                                    .id(casted.id())
+                                    .replyMarkup(request.replyMarkup())
+                                    .entities(casted.entities())
+                                    .date(casted.date())
+                                    .ttlPeriod(casted.ttlPeriod())
+                                    .build();
+
+                            Updates upds = UpdateShort.builder()
+                                    .date(casted.date())
+                                    .update(UpdateNewMessage.builder()
+                                            .message(message)
+                                            .pts(casted.pts())
+                                            .ptsCount(casted.ptsCount())
+                                            .build())
+                                    .build();
+
+                            return Tuples.of(message, upds);
+                        }
+                        case BaseUpdates.ID -> {
+                            var casted = (BaseUpdates) updates;
+
+                            var updateMessageId = casted.updates().stream()
+                                    .filter(u -> u.identifier() == UpdateMessageID.ID)
                                     .findFirst()
+                                    .map(upd -> (UpdateMessageID) upd)
                                     .orElseThrow();
 
-                            return Tuples.of(message, casted);
+                            if (updateMessageId.randomId() != request.randomId()) {
+                                throw new IllegalArgumentException("Incorrect random id. Excepted: " + request.randomId()
+                                        + ", received: " + updateMessageId.randomId());
+                            }
+
+                            for (Update u : casted.updates()) {
+                                Message m;
+                                if (u instanceof UpdateNewMessage e) {
+                                    m = e.message();
+                                } else if (u instanceof UpdateNewChannelMessage e) {
+                                    m = e.message();
+                                } else {
+                                    continue;
+                                }
+
+                                if (m.id() == updateMessageId.id()) {
+                                    if (m instanceof MessageEmpty) {
+                                        throw new IllegalStateException("Received MessageEmpty on SendMedia updates");
+                                    }
+                                    return Tuples.of(m, casted);
+                                }
+                            }
+
+                            throw new IllegalStateException();
                         }
-                        default: throw new IllegalArgumentException("Unknown Updates type: " + updates);
+                        default -> throw new IllegalArgumentException("Unknown Updates type: " + updates);
                     }
                 }));
     }

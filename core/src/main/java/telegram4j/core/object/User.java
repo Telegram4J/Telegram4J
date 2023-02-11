@@ -29,7 +29,7 @@ import static telegram4j.tl.UserFull.*;
 /**
  * Representation for available min/full users.
  */
-public class User implements MentionablePeer {
+public final class User implements MentionablePeer {
 
     private final MTProtoTelegramClient client;
     private final BaseUser minData;
@@ -130,8 +130,9 @@ public class User implements MentionablePeer {
      */
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseUserProfilePhoto.class))
-                .map(c -> new ProfilePhoto(client, c, photoInputPeer(minData)));
+        return minData.photo() instanceof BaseUserProfilePhoto p
+                ? Optional.of(new ProfilePhoto(client, p, photoInputPeer(minData)))
+                : Optional.empty();
     }
 
     /**
@@ -142,9 +143,10 @@ public class User implements MentionablePeer {
      */
     @Override
     public Optional<Photo> getPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(u -> TlEntityUtil.unmapEmpty(u.profilePhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
+        if (fullData == null || !(fullData.profilePhoto() instanceof BasePhoto b)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Photo(client, b, Context.createUserPhotoContext(photoInputPeer(minData))));
     }
 
     /**
@@ -154,9 +156,10 @@ public class User implements MentionablePeer {
      * @return The personal {@link Photo photo} for user, if present.
      */
     public Optional<Photo> getContactPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(u -> TlEntityUtil.unmapEmpty(u.fallbackPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
+        if (fullData == null || !(fullData.fallbackPhoto() instanceof BasePhoto b)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Photo(client, b, Context.createUserPhotoContext(photoInputPeer(minData))));
     }
 
     /**
@@ -166,9 +169,10 @@ public class User implements MentionablePeer {
      * @return The personal {@link Photo photo} for user, if present.
      */
     public Optional<Photo> getPersonalPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(u -> TlEntityUtil.unmapEmpty(u.personalPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, Context.createUserPhotoContext(photoInputPeer(minData))));
+        if (fullData == null || !(fullData.personalPhoto() instanceof BasePhoto b)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Photo(client, b, Context.createUserPhotoContext(photoInputPeer(minData))));
     }
 
     /**
@@ -225,16 +229,16 @@ public class User implements MentionablePeer {
      */
     public Optional<EmojiStatus> getEmojiStatus() {
         return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.emojiStatus()))
-                .map(e -> {
-                    switch (e.identifier()) {
-                        case BaseEmojiStatus.ID:
-                            BaseEmojiStatus base = (BaseEmojiStatus) e;
-                            return new EmojiStatus(client, base.documentId(), null);
-                        case EmojiStatusUntil.ID:
-                            EmojiStatusUntil until = (EmojiStatusUntil) e;
-                            return new EmojiStatus(client, until.documentId(), Instant.ofEpochSecond(until.until()));
-                        default: throw new IllegalStateException("Unknown EmojiStatus type: " + e);
+                .map(e -> switch (e.identifier()) {
+                    case BaseEmojiStatus.ID -> {
+                        var base = (BaseEmojiStatus) e;
+                        yield new EmojiStatus(client, base.documentId(), null);
                     }
+                    case EmojiStatusUntil.ID -> {
+                        var until = (EmojiStatusUntil) e;
+                        yield new EmojiStatus(client, until.documentId(), Instant.ofEpochSecond(until.until()));
+                    }
+                    default -> throw new IllegalStateException("Unknown EmojiStatus type: " + e);
                 });
     }
 
@@ -337,10 +341,15 @@ public class User implements MentionablePeer {
         return Optional.ofNullable(fullData).map(UserFull::themeEmoticon);
     }
 
+    /**
+     * Gets name which be shown in {@link MessageForwardHeader#getFromName()}.
+     *
+     * @return The author signature for forwarded messages, if full information
+     * available and signature present.
+     */
     public Optional<String> getPrivateForwardName() {
         return Optional.ofNullable(fullData).map(UserFull::privateForwardName);
     }
-
 
     /**
      * Gets suggested set of admin rights for the bot, to be shown
@@ -386,8 +395,8 @@ public class User implements MentionablePeer {
                 .flatMapMany(u -> {
                     var inputPeer = TlEntityUtil.toInputPeer(u);
                     return PaginationSupport.paginate(o -> client.getServiceHolder().getUserService()
-                                    .getUserPhotos(u, o, maxId, limit), c -> c instanceof PhotosSlice
-                                    ? ((PhotosSlice) c).count() : c.photos().size(), offset, limit)
+                                    .getUserPhotos(u, o, maxId, limit), c -> c instanceof PhotosSlice s
+                                    ? s.count() : c.photos().size(), offset, limit)
                             .flatMapIterable(Photos::photos)
                             .cast(BasePhoto.class)
                             .map(c -> new Photo(client, c, Context.createUserPhotoContext(inputPeer)));
@@ -397,8 +406,7 @@ public class User implements MentionablePeer {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof User)) return false;
-        User that = (User) o;
+        if (!(o instanceof User that)) return false;
         return minData.id() == that.minData.id();
     }
 
@@ -436,6 +444,8 @@ public class User implements MentionablePeer {
 
         /** Whether the user can receive video calls. */
         VIDEO_CALLS_AVAILABLE(VIDEO_CALLS_AVAILABLE_POS),
+
+        TRANSLATIONS_DISABLED(TRANSLATIONS_DISABLED_POS),
 
         // MinUser flags
 
@@ -504,19 +514,19 @@ public class User implements MentionablePeer {
         private static Set<Flag> of(@Nullable telegram4j.tl.UserFull userFull, telegram4j.tl.BaseUser userMin) {
             var minFlags = of(userMin);
             if (userFull != null) {
-                var set = EnumSet.allOf(Flag.class);
+                var set = EnumSet.range(BLOCKED, TRANSLATIONS_DISABLED);
                 int flags = userFull.flags();
-                set.removeIf(value -> value.ordinal() >= SELF.ordinal() || (flags & value.mask()) == 0);
-                set.addAll(of(userMin));
+                set.removeIf(value -> (flags & value.mask()) == 0);
+                set.addAll(minFlags);
                 return set;
             }
             return minFlags;
         }
 
         private static Set<Flag> of(telegram4j.tl.BaseUser user) {
-            var set = EnumSet.allOf(Flag.class);
+            var set = EnumSet.range(SELF, ATTACH_MENU_ENABLED);
             int flags = user.flags();
-            set.removeIf(value -> value.ordinal() < SELF.ordinal() || (flags & value.mask()) == 0);
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

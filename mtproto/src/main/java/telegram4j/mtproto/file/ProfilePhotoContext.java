@@ -4,7 +4,9 @@ import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.tl.InputPeer;
 
-public class ProfilePhotoContext extends Context {
+public sealed class ProfilePhotoContext extends Context
+    permits ChatPhotoContext {
+
     protected final InputPeer peer;
 
     ProfilePhotoContext(InputPeer peer) {

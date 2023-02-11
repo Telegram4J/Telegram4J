@@ -7,18 +7,15 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.StickerSet;
-import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedHistory;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -132,9 +129,10 @@ public final class SupergroupChat extends BaseChannel {
      * @return The {@link Location geolocation} of the supergroup, if full data about chat available and present.
      */
     public Optional<Location> getLocation() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.location(), BaseChannelLocation.class))
-                .map(d -> new Location(client, d));
+        if (fullData == null || !(fullData.location() instanceof BaseChannelLocation b)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Location(b));
     }
 
     /**
@@ -209,19 +207,12 @@ public final class SupergroupChat extends BaseChannel {
      *
      * @see <a href="https://telegram.org/blog/contacts-local-groups">Location-Based chats</a>
      */
-    public static class Location implements TelegramObject {
+    public static final class Location {
 
-        private final MTProtoTelegramClient client;
         private final telegram4j.tl.BaseChannelLocation data;
 
-        public Location(MTProtoTelegramClient client, BaseChannelLocation data) {
-            this.client = Objects.requireNonNull(client);
-            this.data = Objects.requireNonNull(data);
-        }
-
-        @Override
-        public MTProtoTelegramClient getClient() {
-            return client;
+        Location(BaseChannelLocation data) {
+            this.data = data;
         }
 
         /**
@@ -230,9 +221,7 @@ public final class SupergroupChat extends BaseChannel {
          * @return The {@link GeoPoint} of the address.
          */
         public GeoPoint getGeoPoint() {
-            BaseGeoPoint geoPoint = TlEntityUtil.unmapEmpty(data.geoPoint(), BaseGeoPoint.class);
-            Objects.requireNonNull(geoPoint);
-            return new GeoPoint(geoPoint);
+            return new GeoPoint((BaseGeoPoint) data.geoPoint());
         }
 
         /**
@@ -242,19 +231,6 @@ public final class SupergroupChat extends BaseChannel {
          */
         public String getAddress() {
             return data.address();
-        }
-
-        @Override
-        public boolean equals(@Nullable Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Location that = (Location) o;
-            return data.equals(that.data);
-        }
-
-        @Override
-        public int hashCode() {
-            return data.hashCode();
         }
 
         @Override

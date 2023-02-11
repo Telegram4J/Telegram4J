@@ -7,7 +7,7 @@ import telegram4j.tl.InputPeer;
 import java.util.Optional;
 
 /** Type of {@code ProfilePhotoContext} which represents a profile photo received from message. */
-public class ChatPhotoContext extends ProfilePhotoContext {
+public final class ChatPhotoContext extends ProfilePhotoContext {
     private final int messageId; // can be -1 for absent values
 
     ChatPhotoContext(InputPeer peer, int messageId) {

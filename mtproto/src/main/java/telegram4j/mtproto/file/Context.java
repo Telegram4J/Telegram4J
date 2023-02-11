@@ -7,7 +7,10 @@ import telegram4j.tl.messages.StickerSet;
 
 import java.util.Objects;
 
-public abstract class Context {
+public sealed abstract class Context
+        permits BotInfoContext, MessageActionContext,
+                MessageMediaContext, ProfilePhotoContext, StickerSetContext,
+                Context.NoOpContext {
 
     /**
      * Gets type of context.
@@ -122,38 +125,41 @@ public abstract class Context {
      * @return The common instance for documents with empty context.
      */
     public static Context noOpContext() {
-        return noOpContextInstance;
+        return NoOpContext.instance;
     }
 
     static Context deserialize(ByteBuf buf, Context.Type type) {
-        switch (type) {
-            case STICKER_SET:
+        return switch (type) {
+            case STICKER_SET -> {
                 InputStickerSet stickerSet = TlDeserializer.deserialize(buf);
-                return new StickerSetContext(stickerSet);
-            case MESSAGE_MEDIA: {
+                yield new StickerSetContext(stickerSet);
+            }
+            case MESSAGE_MEDIA -> {
                 Peer peer = deserializePeer(buf);
                 int messageId = buf.readIntLE();
-                return new MessageMediaContext(peer, messageId);
+                yield new MessageMediaContext(peer, messageId);
             }
-            case MESSAGE_ACTION: {
+            case MESSAGE_ACTION -> {
                 Peer peer = deserializePeer(buf);
                 int messageId = buf.readIntLE();
-                return new MessageActionContext(peer, messageId);
+                yield new MessageActionContext(peer, messageId);
             }
-            case BOT_INFO:
+            case BOT_INFO -> {
                 Peer chatPeer = deserializePeer(buf);
                 long botId = buf.readByte() != 0 ? buf.readLongLE() : -1;
-                return new BotInfoContext(chatPeer, botId);
-            case PROFILE_PHOTO: {
-                InputPeer peer = deserializeInputPeer(buf);
-                return new ProfilePhotoContext(peer);
+                yield new BotInfoContext(chatPeer, botId);
             }
-            case CHAT_PHOTO:
+            case PROFILE_PHOTO -> {
+                InputPeer peer = deserializeInputPeer(buf);
+                yield new ProfilePhotoContext(peer);
+            }
+            case CHAT_PHOTO -> {
                 InputPeer peer = deserializeInputPeer(buf);
                 int messageId = buf.readByte() != 0 ? buf.readIntLE() : -1;
-                return new ChatPhotoContext(peer, messageId);
-            default: throw new IllegalStateException();
-        }
+                yield new ChatPhotoContext(peer, messageId);
+            }
+            default -> throw new IllegalStateException();
+        };
     }
 
     static final byte PEER_USER = 0;
@@ -169,115 +175,113 @@ public abstract class Context {
 
     static Peer deserializePeer(ByteBuf buf) {
         byte type = buf.readByte();
-        switch (type) {
-            case PEER_CHANNEL: return ImmutablePeerChannel.of(buf.readLongLE());
-            case PEER_USER: return ImmutablePeerUser.of(buf.readLongLE());
-            case PEER_CHAT: return ImmutablePeerChat.of(buf.readLongLE());
-            default: throw new IllegalArgumentException("Unknown Peer type: " + type);
-        }
+        return switch (type) {
+            case PEER_CHANNEL -> ImmutablePeerChannel.of(buf.readLongLE());
+            case PEER_USER -> ImmutablePeerUser.of(buf.readLongLE());
+            case PEER_CHAT -> ImmutablePeerChat.of(buf.readLongLE());
+            default -> throw new IllegalArgumentException("Unknown Peer type: " + type);
+        };
     }
 
     static InputPeer deserializeInputPeer(ByteBuf buf) {
         byte type = buf.readByte();
-        switch (type) {
-            case I_PEER_CHANNEL: {
+        return switch (type) {
+            case I_PEER_CHANNEL -> {
                 long channelId = buf.readLongLE();
                 long accessHash = buf.readLongLE();
-                return ImmutableInputPeerChannel.of(channelId, accessHash);
+                yield ImmutableInputPeerChannel.of(channelId, accessHash);
             }
-            case I_PEER_CHANNEL_MIN: {
+            case I_PEER_CHANNEL_MIN -> {
                 long channelId = buf.readLongLE();
                 int msgId = buf.readIntLE();
                 InputPeer peer = deserializeInputPeer(buf);
-                return ImmutableInputPeerChannelFromMessage.of(peer, msgId, channelId);
+                yield ImmutableInputPeerChannelFromMessage.of(peer, msgId, channelId);
             }
-            case I_PEER_CHAT: return ImmutableInputPeerChat.of(buf.readLongLE());
-            case I_PEER_USER: {
+            case I_PEER_CHAT -> ImmutableInputPeerChat.of(buf.readLongLE());
+            case I_PEER_USER -> {
                 long userId = buf.readLongLE();
                 long accessHash = buf.readLongLE();
-                return ImmutableInputPeerUser.of(userId, accessHash);
+                yield ImmutableInputPeerUser.of(userId, accessHash);
             }
-            case I_PEER_USER_MIN: {
+            case I_PEER_USER_MIN -> {
                 long userId = buf.readLongLE();
                 int msgId = buf.readIntLE();
                 InputPeer peer = deserializeInputPeer(buf);
-                return ImmutableInputPeerUserFromMessage.of(peer, msgId, userId);
+                yield ImmutableInputPeerUserFromMessage.of(peer, msgId, userId);
             }
-            case I_PEER_SELF: return InputPeerSelf.instance();
-            default: throw new IllegalArgumentException("Unknown InputPeer type: " + type);
-        }
+            case I_PEER_SELF -> InputPeerSelf.instance();
+            default -> throw new IllegalArgumentException("Unknown InputPeer type: " + type);
+        };
     }
 
     static void serializeInputPeer(ByteBuf buf, InputPeer peer) {
         switch (peer.identifier()) {
-            case InputPeerChannel.ID:
+            case InputPeerChannel.ID -> {
                 var ipch = (InputPeerChannel) peer;
                 buf.writeByte(I_PEER_CHANNEL);
                 buf.writeLongLE(ipch.channelId());
                 buf.writeLongLE(ipch.accessHash());
-                break;
-            case InputPeerChannelFromMessage.ID:
+            }
+            case InputPeerChannelFromMessage.ID -> {
                 var ipchm = (InputPeerChannelFromMessage) peer;
                 buf.writeByte(I_PEER_CHANNEL_MIN);
                 buf.writeLongLE(ipchm.channelId());
                 buf.writeIntLE(ipchm.msgId());
                 serializeInputPeer(buf, ipchm.peer());
-                break;
-            case InputPeerChat.ID:
+            }
+            case InputPeerChat.ID -> {
                 var ipc = (InputPeerChat) peer;
                 buf.writeByte(I_PEER_CHAT);
                 buf.writeLongLE(ipc.chatId());
-                break;
-            case InputPeerSelf.ID:
-                buf.writeByte(I_PEER_SELF);
-                break;
-            case InputPeerUser.ID:
+            }
+            case InputPeerSelf.ID -> buf.writeByte(I_PEER_SELF);
+            case InputPeerUser.ID -> {
                 var ipu = (InputPeerUser) peer;
                 buf.writeByte(I_PEER_USER);
                 buf.writeLongLE(ipu.userId());
                 buf.writeLongLE(ipu.accessHash());
-                break;
-            case InputPeerUserFromMessage.ID:
+            }
+            case InputPeerUserFromMessage.ID -> {
                 var ipum = (InputPeerUserFromMessage) peer;
                 buf.writeByte(I_PEER_USER_MIN);
                 buf.writeLongLE(ipum.userId());
                 buf.writeIntLE(ipum.msgId());
                 serializeInputPeer(buf, ipum.peer());
-                break;
-            default:
-                throw new IllegalArgumentException("Unexpected type of InputPeer: " + peer);
+            }
+            default -> throw new IllegalArgumentException("Unexpected type of InputPeer: " + peer);
         }
     }
 
     static void serializePeer(ByteBuf buf, Peer peer) {
         switch (peer.identifier()) {
-            case PeerUser.ID:
+            case PeerUser.ID -> {
                 var pu = (PeerUser) peer;
                 buf.writeByte(PEER_USER);
                 buf.writeLongLE(pu.userId());
-                break;
-            case PeerChat.ID:
+            }
+            case PeerChat.ID -> {
                 var pc = (PeerChat) peer;
                 buf.writeByte(PEER_CHAT);
                 buf.writeLongLE(pc.chatId());
-                break;
-            case PeerChannel.ID:
+            }
+            case PeerChannel.ID -> {
                 var pch = (PeerChannel) peer;
                 buf.writeByte(PEER_CHANNEL);
                 buf.writeLongLE(pch.channelId());
-                break;
-            default:throw new IllegalArgumentException("Unknown peer type: " + peer);
+            }
+            default -> throw new IllegalArgumentException("Unknown peer type: " + peer);
         }
     }
 
-    static final Context noOpContextInstance;
+    static final class NoOpContext extends Context {
+        static final NoOpContext instance = new NoOpContext();
 
-    static {
-        noOpContextInstance = new Context() {
-            @Override
-            public Type getType() { return Type.UNKNOWN; }
-            @Override
-            void serialize(ByteBuf buf) {}
-        };
+        NoOpContext() {}
+
+        @Override
+        public Type getType() { return Type.UNKNOWN; }
+
+        @Override
+        void serialize(ByteBuf buf) {}
     }
 }

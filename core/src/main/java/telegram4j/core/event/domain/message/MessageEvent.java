@@ -13,7 +13,9 @@ import telegram4j.core.event.domain.Event;
  *     <li>{@link UpdatePinnedMessagesEvent}: a message or batch of messages was pinned/unpinned.</li>
  * </ul>
  */
-public abstract class MessageEvent extends Event {
+public abstract sealed class MessageEvent extends Event
+        permits DeleteMessagesEvent, EditMessageEvent, MessagePollResultsEvent,
+                MessagePollVoteEvent, SendMessageEvent, UpdatePinnedMessagesEvent {
 
     protected MessageEvent(MTProtoTelegramClient client) {
         super(client);

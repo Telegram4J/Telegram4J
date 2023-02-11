@@ -9,7 +9,6 @@ import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.BotInfo;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.User;
@@ -30,10 +29,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static telegram4j.mtproto.util.TlEntityUtil.photoInputPeer;
 
-abstract class BaseChannel extends BaseChat implements Channel {
+sealed abstract class BaseChannel extends BaseChat implements Channel
+        permits SupergroupChat, BroadcastChannel {
 
     protected final telegram4j.tl.Channel minData;
     @Nullable
@@ -104,15 +105,17 @@ abstract class BaseChannel extends BaseChat implements Channel {
 
     @Override
     public Optional<ProfilePhoto> getMinPhoto() {
-        return Optional.ofNullable(TlEntityUtil.unmapEmpty(minData.photo(), BaseChatPhoto.class))
-                .map(d -> new ProfilePhoto(client, d, photoInputPeer(minData)));
+        return minData.photo() instanceof BaseChatPhoto p
+                ? Optional.of(new ProfilePhoto(client, p, photoInputPeer(minData)))
+                : Optional.empty();
     }
 
     @Override
     public Optional<Photo> getPhoto() {
-        return Optional.ofNullable(fullData)
-                .map(d -> TlEntityUtil.unmapEmpty(d.chatPhoto(), BasePhoto.class))
-                .map(d -> new Photo(client, d, Context.createChatPhotoContext(photoInputPeer(minData), -1)));
+        if (fullData == null || !(fullData.chatPhoto() instanceof BasePhoto p)) {
+            return Optional.empty();
+        }
+        return Optional.of(new Photo(client, p, Context.createChatPhotoContext(photoInputPeer(minData), -1)));
     }
 
     @Override
@@ -385,28 +388,20 @@ abstract class BaseChannel extends BaseChat implements Channel {
                                 .getParticipants(channel, filter, o, limit, 0), BaseChannelParticipants::count, offset, limit)
                         .flatMap(data -> {
                             var chats = data.chats().stream()
-                                    .map(c -> (Channel) EntityFactory.createChat(client, c, null))
-                                    .filter(Objects::nonNull)
+                                    .flatMap(c -> Stream.ofNullable((Channel) EntityFactory.createChat(client, c, null)))
                                     .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
                             var users = data.users().stream()
-                                    .map(u -> EntityFactory.createUser(client, u))
-                                    .filter(Objects::nonNull)
+                                    .flatMap(u -> Stream.ofNullable(EntityFactory.createUser(client, u)))
                                     .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                             return Flux.fromIterable(data.participants())
                                     .map(c -> {
                                         Id peerId = Id.of(TlEntityUtil.getUserId(c));
-                                        MentionablePeer peer;
-                                        switch (peerId.getType()) {
-                                            case USER:
-                                                peer = users.get(peerId);
-                                                break;
-                                            case CHANNEL:
-                                                peer = chats.get(peerId);
-                                                break;
-                                            default:
-                                                throw new IllegalStateException();
-                                        }
+                                        MentionablePeer peer = switch (peerId.getType()) {
+                                            case USER -> users.get(peerId);
+                                            case CHANNEL -> chats.get(peerId);
+                                            case CHAT -> throw new IllegalStateException();
+                                        };
 
                                         return new ChatParticipant(client, peer, c,
                                                 Id.of(channel, client.getSelfId()));

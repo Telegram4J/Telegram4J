@@ -3,13 +3,13 @@ package telegram4j.core.event.dispatcher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.ChatParticipantUpdateEvent;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.ChatParticipant;
+import telegram4j.core.object.chat.ExportedChatInvite;
 import telegram4j.core.util.Id;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatInviteExported;
+import telegram4j.tl.ChatInvitePublicJoinRequests;
 import telegram4j.tl.UpdateChannelParticipant;
 
 import java.time.Instant;
@@ -43,10 +43,10 @@ class ChannelUpdateHandlers {
         // I can't be sure that ChatParticipant have user information attached because that field named as userId :/
         User peer = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
         User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId())));
-        ExportedChatInvite invite = Optional.ofNullable(upd.invite())
-                .map(e -> TlEntityUtil.unmapEmpty(e, ChatInviteExported.class))
-                .map(d -> new ExportedChatInvite(context.getClient(), d))
-                .orElse(null);
+        ExportedChatInvite invite = upd.invite() instanceof ChatInviteExported d
+                ? new ExportedChatInvite(context.getClient(), d)
+                : null;
+        boolean joinRequests = upd.invite() == ChatInvitePublicJoinRequests.instance();
         Instant timestamp = Instant.ofEpochSecond(upd.date());
         ChatParticipant oldParticipant = Optional.ofNullable(upd.prevParticipant())
                 .map(d -> new ChatParticipant(context.getClient(), peer, d, channel.getId()))
@@ -56,7 +56,8 @@ class ChannelUpdateHandlers {
                 .orElse(null);
 
         return Flux.just(new ChatParticipantUpdateEvent(context.getClient(),
-                timestamp, oldParticipant, currentParticipant, invite, channel, actor));
+                timestamp, oldParticipant, currentParticipant,
+                invite, joinRequests, channel, actor));
     }
 
 }

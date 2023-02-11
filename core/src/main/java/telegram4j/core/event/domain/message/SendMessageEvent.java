@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Event of new ordinary/scheduled message from chat/channel. */
-public class SendMessageEvent extends MessageEvent {
+public final class SendMessageEvent extends MessageEvent {
 
     private final Message message;
     @Nullable

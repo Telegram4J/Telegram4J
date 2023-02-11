@@ -5,7 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.tl.InputStickerSet;
 import telegram4j.tl.TlSerializer;
 
-public class StickerSetContext extends Context {
+public final class StickerSetContext extends Context {
     private final InputStickerSet stickerSet;
 
     StickerSetContext(InputStickerSet stickerSet) {

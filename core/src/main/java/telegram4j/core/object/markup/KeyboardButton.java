@@ -2,11 +2,12 @@ package telegram4j.core.object.markup;
 
 import io.netty.buffer.ByteBuf;
 import reactor.core.publisher.Mono;
-import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
+import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.spec.markup.KeyboardButtonSpec;
@@ -15,6 +16,7 @@ import telegram4j.tl.*;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Representation of various types of markup button.
@@ -60,8 +62,8 @@ public final class KeyboardButton implements TelegramObject {
      * @return The callback data, if {@link #getType() type} is {@link Type#CALLBACK}.
      */
     public Optional<ByteBuf> getData() {
-        return data.identifier() == KeyboardButtonCallback.ID
-                ? Optional.of(((KeyboardButtonCallback) data).data())
+        return data instanceof KeyboardButtonCallback c
+                ? Optional.of(c.data())
                 : Optional.empty();
     }
 
@@ -74,8 +76,8 @@ public final class KeyboardButton implements TelegramObject {
      * @return {@code true} if button allows creating quiz polls.
      */
     public Optional<Boolean> isQuiz() {
-        return data.identifier() == KeyboardButtonRequestPoll.ID
-                ? Optional.ofNullable(((KeyboardButtonRequestPoll) data).quiz())
+        return data instanceof KeyboardButtonRequestPoll p
+                ? Optional.ofNullable(p.quiz())
                 : Optional.empty();
     }
 
@@ -85,8 +87,8 @@ public final class KeyboardButton implements TelegramObject {
      * @return The inline query, if {@link #getType() type} is {@link Type#SWITCH_INLINE}.
      */
     public Optional<String> getQuery() {
-        return data.identifier() == KeyboardButtonSwitchInline.ID
-                ? Optional.of(((KeyboardButtonSwitchInline) data).query())
+        return data instanceof KeyboardButtonSwitchInline i
+                ? Optional.of(i.query())
                 : Optional.empty();
     }
 
@@ -96,8 +98,7 @@ public final class KeyboardButton implements TelegramObject {
      * @return {@code true} if button uses current chat/channel for inline query.
      */
     public boolean isSamePeer() {
-        return data.identifier() == KeyboardButtonSwitchInline.ID
-                && ((KeyboardButtonSwitchInline) data).samePeer();
+        return data instanceof KeyboardButtonSwitchInline i && i.samePeer();
     }
 
     /**
@@ -108,14 +109,14 @@ public final class KeyboardButton implements TelegramObject {
      * {@link Type#URL}, {@link Type#URL_AUTH}, {@link Type#WEB_VIEW}, {@link Type#SIMPLE_WEB_VIEW}
      */
     public Optional<String> getUrl() {
-        switch (data.identifier()) {
-            case KeyboardButtonWebView.ID: return Optional.of(((KeyboardButtonWebView) data).url());
-            case KeyboardButtonSimpleWebView.ID: return Optional.of(((KeyboardButtonSimpleWebView) data).url());
-            case KeyboardButtonUrl.ID: return Optional.of(((KeyboardButtonUrl) data).url());
-            case KeyboardButtonUrlAuth.ID: return Optional.of(((KeyboardButtonUrlAuth) data).url());
-            case InputKeyboardButtonUrlAuth.ID: return Optional.of(((InputKeyboardButtonUrlAuth) data).url());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case KeyboardButtonWebView.ID -> Optional.of(((KeyboardButtonWebView) data).url());
+            case KeyboardButtonSimpleWebView.ID -> Optional.of(((KeyboardButtonSimpleWebView) data).url());
+            case KeyboardButtonUrl.ID -> Optional.of(((KeyboardButtonUrl) data).url());
+            case KeyboardButtonUrlAuth.ID -> Optional.of(((KeyboardButtonUrlAuth) data).url());
+            case InputKeyboardButtonUrlAuth.ID -> Optional.of(((InputKeyboardButtonUrlAuth) data).url());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -124,20 +125,24 @@ public final class KeyboardButton implements TelegramObject {
      * @return The text that will be displayed in forwarded messages, if {@link #getType() type} is {@link Type#URL_AUTH}.
      */
     public Optional<String> getForwardText() {
-        return data.identifier() == KeyboardButtonUrlAuth.ID
-                ? Optional.ofNullable(((KeyboardButtonUrlAuth) data).fwdText())
+        return data instanceof KeyboardButtonUrlAuth a
+                ? Optional.ofNullable(a.fwdText())
                 : Optional.empty();
     }
 
     /**
-     * Gets id of login button, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     * Gets id of login or request peer button, if {@link #getType() type} is
+     * {@link Type#URL_AUTH} or {@link Type#REQUEST_PEER}.
      *
-     * @return The id of login button, if {@link #getType() type} is {@link Type#URL_AUTH}.
+     * @return The id of login or request peer button, if {@link #getType() type} is
+     * {@link Type#URL_AUTH} or {@link Type#REQUEST_PEER}.
      */
     public Optional<Integer> getButtonId() {
-        return data.identifier() == KeyboardButtonUrlAuth.ID
-                ? Optional.of(((KeyboardButtonUrlAuth) data).buttonId())
-                : Optional.empty();
+        return switch (data.identifier()) {
+            case KeyboardButtonUrlAuth.ID -> Optional.of(((KeyboardButtonUrlAuth) data).buttonId());
+            case KeyboardButtonRequestPeer.ID -> Optional.of(((KeyboardButtonRequestPeer) data).buttonId());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -146,8 +151,7 @@ public final class KeyboardButton implements TelegramObject {
      * @return {@code true} if bot requests the permission to send messages to user.
      */
     public boolean isRequestWriteAccess() {
-        return data.identifier() == InputKeyboardButtonUrlAuth.ID
-                && ((InputKeyboardButtonUrlAuth) data).requestWriteAccess();
+        return data instanceof InputKeyboardButtonUrlAuth a && a.requestWriteAccess();
     }
 
     /**
@@ -156,8 +160,7 @@ public final class KeyboardButton implements TelegramObject {
      * @return {@code true} if user should verify his identity by password.
      */
     public boolean isRequiresPassword() {
-        return data.identifier() == KeyboardButtonCallback.ID
-                && ((KeyboardButtonCallback) data).requiresPassword();
+        return data instanceof KeyboardButtonCallback a && a.requiresPassword();
     }
 
     /**
@@ -166,11 +169,9 @@ public final class KeyboardButton implements TelegramObject {
      * @return The id of bot which will be used for user authorization, if {@link #getType() type} is {@link Type#URL_AUTH}.
      */
     public Optional<Id> getBotId() {
-        if (data.identifier() == InputKeyboardButtonUrlAuth.ID) {
-            InputUser inputUser = ((InputKeyboardButtonUrlAuth) data).bot();
-            return Optional.of(Id.of(inputUser, client.getSelfId()));
-        }
-        return Optional.empty();
+        return data instanceof InputKeyboardButtonUrlAuth a
+                ? Optional.of(Id.of(a.bot(), client.getSelfId()))
+                : Optional.empty();
     }
 
     /**
@@ -199,12 +200,12 @@ public final class KeyboardButton implements TelegramObject {
      * @return The id of user their profile will be opened on press, if {@link #getType() type} is {@link Type#USER_PROFILE}.
      */
     public Optional<Id> getUserId() {
-        switch (data.identifier()) {
-            case KeyboardButtonUserProfile.ID: return Optional.of(Id.ofUser(((KeyboardButtonUserProfile) data).userId()));
-            case InputKeyboardButtonUserProfile.ID: return Optional.of(Id.of(
+        return switch (data.identifier()) {
+            case KeyboardButtonUserProfile.ID -> Optional.of(Id.ofUser(((KeyboardButtonUserProfile) data).userId()));
+            case InputKeyboardButtonUserProfile.ID -> Optional.of(Id.of(
                     ((InputKeyboardButtonUserProfile) data).userId(), client.getSelfId()));
-            default: return Optional.empty();
-        }
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -227,17 +228,16 @@ public final class KeyboardButton implements TelegramObject {
                 .flatMap(id -> client.withRetrievalStrategy(strategy).getUserById(id));
     }
 
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        KeyboardButton that = (KeyboardButton) o;
-        return data.equals(that.data);
-    }
+    /**
+     * Gets {@code RequestPeer} parameters if {@link #getType()} is {@link Type#REQUEST_PEER}.
+     *
+     * @return The {@code RequestPeer} parameters if {@link #getType()} is {@link Type#REQUEST_PEER}.
+     */
+    public Optional<RequestPeer> getRequestPeer() {
+        return data instanceof KeyboardButtonRequestPeer d
+                ? Optional.of(EntityFactory.createRequestPeer(d.peerType()))
+                : Optional.empty();
 
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override
@@ -304,7 +304,9 @@ public final class KeyboardButton implements TelegramObject {
 
         SIMPLE_WEB_VIEW,
 
-        WEB_VIEW;
+        WEB_VIEW,
+
+        REQUEST_PEER;
 
         /**
          * Gets type of raw {@link telegram4j.tl.KeyboardButton} object.
@@ -314,45 +316,133 @@ public final class KeyboardButton implements TelegramObject {
          * @return The {@code Type} of raw button object.
          */
         public static Type of(telegram4j.tl.KeyboardButton data) {
-            switch (data.identifier()) {
-                case BaseKeyboardButton.ID: return DEFAULT;
-                case InputKeyboardButtonUrlAuth.ID:
-                case KeyboardButtonUrlAuth.ID: return URL_AUTH;
-                case InputKeyboardButtonUserProfile.ID:
-                case KeyboardButtonUserProfile.ID: return USER_PROFILE;
-                case KeyboardButtonBuy.ID: return BUY;
-                case KeyboardButtonCallback.ID: return CALLBACK;
-                case KeyboardButtonGame.ID: return GAME;
-                case KeyboardButtonRequestGeoLocation.ID: return REQUEST_GEO_LOCATION;
-                case KeyboardButtonRequestPhone.ID: return REQUEST_PHONE;
-                case KeyboardButtonRequestPoll.ID: return REQUEST_POLL;
-                case KeyboardButtonSwitchInline.ID: return SWITCH_INLINE;
-                case KeyboardButtonUrl.ID: return URL;
-                case KeyboardButtonSimpleWebView.ID: return SIMPLE_WEB_VIEW;
-                case KeyboardButtonWebView.ID: return WEB_VIEW;
-                default: throw new IllegalStateException("Unexpected keyboard button type: " + data);
-            }
+            return switch (data.identifier()) {
+                case BaseKeyboardButton.ID -> DEFAULT;
+                case InputKeyboardButtonUrlAuth.ID, KeyboardButtonUrlAuth.ID -> URL_AUTH;
+                case InputKeyboardButtonUserProfile.ID, KeyboardButtonUserProfile.ID -> USER_PROFILE;
+                case KeyboardButtonBuy.ID -> BUY;
+                case KeyboardButtonCallback.ID -> CALLBACK;
+                case KeyboardButtonGame.ID -> GAME;
+                case KeyboardButtonRequestGeoLocation.ID -> REQUEST_GEO_LOCATION;
+                case KeyboardButtonRequestPhone.ID -> REQUEST_PHONE;
+                case KeyboardButtonRequestPoll.ID -> REQUEST_POLL;
+                case KeyboardButtonSwitchInline.ID -> SWITCH_INLINE;
+                case KeyboardButtonUrl.ID -> URL;
+                case KeyboardButtonSimpleWebView.ID -> SIMPLE_WEB_VIEW;
+                case KeyboardButtonWebView.ID -> WEB_VIEW;
+                case KeyboardButtonRequestPeer.ID -> REQUEST_PEER;
+                default -> throw new IllegalStateException("Unexpected keyboard button type: " + data);
+            };
         }
 
         /**
-         * Gets whether specified type supports only in the {@link ReplyMarkup.Type#INLINE inline} keyboards.
+         * Gets whether this button supports only in the {@link ReplyMarkup.Type#INLINE inline} keyboards.
          *
-         * @param type The type of button.
          * @return {@code true} if button type is supports in the inline keyboards.
          */
-        public static boolean isInlineOnly(Type type) {
-            switch (type) {
-                case BUY:
-                case CALLBACK:
-                case GAME:
-                case SWITCH_INLINE:
-                case URL_AUTH:
-                case USER_PROFILE:
-                case URL:
-                    return true;
-                default:
-                    return false;
-            }
+        public boolean isInlineOnly() {
+            return switch (this) {
+                case BUY, CALLBACK, GAME, SWITCH_INLINE, URL_AUTH, USER_PROFILE, URL -> true;
+                default -> false;
+            };
         }
     }
+
+    public static final class RequestChannel implements RequestPeer {
+
+        private final RequestPeerTypeBroadcast data;
+
+        public RequestChannel(RequestPeerTypeBroadcast data) {
+            this.data = data;
+        }
+
+        public boolean isOwnedByUser() {
+            return data.creator();
+        }
+
+        public Optional<Boolean> hasUsername() {
+            return Optional.ofNullable(data.hasUsername());
+        }
+
+        public Optional<Set<AdminRight>> getUserAdminRights() {
+            return Optional.ofNullable(data.userAdminRights()).map(AdminRight::of);
+        }
+
+        public Optional<Set<AdminRight>> getBotAdminRights() {
+            return Optional.ofNullable(data.botAdminRights()).map(AdminRight::of);
+        }
+
+        @Override
+        public String toString() {
+            return "RequestChannel{" +
+                    "data=" + data +
+                    '}';
+        }
+    }
+
+    public static final class RequestChat implements RequestPeer {
+
+        private final RequestPeerTypeChat data;
+
+        public RequestChat(RequestPeerTypeChat data) {
+            this.data = data;
+        }
+
+        public boolean isOwnedByUser() {
+            return data.creator();
+        }
+
+        public boolean isBotParticipant() {
+            return data.botParticipant();
+        }
+
+        public Optional<Boolean> hasUsername() {
+            return Optional.ofNullable(data.hasUsername());
+        }
+
+        public Optional<Boolean> isForum() {
+            return Optional.ofNullable(data.forum());
+        }
+
+        public Optional<Set<AdminRight>> getUserAdminRights() {
+            return Optional.ofNullable(data.userAdminRights()).map(AdminRight::of);
+        }
+
+        public Optional<Set<AdminRight>> getBotAdminRights() {
+            return Optional.ofNullable(data.botAdminRights()).map(AdminRight::of);
+        }
+
+        @Override
+        public String toString() {
+            return "RequestChat{" +
+                    "data=" + data +
+                    '}';
+        }
+    }
+
+    public static final class RequestUser implements RequestPeer {
+
+        private final RequestPeerTypeUser data;
+
+        public RequestUser(RequestPeerTypeUser data) {
+            this.data = data;
+        }
+
+        public Optional<Boolean> isBot() {
+            return Optional.ofNullable(data.bot());
+        }
+
+        public Optional<Boolean> isPremium() {
+            return Optional.ofNullable(data.premium());
+        }
+
+        @Override
+        public String toString() {
+            return "RequestUser{" +
+                    "data=" + data +
+                    '}';
+        }
+    }
+
+    public sealed interface RequestPeer {}
 }

@@ -9,23 +9,20 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.GroupChat;
 import telegram4j.core.object.chat.SupergroupChat;
+import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
 import telegram4j.mtproto.file.ChatPhotoContext;
 import telegram4j.mtproto.file.MessageActionContext;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /** Basic type of service messages. */
-public class MessageAction implements TelegramObject {
+public sealed class MessageAction implements TelegramObject {
     protected final MTProtoTelegramClient client;
     protected final Type type;
 
@@ -149,10 +146,12 @@ public class MessageAction implements TelegramObject {
 
         SUGGEST_PROFILE_PHOTO,
 
-        ATTACH_MENU_BOT_ALLOWED
+        ATTACH_MENU_BOT_ALLOWED,
+
+        REQUESTED_PEER
     }
 
-    public static class BotAllowed extends MessageAction {
+    public static final class BotAllowed extends MessageAction {
 
         private final MessageActionBotAllowed data;
 
@@ -174,7 +173,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing {@link Channel} creation. */
-    public static class ChannelCreate extends MessageAction {
+    public static final class ChannelCreate extends MessageAction {
 
         private final MessageActionChannelCreate data;
 
@@ -201,7 +200,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing first message after {@link GroupChat} migration. */
-    public static class ChannelMigrateFrom extends MessageAction {
+    public static final class ChannelMigrateFrom extends MessageAction {
 
         private final MessageActionChannelMigrateFrom data;
 
@@ -258,7 +257,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing joined to chat users. */
-    public static class ChatJoinUsers extends MessageAction {
+    public static final class ChatJoinUsers extends MessageAction {
 
         private final MessageActionChatAddUser data;
 
@@ -309,7 +308,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing {@link GroupChat} creation. */
-    public static class ChatCreate extends MessageAction {
+    public static final class ChatCreate extends MessageAction {
 
         private final MessageActionChatCreate data;
 
@@ -369,7 +368,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing left from the chat user. */
-    public static class ChatLeftUser extends MessageAction {
+    public static final class ChatLeftUser extends MessageAction {
 
         private final MessageActionChatDeleteUser data;
 
@@ -414,7 +413,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class UpdateChatPhoto extends MessageAction {
+    public static final class UpdateChatPhoto extends MessageAction {
 
         @Nullable
         private final MessageActionChatEditPhoto data;
@@ -439,9 +438,10 @@ public class MessageAction implements TelegramObject {
          * @return The current chat photo, absent if photo was deleted,
          */
         public Optional<Photo> getCurrentPhoto() {
-            return Optional.ofNullable(data)
-                    .map(d -> TlEntityUtil.unmapEmpty(d.photo(), BasePhoto.class))
-                    .map(d -> new Photo(client, d, Objects.requireNonNull(context)));
+            if (data == null || !(data.photo() instanceof BasePhoto p)) {
+                return Optional.empty();
+            }
+            return Optional.of(new Photo(client, p, Objects.requireNonNull(context)));
         }
 
         @Override
@@ -453,7 +453,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class ChatEditTitle extends MessageAction {
+    public static final class ChatEditTitle extends MessageAction {
 
         private final MessageActionChatEditTitle data;
 
@@ -480,7 +480,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing the joining of <i>current</i> user to the chat by invite link. */
-    public static class ChatJoinedByLink extends MessageAction {
+    public static final class ChatJoinedByLink extends MessageAction {
 
         private final MessageActionChatJoinedByLink data;
 
@@ -526,7 +526,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service message representing the latest message in old {@link GroupChat}. */
-    public static class ChatMigrateTo extends MessageAction {
+    public static final class ChatMigrateTo extends MessageAction {
 
         private final MessageActionChatMigrateTo data;
 
@@ -573,7 +573,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class Custom extends MessageAction {
+    public static final class Custom extends MessageAction {
 
         private final MessageActionCustomAction data;
 
@@ -594,7 +594,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class GameScore extends MessageAction {
+    public static final class GameScore extends MessageAction {
 
         private final MessageActionGameScore data;
 
@@ -619,7 +619,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class GeoProximityReached extends MessageAction {
+    public static final class GeoProximityReached extends MessageAction {
 
         private final MessageActionGeoProximityReached data;
 
@@ -648,7 +648,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class GroupCall extends MessageAction {
+    public static final class GroupCall extends MessageAction {
 
         private final MessageActionGroupCall data;
 
@@ -673,7 +673,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class GroupCallScheduled extends MessageAction {
+    public static final class GroupCallScheduled extends MessageAction {
 
         private final MessageActionGroupCallScheduled data;
 
@@ -698,7 +698,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class InviteToGroupCall extends MessageAction {
+    public static final class InviteToGroupCall extends MessageAction {
 
         private final MessageActionInviteToGroupCall data;
 
@@ -725,7 +725,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class PaymentSent extends MessageAction {
+    public static final class PaymentSent extends MessageAction {
 
         private final MessageActionPaymentSent data;
 
@@ -750,7 +750,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class PaymentSentMe extends MessageAction {
+    public static final class PaymentSentMe extends MessageAction {
 
         private final MessageActionPaymentSentMe data;
 
@@ -791,7 +791,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class PhoneCall extends MessageAction {
+    public static final class PhoneCall extends MessageAction {
 
         private final MessageActionPhoneCall data;
 
@@ -824,7 +824,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class SecureValuesSent extends MessageAction {
+    public static final class SecureValuesSent extends MessageAction {
 
         private final MessageActionSecureValuesSent data;
 
@@ -833,8 +833,10 @@ public class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
-        public List<SecureValueType> getTypes() {
-            return data.types();
+        public Set<SecureValueType> getTypes() {
+            var set = EnumSet.noneOf(SecureValueType.class);
+            set.addAll(data.types());
+            return set;
         }
 
         @Override
@@ -845,7 +847,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class SecureValuesSentMe extends MessageAction {
+    public static final class SecureValuesSentMe extends MessageAction {
 
         private final MessageActionSecureValuesSentMe data;
 
@@ -870,7 +872,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class SetChatTheme extends MessageAction {
+    public static final class SetChatTheme extends MessageAction {
 
         private final MessageActionSetChatTheme data;
 
@@ -896,7 +898,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class SetMessagesTtl extends MessageAction {
+    public static final class SetMessagesTtl extends MessageAction {
 
         private final MessageActionSetMessagesTTL data;
 
@@ -947,7 +949,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service messages representing creation of new channel topic. */
-    public static class TopicCreate extends MessageAction {
+    public static final class TopicCreate extends MessageAction {
         // from https://github.com/telegramdesktop/tdesktop/blob/55fd9c50912b127bf782765f23a1b31569e53cbe/Telegram/SourceFiles/data/data_forum_topic.cpp#L47
         /** Topic icon color in RGB format looking like this: <span style="color: #6FB9F0">\u25A0</span>. */
         public static final int BLUE = 0x6FB9F0;
@@ -1008,7 +1010,7 @@ public class MessageAction implements TelegramObject {
     }
 
     /** Service messages representing edition of channel topic. */
-    public static class TopicEdit extends MessageAction {
+    public static final class TopicEdit extends MessageAction {
 
         private final MessageActionTopicEdit data;
 
@@ -1060,7 +1062,7 @@ public class MessageAction implements TelegramObject {
         }
     }
 
-    public static class SuggestProfilePhoto extends MessageAction {
+    public static final class SuggestProfilePhoto extends MessageAction {
         private final MessageActionSuggestProfilePhoto data;
         private final MessageActionContext context;
 
@@ -1074,6 +1076,60 @@ public class MessageAction implements TelegramObject {
 
         public Photo getPhoto() {
             return new Photo(client, (BasePhoto) data.photo(), context);
+        }
+    }
+
+    public static final class RequestedPeer extends MessageAction {
+        private final MessageActionRequestedPeer data;
+
+        public RequestedPeer(MTProtoTelegramClient client, MessageActionRequestedPeer data) {
+            super(client, Type.REQUESTED_PEER);
+            this.data = data;
+        }
+
+        /**
+         * Gets custom id of button by which requested this peer.
+         *
+         * @see KeyboardButton#getButtonId()
+         * @return The id of button by which requested this peer.
+         */
+        public int getButtonId() {
+            return data.buttonId();
+        }
+
+        /**
+         * Gets id of selected peer.
+         *
+         * @return The id of selected peer.
+         */
+        public Id getPeerId() {
+            return Id.of(data.peer());
+        }
+
+        /**
+         * Requests to retrieve selected peer.
+         *
+         * @return An {@link Mono} emitting on successful completion the {@link PeerEntity}.
+         */
+        public Mono<PeerEntity> getPeer() {
+            return getPeer(MappingUtil.IDENTITY_RETRIEVER);
+        }
+
+        /**
+         * Requests to retrieve selected peer using specified retrieval strategy.
+         *
+         * @param strategy The strategy to apply.
+         * @return An {@link Mono} emitting on successful completion the {@link PeerEntity}.
+         */
+        public Mono<PeerEntity> getPeer(EntityRetrievalStrategy strategy) {
+            return Mono.defer(() -> {
+                Id id = getPeerId();
+                var retriever = client.withRetrievalStrategy(strategy);
+                return switch (id.getType()) {
+                    case CHAT, CHANNEL -> retriever.getChatById(id);
+                    case USER -> retriever.getUserById(id);
+                };
+            });
         }
     }
 }

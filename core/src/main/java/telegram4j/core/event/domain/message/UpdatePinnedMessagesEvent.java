@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /** Event when the message(s) were pinned/unpinned from the chat/channel. */
-public class UpdatePinnedMessagesEvent extends MessageEvent {
+public final class UpdatePinnedMessagesEvent extends MessageEvent {
 
     private final boolean pinned;
     private final Id chatId;

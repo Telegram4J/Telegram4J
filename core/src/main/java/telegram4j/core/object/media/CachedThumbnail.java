@@ -4,11 +4,11 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.Objects;
 
-public class PhotoCachedSize implements PhotoSize {
+public final class CachedThumbnail implements Thumbnail {
 
     private final telegram4j.tl.PhotoCachedSize data;
 
-    public PhotoCachedSize(telegram4j.tl.PhotoCachedSize data) {
+    public CachedThumbnail(telegram4j.tl.PhotoCachedSize data) {
         this.data = Objects.requireNonNull(data);
     }
 
@@ -17,10 +17,20 @@ public class PhotoCachedSize implements PhotoSize {
         return data.type().charAt(0);
     }
 
+    /**
+     * Gets width of thumbnail.
+     *
+     * @return The width of thumbnail.
+     */
     public int getWidth() {
         return data.w();
     }
 
+    /**
+     * Gets height of thumbnail.
+     *
+     * @return The height of thumbnail.
+     */
     public int getHeight() {
         return data.h();
     }

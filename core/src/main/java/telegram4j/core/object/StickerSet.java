@@ -5,7 +5,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.internal.EntityFactory;
-import telegram4j.core.object.media.PhotoSize;
+import telegram4j.core.object.media.Thumbnail;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.ImmutableInputStickerSetID;
 
@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class StickerSet implements TelegramObject {
+public final class StickerSet implements TelegramObject {
     private final MTProtoTelegramClient client;
     private final telegram4j.tl.StickerSet data;
 
@@ -134,10 +134,10 @@ public class StickerSet implements TelegramObject {
      *
      * @return The mutable list of sticker set thumbnails, if present.
      */
-    public Optional<List<PhotoSize>> getThumbs() {
+    public Optional<List<Thumbnail>> getThumbs() {
         return Optional.ofNullable(data.thumbs())
                 .map(l -> l.stream()
-                        .map(EntityFactory::createPhotoSize)
+                        .map(EntityFactory::createThumbnail)
                         .collect(Collectors.toList()));
     }
 
@@ -164,7 +164,7 @@ public class StickerSet implements TelegramObject {
      *
      * @return The id of {@link Sticker custom emoji} which used as sticker set thumbnail, if present.
      */
-    public Optional<Long> getThumbDocumentId() {
+    public Optional<Long> getThumbEmojiId() {
         return Optional.ofNullable(data.thumbDocumentId());
     }
 

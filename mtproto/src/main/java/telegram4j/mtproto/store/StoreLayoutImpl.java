@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
+import java.util.stream.Stream;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getUserId;
 import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
@@ -38,7 +38,7 @@ import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 /** Default in-memory store implementation. */
 public class StoreLayoutImpl implements StoreLayout {
 
-    private final Cache<MessageId, BaseMessageFields> messages;
+    private final Cache<MessageId, Message> messages;
     private final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
     private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
@@ -109,90 +109,72 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Boolean> existMessage(BaseMessageFields message) {
-        return Mono.fromSupplier(() -> messages.getIfPresent(MessageId.create(message)) != null);
+    public Mono<Boolean> existMessage(Peer peerId, int messageId) {
+        return Mono.fromSupplier(() -> messages.getIfPresent(MessageId.create(peerId, messageId)) != null);
+    }
+
+    @Nullable
+    private Messages getMessages0(long rawPeerId, Iterable<? extends InputMessage> messageIds) {
+        Set<MessageId> ids = new HashSet<>();
+        for (InputMessage id : messageIds) {
+            int msgId = switch (id.identifier()) {
+                case InputMessagePinned.ID -> {
+                    if (rawPeerId == -1) {
+                        throw new UnsupportedOperationException("Message id type: " + id);
+                    }
+
+                    yield Optional.ofNullable(this.channels.get(rawPeerId))
+                            .map(c -> c.full)
+                            .map(ChatFull::pinnedMsgId)
+                            .orElse(null);
+                }
+                case InputMessageID.ID -> ((InputMessageID) id).id();
+                case InputMessageReplyTo.ID, InputMessageCallbackQuery.ID ->
+                        throw new UnsupportedOperationException("Message id type: " + id);
+                default -> throw new IllegalArgumentException("Unknown message id type: " + id);
+            };
+            ids.add(new MessageId(rawPeerId, msgId));
+        }
+
+        var messagesMap = this.messages.getAllPresent(ids);
+        if (messagesMap.isEmpty()) {
+            return null;
+        }
+
+        var messages = messagesMap.values();
+
+        Set<User> users = new HashSet<>();
+        Set<Chat> chats = new HashSet<>();
+        for (var message : messages) {
+            Peer peerId;
+            Peer fromId;
+            if (message instanceof BaseMessage b) {
+                peerId = b.peerId();
+                fromId = b.fromId();
+            } else if (message instanceof MessageService s) {
+                peerId = s.peerId();
+                fromId = s.fromId();
+            } else {
+                throw new IllegalStateException();
+            }
+
+            addContact(peerId, chats, users);
+            if (fromId != null) {
+                addContact(fromId, chats, users);
+            }
+        }
+
+        return ImmutableBaseMessages.of(messages, chats, users);
     }
 
     @Override
     public Mono<Messages> getMessages(Iterable<? extends InputMessage> messageIds) {
-        return Mono.fromSupplier(() -> {
-            var ids = StreamSupport.stream(messageIds.spliterator(), false)
-                    .map(id -> {
-                        switch (id.identifier()) {
-                            case InputMessageID.ID: return ((InputMessageID) id).id();
-                            case InputMessagePinned.ID:
-                            case InputMessageReplyTo.ID:
-                            case InputMessageCallbackQuery.ID:
-                                throw new UnsupportedOperationException("Message id type: " + id);
-                            default: throw new IllegalArgumentException("Unknown message id type: " + id);
-                        }
-                    })
-                    .map(i -> new MessageId(i, -1))
-                    .collect(Collectors.toSet());
-
-            var messagesMap = this.messages.getAllPresent(ids);
-            if (messagesMap.isEmpty()) {
-                return null;
-            }
-
-            var messages = messagesMap.values();
-
-            Set<User> users = new HashSet<>();
-            Set<Chat> chats = new HashSet<>();
-            for (var message : messages) {
-                addContact(message.peerId(), chats, users);
-                Peer fromId = message.fromId();
-                if (fromId != null) {
-                    addContact(fromId, chats, users);
-                }
-            }
-
-            return ImmutableBaseMessages.of(messages, chats, users);
-        });
+        return Mono.fromSupplier(() -> getMessages0(-1, messageIds));
     }
 
     @Override
     public Mono<Messages> getMessages(long channelId, Iterable<? extends InputMessage> messageIds) {
-        return Mono.fromSupplier(() -> {
-            var ids = StreamSupport.stream(messageIds.spliterator(), false)
-                    .map(id -> {
-                        switch (id.identifier()) {
-                            case InputMessageID.ID: return ((InputMessageID) id).id();
-                            case InputMessagePinned.ID:
-                                return Optional.ofNullable(this.channels.get(channelId))
-                                        .map(c -> c.full)
-                                        .map(ChatFull::pinnedMsgId)
-                                        .orElse(null);
-                            case InputMessageReplyTo.ID:
-                            case InputMessageCallbackQuery.ID:
-                                throw new UnsupportedOperationException("Message id type: " + id);
-                            default:
-                                throw new IllegalArgumentException("Unknown message id type: " + id);
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .map(i -> new MessageId(i, channelId))
-                    .collect(Collectors.toSet());
-
-            var messagesMap = this.messages.getAllPresent(ids);
-            if (messagesMap.isEmpty()) {
-                return null;
-            }
-
-            var messages = messagesMap.values();
-
-            Set<User> users = new HashSet<>();
-            Set<Chat> chats = new HashSet<>();
-            for (var message : messages) {
-                addContact(message.peerId(), chats, users);
-                Peer fromId = message.fromId();
-                if (fromId != null) {
-                    addContact(fromId, chats, users);
-                }
-            }
-
-            return ImmutableBaseMessages.of(messages, chats, users);
-        });
+        return Mono.fromSupplier(() -> getMessages0(channelId, messageIds));
     }
 
     @Override
@@ -413,96 +395,101 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Message> onEditMessage(Message update) {
+        return Mono.fromSupplier(() -> saveMessage(update));
+    }
+
+    @Override
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessages update) {
+        return Mono.fromSupplier(() -> onDeleteMessages0(null, update.messages()));
+    }
+
+    @Override
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteScheduledMessages update) {
         return Mono.fromSupplier(() -> {
-            BaseMessageFields cast = copy((BaseMessageFields) update);
-            MessageId key = MessageId.create(cast);
-
-            savePeer(cast.peerId(), cast);
-            Peer p = cast.fromId();
-            if (p != null) {
-                savePeer(p, cast);
-            }
-
-            return messages.asMap().put(key, cast);
+            Peer p = copyPeer(update.peer());
+            return onDeleteMessages0(p, update.messages());
         });
     }
 
     @Override
-    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update) {
+    public Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteChannelMessages update) {
         return Mono.fromSupplier(() -> {
-
-            InputPeer peer;
-            switch (update.identifier()) {
-                case UpdateDeleteChannelMessages.ID:
-                    long channelId = ((UpdateDeleteChannelMessages) update).channelId();
-                    peer = peers.getOrDefault(ImmutablePeerChannel.of(channelId), InputPeerEmpty.instance());
-                    break;
-                case UpdateDeleteScheduledMessages.ID:
-                    Peer p = ((UpdateDeleteScheduledMessages) update).peer();
-                    peer = peers.getOrDefault(p, InputPeerEmpty.instance());
-                    break;
-                case UpdateDeleteMessages.ID:
-                    peer = update.messages().stream()
-                            .map(i -> new MessageId(i, -1))
-                            .map(messages.asMap()::get)
-                            .filter(Objects::nonNull)
-                            .map(m -> peers.getOrDefault(m.peerId(), InputPeerEmpty.instance()))
-                            .findFirst()
-                            .orElse(InputPeerEmpty.instance());
-                    break;
-                default:
-                    throw new IllegalStateException("Unexpected update type: " + update);
-            }
-
-            long rawPeerId;
-            switch (peer.identifier()) {
-                case InputPeerEmpty.ID:
-                    return null;
-                case InputPeerChannel.ID:
-                    var channel = (InputPeerChannel) peer;
-                    rawPeerId = channel.channelId();
-                    break;
-                case InputPeerChannelFromMessage.ID:
-                    var minChannel = (InputPeerChannelFromMessage) peer;
-                    rawPeerId = minChannel.channelId();
-                    break;
-                case InputPeerChat.ID:
-                case InputPeerSelf.ID:
-                case InputPeerUser.ID:
-                case InputPeerUserFromMessage.ID:
-                    rawPeerId = -1;
-                    break;
-                default:
-                    throw new IllegalStateException("Unknown peer type: " + peer);
-            }
-
-            var messages = update.messages().stream()
-                    .map(id -> new MessageId(id, rawPeerId))
-                    .map(this.messages.asMap()::remove)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            return new ResolvedDeletedMessages(peer, messages);
+            Peer p = ImmutablePeerChannel.of(update.channelId());
+            return onDeleteMessages0(p, update.messages());
         });
     }
 
-    @Override
-    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload) {
-        return Mono.fromRunnable(() -> {
-
-            long chatId = payload.identifier() == UpdatePinnedChannelMessages.ID
-                    ? ((UpdatePinnedChannelMessages) payload).channelId() : -1;
-
-            payload.messages().stream()
-                    .map(i -> new MessageId(i, chatId))
-                    .forEach(k -> messages.asMap().computeIfPresent(k, (k1, v) -> {
-                        if (v.identifier() == BaseMessage.ID) {
-                            return ImmutableBaseMessage.copyOf((BaseMessage) v)
-                                    .withPinned(payload.pinned());
+    @Nullable
+    private ResolvedDeletedMessages onDeleteMessages0(@Nullable Peer peer, List<Integer> ids) {
+        InputPeer inputPeer;
+        if (peer == null) {
+            inputPeer = ids.stream()
+                    .flatMap(i -> Stream.ofNullable(messages.getIfPresent(new MessageId(i))))
+                    .map(m -> {
+                        Peer p;
+                        if (m instanceof BaseMessage b) {
+                            p = b.peerId();
+                        } else if (m instanceof MessageService s) {
+                            p = s.peerId();
+                        } else {
+                            throw new IllegalStateException();
                         }
-                        return v;
-                    }));
-        });
+
+                        return peers.getOrDefault(p, InputPeerEmpty.instance());
+                    })
+                    .findFirst()
+                    .orElse(InputPeerEmpty.instance());
+        } else {
+            inputPeer = peers.getOrDefault(peer, InputPeerEmpty.instance());
+        }
+
+        long rawPeerId;
+        switch (inputPeer.identifier()) {
+            case InputPeerEmpty.ID -> {
+                return null;
+            }
+            case InputPeerChannel.ID -> {
+                var channel = (InputPeerChannel) inputPeer;
+                rawPeerId = channel.channelId();
+            }
+            case InputPeerChannelFromMessage.ID -> {
+                var minChannel = (InputPeerChannelFromMessage) inputPeer;
+                rawPeerId = minChannel.channelId();
+            }
+            case InputPeerChat.ID, InputPeerSelf.ID, InputPeerUser.ID, InputPeerUserFromMessage.ID -> rawPeerId = -1;
+            default -> throw new IllegalStateException("Unknown InputPeer type: " + inputPeer);
+        }
+
+        var messages = ids.stream()
+                .flatMap(id -> Stream.ofNullable(this.messages.asMap().remove(new MessageId(rawPeerId, id))))
+                .collect(Collectors.toList());
+
+        return new ResolvedDeletedMessages(inputPeer, messages);
+    }
+
+    @Override
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessages payload) {
+        return Mono.fromRunnable(() -> onUpdatePinnedMessages0(copyPeer(payload.peer()), payload.pinned(), payload.messages()));
+    }
+
+    @Override
+    public Mono<Void> onUpdatePinnedMessages(UpdatePinnedChannelMessages payload) {
+        return Mono.fromRunnable(() -> onUpdatePinnedMessages0(ImmutablePeerChannel.of(payload.channelId()),
+                payload.pinned(), payload.messages()));
+    }
+
+    private void onUpdatePinnedMessages0(Peer peer, boolean pinned, List<Integer> ids) {
+        long peerId = peer instanceof PeerChannel p ? p.channelId() : -1;
+        for (int id : ids) {
+            MessageId k = new MessageId(peerId, id);
+            messages.asMap().computeIfPresent(k, (k1, v) -> {
+                if (v instanceof BaseMessage b) {
+                    return ImmutableBaseMessage.copyOf(b)
+                            .withPinned(pinned);
+                }
+                return v;
+            });
+        }
     }
 
     @Override
@@ -516,7 +503,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 }
             } else {
                 map = new ConcurrentHashMap<>();
-                map.put(curr.userId(), copy(curr));
+                map.put(curr.userId(), copyChatParticipant(curr));
             }
 
             return v.withParticipants(map);
@@ -531,44 +518,36 @@ public class StoreLayoutImpl implements StoreLayout {
                 return v;
             }
 
-            switch (payload.identifier()) {
-                case BaseChatParticipants.ID: {
-                    BaseChatParticipants base = (BaseChatParticipants) payload;
+            if (payload instanceof BaseChatParticipants b) {
+                var old = v.full.participants() instanceof BaseChatParticipants p ? p : null;
 
-                    BaseChatParticipants old = v.full.participants() instanceof BaseChatParticipants
-                            ? (BaseChatParticipants) v.full.participants()
-                            : null;
-
-                    // no update; just ignore received update
-                    // This check may create inconsistency
-                    if (old != null && base.version() < old.version()) {
-                        return v;
-                    }
-
-                    var map = v.participants();
-                    map.clear();
-                    for (var p : base.participants()) {
-                        var copy = copy(p);
-                        map.put(copy.userId(), copy);
-                    }
-
-                    return v.withFull(f -> f.withParticipants(payload))
-                            .withParticipants(map);
+                // no update; just ignore received update
+                // This check may create inconsistency
+                if (old != null && b.version() < old.version()) {
+                    return v;
                 }
-                case ChatParticipantsForbidden.ID:
-                    ChatParticipantsForbidden forbidden = (ChatParticipantsForbidden) payload;
-                    var updated = v.withFull(f -> f.withParticipants(payload));
-                    var self = forbidden.selfParticipant();
-                    if (self != null) {
-                        var map = updated.participants();
-                        var copy = copy(self);
-                        map.put(copy.userId(), copy(self));
-                        updated = updated.withParticipants(map);
-                    }
 
-                    return updated;
-                default:
-                    throw new IllegalArgumentException("Unexpected ChatParticipants type: " + payload);
+                var map = v.participants();
+                map.clear();
+                for (var p : b.participants()) {
+                    var copy = copyChatParticipant(p);
+                    map.put(copy.userId(), copy);
+                }
+
+                return v.withFull(f -> f.withParticipants(payload))
+                        .withParticipants(map);
+            } else if (payload instanceof ChatParticipantsForbidden f) {
+                var updated = v.withFull(d -> d.withParticipants(payload));
+                var self = f.selfParticipant();
+                if (self != null) {
+                    var map = updated.participants();
+                    var copy = copyChatParticipant(self);
+                    map.put(copy.userId(), copy);
+                    updated = updated.withParticipants(map);
+                }
+                return updated;
+            } else {
+                throw new IllegalArgumentException("Unexpected ChatParticipants type: " + payload);
             }
         }));
     }
@@ -586,7 +565,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 }
             } else {
                 map = new ConcurrentHashMap<>();
-                map.put(getUserId(curr), copy(curr));
+                map.put(getUserId(curr), copyChannelParticipant(curr));
             }
 
             return v;
@@ -660,7 +639,7 @@ public class StoreLayoutImpl implements StoreLayout {
             channels.computeIfPresent(channelId, (k, v) -> {
                 var map = v.participants();
                 for (var p : payload.participants()) {
-                    var copy = copy(p);
+                    var copy = copyChannelParticipant(p);
                     map.put(TlEntityUtil.getUserId(copy), copy);
                 }
                 return v.withParticipants(map);
@@ -674,7 +653,7 @@ public class StoreLayoutImpl implements StoreLayout {
             saveContacts(payload.chats(), payload.users());
 
             channels.computeIfPresent(channelId, (k, v) -> {
-                var copy = copy(payload.participant());
+                var copy = copyChannelParticipant(payload.participant());
                 var map = v.participants();
                 map.put(TlEntityUtil.getUserId(copy), copy);
                 return v.withParticipants(map);
@@ -686,30 +665,27 @@ public class StoreLayoutImpl implements StoreLayout {
     public Mono<Void> onMessages(Messages payload) {
         return Mono.fromRunnable(() -> {
             switch (payload.identifier()) {
-                case BaseMessages.ID:
-                    BaseMessages base = (BaseMessages) payload;
-
+                case BaseMessages.ID -> {
+                    var base = (BaseMessages) payload;
                     saveContacts(base.chats(), base.users());
                     for (var msg : base.messages()) {
                         saveMessage(msg);
                     }
-                    break;
-                case ChannelMessages.ID:
-                    ChannelMessages channel = (ChannelMessages) payload;
-
+                }
+                case ChannelMessages.ID -> {
+                    var channel = (ChannelMessages) payload;
                     saveContacts(channel.chats(), channel.users());
                     for (var msg : channel.messages()) {
                         saveMessage(msg);
                     }
-                    break;
-                case MessagesSlice.ID:
-                    MessagesSlice slice = (MessagesSlice) payload;
-
+                }
+                case MessagesSlice.ID -> {
+                    var slice = (MessagesSlice) payload;
                     saveContacts(slice.chats(), slice.users());
                     for (var msg : slice.messages()) {
                         saveMessage(msg);
                     }
-                    break;
+                }
             }
         });
     }
@@ -748,11 +724,10 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     private void saveUser(@Nullable ImmutableUserFull anyUserFull, User anyUser) {
-        if (!(anyUser instanceof BaseUser)) {
+        if (!(anyUser instanceof BaseUser user)) {
             return;
         }
 
-        BaseUser user = (BaseUser) anyUser;
         var userInfo = users.get(user.id());
 
         saveUsernamePeer(user);
@@ -795,19 +770,18 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private void saveChat(@Nullable ChatFull anyChatFull, Chat anyChat) {
         switch (anyChat.identifier()) {
-            case ChannelForbidden.ID:
+            case ChannelForbidden.ID -> {
                 ChannelForbidden channelForbidden = (ChannelForbidden) anyChat;
                 var inputPeer = ImmutableInputPeerChannel.of(channelForbidden.id(), channelForbidden.accessHash());
                 peers.put(ImmutablePeerChannel.of(channelForbidden.id()), inputPeer);
                 channels.remove(channelForbidden.id());
-                return;
-            case ChatForbidden.ID:
+            }
+            case ChatForbidden.ID -> {
                 peers.putIfAbsent(ImmutablePeerChat.of(anyChat.id()), ImmutableInputPeerChat.of(anyChat.id()));
                 chats.remove(anyChat.id());
-                return;
-            case BaseChat.ID:
+            }
+            case BaseChat.ID -> {
                 var chat = ImmutableBaseChat.copyOf((BaseChat) anyChat);
-
                 peers.putIfAbsent(ImmutablePeerChat.of(chat.id()), ImmutableInputPeerChat.of(chat.id()));
                 chats.compute(chat.id(), (k, v) -> {
                     var chatFull = Optional.ofNullable(anyChatFull)
@@ -820,22 +794,21 @@ public class StoreLayoutImpl implements StoreLayout {
                             : v.withData(chat, chatFull);
 
                     if (anyChatFull != null) { // was updated
-                        if (chatFull.participants() instanceof BaseChatParticipants) {
-                            var base = (BaseChatParticipants) chatFull.participants();
+                        if (chatFull.participants() instanceof BaseChatParticipants base) {
 
                             var map = updated.participants();
                             map.clear();
                             for (var p : base.participants()) {
-                                var copy = copy(p);
+                                var copy = copyChatParticipant(p);
                                 map.put(copy.userId(), copy);
                             }
 
                             updated = updated.withParticipants(map);
                         } else {
                             ChatParticipant selfParticipant;
-                            if (chatFull.participants() instanceof ChatParticipantsForbidden &&
-                                    (selfParticipant = ((ChatParticipantsForbidden) chatFull.participants()).selfParticipant()) != null) {
-                                var copy = copy(selfParticipant);
+                            if (chatFull.participants() instanceof ChatParticipantsForbidden f &&
+                                    (selfParticipant = f.selfParticipant()) != null) {
+                                var copy = copyChatParticipant(selfParticipant);
                                 var map = updated.participants();
                                 map.put(copy.userId(), copy);
                                 updated = updated.withParticipants(map);
@@ -847,18 +820,16 @@ public class StoreLayoutImpl implements StoreLayout {
 
                     return updated;
                 });
-                return;
-            case Channel.ID:
+            }
+            case Channel.ID -> {
                 var channel = (Channel) anyChat;
                 var channelInfo = channels.get(channel.id());
-
                 saveUsernamePeer(channel);
 
                 // received channel is min, and we have non-min channel, just ignore received.
                 if (channel.min() && channelInfo != null && !channelInfo.min.min() && channelInfo.min.accessHash() != null) {
                     return;
                 }
-
                 var channelCopy = ImmutableChannel.copyOf(channel);
                 channels.compute(channelCopy.id(), (k, v) -> {
                     var channelFull = Optional.ofNullable(anyChatFull)
@@ -874,34 +845,53 @@ public class StoreLayoutImpl implements StoreLayout {
                 if (acch != null && !channelCopy.min()) { // see saveUser()
                     peers.put(ImmutablePeerChannel.of(channelCopy.id()), ImmutableInputPeerChannel.of(channelCopy.id(), acch));
                 }
-                // if channel is min and received from message update,
-                // then the *FromMessage peer would be saved in savePeer()
+            }
+            // if channel is min and received from message update,
+            // then the *FromMessage peer would be saved in savePeer()
         }
     }
 
-    @SuppressWarnings("unchecked")
-    static <T extends TlObject> T copy(T object) {
-        switch (object.identifier()) {
-            case BaseChat.ID: return (T) ImmutableBaseChat.copyOf((BaseChat) object);
-            case Channel.ID: return (T) ImmutableChannel.copyOf((Channel) object);
-            case BaseChatFull.ID: return (T) ImmutableBaseChatFull.copyOf((BaseChatFull) object);
-            case ChannelFull.ID: return (T) ImmutableChannelFull.copyOf((ChannelFull) object);
-
-            case BaseMessage.ID: return (T) ImmutableBaseMessage.copyOf((BaseMessage) object);
-            case MessageService.ID: return (T) ImmutableMessageService.copyOf((MessageService) object);
-
-            case BaseChatParticipant.ID: return (T) ImmutableBaseChatParticipant.copyOf((BaseChatParticipant) object);
-            case ChatParticipantAdmin.ID: return (T) ImmutableChatParticipantAdmin.copyOf((ChatParticipantAdmin) object);
-            case ChatParticipantCreator.ID: return (T) ImmutableChatParticipantCreator.copyOf((ChatParticipantCreator) object);
-
-            case BaseChannelParticipant.ID: return (T) ImmutableBaseChannelParticipant.copyOf((BaseChannelParticipant) object);
-            case ChannelParticipantAdmin.ID: return (T) ImmutableChannelParticipantAdmin.copyOf((ChannelParticipantAdmin) object);
-            case ChannelParticipantBanned.ID: return (T) ImmutableChannelParticipantBanned.copyOf((ChannelParticipantBanned) object);
-            case ChannelParticipantCreator.ID: return (T) ImmutableChannelParticipantCreator.copyOf((ChannelParticipantCreator) object);
-            case ChannelParticipantLeft.ID: return (T) ImmutableChannelParticipantLeft.copyOf((ChannelParticipantLeft) object);
-            case ChannelParticipantSelf.ID: return (T) ImmutableChannelParticipantSelf.copyOf((ChannelParticipantSelf) object);
-            default: throw new IllegalArgumentException("Unknown entity type: " + object);
+    static Message copyMessage(Message object) {
+        if (object instanceof BaseMessage b) {
+            return ImmutableBaseMessage.copyOf(b);
+        } else if (object instanceof MessageService s) {
+            return ImmutableMessageService.copyOf(s);
+        } else { // MessageEmpty
+            throw new IllegalArgumentException();
         }
+    }
+
+    static Peer copyPeer(Peer peer) {
+        if (peer instanceof PeerUser p) {
+            return ImmutablePeerUser.copyOf(p);
+        } else if (peer instanceof PeerChannel p) {
+            return ImmutablePeerChannel.copyOf(p);
+        } else if (peer instanceof PeerChat p) {
+            return ImmutablePeerChat.copyOf(p);
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    static ChannelParticipant copyChannelParticipant(ChannelParticipant object) {
+        return switch (object.identifier()) {
+            case BaseChannelParticipant.ID -> ImmutableBaseChannelParticipant.copyOf((BaseChannelParticipant) object);
+            case ChannelParticipantAdmin.ID -> ImmutableChannelParticipantAdmin.copyOf((ChannelParticipantAdmin) object);
+            case ChannelParticipantBanned.ID -> ImmutableChannelParticipantBanned.copyOf((ChannelParticipantBanned) object);
+            case ChannelParticipantCreator.ID -> ImmutableChannelParticipantCreator.copyOf((ChannelParticipantCreator) object);
+            case ChannelParticipantLeft.ID -> ImmutableChannelParticipantLeft.copyOf((ChannelParticipantLeft) object);
+            case ChannelParticipantSelf.ID -> ImmutableChannelParticipantSelf.copyOf((ChannelParticipantSelf) object);
+            default -> throw new IllegalArgumentException("Unknown ChannelParticipant type: " + object);
+        };
+    }
+
+    static ChatParticipant copyChatParticipant(ChatParticipant object) {
+        return switch (object.identifier()) {
+            case BaseChatParticipant.ID -> ImmutableBaseChatParticipant.copyOf((BaseChatParticipant) object);
+            case ChatParticipantAdmin.ID -> ImmutableChatParticipantAdmin.copyOf((ChatParticipantAdmin) object);
+            case ChatParticipantCreator.ID -> ImmutableChatParticipantCreator.copyOf((ChatParticipantCreator) object);
+            default -> throw new IllegalArgumentException("Unknown ChatParticipant type: " + object);
+        };
     }
 
     private boolean isBot() {
@@ -920,94 +910,96 @@ public class StoreLayoutImpl implements StoreLayout {
 
     private void saveUsernamePeer(TlObject object) {
         switch (object.identifier()) {
-            case BaseUser.ID: {
-                BaseUser user = (BaseUser) object;
+            case BaseUser.ID -> {
+                var user = (BaseUser) object;
                 String username = user.username();
                 if (username != null) {
                     usernames.put(stripUsername(username), ImmutablePeerUser.of(user.id()));
                 }
-                break;
             }
-            case Channel.ID: {
-                Channel channel = (Channel) object;
-
+            case Channel.ID -> {
+                var channel = (Channel) object;
                 String username = channel.username();
                 if (username != null) {
                     usernames.put(stripUsername(username), ImmutablePeerChannel.of(channel.id()));
                 }
-                break;
             }
-            default: throw new IllegalStateException("Unexpected peer type: " + object);
+            default -> throw new IllegalStateException("Unexpected peer type: " + object);
         }
     }
 
-    private void savePeer(Peer p, BaseMessageFields message) {
+    private void savePeer0(Peer p, Peer peerId, int msgId) {
         switch (p.identifier()) {
-            case PeerChat.ID:
+            case PeerChat.ID -> {
                 var cp = ImmutablePeerChat.copyOf((PeerChat) p);
                 peers.putIfAbsent(cp, ImmutableInputPeerChat.of(cp.chatId()));
-                break;
+            }
             // Here only handling for min objects
-            case PeerChannel.ID: {
+            case PeerChannel.ID -> {
                 var chp = ImmutablePeerChannel.copyOf((PeerChannel) p);
                 var channelInfo = channels.get(chp.channelId());
 
                 if ((channelInfo == null || channelInfo.min.min()) && !isBot()) {
-                    var chatPeer = peers.get(message.peerId());
+                    var chatPeer = peers.get(peerId);
                     if (chatPeer == null) {
                         break;
                     }
 
                     var minChannel = ImmutableInputPeerChannelFromMessage.of(
-                            chatPeer, message.id(), chp.channelId());
+                            chatPeer, msgId, chp.channelId());
                     peers.put(chp, minChannel);
                 }
-                break;
             }
-            case PeerUser.ID:
+            case PeerUser.ID -> {
                 var up = ImmutablePeerUser.copyOf((PeerUser) p);
                 var userInfo = users.get(up.userId());
                 if ((userInfo == null || userInfo.min.min()) && !isBot()) {
-                    InputPeer chatPeer = peers.get(message.peerId());
+                    InputPeer chatPeer = peers.get(peerId);
                     if (chatPeer == null) {
                         break;
                     }
 
                     var minUser = ImmutableInputPeerUserFromMessage.of(
-                            chatPeer, message.id(), up.userId());
+                            chatPeer, msgId, up.userId());
                     peers.put(up, minUser);
                 }
-                break;
-            default:
-                throw new IllegalStateException("Unexpected Peer type: " + p);
+            }
+            default -> throw new IllegalStateException("Unexpected Peer type: " + p);
         }
+    }
+
+    private void savePeer(Peer p, MessageService message) {
+        savePeer0(p, message.peerId(), message.id());
+    }
+
+    private void savePeer(Peer p, BaseMessage message) {
+        savePeer0(p, message.peerId(), message.id());
     }
 
     private void addContact(Peer p, Consumer<Chat> chats, Consumer<User> users) {
         switch (p.identifier()) {
-            case PeerChat.ID:
+            case PeerChat.ID -> {
                 var cp = (PeerChat) p;
                 var chatInfo = this.chats.get(cp.chatId());
                 if (chatInfo != null) {
                     chats.accept(chatInfo.min);
                 }
-                break;
-            case PeerChannel.ID:
+            }
+            case PeerChannel.ID -> {
                 var chp = (PeerChannel) p;
                 var channelInfo = this.channels.get(chp.channelId());
                 if (channelInfo != null) {
                     chats.accept(channelInfo.min);
                 }
-                break;
-            case PeerUser.ID:
+            }
+            case PeerUser.ID -> {
                 var up = (PeerUser) p;
                 var userInfo = this.users.get(up.userId());
                 if (userInfo != null) {
                     users.accept(userInfo.min);
                 }
-                break;
-            default:
-                throw new IllegalArgumentException("Unknown Peer type: " + p);
+            }
+            default -> throw new IllegalArgumentException("Unknown Peer type: " + p);
         }
     }
 
@@ -1015,33 +1007,45 @@ public class StoreLayoutImpl implements StoreLayout {
         addContact(peer, chats::add, users::add);
     }
 
-    private void saveMessage(Message message) {
-        if (!(message instanceof BaseMessageFields)) return;
+    @Nullable
+    private Message saveMessage(Message message) {
+        Message old;
+        if (message instanceof BaseMessage b) {
+            MessageId key = MessageId.create(b);
+            var copy = ImmutableBaseMessage.copyOf(b);
+            old = messages.asMap().put(key, copy);
 
-        BaseMessageFields copy = copy((BaseMessageFields) message);
-        MessageId key = MessageId.create(copy);
+            // TODO: extract all possible peers from message?
+            savePeer(copy.peerId(), copy);
+            Peer p = copy.fromId();
+            if (p != null) {
+                savePeer(p, copy);
+            }
 
-        messages.put(key, copy);
-
-        // TODO: extract all possible peers from message?
-        savePeer(copy.peerId(), copy);
-        Peer p = copy.fromId();
-        if (p != null) {
-            savePeer(p, copy);
-        }
-
-        if (copy instanceof BaseMessage) {
-            var base = (BaseMessage) copy;
-            var media = base.media();
+            MessageMedia media = copy.media();
             if (media != null) {
                 switch (media.identifier()) {
-                    case MessageMediaPoll.ID:
+                    case MessageMediaPoll.ID -> {
                         var mmp = (MessageMediaPoll) media;
                         polls.put(mmp.poll().id(), new MessagePoll(mmp.poll(), copy.peerId(), copy.id()));
-                        break;
+                    }
                 }
             }
+        } else if (message instanceof MessageService m) {
+            MessageId key = MessageId.create(m);
+            var copy = ImmutableMessageService.copyOf(m);
+            old = messages.asMap().put(key, copy);
+
+            savePeer(copy.peerId(), copy);
+            Peer p = copy.fromId();
+            if (p != null) {
+                savePeer(p, copy);
+            }
+        } else {
+            throw new IllegalStateException();
         }
+
+        return old;
     }
 
     static class ChannelInfo {
@@ -1133,37 +1137,49 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class MessageId {
-        final int messageId;
+    static class MessageId implements Comparable<MessageId> {
         final long chatId; // -1 for DM/Group Chats
+        final int messageId;
 
-        static MessageId create(BaseMessageFields message) {
-            switch (message.peerId().identifier()) {
-                case PeerChannel.ID:
-                    return new MessageId(message.id(), ((PeerChannel) message.peerId()).channelId());
-                case PeerChat.ID:
-                case PeerUser.ID:
-                    return new MessageId(message.id(), -1);
-                default: throw new IllegalArgumentException("Unknown Peer type: " + message.peerId());
-            }
+        static MessageId create(Peer peerId, int messageId) {
+            long chatId = peerId instanceof PeerChannel c ? c.channelId() : -1;
+            return new MessageId(chatId, messageId);
         }
 
-        MessageId(int messageId, long chatId) {
-            this.messageId = messageId;
+        static MessageId create(BaseMessage message) {
+            return create(message.peerId(), message.id());
+        }
+
+        static MessageId create(MessageService message) {
+            return create(message.peerId(), message.id());
+        }
+
+        MessageId(int messageId) {
+            this(-1, messageId);
+        }
+
+        MessageId(long chatId, int messageId) {
             this.chatId = chatId;
+            this.messageId = messageId;
+        }
+
+        @Override
+        public int compareTo(MessageId o) {
+            int c = Long.compare(chatId, o.chatId);
+            if (c != 0) return c;
+            return Integer.compare(messageId, o.messageId);
         }
 
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            MessageId messageId1 = (MessageId) o;
-            return messageId == messageId1.messageId && chatId == messageId1.chatId;
+            if (!(o instanceof MessageId m)) return false;
+            return chatId == m.chatId && messageId == m.messageId;
         }
 
         @Override
         public int hashCode() {
-            return messageId ^ Long.hashCode(chatId);
+            return Long.hashCode(chatId) ^ messageId;
         }
     }
 
@@ -1178,19 +1194,28 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class DcKey {
-        final int id;
-        final DataCenter.Type type;
+    static class DcKey implements Comparable<DcKey> {
         final boolean test;
+        final DataCenter.Type type;
+        final int id;
 
-        DcKey(int id, DataCenter.Type type, boolean test) {
-            this.id = id;
-            this.type = type;
+        DcKey(boolean test, DataCenter.Type type, int id) {
             this.test = test;
+            this.type = type;
+            this.id = id;
         }
 
         static DcKey create(DataCenter dc) {
-            return new DcKey(dc.getId(), dc.getType(), dc.isTest());
+            return new DcKey(dc.isTest(), dc.getType(), dc.getId());
+        }
+
+        @Override
+        public int compareTo(DcKey o) {
+            int c = Boolean.compare(test, o.test);
+            if (c != 0) return c;
+            c = type.compareTo(o.type);
+            if (c != 0) return c;
+            return Integer.compare(id, o.id);
         }
 
         @Override

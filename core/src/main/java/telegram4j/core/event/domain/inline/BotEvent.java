@@ -7,7 +7,8 @@ import telegram4j.core.object.User;
 /**
  * Subtype of bot interaction events.
  */
-public abstract class BotEvent extends Event {
+public abstract sealed class BotEvent extends Event
+        permits CallbackEvent, InlineQueryEvent {
 
     protected BotEvent(MTProtoTelegramClient client) {
         super(client);

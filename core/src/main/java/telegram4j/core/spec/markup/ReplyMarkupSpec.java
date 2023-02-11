@@ -83,46 +83,37 @@ public final class ReplyMarkupSpec {
     }
 
     public Mono<telegram4j.tl.ReplyMarkup> asData(MTProtoTelegramClient client) {
-        return Mono.defer(() -> {
-            switch (type()) {
-                case KEYBOARD:
-                    return Flux.fromIterable(rows().orElseThrow())
-                            .flatMap(list -> Flux.fromIterable(list)
-                                    .flatMap(s -> s.asData(client))
-                                    .collect(Collectors.toUnmodifiableList())
-                                    .map(ImmutableKeyboardButtonRow::of))
+        return Mono.defer(() -> switch (type()) {
+            case KEYBOARD -> Flux.fromIterable(rows().orElseThrow())
+                    .flatMap(list -> Flux.fromIterable(list)
+                            .flatMap(s -> s.asData(client))
                             .collect(Collectors.toUnmodifiableList())
-                            .map(rows -> ReplyKeyboardMarkup.builder()
-                                    .flags(flags.getValue())
-                                    .placeholder(placeholder)
-                                    .rows(rows)
-                                    .build());
-                case HIDE:
-                    return Mono.just(ImmutableReplyKeyboardHide.of(flags.getValue()));
-                case FORCE_REPLY:
-                    return Mono.just(ReplyKeyboardForceReply.builder()
+                            .map(ImmutableKeyboardButtonRow::of))
+                    .collect(Collectors.toUnmodifiableList())
+                    .map(rows -> ReplyKeyboardMarkup.builder()
                             .flags(flags.getValue())
                             .placeholder(placeholder)
+                            .rows(rows)
                             .build());
-                case INLINE:
-                    return Flux.fromIterable(rows().orElseThrow())
-                            .flatMap(list -> Flux.fromIterable(list)
-                                    .flatMap(s -> s.asData(client))
-                                    .collect(Collectors.toUnmodifiableList())
-                                    .map(ImmutableKeyboardButtonRow::of))
+            case HIDE -> Mono.just(ImmutableReplyKeyboardHide.of(flags.getValue()));
+            case FORCE_REPLY -> Mono.just(ReplyKeyboardForceReply.builder()
+                    .flags(flags.getValue())
+                    .placeholder(placeholder)
+                    .build());
+            case INLINE -> Flux.fromIterable(rows().orElseThrow())
+                    .flatMap(list -> Flux.fromIterable(list)
+                            .flatMap(s -> s.asData(client))
                             .collect(Collectors.toUnmodifiableList())
-                            .map(ImmutableReplyInlineMarkup::of);
-                default:
-                    return Mono.error(new IllegalStateException());
-            }
+                            .map(ImmutableKeyboardButtonRow::of))
+                    .collect(Collectors.toUnmodifiableList())
+                    .map(ImmutableReplyInlineMarkup::of);
         });
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ReplyMarkupSpec)) return false;
-        ReplyMarkupSpec that = (ReplyMarkupSpec) o;
+        if (!(o instanceof ReplyMarkupSpec that)) return false;
         return type.equals(that.type)
                 && Objects.equals(rows, that.rows)
                 && flags.equals(that.flags)

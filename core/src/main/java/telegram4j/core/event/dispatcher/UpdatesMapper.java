@@ -8,22 +8,34 @@ import telegram4j.tl.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static telegram4j.core.event.dispatcher.UpdatesMapper.StateUpdateHandler.noOp;
+
 public final class UpdatesMapper {
-    private final List<HandlerTuple<?, ?>> handlers = new ArrayList<>();
+    private final List<Handler<?, ?>> handlers = new ArrayList<>();
 
     private UpdatesMapper() {
         // message updates
-        addHandler(UpdateNewMessageFields.class, MessageUpdateHandlers::handleStateUpdateNewMessage,
+        addHandler(UpdateNewMessage.class, MessageUpdateHandlers::persistUpdateNewMessage,
                 MessageUpdateHandlers::handleUpdateNewMessage);
-        addHandler(UpdateEditMessageFields.class, MessageUpdateHandlers::handleStateUpdateEditMessage,
+        addHandler(UpdateNewChannelMessage.class, MessageUpdateHandlers::persistUpdateNewChannelMessage,
+                MessageUpdateHandlers::handleUpdateNewChannelMessage);
+        addHandler(UpdateEditMessage.class, MessageUpdateHandlers::persistUpdateEditMessage,
                 MessageUpdateHandlers::handleUpdateEditMessage);
-        addHandler(UpdateDeleteMessagesFields.class, MessageUpdateHandlers::handleStateUpdateDeleteMessages,
-                MessageUpdateHandlers::handleUpdateDeleteMessages);
-        addHandler(UpdatePinnedMessagesFields.class, MessageUpdateHandlers::handleStateUpdatePinnedMessages,
+        addHandler(UpdateEditChannelMessage.class, MessageUpdateHandlers::persistUpdateEditChannelMessage,
+                MessageUpdateHandlers::handleUpdateEditChannelMessage);
+        addHandler(UpdatePinnedMessages.class, MessageUpdateHandlers::persistUpdatePinnedMessages,
                 MessageUpdateHandlers::handleUpdatePinnedMessages);
-        addHandler(UpdateMessagePoll.class, MessageUpdateHandlers::handleStateUpdateMessagePoll,
+        addHandler(UpdateDeleteMessages.class, MessageUpdateHandlers::persistUpdateDeleteMessages,
+                MessageUpdateHandlers::handleUpdateDeleteMessages);
+        addHandler(UpdateDeleteScheduledMessages.class, MessageUpdateHandlers::persistUpdateDeleteScheduledMessages,
+                MessageUpdateHandlers::handleUpdateDeleteScheduledMessages);
+        addHandler(UpdateDeleteChannelMessages.class, MessageUpdateHandlers::persistUpdateDeleteChannelMessages,
+                MessageUpdateHandlers::handleUpdateDeleteChannelMessages);
+        addHandler(UpdatePinnedChannelMessages.class, MessageUpdateHandlers::persistUpdatePinnedChannelMessages,
+                MessageUpdateHandlers::handleUpdatePinnedChannelMessages);
+        addHandler(UpdateMessagePoll.class, MessageUpdateHandlers::persistUpdateMessagePoll,
                 MessageUpdateHandlers::handleUpdateMessagePoll);
-        addHandler(UpdateMessagePollVote.class, MessageUpdateHandlers::handleStateUpdateMessagePollVote,
+        addHandler(UpdateMessagePollVote.class, MessageUpdateHandlers::persistUpdateMessagePollVote,
                 MessageUpdateHandlers::handleUpdateMessagePollVote);
         // chat updates
         addHandler(UpdateChatParticipant.class, ChatUpdateHandlers::handleStateUpdateChatParticipant,
@@ -34,10 +46,9 @@ public final class UpdatesMapper {
         addHandler(UpdateChannelParticipant.class, ChannelUpdateHandlers::handleStateUpdateChatParticipant,
                 ChannelUpdateHandlers::handleUpdateChannelParticipant);
         // bot updates
-        addHandler(UpdateBotInlineQuery.class, StateUpdateHandler.noOp(), BotUpdatesHandlers::handleUpdateBotInlineQuery);
-        addHandler(UpdateBotCallbackQuery.class, StateUpdateHandler.noOp(), BotUpdatesHandlers::handleUpdateBotCallbackQuery);
-        addHandler(UpdateInlineBotCallbackQuery.class, StateUpdateHandler.noOp(),
-                BotUpdatesHandlers::handleUpdateInlineBotCallbackQuery);
+        addHandler(UpdateBotInlineQuery.class, noOp(), BotUpdatesHandlers::handleUpdateBotInlineQuery);
+        addHandler(UpdateBotCallbackQuery.class, noOp(), BotUpdatesHandlers::handleUpdateBotCallbackQuery);
+        addHandler(UpdateInlineBotCallbackQuery.class, noOp(), BotUpdatesHandlers::handleUpdateInlineBotCallbackQuery);
     }
 
     public static final UpdatesMapper instance = new UpdatesMapper();
@@ -45,7 +56,7 @@ public final class UpdatesMapper {
     private <U extends Update, O> void addHandler(Class<? extends U> type,
                                                  StateUpdateHandler<U, O> updateHandler,
                                                  UpdateHandler<U, O> handler) {
-        handlers.add(new HandlerTuple<>(type, updateHandler, handler));
+        handlers.add(new Handler<>(type, updateHandler, handler));
     }
 
     @SuppressWarnings("unchecked")
@@ -53,24 +64,16 @@ public final class UpdatesMapper {
         return Mono.justOrEmpty(handlers.stream()
                         .filter(t -> t.type.isAssignableFrom(context.getUpdate().getClass()))
                         .findFirst())
-                .map(t -> (HandlerTuple<U, Object>) t)
+                .map(t -> (Handler<U, Object>) t)
                 .flatMapMany(t -> t.updateHandler.handle(context)
                         .map(obj -> StatefulUpdateContext.from(context, obj))
                         .defaultIfEmpty(StatefulUpdateContext.from(context, null))
                         .flatMapMany(t.handler::handle));
     }
 
-    static class HandlerTuple<U extends Update, O> {
-        final Class<? extends U> type;
-        final StateUpdateHandler<U, O> updateHandler;
-        final UpdateHandler<U, O> handler;
-
-        HandlerTuple(Class<? extends U> type, StateUpdateHandler<U, O> updateHandler, UpdateHandler<U, O> handler) {
-            this.type = type;
-            this.updateHandler = updateHandler;
-            this.handler = handler;
-        }
-    }
+    record Handler<U extends Update, O>(Class<? extends U> type,
+                                        StateUpdateHandler<U, O> updateHandler,
+                                        UpdateHandler<U, O> handler) {}
 
     @FunctionalInterface
     interface UpdateHandler<U extends Update, O> {

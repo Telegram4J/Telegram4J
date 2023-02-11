@@ -11,7 +11,6 @@ import telegram4j.tl.storage.FileType;
 
 import java.util.Locale;
 import java.util.Objects;
-import java.util.function.Function;
 
 /** Utility class with frequently used methods for mapping TL objects. */
 public class TlEntityUtil {
@@ -24,31 +23,31 @@ public class TlEntityUtil {
             return FileType.UNKNOWN;
         }
 
-        switch (mimeType.toLowerCase(Locale.ROOT)) {
-            case "image/gif": return FileType.GIF;
-            case "image/jpeg": return FileType.JPEG;
-            case "image/png": return FileType.PNG;
-            case "image/webp": return FileType.WEBP;
-            case "application/pdf": return FileType.PDF;
-            case "audio/mpeg": return FileType.MP3;
-            case "audio/mp4": return FileType.MP4;
-            case "video/quicktime": return FileType.MOV;
-            default: return FileType.UNKNOWN;
-        }
+        return switch (mimeType.toLowerCase(Locale.ROOT)) {
+            case "image/gif" -> FileType.GIF;
+            case "image/jpeg" -> FileType.JPEG;
+            case "image/png" -> FileType.PNG;
+            case "image/webp" -> FileType.WEBP;
+            case "application/pdf" -> FileType.PDF;
+            case "audio/mpeg" -> FileType.MP3;
+            case "audio/mp4" -> FileType.MP4;
+            case "video/quicktime" -> FileType.MOV;
+            default -> FileType.UNKNOWN;
+        };
     }
 
     public static String toMimeType(FileType type) {
-        switch (type) {
-            case JPEG: return "image/jpeg";
-            case GIF: return "image/gif";
-            case PNG: return "image/png";
-            case PDF: return "application/pdf";
-            case MP3: return "audio/mpeg";
-            case MOV: return "video/quicktime";
-            case MP4: return "audio/mp4";
-            case WEBP: return "image/webp";
-            default: throw new IllegalArgumentException("Unexpected file type: " + type);
-        }
+        return switch (type) {
+            case JPEG -> "image/jpeg";
+            case GIF -> "image/gif";
+            case PNG -> "image/png";
+            case PDF -> "application/pdf";
+            case MP3 -> "audio/mpeg";
+            case MOV -> "video/quicktime";
+            case MP4 -> "audio/mp4";
+            case WEBP -> "image/webp";
+            default -> throw new IllegalArgumentException("Unexpected file type: " + type);
+        };
     }
 
     // https://github.com/telegramdesktop/tdesktop/tree/17de379145684999eed826d22469503097516689/Telegram/SourceFiles/ui/image/image.cpp#L44-#L91
@@ -92,82 +91,90 @@ public class TlEntityUtil {
     }
 
     public static long getRawPeerId(Peer peer) {
-        switch (peer.identifier()) {
-            case PeerChannel.ID: return ((PeerChannel) peer).channelId();
-            case PeerChat.ID: return ((PeerChat) peer).chatId();
-            case PeerUser.ID: return ((PeerUser) peer).userId();
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
-        }
+        return switch (peer.identifier()) {
+            case PeerChannel.ID -> ((PeerChannel) peer).channelId();
+            case PeerChat.ID -> ((PeerChat) peer).chatId();
+            case PeerUser.ID -> ((PeerUser) peer).userId();
+            default -> throw new IllegalArgumentException("Unknown peer type: " + peer);
+        };
     }
 
     public static long getRawPeerId(InputChannel inputChannel) {
-        switch (inputChannel.identifier()) {
-            case BaseInputChannel.ID: return ((BaseInputChannel) inputChannel).channelId();
-            case InputChannelFromMessage.ID: return ((InputChannelFromMessage) inputChannel).channelId();
-            default: throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
-        }
+        return switch (inputChannel.identifier()) {
+            case BaseInputChannel.ID -> ((BaseInputChannel) inputChannel).channelId();
+            case InputChannelFromMessage.ID -> ((InputChannelFromMessage) inputChannel).channelId();
+            default -> throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
+        };
     }
 
     public static InputPeer toInputPeer(InputUser user) {
-        switch (user.identifier()) {
-            case InputUserFromMessage.ID:
+        return switch (user.identifier()) {
+            case InputUserFromMessage.ID -> {
                 var d = (InputUserFromMessage) user;
-                return ImmutableInputPeerUserFromMessage.of(d.peer(), d.msgId(), d.userId());
-            case InputUserSelf.ID: return InputPeerSelf.instance();
-            case BaseInputUser.ID:
+                yield ImmutableInputPeerUserFromMessage.of(d.peer(), d.msgId(), d.userId());
+            }
+            case InputUserSelf.ID -> InputPeerSelf.instance();
+            case BaseInputUser.ID -> {
                 var v = (BaseInputUser) user;
-                return ImmutableInputPeerUser.of(v.userId(), v.accessHash());
-            default: throw new IllegalArgumentException("Unknown input user type: " + user);
-        }
+                yield ImmutableInputPeerUser.of(v.userId(), v.accessHash());
+            }
+            default -> throw new IllegalArgumentException("Unknown input user type: " + user);
+        };
     }
 
     public static InputPeer toInputPeer(InputChannel channel) {
-        switch (channel.identifier()) {
-            case InputChannelFromMessage.ID:
+        return switch (channel.identifier()) {
+            case InputChannelFromMessage.ID -> {
                 var d = (InputChannelFromMessage) channel;
-                return ImmutableInputPeerChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
-            case BaseInputChannel.ID:
+                yield ImmutableInputPeerChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
+            }
+            case BaseInputChannel.ID -> {
                 var v = (BaseInputChannel) channel;
-                return ImmutableInputPeerChannel.of(v.channelId(), v.accessHash());
-            default: throw new IllegalArgumentException("Unknown input channel type: " + channel);
-        }
+                yield ImmutableInputPeerChannel.of(v.channelId(), v.accessHash());
+            }
+            default -> throw new IllegalArgumentException("Unknown input channel type: " + channel);
+        };
     }
 
     public static InputUser toInputUser(InputPeer peer) {
-        switch (peer.identifier()) {
-            case InputPeerUserFromMessage.ID:
+        return switch (peer.identifier()) {
+            case InputPeerUserFromMessage.ID -> {
                 var d = (InputPeerUserFromMessage) peer;
-                return ImmutableInputUserFromMessage.of(d.peer(), d.msgId(), d.userId());
-            case InputPeerSelf.ID: return InputUserSelf.instance();
-            case InputPeerUser.ID:
+                yield ImmutableInputUserFromMessage.of(d.peer(), d.msgId(), d.userId());
+            }
+            case InputPeerSelf.ID -> InputUserSelf.instance();
+            case InputPeerUser.ID -> {
                 var v = (InputPeerUser) peer;
-                return ImmutableBaseInputUser.of(v.userId(), v.accessHash());
-            default: throw new IllegalArgumentException("Unknown input peer user type: " + peer);
-        }
+                yield ImmutableBaseInputUser.of(v.userId(), v.accessHash());
+            }
+            default -> throw new IllegalArgumentException("Unknown input peer user type: " + peer);
+        };
     }
 
     public static InputChannel toInputChannel(InputPeer peer) {
-        switch (peer.identifier()) {
-            case InputPeerChannelFromMessage.ID:
+        return switch (peer.identifier()) {
+            case InputPeerChannelFromMessage.ID -> {
                 var d = (InputPeerChannelFromMessage) peer;
-                return ImmutableInputChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
-            case InputPeerChannel.ID:
+                yield ImmutableInputChannelFromMessage.of(d.peer(), d.msgId(), d.channelId());
+            }
+            case InputPeerChannel.ID -> {
                 var v = (InputPeerChannel) peer;
-                return ImmutableBaseInputChannel.of(v.channelId(), v.accessHash());
-            default: throw new IllegalArgumentException("Unknown input peer channel type: " + peer);
-        }
+                yield ImmutableBaseInputChannel.of(v.channelId(), v.accessHash());
+            }
+            default -> throw new IllegalArgumentException("Unknown input peer channel type: " + peer);
+        };
     }
 
     public static Peer getUserId(ChannelParticipant data) {
-        switch (data.identifier()) {
-            case BaseChannelParticipant.ID: return ImmutablePeerUser.of(((BaseChannelParticipant) data).userId());
-            case ChannelParticipantSelf.ID: return ImmutablePeerUser.of(((ChannelParticipantSelf) data).userId());
-            case ChannelParticipantAdmin.ID: return ImmutablePeerUser.of(((ChannelParticipantAdmin) data).userId());
-            case ChannelParticipantBanned.ID: return ((ChannelParticipantBanned) data).peer();
-            case ChannelParticipantLeft.ID: return ((ChannelParticipantLeft) data).peer();
-            case ChannelParticipantCreator.ID: return ImmutablePeerUser.of(((ChannelParticipantCreator) data).userId());
-            default: throw new IllegalArgumentException("Unknown channel participant type: " + data);
-        }
+        return switch (data.identifier()) {
+            case BaseChannelParticipant.ID -> ImmutablePeerUser.of(((BaseChannelParticipant) data).userId());
+            case ChannelParticipantSelf.ID -> ImmutablePeerUser.of(((ChannelParticipantSelf) data).userId());
+            case ChannelParticipantAdmin.ID -> ImmutablePeerUser.of(((ChannelParticipantAdmin) data).userId());
+            case ChannelParticipantBanned.ID -> ((ChannelParticipantBanned) data).peer();
+            case ChannelParticipantLeft.ID -> ((ChannelParticipantLeft) data).peer();
+            case ChannelParticipantCreator.ID -> ImmutablePeerUser.of(((ChannelParticipantCreator) data).userId());
+            default -> throw new IllegalArgumentException("Unknown channel participant type: " + data);
+        };
     }
 
     @Nullable
@@ -186,18 +193,6 @@ public class TlEntityUtil {
         return obj;
     }
 
-    public static <T> Function<Object, T> isInstance(Class<T> type) {
-        return o -> mapCast(o, type);
-    }
-
-    @Nullable
-    public static <T> T mapCast(@Nullable Object obj, Class<T> type) {
-        if (!type.isInstance(obj)) {
-            return null;
-        }
-        return type.cast(obj);
-    }
-
     // These methods use access hashes even with min entities, just to get the profile's photo
     public static InputPeer photoInputPeer(Channel channel) {
         return ImmutableInputPeerChannel.of(channel.id(),
@@ -213,11 +208,9 @@ public class TlEntityUtil {
     }
 
     public static boolean isUserPeer(InputPeer peer) {
-        switch (peer.identifier()) {
-            case InputPeerSelf.ID:
-            case InputPeerUser.ID:
-            case InputPeerUserFromMessage.ID: return true;
-            default: return false;
-        }
+        return switch (peer.identifier()) {
+            case InputPeerSelf.ID, InputPeerUser.ID, InputPeerUserFromMessage.ID -> true;
+            default -> false;
+        };
     }
 }

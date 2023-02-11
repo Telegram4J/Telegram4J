@@ -4,8 +4,8 @@ import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.EntityFactory;
-import telegram4j.core.object.media.PhotoSize;
-import telegram4j.core.object.media.VideoSize;
+import telegram4j.core.object.media.AnimatedThumbnail;
+import telegram4j.core.object.media.Thumbnail;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.tl.*;
@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
  * All subtypes are inferred from {@link BaseDocument#attributes()} except {@link telegram4j.tl.DocumentAttributeFilename},
  * that pre-inferred to {@link #getFileName()} for this type.
  */
-public class Document implements TelegramObject {
+public sealed class Document implements TelegramObject
+        permits Video, Photo, Sticker, Audio {
 
     protected final MTProtoTelegramClient client;
     protected final TlObject data; // WebDocument/BaseDocument/BasePhoto
@@ -39,15 +40,20 @@ public class Document implements TelegramObject {
         this.fileName = fileName;
     }
 
-    public Document(MTProtoTelegramClient client, BaseDocumentFields data,
+    public Document(MTProtoTelegramClient client, BaseDocument data,
                     @Nullable String fileName, Context context) {
         this.client = Objects.requireNonNull(client);
         this.data = Objects.requireNonNull(data);
         this.fileName = fileName;
+        this.fileReferenceId = FileReferenceId.ofDocument(data, context);
+    }
 
-        this.fileReferenceId = data instanceof BaseDocument
-                ? FileReferenceId.ofDocument((BaseDocument) data, context)
-                : FileReferenceId.ofDocument((WebDocument) data, context);
+    public Document(MTProtoTelegramClient client, WebDocument data,
+                    @Nullable String fileName, Context context) {
+        this.client = Objects.requireNonNull(client);
+        this.data = Objects.requireNonNull(data);
+        this.fileName = fileName;
+        this.fileReferenceId = FileReferenceId.ofDocument(data, context);
     }
 
     @Override
@@ -61,17 +67,17 @@ public class Document implements TelegramObject {
      * @return {@code true} if document is web, otherwise {@code false}.
      */
     public boolean isWeb() {
-        return data.identifier() != BaseDocument.ID;
+        return data instanceof WebDocument;
     }
 
     /**
-     * Gets url of web file, if present.
+     * Gets url of web file, if document is web file.
      *
      * @return The url of the web file, if present.
      */
     public Optional<String> getUrl() {
-        return data instanceof WebDocument
-                ? Optional.of(((WebDocument) data).url())
+        return data instanceof WebDocument w
+                ? Optional.of(w.url())
                 : Optional.empty();
     }
 
@@ -90,11 +96,11 @@ public class Document implements TelegramObject {
      * @return The id of the document, if document isn't web.
      */
     public Optional<Long> getId() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.of(((BaseDocument) data).id());
-            case BasePhoto.ID: return Optional.of(((BasePhoto) data).id());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.of(((BaseDocument) data).id());
+            case BasePhoto.ID -> Optional.of(((BasePhoto) data).id());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -103,12 +109,12 @@ public class Document implements TelegramObject {
      * @return The access hash of the document, if document has telegram proxying.
      */
     public Optional<Long> getAccessHash() {
-        switch (data.identifier()) {
-            case BasePhoto.ID: return Optional.of(((BasePhoto) data).accessHash());
-            case BaseWebDocument.ID: return Optional.of(((BaseWebDocument) data).accessHash());
-            case BaseDocument.ID: return Optional.of(((BaseDocument) data).accessHash());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BasePhoto.ID -> Optional.of(((BasePhoto) data).accessHash());
+            case BaseWebDocument.ID -> Optional.of(((BaseWebDocument) data).accessHash());
+            case BaseDocument.ID -> Optional.of(((BaseDocument) data).accessHash());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -117,11 +123,11 @@ public class Document implements TelegramObject {
      * @return The <i>immutable</i> {@link ByteBuf} of the file reference, if document isn't web.
      */
     public Optional<ByteBuf> getFileReference() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.of(((BaseDocument) data).fileReference());
-            case BasePhoto.ID: return Optional.of(((BasePhoto) data).fileReference());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.of(((BaseDocument) data).fileReference());
+            case BasePhoto.ID -> Optional.of(((BasePhoto) data).fileReference());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -130,11 +136,11 @@ public class Document implements TelegramObject {
      * @return The {@link Instant} of the document creation, if document isn't web.
      */
     public Optional<Instant> getCreationTimestamp() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.of(Instant.ofEpochSecond(((BaseDocument) data).date()));
-            case BasePhoto.ID: return Optional.of(Instant.ofEpochSecond(((BasePhoto) data).date()));
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.of(Instant.ofEpochSecond(((BaseDocument) data).date()));
+            case BasePhoto.ID -> Optional.of(Instant.ofEpochSecond(((BasePhoto) data).date()));
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -143,9 +149,12 @@ public class Document implements TelegramObject {
      * @return The mime-type string of the document.
      */
     public String getMimeType() {
-        return data instanceof BaseDocumentFields
-                ? ((BaseDocumentFields) data).mimeType()
-                : "image/jpeg";
+        return switch (data.identifier()) {
+            case BasePhoto.ID -> "image/jpeg";
+            case BaseWebDocument.ID, WebDocumentNoProxy.ID -> ((WebDocument) data).mimeType();
+            case BaseDocument.ID -> ((BaseDocument) data).mimeType();
+            default -> throw new IllegalStateException();
+        };
     }
 
     /**
@@ -155,47 +164,45 @@ public class Document implements TelegramObject {
      * @return The size of document in the bytes, if present.
      */
     public Optional<Long> getSize() {
-        if (data instanceof WebDocument) {
-            return Optional.of((long) ((WebDocument) data).size());
-        } else if (data.identifier() == BaseDocument.ID) {
-            return Optional.of(((BaseDocument) data).size());
-        } else {
-            return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BaseWebDocument.ID, WebDocumentNoProxy.ID -> Optional.of((long) ((WebDocument) data).size());
+            case BaseDocument.ID -> Optional.of(((BaseDocument) data).size());
+            default -> Optional.empty();
+        };
     }
 
     /**
-     * Gets mutable list of {@link PhotoSize thumbnails} for this document, if present.
+     * Gets mutable list of {@link Thumbnail thumbnails} for this document, if present.
      *
-     * @return The mutable list of {@link PhotoSize thumbnails} for this document, if present.
+     * @return The mutable list of {@link Thumbnail thumbnails} for this document, if present.
      */
-    public Optional<List<PhotoSize>> getThumbs() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.ofNullable(((BaseDocument) data).thumbs()).map(l -> l.stream()
-                    .map(EntityFactory::createPhotoSize)
+    public Optional<List<Thumbnail>> getThumbs() {
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.ofNullable(((BaseDocument) data).thumbs()).map(l -> l.stream()
+                    .map(EntityFactory::createThumbnail)
                     .collect(Collectors.toList()));
-            case BasePhoto.ID: return Optional.of(((BasePhoto) data).sizes()).map(l -> l.stream()
-                    .map(EntityFactory::createPhotoSize)
+            case BasePhoto.ID -> Optional.of(((BasePhoto) data).sizes()).map(l -> l.stream()
+                    .map(EntityFactory::createThumbnail)
                     .collect(Collectors.toList()));
-            default: return Optional.empty();
-        }
+            default -> Optional.empty();
+        };
     }
 
     /**
-     * Gets mutable list of {@link VideoSize video thumbnails} for this document, if present.
+     * Gets mutable list of {@link AnimatedThumbnail video thumbnails} for this document, if present.
      *
-     * @return The mutable list of {@link VideoSize video thumbnails} for this document, if present.
+     * @return The mutable list of {@link AnimatedThumbnail video thumbnails} for this document, if present.
      */
-    public Optional<List<VideoSize>> getVideoThumbs() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.ofNullable(((BaseDocument) data).videoThumbs()).map(l -> l.stream()
-                    .map(d -> new VideoSize(client, d))
+    public Optional<List<AnimatedThumbnail>> getAnimatedThumbs() {
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.ofNullable(((BaseDocument) data).videoThumbs()).map(l -> l.stream()
+                    .map(d -> EntityFactory.createAnimatedThumbnail(client, d))
                     .collect(Collectors.toList()));
-            case BasePhoto.ID: return Optional.ofNullable(((BasePhoto) data).videoSizes()).map(l -> l.stream()
-                    .map(d -> new VideoSize(client, d))
+            case BasePhoto.ID -> Optional.ofNullable(((BasePhoto) data).videoSizes()).map(l -> l.stream()
+                    .map(d -> EntityFactory.createAnimatedThumbnail(client, d))
                     .collect(Collectors.toList()));
-            default: return Optional.empty();
-        }
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -204,11 +211,11 @@ public class Document implements TelegramObject {
      * @return The id of the DC, where document was stored, if document isn't web.
      */
     public Optional<Integer> getDcId() {
-        switch (data.identifier()) {
-            case BaseDocument.ID: return Optional.of(((BaseDocument) data).dcId());
-            case BasePhoto.ID: return Optional.of(((BasePhoto) data).dcId());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case BaseDocument.ID -> Optional.of(((BaseDocument) data).dcId());
+            case BasePhoto.ID -> Optional.of(((BasePhoto) data).dcId());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -223,9 +230,8 @@ public class Document implements TelegramObject {
     @Override
     public final boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Document document = (Document) o;
-        return fileReferenceId.equals(document.fileReferenceId);
+        if (!(o instanceof Document d)) return false;
+        return fileReferenceId.equals(d.fileReferenceId);
     }
 
     @Override

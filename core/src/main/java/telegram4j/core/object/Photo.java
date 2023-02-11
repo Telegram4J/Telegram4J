@@ -5,9 +5,10 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.Context;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.file.ProfilePhotoContext;
-import telegram4j.tl.BaseDocumentFields;
+import telegram4j.tl.BaseDocument;
 import telegram4j.tl.BasePhoto;
 import telegram4j.tl.DocumentAttributeImageSize;
+import telegram4j.tl.WebDocument;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -18,11 +19,18 @@ import java.util.Optional;
  * <p> For separation between ordinal message photos and sent as document you
  * can check {@link FileReferenceId#getFileType()} of {@link #getFileReferenceId()}.
  */
-public class Photo extends Document {
+public final class Photo extends Document {
     @Nullable
     private final DocumentAttributeImageSize sizeData;
 
-    public Photo(MTProtoTelegramClient client, BaseDocumentFields data,
+    public Photo(MTProtoTelegramClient client, WebDocument data,
+                 @Nullable String fileName, Context context,
+                 DocumentAttributeImageSize sizeData) {
+        super(client, data, fileName, context);
+        this.sizeData = Objects.requireNonNull(sizeData);
+    }
+
+    public Photo(MTProtoTelegramClient client, BaseDocument data,
                  @Nullable String fileName, Context context,
                  DocumentAttributeImageSize sizeData) {
         super(client, data, fileName, context);
@@ -65,7 +73,7 @@ public class Photo extends Document {
      * @return {@code true} if photo has mask stickers attached to it.
      */
     public boolean hasStickers() {
-        return data.identifier() == BasePhoto.ID && ((BasePhoto) data).hasStickers();
+        return data instanceof BasePhoto p && p.hasStickers();
     }
 
     @Override

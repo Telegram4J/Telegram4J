@@ -10,14 +10,12 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.InlineMessageId;
-import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.BaseGeoPoint;
 import telegram4j.tl.UpdateBotCallbackQuery;
 import telegram4j.tl.UpdateBotInlineQuery;
 import telegram4j.tl.UpdateInlineBotCallbackQuery;
 
 import java.util.Objects;
-import java.util.Optional;
 
 class BotUpdatesHandlers {
 
@@ -55,9 +53,7 @@ class BotUpdatesHandlers {
         UpdateBotInlineQuery upd = context.getUpdate();
 
         User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
-        GeoPoint geo = Optional.ofNullable(TlEntityUtil.unmapEmpty(upd.geo(), BaseGeoPoint.class))
-                .map(GeoPoint::new)
-                .orElse(null);
+        GeoPoint geo = upd.geo() instanceof BaseGeoPoint b ? new GeoPoint(b) : null;
 
         return Flux.just(new InlineQueryEvent(client, upd.queryId(), user,
                 upd.query(), geo, upd.peerType(), upd.offset()));

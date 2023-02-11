@@ -1,6 +1,5 @@
 package telegram4j.core.object.chat;
 
-import reactor.util.annotation.Nullable;
 import telegram4j.core.util.BitFlag;
 import telegram4j.tl.ChatBannedRights;
 
@@ -35,6 +34,10 @@ public final class ChatRestrictions {
      * @return The timestamp until which restriction is active, if present otherwise restriction is active forever.
      */
     public Optional<Instant> getUntilTimestamp() {
+        if (data.untilDate() == 0) {
+            return Optional.empty();
+        }
+
         // TD:
         // https://github.com/tdlib/td/blob/92f8093486f19c049de5446cc20950e641c6ade0/td/telegram/DialogParticipant.cpp#L581-#L587
         //   if user is restricted for more than 366 days or less than 30 seconds from the current time,
@@ -46,19 +49,6 @@ public final class ChatRestrictions {
             return Optional.empty();
         }
         return Optional.of(until);
-    }
-
-    @Override
-    public boolean equals(@Nullable Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ChatRestrictions that = (ChatRestrictions) o;
-        return data.equals(that.data);
-    }
-
-    @Override
-    public int hashCode() {
-        return data.hashCode();
     }
 
     @Override
@@ -108,7 +98,15 @@ public final class ChatRestrictions {
         PIN_MESSAGES(PIN_MESSAGES_POS),
 
         /** Disallows to create, edit and delete group chat topics. */
-        MANAGE_TOPICS(MANAGE_TOPICS_POS);
+        MANAGE_TOPICS(MANAGE_TOPICS_POS),
+
+        SEND_PHOTOS(SEND_PHOTOS_POS),
+        SEND_VIDEOS(SEND_VIDEOS_POS),
+        SEND_ROUND_VIDEOS(SEND_ROUNDVIDEOS_POS),
+        SEND_AUDIOS(SEND_AUDIOS_POS),
+        SEND_VOICES(SEND_VOICES_POS),
+        SEND_DOCS(SEND_DOCS_POS),
+        SEND_PLAIN(SEND_PLAIN_POS);
 
         private final byte position;
 

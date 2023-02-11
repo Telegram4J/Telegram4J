@@ -2,20 +2,30 @@ package telegram4j.core.object;
 
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.Context;
-import telegram4j.tl.BaseDocumentFields;
+import telegram4j.tl.BaseDocument;
 import telegram4j.tl.DocumentAttributeVideo;
+import telegram4j.tl.WebDocument;
 
 import java.time.Duration;
 import java.util.Objects;
 
-/** Inferred from {@link BaseDocumentFields#attributes()} type of video and gif documents. */
-public class Video extends Document {
+/** Inferred from document attributes type of video and gif documents. */
+public final class Video extends Document {
 
     private final telegram4j.tl.DocumentAttributeVideo videoData;
     private final boolean hasStickers;
     private final boolean gif;
 
-    public Video(MTProtoTelegramClient client, BaseDocumentFields data,
+    public Video(MTProtoTelegramClient client, BaseDocument data,
+                 String fileName, Context context, DocumentAttributeVideo videoData,
+                 boolean hasStickers, boolean gif) {
+        super(client, data, fileName, context);
+        this.videoData = Objects.requireNonNull(videoData);
+        this.hasStickers = hasStickers;
+        this.gif = gif;
+    }
+
+    public Video(MTProtoTelegramClient client, WebDocument data,
                  String fileName, Context context, DocumentAttributeVideo videoData,
                  boolean hasStickers, boolean gif) {
         super(client, data, fileName, context);

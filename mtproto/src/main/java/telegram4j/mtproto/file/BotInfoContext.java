@@ -6,7 +6,7 @@ import telegram4j.tl.Peer;
 
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
-public class BotInfoContext extends Context {
+public final class BotInfoContext extends Context {
     private final Peer chatPeer;
     private final long botId; // may be -1 if it's equals to chatPeer
 

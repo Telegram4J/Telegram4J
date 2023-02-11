@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 /** Interface for {@link User} and {@link Channel} peers which can have username. */
-public interface MentionablePeer extends PeerEntity {
+public sealed interface MentionablePeer extends PeerEntity
+        permits User, Channel {
 
     /**
      * Gets username of this user in format <b>username</b>, if present.

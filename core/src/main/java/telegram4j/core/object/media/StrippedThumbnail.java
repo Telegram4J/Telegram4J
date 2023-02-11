@@ -5,11 +5,11 @@ import telegram4j.mtproto.util.TlEntityUtil;
 
 import java.util.Objects;
 
-public class PhotoStrippedSize implements PhotoSize {
+public final class StrippedThumbnail implements Thumbnail {
 
     private final telegram4j.tl.PhotoStrippedSize data;
 
-    public PhotoStrippedSize(telegram4j.tl.PhotoStrippedSize data) {
+    public StrippedThumbnail(telegram4j.tl.PhotoStrippedSize data) {
         this.data = Objects.requireNonNull(data);
     }
 

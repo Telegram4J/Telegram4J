@@ -13,8 +13,8 @@ import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.ImmutableCodeSettings;
 import telegram4j.tl.auth.BaseAuthorization;
+import telegram4j.tl.auth.BaseSentCode;
 import telegram4j.tl.auth.CodeType;
-import telegram4j.tl.auth.SentCode;
 import telegram4j.tl.request.auth.ImmutableCancelCode;
 import telegram4j.tl.request.auth.ImmutableResendCode;
 import telegram4j.tl.request.auth.ImmutableSendCode;
@@ -42,7 +42,7 @@ public class CodeAuthorization {
         this.completeSink = completeSink;
     }
 
-    SentCode currentCode;
+    BaseSentCode currentCode;
     String phoneNumber;
     boolean firstNumber = true;
     boolean validPhone = false;
@@ -100,10 +100,13 @@ public class CodeAuthorization {
                                                 .flatMap(clientGroup::setMain)
                                                 .then(Mono.fromRunnable(() -> state.emitNext(State.SEND_CODE, FAIL_FAST)));
                                     })
+                                    // TODO: why new subtype of SentCode was added?
+                                    .cast(BaseSentCode.class)
                                     .flatMapMany(this::applyCode);
                         case RESEND_CODE:
                             return clientGroup.main()
                                     .sendAwait(ImmutableResendCode.of(phoneNumber, currentCode.phoneCodeHash()))
+                                    .cast(BaseSentCode.class)
                                     .flatMapMany(this::applyCode);
                         case AWAIT_CODE:
                             synchronized (System.out) {
@@ -152,7 +155,7 @@ public class CodeAuthorization {
         return phoneNumber;
     }
 
-    Publisher<?> applyCode(SentCode scode) {
+    Publisher<?> applyCode(BaseSentCode scode) {
         boolean resend = currentCode != null;
         currentCode = scode;
 

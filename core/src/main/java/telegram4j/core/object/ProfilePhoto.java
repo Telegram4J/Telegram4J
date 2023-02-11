@@ -2,10 +2,11 @@ package telegram4j.core.object;
 
 import io.netty.buffer.ByteBuf;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.FileReferenceId;
 import telegram4j.mtproto.util.TlEntityUtil;
+import telegram4j.tl.BaseChatPhoto;
 import telegram4j.tl.BaseUserProfilePhoto;
-import telegram4j.tl.ChatPhotoFields;
 import telegram4j.tl.InputPeer;
 
 import java.util.Objects;
@@ -17,19 +18,27 @@ import java.util.Optional;
  * <p> There are 2 versions available for download: small ({@link ProfilePhoto#getSmallFileReferenceId()})
  * and big ({@link ProfilePhoto#getBigFileReferenceId()}).
  */
-public class ProfilePhoto implements TelegramObject {
+public final class ProfilePhoto implements TelegramObject {
     private final MTProtoTelegramClient client;
-    private final ChatPhotoFields data;
+    private final Variant2<BaseChatPhoto, BaseUserProfilePhoto> data;
 
     private final FileReferenceId smallFileReferenceId;
     private final FileReferenceId bigFileReferenceId;
 
-    public ProfilePhoto(MTProtoTelegramClient client, ChatPhotoFields data, InputPeer context) {
+    public ProfilePhoto(MTProtoTelegramClient client, BaseChatPhoto data, InputPeer peer) {
         this.client = Objects.requireNonNull(client);
-        this.data = Objects.requireNonNull(data);
+        this.data = Variant2.ofT1(data);
 
-        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, context);
-        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, context);
+        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, peer);
+        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, peer);
+    }
+
+    public ProfilePhoto(MTProtoTelegramClient client, BaseUserProfilePhoto data, InputPeer peer) {
+        this.client = Objects.requireNonNull(client);
+        this.data = Variant2.ofT2(data);
+
+        this.smallFileReferenceId = FileReferenceId.ofChatPhoto(data, false, peer);
+        this.bigFileReferenceId = FileReferenceId.ofChatPhoto(data, true, peer);
     }
 
     @Override
@@ -61,12 +70,12 @@ public class ProfilePhoto implements TelegramObject {
      * @return {@code true} if peer has animated profile photo.
      */
     public boolean hasVideo() {
-        return data.hasVideo();
+        return data.map(BaseChatPhoto::hasVideo, BaseUserProfilePhoto::hasVideo);
     }
 
     // TODO: docs
     public boolean isPersonal() {
-        return data instanceof BaseUserProfilePhoto && ((BaseUserProfilePhoto) data).personal();
+        return data.map(e -> false, BaseUserProfilePhoto::personal);
     }
 
     /**
@@ -75,7 +84,7 @@ public class ProfilePhoto implements TelegramObject {
      * @return The id of chat photo.
      */
     public long getId() {
-        return data.photoId();
+        return data.map(BaseChatPhoto::photoId, BaseUserProfilePhoto::photoId);
     }
 
     /**
@@ -84,7 +93,8 @@ public class ProfilePhoto implements TelegramObject {
      * @return The new {@link ByteBuf} with expanded stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getThumb() {
-        return Optional.ofNullable(data.strippedThumb()).map(TlEntityUtil::expandInlineThumb);
+        return Optional.ofNullable(data.map(BaseChatPhoto::strippedThumb, BaseUserProfilePhoto::strippedThumb))
+                .map(TlEntityUtil::expandInlineThumb);
     }
 
     /**
@@ -93,7 +103,7 @@ public class ProfilePhoto implements TelegramObject {
      * @return The raw stripped thumbnail for photo, if present.
      */
     public Optional<ByteBuf> getStrippedThumb() {
-        return Optional.ofNullable(data.strippedThumb());
+        return Optional.ofNullable(data.map(BaseChatPhoto::strippedThumb, BaseUserProfilePhoto::strippedThumb));
     }
 
     /**
@@ -102,7 +112,7 @@ public class ProfilePhoto implements TelegramObject {
      * @return The id of DC that can be used for downloading this photo.
      */
     public int getDcId() {
-        return data.dcId();
+        return data.map(BaseChatPhoto::dcId, BaseUserProfilePhoto::dcId);
     }
 
     @Override

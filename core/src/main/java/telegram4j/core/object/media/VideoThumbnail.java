@@ -1,40 +1,31 @@
 package telegram4j.core.object.media;
 
-import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.TelegramObject;
-
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Representation for animated profile pictures in MPEG4 format.
+ * Representation of animated thumbnail of animated profile pictures in MPEG4 format.
  *
  * @see <a href="https://core.telegram.org/api/files#animated-profile-pictures">Animated Profile Pictures</a>
  */
-public final class VideoSize implements TelegramObject {
+public final class VideoThumbnail implements AnimatedThumbnail {
 
-    private final MTProtoTelegramClient client;
-    private final telegram4j.tl.VideoSize data;
+    private final telegram4j.tl.BaseVideoSize data;
 
-    public VideoSize(MTProtoTelegramClient client, telegram4j.tl.VideoSize data) {
-        this.client = Objects.requireNonNull(client);
+    public VideoThumbnail(telegram4j.tl.BaseVideoSize data) {
         this.data = Objects.requireNonNull(data);
-    }
-
-    @Override
-    public MTProtoTelegramClient getClient() {
-        return client;
     }
 
     /**
      * Gets single-char type of applied transformations to video.
      * Can be one of these chars:
      * <ul>
-     *   <li>{@code 'u'}: if it's a profile photo.</li>
+     *   <li>{@code 'u'}: if it's a animated profile photo.</li>
      *   <li>{@code 'v'}: if it's a trimmed and downscaled video previews.</li>
      * </ul>
      *
      * @return The single-char type of applied transformations.
+     * @see <a href="https://core.telegram.org/api/files#video-types">Video Thumbnail Types</a>
      */
     public char getType() {
         return data.type().charAt(0);
@@ -78,7 +69,7 @@ public final class VideoSize implements TelegramObject {
 
     @Override
     public String toString() {
-        return "VideoSize{" +
+        return "VideoThumbnail{" +
                 "data=" + data +
                 '}';
     }

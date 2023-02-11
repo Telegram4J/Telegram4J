@@ -14,6 +14,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * File reference wrapper, which can be serialized to {@code base64url} string
@@ -75,7 +76,7 @@ public final class FileReferenceId {
         this.context = Objects.requireNonNull(context);
     }
 
-    private static char asChar(String type) {
+    private static char thumbTypeAsChar(String type) {
         char c;
         if (type.length() != 1 || (c = type.charAt(0)) > 0xff)
             throw new IllegalArgumentException("Unknown format of the photo size type: '" + type + "'");
@@ -110,9 +111,13 @@ public final class FileReferenceId {
      */
     public static FileReferenceId ofDocument(BaseDocument document, Context context) {
         char thumbSizeType = Optional.ofNullable(document.videoThumbs())
-                .map(d -> asChar(d.get(0).type()))
+                .flatMap(thumbs -> thumbs.stream()
+                        .flatMap(d -> d instanceof BaseVideoSize b
+                                ? Stream.of(thumbTypeAsChar(b.type()))
+                                : Stream.empty())
+                        .findFirst())
                 .or(() -> Optional.ofNullable(document.thumbs())
-                        .map(d -> asChar(d.get(0).type())))
+                        .map(d -> thumbTypeAsChar(d.get(0).type())))
                 .orElse('\0');
 
         return ofDocument(document, thumbSizeType, context);
@@ -148,8 +153,12 @@ public final class FileReferenceId {
      */
     public static FileReferenceId ofChatPhoto(BasePhoto chatPhoto, ProfilePhotoContext context) {
         char thumbSizeType = Optional.ofNullable(chatPhoto.videoSizes())
-                .map(d -> asChar(d.get(0).type()))
-                .orElseGet(() -> asChar(chatPhoto.sizes().get(0).type()));
+                .flatMap(thumbs -> thumbs.stream()
+                        .flatMap(d -> d instanceof BaseVideoSize b
+                                ? Stream.of(thumbTypeAsChar(b.type()))
+                                : Stream.empty())
+                        .findFirst())
+                .orElseGet(() -> thumbTypeAsChar(chatPhoto.sizes().get(0).type()));
 
         return ofChatPhoto(chatPhoto, thumbSizeType, context);
     }
@@ -182,7 +191,19 @@ public final class FileReferenceId {
      * @param peer The peer that's have this photo.
      * @return The new {@code FileReferenceId} from given minimal chat photo and source context.
      */
-    public static FileReferenceId ofChatPhoto(ChatPhotoFields chatPhoto, boolean big, InputPeer peer) {
+    public static FileReferenceId ofChatPhoto(BaseChatPhoto chatPhoto, boolean big, InputPeer peer) {
+        if (chatPhoto.dcId() > MAX_DC_ID)
+            throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
+
+        byte sizeType = big ? SIZE_TYPE_BIG : SIZE_TYPE_SMALL;
+        var context = new ProfilePhotoContext(peer);
+        return new FileReferenceId(Type.CHAT_PHOTO, null, sizeType,
+                (short) chatPhoto.dcId(), chatPhoto.photoId(), -1,
+                null, '\0', null,
+                null, -1, context);
+    }
+
+    public static FileReferenceId ofChatPhoto(BaseUserProfilePhoto chatPhoto, boolean big, InputPeer peer) {
         if (chatPhoto.dcId() > MAX_DC_ID)
             throw new IllegalArgumentException("Unexpected dcId: " + chatPhoto.dcId() + " > " + MAX_DC_ID);
 
@@ -204,8 +225,12 @@ public final class FileReferenceId {
      */
     public static FileReferenceId ofPhoto(BasePhoto photo, Context context) {
         char thumbSizeType = Optional.ofNullable(photo.videoSizes())
-                .map(d -> asChar(d.get(0).type()))
-                .orElseGet(() -> asChar(photo.sizes().get(0).type()));
+                .flatMap(thumbs -> thumbs.stream()
+                        .flatMap(d -> d instanceof BaseVideoSize b
+                                ? Stream.of(thumbTypeAsChar(b.type()))
+                                : Stream.empty())
+                        .findFirst())
+                .orElseGet(() -> thumbTypeAsChar(photo.sizes().get(0).type()));
 
         return ofPhoto(photo, thumbSizeType, context);
     }
@@ -490,49 +515,51 @@ public final class FileReferenceId {
      * @return The new {@link InputFileLocation} from this reference.
      */
     public Optional<InputFileLocation> asLocation() {
-        switch (fileType) {
-            case CHAT_PHOTO:
+        return switch (fileType) {
+            case CHAT_PHOTO -> {
                 if (sizeType == SIZE_TYPE_ABSENT) { // is full image
                     Objects.requireNonNull(fileReference);
-                    return Optional.of(InputPhotoFileLocation.builder()
+                    yield Optional.of(InputPhotoFileLocation.builder()
                             .accessHash(accessHash)
                             .fileReference(fileReference)
                             .id(documentId)
                             .thumbSize(String.valueOf(thumbSizeType))
                             .build());
                 }
-
                 var ctx = (ProfilePhotoContext) context;
-                return Optional.of(InputPeerPhotoFileLocation.builder()
+                yield Optional.of(InputPeerPhotoFileLocation.builder()
                         .peer(ctx.getPeer())
                         .photoId(documentId)
                         .big(sizeType == SIZE_TYPE_BIG)
                         .build());
-            case PHOTO:
+            }
+            case PHOTO -> {
                 Objects.requireNonNull(fileReference);
-                return Optional.of(InputPhotoFileLocation.builder()
+                yield Optional.of(InputPhotoFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
                         .id(documentId)
                         .thumbSize(String.valueOf(thumbSizeType))
                         .build());
-            case STICKER_SET_THUMB:
+            }
+            case STICKER_SET_THUMB -> {
                 Objects.requireNonNull(stickerSet);
-                return Optional.of(InputStickerSetThumb.builder()
+                yield Optional.of(InputStickerSetThumb.builder()
                         .stickerset(stickerSet)
                         .thumbVersion(thumbVersion)
                         .build());
-            case DOCUMENT:
+            }
+            case DOCUMENT -> {
                 Objects.requireNonNull(fileReference);
-                return Optional.of(InputDocumentFileLocation.builder()
+                yield Optional.of(InputDocumentFileLocation.builder()
                         .accessHash(accessHash)
                         .fileReference(fileReference)
                         .id(documentId)
                         .thumbSize(String.valueOf(thumbSizeType))
                         .build());
-            default:
-                return Optional.empty();
-        }
+            }
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -638,14 +665,14 @@ public final class FileReferenceId {
         builder.append("fileType=").append(fileType);
 
         switch (fileType) {
-            case WEB_DOCUMENT:
+            case WEB_DOCUMENT -> {
                 builder.append(", ").append("documentType=").append(documentType);
                 builder.append(", ").append("url='").append(url).append('\'');
                 if (accessHash != -1) {
                     builder.append(", ").append("accessHash=").append(accessHash);
                 }
-                break;
-            case DOCUMENT:
+            }
+            case DOCUMENT -> {
                 builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
                 builder.append(", ").append("accessHash=").append(accessHash);
@@ -653,16 +680,15 @@ public final class FileReferenceId {
                 builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
                 Objects.requireNonNull(fileReference);
                 builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
-                break;
-            case STICKER_SET_THUMB:
+            }
+            case STICKER_SET_THUMB -> {
                 builder.append(", ").append("stickerSet=").append(stickerSet);
                 builder.append(", ").append("thumbVersion=").append(thumbVersion);
                 builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
-                break;
-            case CHAT_PHOTO:
+            }
+            case CHAT_PHOTO -> {
                 builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
-
                 if (sizeType == SIZE_TYPE_ABSENT) {
                     builder.append(", ").append("accessHash=").append(accessHash);
                     Objects.requireNonNull(fileReference);
@@ -671,17 +697,15 @@ public final class FileReferenceId {
                 } else {
                     builder.append(", ").append("big=").append(sizeType == SIZE_TYPE_BIG);
                 }
-                break;
-            case PHOTO:
+            }
+            case PHOTO -> {
                 builder.append(", ").append("dcId=").append(Short.toUnsignedInt(dcId));
                 builder.append(", ").append("documentId=").append(documentId);
                 builder.append(", ").append("accessHash=").append(accessHash);
                 Objects.requireNonNull(fileReference);
                 builder.append(", ").append("fileReference='").append(ByteBufUtil.hexDump(fileReference)).append('\'');
                 builder.append(", ").append("thumbSizeType=").append(thumbSizeType);
-                break;
-            default:
-                throw new IllegalStateException();
+            }
         }
 
         if (context != Context.noOpContext())
@@ -731,19 +755,21 @@ public final class FileReferenceId {
             boolean haveSizeAttr = false;
             for (DocumentAttribute attribute : attributes) {
                 switch (attribute.identifier()) {
-                    case DocumentAttributeAnimated.ID: return GIF;
-                    case DocumentAttributeAudio.ID: {
+                    case DocumentAttributeAnimated.ID -> {
+                        return GIF;
+                    }
+                    case DocumentAttributeAudio.ID -> {
                         DocumentAttributeAudio d = (DocumentAttributeAudio) attribute;
                         return d.voice() ? VOICE : AUDIO;
                     }
-                    case DocumentAttributeCustomEmoji.ID: return EMOJI;
-                    case DocumentAttributeSticker.ID: return STICKER;
-                    case DocumentAttributeVideo.ID:
-                        type = VIDEO;
-                        break;
-                    case DocumentAttributeImageSize.ID:
-                        haveSizeAttr = true;
-                        break;
+                    case DocumentAttributeCustomEmoji.ID -> {
+                        return EMOJI;
+                    }
+                    case DocumentAttributeSticker.ID -> {
+                        return STICKER;
+                    }
+                    case DocumentAttributeVideo.ID -> type = VIDEO;
+                    case DocumentAttributeImageSize.ID -> haveSizeAttr = true;
                 }
             }
             return haveSizeAttr ? PHOTO : type;
@@ -793,10 +819,10 @@ public final class FileReferenceId {
         }
 
         public static Version of(short version) {
-            switch (version) {
-                case 0: return REVISION_0;
-                default: throw new IllegalArgumentException("Unknown version: " + version);
-            }
+            return switch (version) {
+                case 0 -> REVISION_0;
+                default -> throw new IllegalArgumentException("Unknown version: " + version);
+            };
         }
     }
 

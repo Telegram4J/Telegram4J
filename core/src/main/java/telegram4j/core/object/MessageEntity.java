@@ -78,8 +78,8 @@ public final class MessageEntity implements TelegramObject {
      * @return The programming language name for code block.
      */
     public Optional<String> getLanguage() {
-        return data.identifier() == MessageEntityPre.ID
-                ? Optional.of((MessageEntityPre) data).map(MessageEntityPre::language)
+        return data instanceof MessageEntityPre p
+                ? Optional.of(p.language())
                 : Optional.empty();
     }
 
@@ -89,8 +89,8 @@ public final class MessageEntity implements TelegramObject {
      * @return The url for in-text url.
      */
     public Optional<String> getUrl() {
-        return data.identifier() == MessageEntityTextUrl.ID
-                ? Optional.of((MessageEntityTextUrl) data).map(MessageEntityTextUrl::url)
+        return data instanceof MessageEntityTextUrl p
+                ? Optional.of(p.url())
                 : Optional.empty();
     }
 
@@ -100,8 +100,8 @@ public final class MessageEntity implements TelegramObject {
      * @return The id of the mentioned user.
      */
     public Optional<Id> getUserId() {
-        return data.identifier() == MessageEntityMentionName.ID
-                ? Optional.of((MessageEntityMentionName) data).map(e -> Id.ofUser(e.userId()))
+        return data instanceof MessageEntityMentionName p
+                ? Optional.of(Id.ofUser(p.userId()))
                 : Optional.empty();
     }
 
@@ -130,9 +130,9 @@ public final class MessageEntity implements TelegramObject {
      *
      * @return The id of custom emoji.
      */
-    public Optional<Long> getDocumentId() {
-        return data.identifier() == MessageEntityCustomEmoji.ID
-                ? Optional.of(((MessageEntityCustomEmoji) data).documentId())
+    public Optional<Long> getEmojiId() {
+        return data instanceof MessageEntityCustomEmoji p
+                ? Optional.of(p.documentId())
                 : Optional.empty();
     }
 
@@ -142,7 +142,7 @@ public final class MessageEntity implements TelegramObject {
      * @return An {@link Mono} emitting on successful completion the {@link Sticker custom emoji}.
      */
     public Mono<Sticker> getCustomEmoji() {
-        return Mono.justOrEmpty(getDocumentId())
+        return Mono.justOrEmpty(getEmojiId())
                 .flatMap(client::getCustomEmoji);
     }
 
@@ -222,30 +222,30 @@ public final class MessageEntity implements TelegramObject {
          * @return The {@code Type} of raw message entity data.
          */
         public static Type of(telegram4j.tl.MessageEntity data) {
-            switch (data.identifier()) {
-                case MessageEntityMention.ID: return MENTION;
-                case MessageEntityHashtag.ID: return HASHTAG;
-                case MessageEntityBotCommand.ID: return BOT_COMMAND;
-                case MessageEntityUrl.ID: return URL;
-                case MessageEntityEmail.ID: return EMAIL_ADDRESS;
-                case MessageEntityBold.ID: return BOLD;
-                case MessageEntityItalic.ID: return ITALIC;
-                case MessageEntityCode.ID: return CODE;
-                case MessageEntityPre.ID: return PRE;
-                case MessageEntityTextUrl.ID: return TEXT_URL;
-                case MessageEntityMentionName.ID:
-                case InputMessageEntityMentionName.ID: return MENTION_NAME; // for compatibility
-                case MessageEntityPhone.ID: return PHONE_NUMBER;
-                case MessageEntityCashtag.ID: return CASHTAG;
-                case MessageEntityUnderline.ID: return UNDERLINE;
-                case MessageEntityStrike.ID: return STRIKETHROUGH;
-                case MessageEntityBlockquote.ID: return BLOCK_QUOTE;
-                case MessageEntityBankCard.ID: return BANK_CARD_NUMBER;
-                case MessageEntitySpoiler.ID: return SPOILER;
-                case MessageEntityCustomEmoji.ID: return CUSTOM_EMOJI;
+            return switch (data.identifier()) {
+                case MessageEntityMention.ID -> MENTION;
+                case MessageEntityHashtag.ID -> HASHTAG;
+                case MessageEntityBotCommand.ID -> BOT_COMMAND;
+                case MessageEntityUrl.ID -> URL;
+                case MessageEntityEmail.ID -> EMAIL_ADDRESS;
+                case MessageEntityBold.ID -> BOLD;
+                case MessageEntityItalic.ID -> ITALIC;
+                case MessageEntityCode.ID -> CODE;
+                case MessageEntityPre.ID -> PRE;
+                case MessageEntityTextUrl.ID -> TEXT_URL;
+                // for compatibility
+                case MessageEntityMentionName.ID, InputMessageEntityMentionName.ID -> MENTION_NAME;
+                case MessageEntityPhone.ID -> PHONE_NUMBER;
+                case MessageEntityCashtag.ID -> CASHTAG;
+                case MessageEntityUnderline.ID -> UNDERLINE;
+                case MessageEntityStrike.ID -> STRIKETHROUGH;
+                case MessageEntityBlockquote.ID -> BLOCK_QUOTE;
+                case MessageEntityBankCard.ID -> BANK_CARD_NUMBER;
+                case MessageEntitySpoiler.ID -> SPOILER;
+                case MessageEntityCustomEmoji.ID -> CUSTOM_EMOJI;
                 // and MessageEntityUnknown
-                default: throw new IllegalArgumentException("Unknown message type: " + data);
-            }
+                default -> throw new IllegalArgumentException("Unknown message type: " + data);
+            };
         }
     }
 }

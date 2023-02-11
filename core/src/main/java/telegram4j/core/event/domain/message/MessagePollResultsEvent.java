@@ -8,7 +8,7 @@ import telegram4j.core.object.media.PollResults;
 import java.util.Optional;
 
 /** Event of poll results. */
-public class MessagePollResultsEvent extends MessageEvent{
+public final class MessagePollResultsEvent extends MessageEvent{
 
     private final @Nullable Poll poll;
     private final PollResults results;

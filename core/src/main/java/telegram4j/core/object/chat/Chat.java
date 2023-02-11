@@ -16,7 +16,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 /** The Telegram <a href="https://core.telegram.org/api/channel">chat</a> representation. */
-public interface Chat extends PeerEntity {
+public sealed interface Chat extends PeerEntity permits BaseChat, Channel {
 
     /**
      * Gets the type of chat.

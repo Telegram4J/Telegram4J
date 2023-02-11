@@ -18,11 +18,13 @@ import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.*;
@@ -39,6 +41,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static telegram4j.core.internal.MappingUtil.getAuthor;
 import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
@@ -59,6 +62,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     protected volatile int qts = -1;
     protected volatile int date = -1;
     protected volatile int seq = -1;
+    protected volatile boolean initialized;
 
     public DefaultUpdatesManager(MTProtoTelegramClient client, Options options) {
         this.client = Objects.requireNonNull(client);
@@ -79,11 +83,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
         return client.getServiceHolder()
         .getUpdatesService().getState()
         .flatMap(state -> {
-            if (date == -1 || pts == -1 || seq == -1 || qts == -1) {
+            if (!initialized) {
                 return client.getMtProtoResources().getStoreLayout()
                         .getCurrentState()
                         .defaultIfEmpty(state)
-                        .doOnNext(this::applyStateLocal);
+                        .doOnNext(s -> {
+                            applyStateLocal(s);
+                            initialized = true;
+                        });
             }
             return Mono.empty();
         })
@@ -95,10 +102,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Override
     public Flux<Event> handle(Updates updates) {
-        switch (updates.identifier()) {
-            case UpdatesTooLong.ID:
-                return getDifference();
-            case UpdateShort.ID: {
+        return switch (updates.identifier()) {
+            case UpdatesTooLong.ID -> getDifference();
+            case UpdateShort.ID -> {
                 var data = (UpdateShort) updates;
 
                 if (log.isDebugEnabled()) {
@@ -106,10 +112,10 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                return saveStateIf(true)
+                yield saveStateIf(true)
                         .thenMany(applyUpdate(UpdateContext.create(client, data.update()), true));
             }
-            case BaseUpdates.ID: {
+            case BaseUpdates.ID -> {
                 var data = (BaseUpdates) updates;
 
                 int seqEnd = data.seq();
@@ -120,9 +126,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     if (seq + 1 < seqEnd) {
                         log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqEnd, seqEnd, seq);
 
-                        return getDifference();
+                        yield getDifference();
                     } else if (seq + 1 > seqEnd) {
-                        return Flux.empty();
+                        yield Flux.empty();
                     }
 
                     j.add("seq: " + seq + "->" + seqEnd);
@@ -135,9 +141,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                return handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
+                yield handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
             }
-            case UpdatesCombined.ID: {
+            case UpdatesCombined.ID -> {
                 var data = (UpdatesCombined) updates;
 
                 int seqBegin = data.seqStart();
@@ -149,9 +155,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     if (seq + 1 < seqBegin) {
                         log.debug("Updates gap found. Received seq: {}-{}, local seq: {}", seqBegin, seqEnd, seq);
 
-                        return getDifference();
+                        yield getDifference();
                     } else if (seq + 1 > seqBegin) {
-                        return Flux.empty();
+                        yield Flux.empty();
                     }
 
                     j.add("seq: " + seq + "->" + seqEnd);
@@ -164,22 +170,22 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                return handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
+                yield handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
             }
-            case UpdateShortChatMessage.ID: {
+            case UpdateShortChatMessage.ID -> {
                 var data = (UpdateShortChatMessage) updates;
 
                 int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
-                    return getDifference(pts, qts, date);
+                    yield getDifference(pts, qts, date);
                 } else if (pts + data.ptsCount() > data.pts()) {
-                    return Flux.empty();
+                    yield Flux.empty();
                 }
 
                 if (options.discardMinimalMessageUpdates) {
-                    return getDifference(pts, qts, date);
+                    yield getDifference(pts, qts, date);
                 }
 
                 log.debug("Updating state, pts: {}->{}", pts, data.pts());
@@ -203,23 +209,23 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .ptsCount(data.ptsCount())
                         .build()));
 
-                return saveStateIf(true)
+                yield saveStateIf(true)
                         .thenMany(mapUpdate);
             }
-            case UpdateShortMessage.ID: {
+            case UpdateShortMessage.ID -> {
                 var data = (UpdateShortMessage) updates;
 
                 int pts = this.pts;
                 if (pts + data.ptsCount() < data.pts()) {
                     log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
                             data.pts() - data.ptsCount(), data.pts(), pts);
-                    return getDifference(pts, qts, date);
+                    yield getDifference(pts, qts, date);
                 } else if (pts + data.ptsCount() > data.pts()) {
-                    return Flux.empty();
+                    yield Flux.empty();
                 }
 
                 if (options.discardMinimalMessageUpdates) {
-                    return getDifference(pts, qts, date);
+                    yield getDifference(pts, qts, date);
                 }
 
                 log.debug("Updating state, pts: {}->{}", pts, data.pts());
@@ -245,12 +251,11 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         .ptsCount(data.ptsCount())
                         .build()));
 
-                return saveStateIf(true)
+                yield saveStateIf(true)
                         .thenMany(mapUpdate);
             }
-            default:
-                return Flux.error(new IllegalArgumentException("Unknown Updates type: " + updates));
-        }
+            default -> Flux.error(new IllegalArgumentException("Unknown Updates type: " + updates));
+        };
     }
 
     @Override
@@ -336,8 +341,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                         log.trace("difference: {}", difference);
                     }
 
-                    switch (difference.identifier()) {
-                        case DifferenceEmpty.ID: {
+                    return switch (difference.identifier()) {
+                        case DifferenceEmpty.ID -> {
                             var diff = (DifferenceEmpty) difference;
 
                             boolean updated = false;
@@ -356,7 +361,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
                                 String str = j.toString();
                                 if (str.isEmpty()) {
-                                    return Mono.empty();
+                                    yield Mono.empty();
                                 }
 
                                 updated = true;
@@ -377,52 +382,61 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 this.date = diff.date();
                             }
 
-                            return saveStateIf(updated)
+                            yield saveStateIf(updated)
                                     .then(Mono.empty());
                         }
-                        case BaseDifference.ID: {
+                        case BaseDifference.ID -> {
                             var diff = (BaseDifference) difference;
 
-                            return applyState(diff.state(), false)
+                            yield applyState(diff.state(), false)
                                     .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
                                             diff.chats(), diff.users(), false));
                         }
-                        case DifferenceSlice.ID: {
+                        case DifferenceSlice.ID -> {
                             var diff = (DifferenceSlice) difference;
                             State state = diff.intermediateState();
 
-                            return applyState(state, true)
+                            yield applyState(state, true)
                                     .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
                                             diff.chats(), diff.users(), false))
                                     .concatWith(getDifference(state.pts(), state.qts(), state.date()));
                         }
-                        default:
-                            return Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
-                    }
+                        default -> Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
+                    };
                 });
     }
 
-    protected Flux<Event> handleUpdates0(List<Message> newMessages, List<Update> otherUpdates,
+    @Nullable
+    private static Variant2<BaseMessage, MessageService> filterMessage(telegram4j.tl.Message message) {
+        if (message instanceof BaseMessage b) {
+            return Variant2.ofT1(b);
+        } else if (message instanceof MessageService m) {
+            return Variant2.ofT2(m);
+        } else { // MessageEmpty
+            return null;
+        }
+    }
+
+    protected Flux<Event> handleUpdates0(List<telegram4j.tl.Message> newMessages, List<Update> otherUpdates,
                                          List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
                                          boolean notFromDiff) {
         var usersMap = users.stream()
-                .map(u -> EntityFactory.createUser(client, u))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+                .flatMap(u -> Stream.ofNullable(EntityFactory.createUser(client, u)))
+                .collect(Collectors.toMap(User::getId, Function.identity()));
 
         var selfUser = usersMap.get(client.getSelfId());
 
         var chatsMap = chats.stream()
-                .map(u -> EntityFactory.createChat(client, u, null))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
+                .flatMap(u -> Stream.ofNullable(EntityFactory.createChat(client, u, null)))
+                .collect(Collectors.toMap(Chat::getId, Function.identity()));
 
         Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(newMessages)
-                .ofType(BaseMessageFields.class)
+                .mapNotNull(DefaultUpdatesManager::filterMessage)
                 .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
-                        .getStoreLayout().existMessage(message)))
+                        .getStoreLayout().existMessage(message.map(BaseMessage::peerId, MessageService::peerId),
+                                message.map(BaseMessage::id, MessageService::id))))
                 .flatMap(data -> {
-                    Id peerId = Id.of(data.peerId());
+                    Id peerId = Id.of(data.map(BaseMessage::peerId, MessageService::peerId));
                     var chat = getChatEntity(peerId, chatsMap, usersMap, selfUser);
                     var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
 
@@ -432,7 +446,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             .switchIfEmpty(client.asInputPeer(peerId)
                                     .map(p -> Id.of(p, client.getSelfId())))
                             .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
-                            .map(i -> EntityFactory.createMessage(client, data, i))
+                            .map(i -> new Message(client, data, i))
                             .map(m -> new SendMessageEvent(client, m, chat, author));
                 });
 
@@ -455,7 +469,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             .orElseThrow();
 
                     Integer upts = (upts = u.pts()) == null ? -1 : upts;
-                    int dpts = Math.max(1, Math.max(upts, cpts));
+                    int dpts = Math.max(1, Math.min(upts, cpts));
                     int limit = options.channelDifferenceLimit;
 
                     if (log.isDebugEnabled()) {
@@ -493,26 +507,20 @@ public class DefaultUpdatesManager implements UpdatesManager {
             log.trace("channel difference for {}: {}", channelId.asString(), diff);
         }
 
-        int newPts;
-        switch (diff.identifier()) {
-            case BaseChannelDifference.ID:
-                newPts = ((BaseChannelDifference) diff).pts();
-                break;
-            case ChannelDifferenceEmpty.ID:
-                newPts = ((ChannelDifferenceEmpty) diff).pts();
-                break;
-            case ChannelDifferenceTooLong.ID:
+        int newPts = switch (diff.identifier()) {
+            case BaseChannelDifference.ID -> ((BaseChannelDifference) diff).pts();
+            case ChannelDifferenceEmpty.ID -> ((ChannelDifferenceEmpty) diff).pts();
+            case ChannelDifferenceTooLong.ID -> {
                 ChannelDifferenceTooLong diff0 = (ChannelDifferenceTooLong) diff;
-                if (diff0.dialog().identifier() == BaseDialog.ID) {
-                    BaseDialog dialog = (BaseDialog) diff0.dialog();
-                    Integer pts = dialog.pts();
-                    newPts = pts != null ? pts : 1;
+                if (diff0.dialog() instanceof BaseDialog d) {
+                    Integer pts = d.pts();
+                    yield pts != null ? pts : 1;
                 } else {
-                    newPts = 1;
+                    yield 1;
                 }
-                break;
-            default: throw new IllegalArgumentException("Unknown channel difference type: " + diff);
-        }
+            }
+            default -> throw new IllegalArgumentException("Unknown channel difference type: " + diff);
+        };
 
         Mono<Void> updatePts = Mono.defer(() -> {
             if (log.isDebugEnabled()) {
@@ -542,30 +550,29 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     .flatMapMany(d -> handleChannelDifference(updRequest, d));
         });
 
-        switch (diff.identifier()) {
-            case BaseChannelDifference.ID: {
+        return switch (diff.identifier()) {
+            case BaseChannelDifference.ID -> {
                 var diff0 = (BaseChannelDifference) diff;
 
                 var usersMap = diff0.users().stream()
-                        .map(u -> EntityFactory.createUser(client, u))
-                        .filter(Objects::nonNull)
+                        .flatMap(u -> Stream.ofNullable(EntityFactory.createUser(client, u)))
                         .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 var selfUser = usersMap.get(client.getSelfId());
 
                 var chatsMap = diff0.chats().stream()
-                        .map(u -> EntityFactory.createChat(client, u, null))
-                        .filter(Objects::nonNull)
+                        .flatMap(u -> Stream.ofNullable(EntityFactory.createChat(client, u, null)))
                         .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.newMessages())
-                        .ofType(BaseMessageFields.class)
+                        .mapNotNull(DefaultUpdatesManager::filterMessage)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
-                                .getStoreLayout().existMessage(message)))
+                                .getStoreLayout().existMessage(message.map(BaseMessage::peerId, MessageService::peerId),
+                                        message.map(BaseMessage::id, MessageService::id))))
                         .map(data -> {
-                            var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
+                            var chat = getChatEntity(Id.of(data.map(BaseMessage::peerId, MessageService::peerId)), chatsMap, usersMap, selfUser);
                             var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
-                            var msg = EntityFactory.createMessage(client, data, channelId);
+                            var msg = new Message(client, data, channelId);
 
                             return new SendMessageEvent(client, msg, chat, author);
                         });
@@ -573,41 +580,40 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 Mono<Void> saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
-                return updatePts.and(saveContacts)
+                yield updatePts.and(saveContacts)
                         .thenMany(Flux.fromIterable(diff0.otherUpdates()))
                         .flatMap(update -> UpdatesMapper.instance.handle(UpdateContext.create(
                                 client, chatsMap, usersMap, update)))
                         .concatWith(messageCreateEvents)
                         .concatWith(refetchDifference);
             }
-            case ChannelDifferenceEmpty.ID: {
+            case ChannelDifferenceEmpty.ID -> {
                 var diff0 = (ChannelDifferenceEmpty) diff;
 
-                return updatePts.thenMany(Flux.empty());
+                yield updatePts.thenMany(Flux.empty());
             }
-            case ChannelDifferenceTooLong.ID: {
+            case ChannelDifferenceTooLong.ID -> {
                 var diff0 = (ChannelDifferenceTooLong) diff;
 
                 var usersMap = diff0.users().stream()
-                        .map(u -> EntityFactory.createUser(client, u))
-                        .filter(Objects::nonNull)
+                        .flatMap(u -> Stream.ofNullable(EntityFactory.createUser(client, u)))
                         .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 var selfUser = usersMap.get(client.getSelfId());
 
                 var chatsMap = diff0.chats().stream()
-                        .map(u -> EntityFactory.createChat(client, u, null))
-                        .filter(Objects::nonNull)
+                        .flatMap(u -> Stream.ofNullable(EntityFactory.createChat(client, u, null)))
                         .collect(Collectors.toMap(PeerEntity::getId, Function.identity()));
 
                 Flux<Event> messageCreateEvents = Flux.fromIterable(diff0.messages())
-                        .ofType(BaseMessageFields.class)
+                        .mapNotNull(DefaultUpdatesManager::filterMessage)
                         .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
-                                .getStoreLayout().existMessage(message)))
+                                .getStoreLayout().existMessage(message.map(BaseMessage::peerId, MessageService::peerId),
+                                        message.map(BaseMessage::id, MessageService::id))))
                         .map(data -> {
-                            var chat = getChatEntity(Id.of(data.peerId()), chatsMap, usersMap, selfUser);
+                            var chat = getChatEntity(Id.of(data.map(BaseMessage::peerId, MessageService::peerId)), chatsMap, usersMap, selfUser);
                             var author = getAuthor(data, chat, client, chatsMap, usersMap).orElse(null);
-                            var msg = EntityFactory.createMessage(client, data, channelId);
+                            var msg = new Message(client, data, channelId);
 
                             return new SendMessageEvent(client, msg, chat, author);
                         });
@@ -615,166 +621,299 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 Mono<Void> saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
-                return updatePts.and(saveContacts)
+                yield updatePts.and(saveContacts)
                         .thenMany(messageCreateEvents)
                         .concatWith(refetchDifference);
             }
-            default:
-                return Flux.error(new IllegalArgumentException("Unknown channel difference type: " + diff));
-        }
+            default -> Flux.error(new IllegalArgumentException("Unknown channel difference type: " + diff));
+        };
     }
 
-    protected Flux<Event> applyUpdate(UpdateContext<Update> ctx, boolean notFromDiff) {
+    protected static boolean isCommonPtsUpdate(Update update) {
+        // https://github.com/tdlib/td/blob/89efc4feca1a3cfbcc516fbc02b84420f9620a53/td/telegram/UpdatesManager.cpp#L3264
+        return switch (update.identifier()) {
+            case UpdateNewMessage.ID:
+            case UpdateReadMessagesContents.ID:
+            case UpdateEditMessage.ID:
+            case UpdateDeleteMessages.ID:
+            case UpdateReadHistoryInbox.ID:
+            case UpdateReadHistoryOutbox.ID:
+            case UpdateWebPage.ID:
+            case UpdatePinnedMessages.ID:
+            case UpdateFolderPeers.ID:
+                yield true;
+            default:
+                yield false;
+        };
+    }
+
+    protected static boolean isChannelPtsUpdate(Update update) {
+        // https://github.com/tdlib/td/blob/89efc4feca1a3cfbcc516fbc02b84420f9620a53/td/telegram/UpdatesManager.cpp#L3339
+        return switch (update.identifier()) {
+            case UpdateNewChannelMessage.ID:
+            case UpdateEditChannelMessage.ID:
+            case UpdateDeleteChannelMessages.ID:
+            case UpdatePinnedChannelMessages.ID:
+                yield true;
+            default:
+                yield false;
+        };
+    }
+
+    protected static boolean isQtsUpdate(Update update) {
+        // https://github.com/tdlib/td/blob/89efc4feca1a3cfbcc516fbc02b84420f9620a53/td/telegram/UpdatesManager.cpp#L3306
+        return switch (update.identifier()) {
+            case UpdateNewEncryptedMessage.ID:
+            case UpdateMessagePollVote.ID:
+            case UpdateBotStopped.ID:
+            case UpdateChatParticipant.ID:
+            case UpdateChannelParticipant.ID:
+            case UpdateBotChatInviteRequester.ID:
+                yield true;
+            default:
+                yield false;
+        };
+    }
+
+    protected static boolean isBotQtsUpdate(Update update) {
+        return switch (update.identifier()) {
+            case UpdateMessagePollVote.ID:
+            case UpdateBotStopped.ID:
+            case UpdateChatParticipant.ID:
+            case UpdateChannelParticipant.ID:
+            case UpdateBotChatInviteRequester.ID:
+                yield true;
+            default:
+                yield false;
+        };
+    }
+
+    // only for channel updates
+    private static long getChannelId(telegram4j.tl.Message message) {
+        return switch (message.identifier()) {
+            case BaseMessage.ID -> {
+                var m = (BaseMessage) message;
+                yield ((PeerChannel) m.peerId()).channelId();
+            }
+            case MessageService.ID -> {
+                var m = (MessageService) message;
+                yield ((PeerChannel) m.peerId()).channelId();
+            }
+            default -> throw new IllegalStateException("Unexpected channel message type: " + message);
+        };
+    }
+
+    private Flux<Event> applyUpdate(UpdateContext<Update> ctx, boolean notFromDiff) {
         Flux<Event> mapUpdate = UpdatesMapper.instance.handle(ctx);
 
-        if (ctx.getUpdate() instanceof PtsUpdate) {
-            var ptsUpdate = (PtsUpdate) ctx.getUpdate();
-
-            long channelId = -1;
-            switch (ptsUpdate.identifier()) {
-                case UpdateReadChannelInbox.ID: {
-                    var u = (UpdateReadChannelInbox) ptsUpdate;
-
-                    channelId = u.channelId();
-                    break;
+        Update u = ctx.getUpdate();
+        if (isCommonPtsUpdate(u)) {
+            int pts;
+            int ptsCount;
+            // region pts, ptsCount extraction
+            switch (u.identifier()) {
+                case UpdateNewMessage.ID -> {
+                    var c = (UpdateNewMessage) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdateDeleteChannelMessages.ID: {
-                    var u = (UpdateDeleteChannelMessages) ptsUpdate;
-
-                    channelId = u.channelId();
-                    break;
+                case UpdateReadMessagesContents.ID -> {
+                    var c = (UpdateReadMessagesContents) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdateEditChannelMessage.ID: {
-                    var u = (UpdateEditChannelMessage) ptsUpdate;
-
-                    PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
-                    channelId = p.channelId();
-                    break;
+                case UpdateEditMessage.ID -> {
+                    var c = (UpdateEditMessage) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdateNewChannelMessage.ID: {
-                    var u = (UpdateNewChannelMessage) ptsUpdate;
-                    PeerChannel p = (PeerChannel) ((BaseMessageFields) u.message()).peerId();
-                    channelId = p.channelId();
-                    break;
+                case UpdateDeleteMessages.ID -> {
+                    var c = (UpdateDeleteMessages) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdatePinnedChannelMessages.ID: {
-                    var u = (UpdatePinnedChannelMessages) ptsUpdate;
-                    channelId = u.channelId();
-                    break;
+                case UpdateReadHistoryInbox.ID -> {
+                    var c = (UpdateReadHistoryInbox) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdateReadHistoryOutbox.ID: {
-                    var u = (UpdateReadHistoryOutbox) ptsUpdate;
-                    if (u.peer() instanceof PeerChannel) {
-                        var cp = (PeerChannel) u.peer();
-                        channelId = cp.channelId();
-                    }
-                    break;
+                case UpdateReadHistoryOutbox.ID -> {
+                    var c = (UpdateReadHistoryOutbox) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
-                case UpdateChannelWebPage.ID: {
-                    var u = (UpdateChannelWebPage) ptsUpdate;
-
-                    channelId = u.channelId();
-                    break;
+                case UpdateWebPage.ID -> {
+                    var c = (UpdateWebPage) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
                 }
+                case UpdatePinnedMessages.ID -> {
+                    var c = (UpdatePinnedMessages) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                }
+                case UpdateFolderPeers.ID -> {
+                    var c = (UpdateFolderPeers) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                }
+                default -> throw new IllegalStateException("Unexpected common pts update type: " + u);
             }
+            // endregion
 
-            if (channelId == -1) { // common pts
-                int pts = this.pts;
-                if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
-                    log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
-                            ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
+            int localPts = this.pts;
+            if (localPts + ptsCount < pts) {
+                log.debug("Updates gap found. Received pts: {}-{}, local pts: {}",
+                        pts - ptsCount, pts, localPts);
 
-                    return getDifference(pts, qts, date);
-                } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
-                    return Flux.empty();
-                } else {
-                    if (log.isDebugEnabled() && notFromDiff) {
-                        log.debug("Updating state, pts: {}->{}", pts, ptsUpdate.pts());
-                    }
-
-                    this.pts = ptsUpdate.pts();
-
-                    return saveStateIf(true)
-                            .thenMany(mapUpdate);
+                return getDifference(localPts, qts, date);
+            } else if (localPts + ptsCount > pts) {
+                return Flux.empty();
+            } else {
+                if (log.isDebugEnabled() && notFromDiff) {
+                    log.debug("Updating state, pts: {}->{}", localPts, pts);
                 }
-            }
 
-            long id = channelId;
+                this.pts = pts;
+
+                return saveStateIf(true)
+                        .thenMany(mapUpdate);
+            }
+        } else if (isChannelPtsUpdate(u)) {
+            int pts;
+            int ptsCount;
+            long channelId;
+            // region pts, ptsCount, channelId extraction
+            switch (u.identifier()) {
+                case UpdateNewChannelMessage.ID -> {
+                    var c = (UpdateNewChannelMessage) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                    channelId = getChannelId(c.message());
+                }
+                case UpdateEditChannelMessage.ID -> {
+                    var c = (UpdateEditChannelMessage) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                    channelId = getChannelId(c.message());
+                }
+                case UpdateDeleteChannelMessages.ID -> {
+                    var c = (UpdateDeleteChannelMessages) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                    channelId = c.channelId();
+                }
+                case UpdatePinnedChannelMessages.ID -> {
+                    var c = (UpdatePinnedChannelMessages) u;
+                    pts = c.pts();
+                    ptsCount = c.ptsCount();
+                    channelId = c.channelId();
+                }
+                default -> throw new IllegalStateException("Unexpected channel pts update type: " + u);
+            }
+            // endregion
 
             // If local channel pts is -1 just apply update
             AtomicBoolean justApplied = new AtomicBoolean();
             return client.getMtProtoResources()
-                    .getStoreLayout().getChannelFullById(id)
+                    .getStoreLayout().getChannelFullById(channelId)
                     .switchIfEmpty(client.getMtProtoResources()
-                            .getStoreLayout().resolveChannel(id)
+                            .getStoreLayout().resolveChannel(channelId)
                             .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
                             .doOnNext(c -> justApplied.set(true)))
                     .map(ChatFull::fullChat)
                     .cast(ChannelFull.class)
                     .map(ChannelFull::pts)
-                    .flatMapMany(pts -> {
+                    .flatMapMany(localPts -> {
                         Mono<Void> updatePts = client.getMtProtoResources()
-                                .getStoreLayout().updateChannelPts(id, ptsUpdate.pts());
+                                .getStoreLayout().updateChannelPts(channelId, pts);
 
                         if (justApplied.get()) {
                             if (log.isDebugEnabled() && notFromDiff) {
-                                log.debug("Updating state for channel: {}, pts: unknown->{}", id, ptsUpdate.pts());
+                                log.debug("Updating state for channel: {}, pts: unknown->{}", channelId, pts);
                             }
                             return updatePts.thenMany(mapUpdate);
                         }
 
-                        if (pts + ptsUpdate.ptsCount() < ptsUpdate.pts()) {
+                        if (localPts + ptsCount < pts) {
                             log.debug("Updates gap found for channel {}. Received pts: {}-{}, local pts: {}",
-                                    id, ptsUpdate.pts() - ptsUpdate.ptsCount(), ptsUpdate.pts(), pts);
+                                    channelId, pts - ptsCount, pts, localPts);
 
-                            return client.getMtProtoResources().getStoreLayout().resolveChannel(id)
-                                    .flatMapMany(c -> getChannelDifference(c, pts));
-                        } else if (pts + ptsUpdate.ptsCount() > ptsUpdate.pts()) {
+                            return client.getMtProtoResources().getStoreLayout().resolveChannel(channelId)
+                                    .flatMapMany(c -> getChannelDifference(c, localPts));
+                        } else if (localPts + ptsCount > pts) {
                             return Flux.empty();
                         }
 
                         if (log.isDebugEnabled() && notFromDiff) {
-                            log.debug("Updating state for channel: {}, pts: {}->{}", id, pts, ptsUpdate.pts());
+                            log.debug("Updating state for channel: {}, pts: {}->{}", channelId, localPts, pts);
                         }
                         return updatePts.thenMany(mapUpdate);
                     });
-        }
+        } else if (isQtsUpdate(u)) {
+            int newQts;
+            // region qts extraction
+            switch (u.identifier()) {
+                case UpdateNewEncryptedMessage.ID -> {
+                    var q = (UpdateNewEncryptedMessage) u;
+                    newQts = q.qts();
+                }
+                case UpdateMessagePollVote.ID -> {
+                    var q = (UpdateMessagePollVote) u;
+                    newQts = q.qts();
+                }
+                case UpdateBotStopped.ID -> {
+                    var q = (UpdateBotStopped) u;
+                    newQts = q.qts();
+                }
+                case UpdateChatParticipant.ID -> {
+                    var q = (UpdateChatParticipant) u;
+                    newQts = q.qts();
+                }
+                case UpdateChannelParticipant.ID -> {
+                    var q = (UpdateChannelParticipant) u;
+                    newQts = q.qts();
+                }
+                case UpdateBotChatInviteRequester.ID -> {
+                    var q = (UpdateBotChatInviteRequester) u;
+                    newQts = q.qts();
+                }
+                default -> throw new IllegalStateException("Unexpected qts update type: " + u);
+            }
+            // endregion
 
-        if (ctx.getUpdate() instanceof QtsUpdate) {
-            var qtsUpdate = (QtsUpdate) ctx.getUpdate();
-            boolean botQtsUpdate = qtsUpdate.identifier() != UpdateNewEncryptedMessage.ID;
-
+            boolean botQtsUpdate = isBotQtsUpdate(u);
             int qts = this.qts;
             if (botQtsUpdate && qts == 0) {
                 if (log.isDebugEnabled() && notFromDiff) {
-                    log.debug("Updating state, qts: {}->{}", qts, qtsUpdate.qts());
+                    log.debug("Updating state, qts: {}->{}", qts, newQts);
                 }
 
-                this.qts = qtsUpdate.qts();
+                this.qts = newQts;
 
                 return saveStateIf(true)
                         .thenMany(mapUpdate);
             } else {
-                if (qts + 1 < qtsUpdate.qts()) {
-                    log.debug("Updates gap found. Received qts: {}, local qts: {}", qtsUpdate.qts(), qts);
+                if (qts + 1 < newQts) {
+                    log.debug("Updates gap found. Received qts: {}, local qts: {}", newQts, qts);
 
                     return getDifference(pts, qts, date);
-                } else if (qts + 1 > qtsUpdate.qts()) {
+                } else if (qts + 1 > newQts) {
                     return Flux.empty();
                 } else {
                     if (log.isDebugEnabled() && notFromDiff) {
-                        log.debug("Updating state, qts: {}->{}", qts, qtsUpdate.qts());
+                        log.debug("Updating state, qts: {}->{}", qts, newQts);
                     }
 
-                    this.qts = qtsUpdate.qts();
+                    this.qts = newQts;
 
                     return saveStateIf(true)
                             .thenMany(mapUpdate);
                 }
             }
+        } else {
+            return mapUpdate;
         }
-
-        return mapUpdate;
     }
 
     protected Flux<Event> getChannelDifference(InputChannel id, int pts) {
@@ -801,46 +940,38 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Nullable
     protected Chat getChatEntity(Id peer, Map<Id, Chat> chatsMap, Map<Id, User> usersMap, @Nullable User selfUser) {
-        switch (peer.getType()) {
-            case CHAT:
-            case CHANNEL:
-                return chatsMap.get(peer);
-            case USER:
+        return switch (peer.getType()) {
+            case CHAT, CHANNEL -> chatsMap.get(peer);
+            case USER -> {
                 User data = usersMap.get(peer);
-                return data != null ? new PrivateChat(client, data, selfUser) : null;
-            default: throw new IllegalStateException();
-        }
+                yield data != null ? new PrivateChat(client, data, selfUser) : null;
+            }
+        };
     }
 
-    public static class Options {
+    /**
+     * @param checkin Interval for retrieving {@link GetState}.
+     * @param channelDifferenceLimit Maximal amount of updates in {@link GetChannelDifference} requests.
+     * @param discardMinimalMessageUpdates Whether received {@link UpdateShortChatMessage} and {@link UpdateShortMessage}
+     * updates will be ignored and refetched as normal message events.
+     */
+    // TODO limit for common difference?
+    public record Options(Duration checkin, int channelDifferenceLimit, boolean discardMinimalMessageUpdates) {
         public static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
         public static final int MAX_BOT_CHANNEL_DIFFERENCE  = 100000;
         public static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
         public static final boolean DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES = false;
 
-        /** Interval for retrieving {@link GetState}. */
-        public final Duration checkin;
-        /** Maximal amount of updates in {@link GetChannelDifference} requests. */
-        public final int channelDifferenceLimit;
-        // TODO limit for common difference?
-        /**
-         * Whether received {@link UpdateShortChatMessage} and {@link UpdateShortMessage}
-         * updates will be ignored and refetched as normal message events.
-         */
-        public final boolean discardMinimalMessageUpdates;
-
         public Options(MTProtoTelegramClient client) {
-            checkin = DEFAULT_CHECKIN;
-            channelDifferenceLimit = client.getAuthResources().isBot()
+            this(DEFAULT_CHECKIN, client.getAuthResources().isBot()
                     ? MAX_BOT_CHANNEL_DIFFERENCE
-                    : MAX_USER_CHANNEL_DIFFERENCE;
-            discardMinimalMessageUpdates = DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES;
+                    : MAX_USER_CHANNEL_DIFFERENCE,
+                    DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES);
         }
 
-        public Options(Duration checkin, int channelDifferenceLimit, boolean discardMinimalMessageUpdates) {
-            this.checkin = Objects.requireNonNull(checkin);
-            this.channelDifferenceLimit = channelDifferenceLimit;
-            this.discardMinimalMessageUpdates = discardMinimalMessageUpdates;
+        public Options {
+            Objects.requireNonNull(checkin);
+            // TODO: other checks
         }
     }
 }

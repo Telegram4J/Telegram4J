@@ -19,11 +19,7 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.ChatReactions;
 import telegram4j.core.object.chat.*;
-import telegram4j.core.object.media.PhotoCachedSize;
-import telegram4j.core.object.media.PhotoPathSize;
-import telegram4j.core.object.media.PhotoSize;
-import telegram4j.core.object.media.PhotoSizeProgressive;
-import telegram4j.core.object.media.PhotoStrippedSize;
+import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.object.media.*;
 import telegram4j.core.spec.inline.*;
 import telegram4j.core.util.Id;
@@ -58,29 +54,31 @@ public class EntityFactory {
     }
 
     public static UserStatus createUserStatus(telegram4j.tl.UserStatus data) {
-        switch (data.identifier()) {
-            case UserStatusLastMonth.ID: return new UserStatus(UserStatus.Type.LAST_MONTH);
-            case UserStatusLastWeek.ID: return new UserStatus(UserStatus.Type.LAST_WEEK);
-            case UserStatusOffline.ID:
-                UserStatusOffline userStatusOffline = (UserStatusOffline) data;
+        return switch (data.identifier()) {
+            case UserStatusLastMonth.ID -> new UserStatus(UserStatus.Type.LAST_MONTH);
+            case UserStatusLastWeek.ID -> new UserStatus(UserStatus.Type.LAST_WEEK);
+            case UserStatusOffline.ID -> {
+                var userStatusOffline = (UserStatusOffline) data;
                 Instant wasOnlineTimestamp = Instant.ofEpochSecond(userStatusOffline.wasOnline());
-                return new UserStatus(UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
-            case UserStatusOnline.ID:
-                UserStatusOnline userStatusOnline = (UserStatusOnline) data;
+                yield new UserStatus(UserStatus.Type.OFFLINE, null, wasOnlineTimestamp);
+            }
+            case UserStatusOnline.ID -> {
+                var userStatusOnline = (UserStatusOnline) data;
                 Instant expiresTimestamp = Instant.ofEpochSecond(userStatusOnline.expires());
-                return new UserStatus(UserStatus.Type.ONLINE, expiresTimestamp, null);
-            case UserStatusRecently.ID: return new UserStatus(UserStatus.Type.RECENTLY);
+                yield new UserStatus(UserStatus.Type.ONLINE, expiresTimestamp, null);
+            }
+            case UserStatusRecently.ID -> new UserStatus(UserStatus.Type.RECENTLY);
             // and UserStatusEmpty
-            default: throw new IllegalArgumentException("Unknown UserStatus type: " + data);
-        }
+            default -> throw new IllegalArgumentException("Unknown UserStatus type: " + data);
+        };
     }
 
     public static Message createMessage(MTProtoTelegramClient client, telegram4j.tl.Message data, Id resolvedChatId) {
-        switch (data.identifier()) {
-            case BaseMessage.ID: return new Message(client, (BaseMessage) data, resolvedChatId);
-            case MessageService.ID: return new Message(client, (MessageService) data, resolvedChatId);
-            default: throw new IllegalArgumentException("Unknown Message type: " + data);
-        }
+        return switch (data.identifier()) {
+            case BaseMessage.ID -> new Message(client, Variant2.ofT1((BaseMessage) data), resolvedChatId);
+            case MessageService.ID -> new Message(client, Variant2.ofT2((MessageService) data), resolvedChatId);
+            default -> throw new IllegalArgumentException("Unknown Message type: " + data);
+        };
     }
 
     public static Chat createChat(MTProtoTelegramClient client, PeerData<?, ?> data, @Nullable User selfUser) {
@@ -103,21 +101,19 @@ public class EntityFactory {
 
                 List<ChatParticipant> chatParticipants;
                 switch (chatData.fullData.participants().identifier()) {
-                    case BaseChatParticipants.ID: {
+                    case BaseChatParticipants.ID -> {
                         var d = (BaseChatParticipants) chatData.fullData.participants();
                         chatParticipants = d.participants().stream()
                                 .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
                                 .collect(Collectors.toUnmodifiableList());
-                        break;
                     }
-                    case ChatParticipantsForbidden.ID: {
+                    case ChatParticipantsForbidden.ID -> {
                         var d = (ChatParticipantsForbidden) chatData.fullData.participants();
                         chatParticipants = Optional.ofNullable(d.selfParticipant())
                                 .map(c -> List.of(new ChatParticipant(client, usersMap.get(c.userId()), c, chatId)))
                                 .orElse(null);
-                        break;
                     }
-                    default: throw new IllegalStateException("Unknown ChatParticipants type: " + chatData.fullData.participants());
+                    default -> throw new IllegalStateException("Unknown ChatParticipants type: " + chatData.fullData.participants());
                 }
 
                 return new GroupChat(client, chatData.fullData,
@@ -162,22 +158,18 @@ public class EntityFactory {
     @Nullable
     public static Chat createChat(MTProtoTelegramClient client, TlObject possibleChat,
                                   @Nullable User selfUser) {
-        switch (possibleChat.identifier()) {
-            case UserEmpty.ID:
-            case ChatEmpty.ID: return null;
-            case ChatForbidden.ID:
-                switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                    case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
-                    case NULL_MAPPING: return null;
-                }
-            case ChannelForbidden.ID:
-                switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                    case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
-                    case NULL_MAPPING: return null;
-                }
-
-            case UserFull.ID: {
-                UserFull userFull = (UserFull) possibleChat;
+        return switch (possibleChat.identifier()) {
+            case UserEmpty.ID, ChatEmpty.ID -> null;
+            case ChatForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
+                case THROWING -> throw UnavailableChatException.from((ChatForbidden) possibleChat);
+                case NULL_MAPPING -> null;
+            };
+            case ChannelForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
+                case THROWING -> throw UnavailableChatException.from((ChannelForbidden) possibleChat);
+                case NULL_MAPPING -> null;
+            };
+            case UserFull.ID -> {
+                var userFull = (UserFull) possibleChat;
 
                 var minData = userFull.users().stream()
                         .filter(u -> u.identifier() == BaseUser.ID &&
@@ -187,66 +179,56 @@ public class EntityFactory {
                         .orElse(null);
 
                 if (minData == null) {
-                    return null;
+                    yield null;
                 }
 
                 User mappedFullUser = new User(client, minData, userFull.fullUser());
-                return new PrivateChat(client, mappedFullUser, selfUser);
+                yield new PrivateChat(client, mappedFullUser, selfUser);
             }
-            case BaseUser.ID:
-                BaseUser baseUser = (BaseUser) possibleChat;
-
+            case BaseUser.ID -> {
+                var baseUser = (BaseUser) possibleChat;
                 User mappedMinUser = new User(client, baseUser, null);
-                return new PrivateChat(client, mappedMinUser, selfUser);
-            case BaseChat.ID:
-                BaseChat baseChat = (BaseChat) possibleChat;
-
-                return new GroupChat(client, baseChat);
-            case telegram4j.tl.Channel.ID:
-                telegram4j.tl.Channel channel = (telegram4j.tl.Channel) possibleChat;
-
+                yield new PrivateChat(client, mappedMinUser, selfUser);
+            }
+            case BaseChat.ID -> {
+                var baseChat = (BaseChat) possibleChat;
+                yield new GroupChat(client, baseChat);
+            }
+            case Channel.ID -> {
+                var channel = (Channel) possibleChat;
                 if (channel.megagroup()) {
-                    return new SupergroupChat(client, channel);
+                    yield new SupergroupChat(client, channel);
                 }
-                return new BroadcastChannel(client, channel);
-            case ChatFull.ID:
-                ChatFull chatFull = (ChatFull) possibleChat;
-
+                yield new BroadcastChannel(client, channel);
+            }
+            case ChatFull.ID -> {
+                var chatFull = (ChatFull) possibleChat;
                 var minData = chatFull.chats().stream()
                         .filter(c -> c.id() == chatFull.fullChat().id())
                         .findFirst()
-                        .map(c -> {
-                            switch (c.identifier()) {
-                                case ChatEmpty.ID: return null;
-                                case ChatForbidden.ID:
-                                    switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                                        case THROWING: throw UnavailableChatException.from((ChatForbidden) possibleChat);
-                                        case NULL_MAPPING: return null;
-                                    }
-                                case ChannelForbidden.ID:
-                                    switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                                        case THROWING: throw UnavailableChatException.from((ChannelForbidden) possibleChat);
-                                        case NULL_MAPPING: return null;
-                                    }
-                                case BaseChat.ID:
-                                case Channel.ID:
-                                    return c;
-                                default: throw new IllegalArgumentException("Unknown Chat type: " + c);
-                            }
+                        .map(c -> switch (c.identifier()) {
+                            case ChatEmpty.ID -> null;
+                            case ChatForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
+                                case THROWING -> throw UnavailableChatException.from((ChatForbidden) possibleChat);
+                                case NULL_MAPPING -> null;
+                            };
+                            case ChannelForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
+                                case THROWING -> throw UnavailableChatException.from((ChannelForbidden) possibleChat);
+                                case NULL_MAPPING -> null;
+                            };
+                            case BaseChat.ID, Channel.ID -> c;
+                            default -> throw new IllegalArgumentException("Unknown Chat type: " + c);
                         })
                         .orElse(null);
-
                 if (minData == null) {
-                    return null;
+                    yield null;
                 }
-
                 var usersMap = chatFull.users().stream()
                         .map(d -> createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
-                if (chatFull.fullChat() instanceof ChannelFull) {
-                    var channelFull = (ChannelFull) chatFull.fullChat();
-                    var channelMin = (telegram4j.tl.Channel) minData;
+                if (chatFull.fullChat() instanceof ChannelFull channelFull) {
+                    var channelMin = (Channel) minData;
 
                     Long acc = channelMin.min() ? null : channelMin.accessHash();
                     Id channelId = Id.ofChannel(channelMin.id(), acc);
@@ -255,11 +237,10 @@ public class EntityFactory {
                                     usersMap.get(Objects.requireNonNull(d.userId()))))
                             .collect(Collectors.toUnmodifiableList());
 
-                    return channelMin.megagroup()
+                    yield channelMin.megagroup()
                             ? new SupergroupChat(client, channelFull, channelMin, botInfo)
                             : new BroadcastChannel(client, channelFull, channelMin, botInfo);
                 }
-
                 var chat = (BaseChatFull) chatFull.fullChat();
                 Id chatId = Id.ofChat(chat.id());
                 var botInfo = Optional.ofNullable(chat.botInfo())
@@ -268,31 +249,26 @@ public class EntityFactory {
                                         usersMap.get(Objects.requireNonNull(d.userId()))))
                                 .collect(Collectors.toUnmodifiableList()))
                         .orElse(null);
-
                 List<ChatParticipant> chatParticipants;
                 switch (chat.participants().identifier()) {
-                    case BaseChatParticipants.ID: {
-                        BaseChatParticipants d = (BaseChatParticipants) chat.participants();
+                    case BaseChatParticipants.ID -> {
+                        var d = (BaseChatParticipants) chat.participants();
                         chatParticipants = d.participants().stream()
                                 .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
                                 .collect(Collectors.toUnmodifiableList());
-                        break;
                     }
-                    case ChatParticipantsForbidden.ID: {
-                        ChatParticipantsForbidden d = (ChatParticipantsForbidden) chat.participants();
+                    case ChatParticipantsForbidden.ID -> {
+                        var d = (ChatParticipantsForbidden) chat.participants();
                         chatParticipants = Optional.ofNullable(d.selfParticipant())
                                 .map(c -> List.of(new ChatParticipant(client, usersMap.get(c.userId()), c, chatId)))
                                 .orElse(null);
-                        break;
                     }
-                    default: throw new IllegalStateException("Unknown ChatParticipants type: " + chat.participants());
+                    default -> throw new IllegalStateException("Unknown ChatParticipants type: " + chat.participants());
                 }
-
-                return new GroupChat(client, chat, (telegram4j.tl.BaseChat) minData,
-                        chatParticipants, botInfo);
-            default:
-                throw new IllegalArgumentException("Unknown Chat type: " + possibleChat);
-        }
+                yield new GroupChat(client, chat, (BaseChat) minData, chatParticipants, botInfo);
+            }
+            default -> throw new IllegalArgumentException("Unknown Chat type: " + possibleChat);
+        };
     }
 
     @Nullable
@@ -311,137 +287,110 @@ public class EntityFactory {
 
     @Nullable
     public static User createUser(MTProtoTelegramClient client, telegram4j.tl.User anyUser) {
-        switch (anyUser.identifier()) {
-            case UserEmpty.ID: return null;
-            case BaseUser.ID:
-                var baseUser = (BaseUser) anyUser;
-
-                return new User(client, baseUser, null);
-            default:
-                throw new IllegalArgumentException("Unknown User type: " + anyUser);
-        }
+        return switch (anyUser.identifier()) {
+            case UserEmpty.ID -> null;
+            case BaseUser.ID -> new User(client, (BaseUser) anyUser, null);
+            default -> throw new IllegalArgumentException("Unknown User type: " + anyUser);
+        };
     }
 
     public static MessageAction createMessageAction(MTProtoTelegramClient client, telegram4j.tl.MessageAction data,
                                                     Id peer, int messageId) {
-        switch (data.identifier()) {
-            case telegram4j.tl.MessageActionBotAllowed.ID:
-                return new MessageAction.BotAllowed(client, (telegram4j.tl.MessageActionBotAllowed) data);
-            case telegram4j.tl.MessageActionChannelCreate.ID:
-                return new MessageAction.ChannelCreate(client, (telegram4j.tl.MessageActionChannelCreate) data);
-            case telegram4j.tl.MessageActionChannelMigrateFrom.ID:
-                return new MessageAction.ChannelMigrateFrom(client, (telegram4j.tl.MessageActionChannelMigrateFrom) data);
-            case telegram4j.tl.MessageActionChatAddUser.ID:
-                return new MessageAction.ChatJoinUsers(client, (telegram4j.tl.MessageActionChatAddUser) data);
-            case telegram4j.tl.MessageActionChatCreate.ID:
-                return new MessageAction.ChatCreate(client, (telegram4j.tl.MessageActionChatCreate) data);
-            case telegram4j.tl.MessageActionChatDeleteUser.ID:
-                return new MessageAction.ChatLeftUser(client, (telegram4j.tl.MessageActionChatDeleteUser) data);
-            case telegram4j.tl.MessageActionChatDeletePhoto.ID: return new MessageAction.UpdateChatPhoto(client);
-            case telegram4j.tl.MessageActionChatEditPhoto.ID:
-                return new MessageAction.UpdateChatPhoto(client, (telegram4j.tl.MessageActionChatEditPhoto) data,
-                        Context.createChatPhotoContext(client.asResolvedInputPeer(peer), messageId));
-            case telegram4j.tl.MessageActionChatEditTitle.ID:
-                return new MessageAction.ChatEditTitle(client, (telegram4j.tl.MessageActionChatEditTitle) data);
-            case telegram4j.tl.MessageActionChatJoinedByLink.ID:
-                return new MessageAction.ChatJoinedByLink(client, (telegram4j.tl.MessageActionChatJoinedByLink) data);
-            case telegram4j.tl.MessageActionChatJoinedByRequest.ID:
-                return new MessageAction(client, MessageAction.Type.CHAT_JOINED_BY_REQUEST);
-            case telegram4j.tl.MessageActionChatMigrateTo.ID:
-                return new MessageAction.ChatMigrateTo(client, (telegram4j.tl.MessageActionChatMigrateTo) data);
-            case telegram4j.tl.MessageActionContactSignUp.ID:
-                return new MessageAction(client, MessageAction.Type.CONTACT_SIGN_UP);
-            case telegram4j.tl.MessageActionCustomAction.ID:
-                return new MessageAction.Custom(client, (telegram4j.tl.MessageActionCustomAction) data);
-            case telegram4j.tl.MessageActionGameScore.ID:
-                return new MessageAction.GameScore(client, (telegram4j.tl.MessageActionGameScore) data);
-            case telegram4j.tl.MessageActionGeoProximityReached.ID:
-                return new MessageAction.GeoProximityReached(client, (telegram4j.tl.MessageActionGeoProximityReached) data);
-            case telegram4j.tl.MessageActionGroupCall.ID:
-                return new MessageAction.GroupCall(client, (telegram4j.tl.MessageActionGroupCall) data);
-            case telegram4j.tl.MessageActionGroupCallScheduled.ID:
-                return new MessageAction.GroupCallScheduled(client, (telegram4j.tl.MessageActionGroupCallScheduled) data);
-            case telegram4j.tl.MessageActionHistoryClear.ID:
-                return new MessageAction(client, MessageAction.Type.HISTORY_CLEAR);
-            case telegram4j.tl.MessageActionInviteToGroupCall.ID:
-                return new MessageAction.InviteToGroupCall(client, (telegram4j.tl.MessageActionInviteToGroupCall) data);
-            case telegram4j.tl.MessageActionPaymentSent.ID:
-                return new MessageAction.PaymentSent(client, (telegram4j.tl.MessageActionPaymentSent) data);
-            case telegram4j.tl.MessageActionPaymentSentMe.ID:
-                return new MessageAction.PaymentSentMe(client, (telegram4j.tl.MessageActionPaymentSentMe) data);
-            case telegram4j.tl.MessageActionPhoneCall.ID:
-                return new MessageAction.PhoneCall(client, (telegram4j.tl.MessageActionPhoneCall) data);
-            case telegram4j.tl.MessageActionPinMessage.ID:
-                return new MessageAction(client, MessageAction.Type.PIN_MESSAGE);
-            case telegram4j.tl.MessageActionScreenshotTaken.ID:
-                return new MessageAction(client, MessageAction.Type.SCREENSHOT_TAKEN);
-            case telegram4j.tl.MessageActionSecureValuesSent.ID:
-                return new MessageAction.SecureValuesSent(client, (telegram4j.tl.MessageActionSecureValuesSent) data);
-            case telegram4j.tl.MessageActionSecureValuesSentMe.ID:
-                return new MessageAction.SecureValuesSentMe(client, (telegram4j.tl.MessageActionSecureValuesSentMe) data);
-            case telegram4j.tl.MessageActionSetChatTheme.ID:
-                return new MessageAction.SetChatTheme(client, (telegram4j.tl.MessageActionSetChatTheme) data);
-            case telegram4j.tl.MessageActionSetMessagesTTL.ID:
-                return new MessageAction.SetMessagesTtl(client, (telegram4j.tl.MessageActionSetMessagesTTL) data);
-            case MessageActionTopicCreate.ID:
-                return new MessageAction.TopicCreate(client, (telegram4j.tl.MessageActionTopicCreate) data);
-            case MessageActionTopicEdit.ID:
-                return new MessageAction.TopicEdit(client, (telegram4j.tl.MessageActionTopicEdit) data);
-            case MessageActionSuggestProfilePhoto.ID:
-                return new MessageAction.SuggestProfilePhoto(client, (MessageActionSuggestProfilePhoto) data,
-                        Context.createActionContext(peer.asPeer(), messageId));
-            case MessageActionAttachMenuBotAllowed.ID: return new MessageAction(client, MessageAction.Type.ATTACH_MENU_BOT_ALLOWED);
-            default:
-                throw new IllegalArgumentException("Unknown MessageAction type: " + data);
-        }
+        return switch (data.identifier()) {
+            case MessageActionBotAllowed.ID -> new MessageAction.BotAllowed(client, (MessageActionBotAllowed) data);
+            case MessageActionChannelCreate.ID -> new MessageAction.ChannelCreate(client, (MessageActionChannelCreate) data);
+            case MessageActionChannelMigrateFrom.ID -> new MessageAction.ChannelMigrateFrom(client, (MessageActionChannelMigrateFrom) data);
+            case MessageActionChatAddUser.ID -> new MessageAction.ChatJoinUsers(client, (MessageActionChatAddUser) data);
+            case MessageActionChatCreate.ID -> new MessageAction.ChatCreate(client, (MessageActionChatCreate) data);
+            case MessageActionChatDeleteUser.ID -> new MessageAction.ChatLeftUser(client, (MessageActionChatDeleteUser) data);
+            case MessageActionChatDeletePhoto.ID -> new MessageAction.UpdateChatPhoto(client);
+            case MessageActionChatEditPhoto.ID -> new MessageAction.UpdateChatPhoto(client, (MessageActionChatEditPhoto) data,
+                    Context.createChatPhotoContext(client.asResolvedInputPeer(peer), messageId));
+            case MessageActionChatEditTitle.ID -> new MessageAction.ChatEditTitle(client, (MessageActionChatEditTitle) data);
+            case MessageActionChatJoinedByLink.ID -> new MessageAction.ChatJoinedByLink(client, (MessageActionChatJoinedByLink) data);
+            case MessageActionChatJoinedByRequest.ID -> new MessageAction(client, MessageAction.Type.CHAT_JOINED_BY_REQUEST);
+            case MessageActionChatMigrateTo.ID -> new MessageAction.ChatMigrateTo(client, (MessageActionChatMigrateTo) data);
+            case MessageActionContactSignUp.ID -> new MessageAction(client, MessageAction.Type.CONTACT_SIGN_UP);
+            case MessageActionCustomAction.ID -> new MessageAction.Custom(client, (MessageActionCustomAction) data);
+            case MessageActionGameScore.ID -> new MessageAction.GameScore(client, (MessageActionGameScore) data);
+            case MessageActionGeoProximityReached.ID -> new MessageAction.GeoProximityReached(client, (MessageActionGeoProximityReached) data);
+            case MessageActionGroupCall.ID -> new MessageAction.GroupCall(client, (MessageActionGroupCall) data);
+            case MessageActionGroupCallScheduled.ID -> new MessageAction.GroupCallScheduled(client, (MessageActionGroupCallScheduled) data);
+            case MessageActionHistoryClear.ID -> new MessageAction(client, MessageAction.Type.HISTORY_CLEAR);
+            case MessageActionInviteToGroupCall.ID -> new MessageAction.InviteToGroupCall(client, (MessageActionInviteToGroupCall) data);
+            case MessageActionPaymentSent.ID -> new MessageAction.PaymentSent(client, (MessageActionPaymentSent) data);
+            case MessageActionPaymentSentMe.ID -> new MessageAction.PaymentSentMe(client, (MessageActionPaymentSentMe) data);
+            case MessageActionPhoneCall.ID -> new MessageAction.PhoneCall(client, (MessageActionPhoneCall) data);
+            case MessageActionPinMessage.ID -> new MessageAction(client, MessageAction.Type.PIN_MESSAGE);
+            case MessageActionScreenshotTaken.ID -> new MessageAction(client, MessageAction.Type.SCREENSHOT_TAKEN);
+            case MessageActionSecureValuesSent.ID -> new MessageAction.SecureValuesSent(client, (MessageActionSecureValuesSent) data);
+            case MessageActionSecureValuesSentMe.ID -> new MessageAction.SecureValuesSentMe(client, (MessageActionSecureValuesSentMe) data);
+            case MessageActionSetChatTheme.ID -> new MessageAction.SetChatTheme(client, (MessageActionSetChatTheme) data);
+            case MessageActionSetMessagesTTL.ID -> new MessageAction.SetMessagesTtl(client, (MessageActionSetMessagesTTL) data);
+            case MessageActionTopicCreate.ID -> new MessageAction.TopicCreate(client, (MessageActionTopicCreate) data);
+            case MessageActionTopicEdit.ID -> new MessageAction.TopicEdit(client, (MessageActionTopicEdit) data);
+            case MessageActionSuggestProfilePhoto.ID -> new MessageAction.SuggestProfilePhoto(client, (MessageActionSuggestProfilePhoto) data,
+                    Context.createActionContext(peer.asPeer(), messageId));
+            case MessageActionAttachMenuBotAllowed.ID -> new MessageAction(client, MessageAction.Type.ATTACH_MENU_BOT_ALLOWED);
+            default -> throw new IllegalArgumentException("Unknown MessageAction type: " + data);
+        };
     }
 
     public static MessageMedia createMessageMedia(MTProtoTelegramClient client, telegram4j.tl.MessageMedia data,
                                                   int messageId, Id peer) {
-        switch (data.identifier()) {
-            case telegram4j.tl.MessageMediaGeo.ID:
-                return new MessageMedia.Geo(client, (telegram4j.tl.MessageMediaGeo) data);
-            case telegram4j.tl.MessageMediaContact.ID:
-                return new MessageMedia.Contact(client, (telegram4j.tl.MessageMediaContact) data);
-            case telegram4j.tl.MessageMediaUnsupported.ID:
-                return new MessageMedia(client, MessageMedia.Type.UNSUPPORTED);
-            case telegram4j.tl.MessageMediaPhoto.ID:
-            case telegram4j.tl.MessageMediaDocument.ID:
-                return new MessageMedia.Document(client, data, Context.createMediaContext(peer.asPeer(), messageId));
-            case telegram4j.tl.MessageMediaWebPage.ID:
-                return new MessageMedia.WebPage(client, (telegram4j.tl.MessageMediaWebPage) data);
-            case telegram4j.tl.MessageMediaVenue.ID:
-                return new MessageMedia.Venue(client, (telegram4j.tl.MessageMediaVenue) data);
-            case telegram4j.tl.MessageMediaGame.ID:
-                return new MessageMedia.Game(client, (telegram4j.tl.MessageMediaGame) data,
-                        Context.createMediaContext(peer.asPeer(), messageId));
-            case telegram4j.tl.MessageMediaInvoice.ID:
-                return new MessageMedia.Invoice(client, (telegram4j.tl.MessageMediaInvoice) data,
-                        Context.createMediaContext(peer.asPeer(), messageId));
-            case telegram4j.tl.MessageMediaGeoLive.ID:
-                return new MessageMedia.GeoLive(client, (telegram4j.tl.MessageMediaGeoLive) data);
-            case telegram4j.tl.MessageMediaPoll.ID:
-                return new MessageMedia.Poll(client, (telegram4j.tl.MessageMediaPoll) data, peer);
-            case telegram4j.tl.MessageMediaDice.ID:
-                return new MessageMedia.Dice(client, (telegram4j.tl.MessageMediaDice) data);
-            default:
-                throw new IllegalArgumentException("Unknown MessageMedia type: " + data);
-        }
+        return switch (data.identifier()) {
+            case MessageMediaGeo.ID -> new MessageMedia.Geo(client, (MessageMediaGeo) data);
+            case MessageMediaContact.ID -> new MessageMedia.Contact(client, (MessageMediaContact) data);
+            case MessageMediaUnsupported.ID -> new MessageMedia(client, MessageMedia.Type.UNSUPPORTED);
+            case MessageMediaPhoto.ID -> new MessageMedia.Document(client, (MessageMediaPhoto) data,
+                    Context.createMediaContext(peer.asPeer(), messageId));
+            case MessageMediaDocument.ID -> new MessageMedia.Document(client, (MessageMediaDocument) data,
+                    Context.createMediaContext(peer.asPeer(), messageId));
+            case MessageMediaWebPage.ID -> new MessageMedia.WebPage(client, (MessageMediaWebPage) data);
+            case MessageMediaVenue.ID -> new MessageMedia.Venue(client, (MessageMediaVenue) data);
+            case MessageMediaGame.ID -> new MessageMedia.Game(client, (MessageMediaGame) data,
+                    Context.createMediaContext(peer.asPeer(), messageId));
+            case MessageMediaInvoice.ID -> new MessageMedia.Invoice(client, (MessageMediaInvoice) data,
+                    Context.createMediaContext(peer.asPeer(), messageId));
+            case MessageMediaGeoLive.ID -> new MessageMedia.GeoLive(client, (MessageMediaGeoLive) data);
+            case MessageMediaPoll.ID -> new MessageMedia.Poll(client, (MessageMediaPoll) data, peer);
+            case MessageMediaDice.ID -> new MessageMedia.Dice(client, (MessageMediaDice) data);
+            default -> throw new IllegalArgumentException("Unknown MessageMedia type: " + data);
+        };
     }
 
-    public static PhotoSize createPhotoSize(telegram4j.tl.PhotoSize data) {
-        switch (data.identifier()) {
-            case telegram4j.tl.BasePhotoSize.ID: return new DefaultPhotoSize((telegram4j.tl.BasePhotoSize) data);
-            case telegram4j.tl.PhotoCachedSize.ID: return new PhotoCachedSize((telegram4j.tl.PhotoCachedSize) data);
-            case telegram4j.tl.PhotoPathSize.ID: return new PhotoPathSize((telegram4j.tl.PhotoPathSize) data);
-            case telegram4j.tl.PhotoSizeProgressive.ID: return new PhotoSizeProgressive((telegram4j.tl.PhotoSizeProgressive) data);
-            case telegram4j.tl.PhotoStrippedSize.ID: return new PhotoStrippedSize((telegram4j.tl.PhotoStrippedSize) data);
-            default: throw new IllegalArgumentException("Unknown photo size type: " + data);
-        }
+    public static AnimatedThumbnail createAnimatedThumbnail(MTProtoTelegramClient client, VideoSize data) {
+        return switch (data.identifier()) {
+            case BaseVideoSize.ID -> new VideoThumbnail((BaseVideoSize) data);
+            case VideoSizeEmojiMarkup.ID -> new StickerThumbnail(client, (VideoSizeEmojiMarkup) data);
+            case VideoSizeStickerMarkup.ID -> new StickerThumbnail(client, (VideoSizeStickerMarkup) data);
+            default -> throw new IllegalArgumentException("Unknown VideoSize type: " + data);
+        };
     }
 
-    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocumentFields data,
-                                          Context context) {
+    public static Thumbnail createThumbnail(telegram4j.tl.PhotoSize data) {
+        return switch (data.identifier()) {
+            case BasePhotoSize.ID -> new PhotoThumbnail((BasePhotoSize) data);
+            case PhotoCachedSize.ID -> new CachedThumbnail((PhotoCachedSize) data);
+            case PhotoPathSize.ID -> new VectorThumbnail((PhotoPathSize) data);
+            case PhotoSizeProgressive.ID -> new ProgressiveThumbnail((PhotoSizeProgressive) data);
+            case PhotoStrippedSize.ID -> new StrippedThumbnail((PhotoStrippedSize) data);
+            default -> throw new IllegalArgumentException("Unknown PhotoSize type: " + data);
+        };
+    }
+
+    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.BaseDocument data, Context context) {
+        return createDocument0(client, data, context);
+    }
+
+    public static Document createDocument(MTProtoTelegramClient client, telegram4j.tl.WebDocument data, Context context) {
+        return createDocument0(client, data, context);
+    }
+
+    private static Document createDocument0(MTProtoTelegramClient client, TlObject any, Context context) {
+        var webDocument = any instanceof WebDocument w ? w : null;
+        var baseDocument = any instanceof BaseDocument b ? b : null;
+
         boolean animated = false;
         boolean hasStickers = false;
         telegram4j.tl.DocumentAttributeVideo videoData = null;
@@ -450,34 +399,18 @@ public class EntityFactory {
         telegram4j.tl.DocumentAttributeImageSize sizeData = null;
         telegram4j.tl.DocumentAttributeCustomEmoji emojiData = null;
         String fileName = null;
-        for (var a : data.attributes()) {
+        var attrs = webDocument != null ? webDocument.attributes() : Objects.requireNonNull(baseDocument).attributes();
+        for (var a : attrs) {
             switch (a.identifier()) {
-                case telegram4j.tl.DocumentAttributeCustomEmoji.ID:
-                    emojiData = (DocumentAttributeCustomEmoji) a;
-                    break;
-                case telegram4j.tl.DocumentAttributeHasStickers.ID:
-                    hasStickers = true;
-                    break;
-                case telegram4j.tl.DocumentAttributeAnimated.ID:
-                    animated = true;
-                    break;
-                case telegram4j.tl.DocumentAttributeAudio.ID:
-                    audioData = (telegram4j.tl.DocumentAttributeAudio) a;
-                    break;
-                case telegram4j.tl.DocumentAttributeFilename.ID:
-                    fileName = ((telegram4j.tl.DocumentAttributeFilename) a).fileName();
-                    break;
-                case telegram4j.tl.DocumentAttributeImageSize.ID:
-                    sizeData = (telegram4j.tl.DocumentAttributeImageSize) a;
-                    break;
-                case telegram4j.tl.DocumentAttributeSticker.ID:
-                    stickerData = (telegram4j.tl.DocumentAttributeSticker) a;
-                    break;
-                case telegram4j.tl.DocumentAttributeVideo.ID:
-                    videoData = (telegram4j.tl.DocumentAttributeVideo) a;
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unknown DocumentAttribute type: " + a);
+                case DocumentAttributeCustomEmoji.ID -> emojiData = (DocumentAttributeCustomEmoji) a;
+                case DocumentAttributeHasStickers.ID -> hasStickers = true;
+                case DocumentAttributeAnimated.ID -> animated = true;
+                case DocumentAttributeAudio.ID -> audioData = (DocumentAttributeAudio) a;
+                case DocumentAttributeFilename.ID -> fileName = ((DocumentAttributeFilename) a).fileName();
+                case DocumentAttributeImageSize.ID -> sizeData = (DocumentAttributeImageSize) a;
+                case DocumentAttributeSticker.ID -> stickerData = (DocumentAttributeSticker) a;
+                case DocumentAttributeVideo.ID -> videoData = (DocumentAttributeVideo) a;
+                default -> throw new IllegalArgumentException("Unknown DocumentAttribute type: " + a);
             }
         }
 
@@ -491,28 +424,37 @@ public class EntityFactory {
                 context = Context.createStickerSetContext(stickerInfo
                         .map(DocumentAttributeSticker::stickerset, DocumentAttributeCustomEmoji::stickerset));
             }
-            return new Sticker(client, data, fileName, context, stickerInfo, Variant2.of(sizeData, videoData));
+            return webDocument != null
+                    ? new Sticker(client, webDocument, fileName, context, stickerInfo, Variant2.of(sizeData, videoData))
+                    : new Sticker(client, baseDocument, fileName, context, stickerInfo, Variant2.of(sizeData, videoData));
         }
 
         if (audioData != null) {
-            return new Audio(client, data, fileName, context, audioData);
+            return webDocument != null
+                    ? new Audio(client, webDocument, fileName, context, audioData)
+                    : new Audio(client, baseDocument, fileName, context, audioData);
         }
 
         if (videoData != null) {
-            return new Video(client, data, fileName, context, videoData, hasStickers, animated);
+            return webDocument != null
+                    ? new Video(client, webDocument, fileName, context, videoData, hasStickers, animated)
+                    : new Video(client, baseDocument, fileName, context, videoData, hasStickers, animated);
         }
 
         if (sizeData != null) {
-            return new Photo(client, data, fileName, context, sizeData);
+            return webDocument != null
+                    ? new Photo(client, webDocument, fileName, context, sizeData)
+                    : new Photo(client, baseDocument, fileName, context, sizeData);
         }
-        return new Document(client, data, fileName, context);
+        return webDocument != null
+                ? new Document(client, webDocument, fileName, context)
+                : new Document(client, baseDocument, fileName, context);
     }
 
     public static Mono<InputBotInlineResult> createInlineResult(MTProtoTelegramClient client, InlineResultSpec spec) {
         Mono<InputBotInlineMessage> sendMessage = createInlineMessage(client, spec.message());
 
-        if (spec instanceof InlineResultArticleSpec) {
-            InlineResultArticleSpec r = (InlineResultArticleSpec) spec;
+        if (spec instanceof InlineResultArticleSpec r) {
 
             var builder = BaseInputBotInlineResult.builder()
                     .type("article")
@@ -533,8 +475,7 @@ public class EntityFactory {
 
             return sendMessage.map(builder::sendMessage)
                     .map(ImmutableBaseInputBotInlineResult.Builder::build);
-        } else if (spec instanceof InlineResultDocumentSpec) {
-            InlineResultDocumentSpec r = (InlineResultDocumentSpec) spec;
+        } else if (spec instanceof InlineResultDocumentSpec r) {
 
             DocumentType documentType = r.type().orElse(DocumentType.GENERAL);
             String type = documentType == DocumentType.GENERAL ? "file" : documentType.name().toLowerCase(Locale.ROOT);
@@ -543,7 +484,7 @@ public class EntityFactory {
             if (url != null) {
                 String mimeType = r.mimeType()
                         .or(() -> documentType == DocumentType.PHOTO ? Optional.of("image/jpeg") : Optional.empty())
-                        .orElseThrow(() -> new IllegalArgumentException("Mime type must be included with urls."));
+                        .orElseThrow(() -> new IllegalArgumentException("Mime type must be included with urls"));
 
                 if (documentType == DocumentType.GENERAL &&
                         !mimeType.equalsIgnoreCase("application/pdf") &&
@@ -565,13 +506,9 @@ public class EntityFactory {
                         .mimeType(mimeType);
 
                 switch (documentType) {
-                    case PHOTO: {
-                        contentBuilder.addAttribute(r.size().map(WebDocumentFields.Size::asData)
-                                .orElseThrow(() -> new IllegalStateException("Size for photos must be set.")));
-                        break;
-                    }
-                    case VIDEO:
-                    case GIF: {
+                    case PHOTO -> contentBuilder.addAttribute(r.size().map(WebDocumentFields.Size::asData)
+                            .orElseThrow(() -> new IllegalStateException("Size for photos must be set.")));
+                    case VIDEO, GIF -> {
                         int duration = r.duration()
                                 .map(Duration::getSeconds)
                                 .map(Math::toIntExact)
@@ -584,22 +521,19 @@ public class EntityFactory {
                                 .w(size.width())
                                 .duration(duration)
                                 .build());
-                        break;
                     }
-                    case AUDIO:
-                    case VOICE:
+                    case AUDIO, VOICE -> {
                         int duration = r.duration()
                                 .map(Duration::getSeconds)
                                 .map(Math::toIntExact)
                                 .orElseThrow(() -> new IllegalStateException("Duration for voice/audio documents must be set."));
-
                         contentBuilder.addAttribute(DocumentAttributeAudio.builder()
                                 .voice(documentType == DocumentType.VOICE)
                                 .duration(duration)
                                 .title(r.title().orElse(null))
                                 .performer(r.performer().orElse(null))
                                 .build());
-                        break;
+                    }
                 }
 
                 r.filename().ifPresent(s -> contentBuilder.addAttribute(ImmutableDocumentAttributeFilename.of(s)));
@@ -608,9 +542,9 @@ public class EntityFactory {
                 builder.content(content);
 
                 r.thumb().map(EntityFactory::createThumbnail).ifPresentOrElse(builder::thumb, () -> {
-                    if (documentType == DocumentType.GIF || documentType == DocumentType.VIDEO ||
-                            documentType == DocumentType.PHOTO)
-                        builder.thumb(content);
+                    switch (documentType) {
+                        case GIF, VIDEO, PHOTO -> builder.thumb(content);
+                    }
                 });
 
                 return sendMessage.map(builder::sendMessage)
@@ -648,8 +582,7 @@ public class EntityFactory {
 
             return sendMessage.map(builder::sendMessage)
                     .map(ImmutableInputBotInlineResultDocument.Builder::build);
-        } else if (spec instanceof InlineResultGameSpec) {
-            InlineResultGameSpec r = (InlineResultGameSpec) spec;
+        } else if (spec instanceof InlineResultGameSpec r) {
 
             var builder = InputBotInlineResultGame.builder()
                     .id(r.id())
@@ -663,55 +596,53 @@ public class EntityFactory {
     }
 
     public static Reaction createReaction(telegram4j.tl.Reaction reaction) {
-        switch (reaction.identifier()) {
-            case ReactionCustomEmoji.ID:
+        return switch (reaction.identifier()) {
+            case ReactionCustomEmoji.ID -> {
                 var custom = (ReactionCustomEmoji) reaction;
-                return new Reaction(custom.documentId());
-            case ReactionEmoji.ID:
+                yield new Reaction(custom.documentId());
+            }
+            case ReactionEmoji.ID -> {
                 var emoticon = (ReactionEmoji) reaction;
-                return new Reaction(emoticon.emoticon());
+                yield new Reaction(emoticon.emoticon());
+            }
             // and ReactionEmpty
-            default:
-                throw new IllegalArgumentException("Unknown reaction type: " + reaction);
-        }
+            default -> throw new IllegalArgumentException("Unknown reaction type: " + reaction);
+        };
     }
 
     @Nullable
     public static ChatReactions createChatReactions(telegram4j.tl.ChatReactions data) {
-        switch (data.identifier()) {
-            case ChatReactionsAll.ID:
+        return switch (data.identifier()) {
+            case ChatReactionsAll.ID -> {
                 var all = (ChatReactionsAll) data;
-                return new ChatReactions(all.allowCustom());
-            case ChatReactionsSome.ID:
+                yield new ChatReactions(all.allowCustom());
+            }
+            case ChatReactionsSome.ID -> {
                 var some = (ChatReactionsSome) data;
-                return new ChatReactions(some.reactions().stream()
+                yield new ChatReactions(some.reactions().stream()
                         .map(EntityFactory::createReaction)
                         .collect(Collectors.toUnmodifiableList()));
-            case ChatReactionsNone.ID: return null;
-            default: throw new IllegalStateException("Unknown ChatReactions type: " + data);
-        }
+            }
+            case ChatReactionsNone.ID -> null;
+            default -> throw new IllegalStateException("Unknown ChatReactions type: " + data);
+        };
     }
 
     public static ChatParticipant createChannelParticipant(MTProtoTelegramClient client, ChannelParticipant p,
                                                            Id chatId, Id peerId) {
-        MentionablePeer peer;
-        switch (peerId.getType()) {
-            case CHANNEL:
-                peer = p.chats().stream()
-                        .filter(u -> u.id() == peerId.asLong())
-                        .findFirst()
-                        .map(u -> (MentionablePeer) EntityFactory.createChat(client, u, null))
-                        .orElse(null);
-                break;
-            case USER:
-                peer = p.users().stream()
-                        .filter(u -> u.id() == peerId.asLong())
-                        .findFirst()
-                        .map(u -> EntityFactory.createUser(client, u))
-                        .orElse(null);
-                break;
-            default: throw new IllegalStateException();
-        }
+        MentionablePeer peer = switch (peerId.getType()) {
+            case CHANNEL -> p.chats().stream()
+                    .filter(u -> u.id() == peerId.asLong())
+                    .findFirst()
+                    .map(u -> (MentionablePeer) EntityFactory.createChat(client, u, null))
+                    .orElse(null);
+            case USER -> p.users().stream()
+                    .filter(u -> u.id() == peerId.asLong())
+                    .findFirst()
+                    .map(u -> EntityFactory.createUser(client, u))
+                    .orElse(null);
+            default -> throw new IllegalStateException();
+        };
         return new ChatParticipant(client, peer, p.participant(), chatId);
     }
 
@@ -735,40 +666,39 @@ public class EntityFactory {
         var replyMarkup = Mono.justOrEmpty(m.replyMarkup())
                 .flatMap(s -> s.asData(client));
 
-        switch (m.type()) {
-            case MEDIA_AUTO: {
+        return switch (m.type()) {
+            case MEDIA_AUTO -> {
                 String c = m.message().orElseThrow().trim();
                 var parser = m.parser()
                         .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                         .map(t -> EntityParserSupport.parse(client, t.apply(c)))
                         .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
 
-                return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageMediaAuto.builder()
+                yield parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageMediaAuto.builder()
                                 .message(txt)
                                 .entities(ent)))
                         .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                 .then(Mono.fromSupplier(builder::build)));
             }
-            case TEXT:
+            case TEXT -> {
                 String c = m.message().orElseThrow().trim();
                 var parser = m.parser()
                         .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                         .map(t -> EntityParserSupport.parse(client, t.apply(c)))
                         .orElseGet(() -> Mono.just(Tuples.of(c, List.of())));
-
-                return parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageText.builder()
+                yield parser.map(TupleUtils.function((txt, ent) -> InputBotInlineMessageText.builder()
                                 .message(txt)
                                 .entities(ent)
                                 .noWebpage(m.noWebpage())))
                         .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                 .then(Mono.fromSupplier(builder::build)));
-            case GAME:
-                return Mono.just(ImmutableInputBotInlineMessageGame.of())
-                        .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
-                                .defaultIfEmpty(r));
-            case VENUE:
+            }
+            case GAME -> Mono.just(ImmutableInputBotInlineMessageGame.of())
+                    .flatMap(r -> replyMarkup.map(r::withReplyMarkup)
+                            .defaultIfEmpty(r));
+            case VENUE -> {
                 var venue = m.venue().orElseThrow();
-                return Mono.just(InputBotInlineMessageMediaVenue.builder()
+                yield Mono.just(InputBotInlineMessageMediaVenue.builder()
                                 .geoPoint(BaseInputGeoPoint.builder()
                                         .lat(venue.latitude())
                                         .longitude(venue.longitude())
@@ -781,7 +711,16 @@ public class EntityFactory {
                                 .address(venue.address()))
                         .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
                                 .then(Mono.fromSupplier(builder::build)));
-            default: throw new IllegalStateException();
-        }
+            }
+        };
+    }
+
+    public static KeyboardButton.RequestPeer createRequestPeer(RequestPeerType data) {
+        return switch (data.identifier()) {
+            case RequestPeerTypeBroadcast.ID -> new KeyboardButton.RequestChannel((RequestPeerTypeBroadcast) data);
+            case RequestPeerTypeChat.ID -> new KeyboardButton.RequestChat((RequestPeerTypeChat) data);
+            case RequestPeerTypeUser.ID -> new KeyboardButton.RequestUser((RequestPeerTypeUser) data);
+            default -> throw new IllegalArgumentException("Unknown RequestPeerType type: " + data);
+        };
     }
 }

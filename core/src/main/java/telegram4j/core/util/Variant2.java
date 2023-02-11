@@ -61,7 +61,7 @@ public class Variant2<T1, T2> {
      * @return The new {@code Variant2}.
      */
     public static <T1, T2> Variant2<T1, T2> of(@Nullable T1 t1, @Nullable T2 t2) {
-        if (t1 == null && t2 == null || t1 != null && t2 != null) {
+        if ((t1 == null) == (t2 == null)) {
             throw new IllegalArgumentException("Unexpected variants, t1: " + t1 + ", t2: " + t2);
         }
         return new Variant2<>(t1, t2);
@@ -97,12 +97,19 @@ public class Variant2<T1, T2> {
         return Optional.ofNullable(t2);
     }
 
+    public boolean isT1Present() {
+        return t1 != null;
+    }
+
+    public boolean isT2Present() {
+        return t2 != null;
+    }
+
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof Variant2)) return false;
-        Variant2<?, ?> variant2 = (Variant2<?, ?>) o;
-        return Objects.equals(t1, variant2.t1) && Objects.equals(t2, variant2.t2);
+        if (!(o instanceof Variant2<?, ?> v)) return false;
+        return Objects.equals(t1, v.t1) && Objects.equals(t2, v.t2);
     }
 
     @Override

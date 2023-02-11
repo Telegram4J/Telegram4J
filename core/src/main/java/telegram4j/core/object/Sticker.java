@@ -18,12 +18,20 @@ import java.util.Optional;
  * Representation of all types of stickers and custom emojis.
  * The {@link #getFileName() file name} will always be available.
  */
-public class Sticker extends Document {
+public final class Sticker extends Document {
 
     private final Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData;
     private final Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData;
 
-    public Sticker(MTProtoTelegramClient client, BaseDocumentFields data, @Nullable String fileName,
+    public Sticker(MTProtoTelegramClient client, BaseDocument data, @Nullable String fileName,
+                   Context context, Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData,
+                   Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData) {
+        super(client, data, fileName, context);
+        this.stickerData = Objects.requireNonNull(stickerData);
+        this.optData = Objects.requireNonNull(optData);
+    }
+
+    public Sticker(MTProtoTelegramClient client, WebDocument data, @Nullable String fileName,
                    Context context, Variant2<DocumentAttributeSticker, DocumentAttributeCustomEmoji> stickerData,
                    Variant2<DocumentAttributeImageSize, DocumentAttributeVideo> optData) {
         super(client, data, fileName, context);
@@ -144,13 +152,12 @@ public class Sticker extends Document {
         VIDEO;
 
         public static Type fromMimeType(String mimeType) {
-            switch (mimeType.toLowerCase(Locale.US)) {
-                case "image/png":
-                case "image/webp": return STATIC;
-                case "video/webm": return VIDEO;
-                case "application/x-tgsticker": return ANIMATED;
-                default: throw new IllegalStateException("Unexpected mime type: '" + mimeType + '\'');
-            }
+            return switch (mimeType.toLowerCase(Locale.US)) {
+                case "image/png", "image/webp" -> STATIC;
+                case "video/webm" -> VIDEO;
+                case "application/x-tgsticker" -> ANIMATED;
+                default -> throw new IllegalStateException("Unexpected mime type: '" + mimeType + '\'');
+            };
         }
     }
 }

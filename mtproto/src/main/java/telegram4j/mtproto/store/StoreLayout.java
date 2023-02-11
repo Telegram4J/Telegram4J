@@ -6,10 +6,11 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthorizationKeyHolder;
-import telegram4j.mtproto.store.object.*;
+import telegram4j.mtproto.store.object.ChatData;
+import telegram4j.mtproto.store.object.MessagePoll;
+import telegram4j.mtproto.store.object.PeerData;
+import telegram4j.mtproto.store.object.ResolvedChatParticipant;
 import telegram4j.tl.*;
-import telegram4j.tl.auth.BaseAuthorization;
-import telegram4j.tl.channels.BaseChannelParticipants;
 import telegram4j.tl.channels.ChannelParticipant;
 import telegram4j.tl.contacts.ResolvedPeer;
 import telegram4j.tl.messages.ChatFull;
@@ -23,7 +24,7 @@ import telegram4j.tl.users.UserFull;
  * @implSpec The implementation must be thread-safe and associated to one dc and user,
  * because of relativity of the message ids from user to user.
  */
-public interface StoreLayout {
+public interface StoreLayout extends UpdatesStore, ResultsStore {
 
     Mono<Void> initialize();
 
@@ -119,10 +120,11 @@ public interface StoreLayout {
      * Check existence of message.
      * <p>Currently used only in updates handling.
      *
-     * @param message The ordinal or service message to check.
+     * @param peerId The id of peer where message was sent.
+     * @param messageId The id of message.
      * @return A {@link Mono} emitting on successful completion {@code true} if message exists.
      */
-    Mono<Boolean> existMessage(BaseMessageFields message);
+    Mono<Boolean> existMessage(Peer peerId, int messageId);
 
     /**
      * Retrieve user/group chat's messages with auxiliary data by given ids.
@@ -291,23 +293,6 @@ public interface StoreLayout {
     Mono<MessagePoll> getPollById(long pollId);
 
     // endregion
-    // region updates
-
-    Mono<Void> onNewMessage(Message update);
-
-    Mono<Message> onEditMessage(Message update);
-
-    Mono<ResolvedDeletedMessages> onDeleteMessages(UpdateDeleteMessagesFields update);
-
-    Mono<Void> onUpdatePinnedMessages(UpdatePinnedMessagesFields payload);
-
-    Mono<Void> onChatParticipant(UpdateChatParticipant payload);
-
-    Mono<Void> onChannelParticipant(UpdateChannelParticipant payload);
-
-    Mono<Void> onChatParticipants(ChatParticipants payload);
-
-    // endregion
     // region state methods
 
     /**
@@ -349,64 +334,6 @@ public interface StoreLayout {
     Mono<Void> updateChannelPts(long channelId, int pts);
 
     Mono<Void> registerPoll(Peer peerId, int messageId, InputMediaPoll poll);
-
-    // endregion
-    // region requests hooks
-
-    /**
-     * Applies given peer entities to local store.
-     *
-     * @param chats An iterable with chats.
-     * @param users An iterable with users.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users);
-
-    /**
-     * Applies given full user to local store.
-     *
-     * @param payload The user full payload.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onUserUpdate(telegram4j.tl.users.UserFull payload);
-
-    /**
-     * Applies given full chat to local store.
-     *
-     * @param payload The user chat payload.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onChatUpdate(telegram4j.tl.messages.ChatFull payload);
-
-    /**
-     * Applies given channel participants list to local store.
-     *
-     * @param channelId The id of channel.
-     * @param payload The channel participants list.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onChannelParticipants(long channelId, BaseChannelParticipants payload);
-
-    /**
-     * Applies given channel participant to local store.
-     *
-     * @param channelId The id of channel.
-     * @param payload The channel participant.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onChannelParticipant(long channelId, ChannelParticipant payload);
-
-    /**
-     * Applies given messages list to local store.
-     *
-     * @param payload The messages list.
-     * @return A {@link Mono} completing the operation is done.
-     */
-    Mono<Void> onMessages(Messages payload);
-
-    Mono<Void> onAuthorization(BaseAuthorization auth);
-
-    Mono<Void> onUpdateConfig(Config config);
 
     // endregion
 }

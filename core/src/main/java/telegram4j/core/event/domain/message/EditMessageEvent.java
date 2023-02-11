@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Event of edited chat/channel message. */
-public class EditMessageEvent extends MessageEvent {
+public final class EditMessageEvent extends MessageEvent {
 
     private final Message newMessage;
     @Nullable

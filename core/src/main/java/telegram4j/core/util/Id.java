@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * The unsigned 64-bot identifier for {@link PeerEntity} objects which
+ * The unsigned 64-bit identifier for {@link PeerEntity} objects which
  * can contains access hash or min information about channel/user.
  */
 public final class Id implements Comparable<Id> {
@@ -63,6 +63,7 @@ public final class Id implements Comparable<Id> {
     /**
      * Create new id with {@link Type#CHANNEL} type and min information.
      *
+     * @throws IllegalArgumentException if {@code messageId} is negative.
      * @param value The id of channel.
      * @param peerId The id of chat/channel where have seen this channel.
      * @param messageId The id of message where have seen this channel.
@@ -109,6 +110,7 @@ public final class Id implements Comparable<Id> {
     /**
      * Create new id with {@link Type#USER} type and min information.
      *
+     * @throws IllegalArgumentException if {@code messageId} is negative.
      * @param value The id of user.
      * @param peerId The id of chat/channel where have seen this user.
      * @param messageId The id of message where have seen this user.
@@ -139,12 +141,12 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link Peer}.
      */
     public static Id of(Peer peer) {
-        switch (peer.identifier()) {
-            case PeerChannel.ID: return new Id(Type.CHANNEL, ((PeerChannel) peer).channelId(), null);
-            case PeerChat.ID: return new Id(Type.CHAT, ((PeerChat) peer).chatId(), null);
-            case PeerUser.ID: return new Id(Type.USER, ((PeerUser) peer).userId(), null);
-            default: throw new IllegalArgumentException("Unknown peer type: " + peer);
-        }
+        return switch (peer.identifier()) {
+            case PeerChannel.ID -> new Id(Type.CHANNEL, ((PeerChannel) peer).channelId(), null);
+            case PeerChat.ID -> new Id(Type.CHAT, ((PeerChat) peer).chatId(), null);
+            case PeerUser.ID -> new Id(Type.USER, ((PeerUser) peer).userId(), null);
+            default -> throw new IllegalArgumentException("Unknown peer type: " + peer);
+        };
     }
 
     /**
@@ -167,20 +169,20 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputUser}.
      */
     public static Id of(InputUser inputUser, Id selfId) {
-        switch (inputUser.identifier()) {
-            case BaseInputUser.ID: {
-                BaseInputUser d = (BaseInputUser) inputUser;
+        return switch (inputUser.identifier()) {
+            case BaseInputUser.ID -> {
+                var d = (BaseInputUser) inputUser;
 
-                return ofUser(d.userId(), d.accessHash());
+                yield ofUser(d.userId(), d.accessHash());
             }
-            case InputUserFromMessage.ID: {
-                InputUserFromMessage d = (InputUserFromMessage) inputUser;
+            case InputUserFromMessage.ID -> {
+                var d = (InputUserFromMessage) inputUser;
 
-                return ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
+                yield ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
             }
-            case InputUserSelf.ID: return selfId;
-            default: throw new IllegalArgumentException("Unknown input user type: " + inputUser);
-        }
+            case InputUserSelf.ID -> selfId;
+            default -> throw new IllegalArgumentException("Unknown input user type: " + inputUser);
+        };
     }
 
     /**
@@ -192,19 +194,19 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputChannel}.
      */
     public static Id of(InputChannel inputChannel, Id selfId) {
-        switch (inputChannel.identifier()) {
-            case BaseInputChannel.ID: {
-                BaseInputChannel d = (BaseInputChannel) inputChannel;
+        return switch (inputChannel.identifier()) {
+            case BaseInputChannel.ID -> {
+                var d = (BaseInputChannel) inputChannel;
 
-                return ofChannel(d.channelId(), d.accessHash());
+                yield ofChannel(d.channelId(), d.accessHash());
             }
-            case InputChannelFromMessage.ID: {
-                InputChannelFromMessage d = (InputChannelFromMessage) inputChannel;
+            case InputChannelFromMessage.ID -> {
+                var d = (InputChannelFromMessage) inputChannel;
 
-                return ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
+                yield ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
             }
-            default: throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
-        }
+            default -> throw new IllegalArgumentException("Unknown input channel type: " + inputChannel);
+        };
     }
 
     /**
@@ -216,35 +218,35 @@ public final class Id implements Comparable<Id> {
      * @return New {@link Id} from given {@link InputPeer}.
      */
     public static Id of(InputPeer inputPeer, Id selfId) {
-        switch (inputPeer.identifier()) {
-            case InputPeerChannel.ID: {
-                InputPeerChannel d = (InputPeerChannel) inputPeer;
+        return switch (inputPeer.identifier()) {
+            case InputPeerChannel.ID -> {
+                var d = (InputPeerChannel) inputPeer;
 
-                return ofChannel(d.channelId(), d.accessHash());
+                yield ofChannel(d.channelId(), d.accessHash());
             }
-            case InputPeerChannelFromMessage.ID: {
-                InputPeerChannelFromMessage d = (InputPeerChannelFromMessage) inputPeer;
+            case InputPeerChannelFromMessage.ID -> {
+                var d = (InputPeerChannelFromMessage) inputPeer;
 
-                return ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
+                yield ofChannel(d.channelId(), of(d.peer(), selfId), d.msgId());
             }
-            case InputPeerChat.ID: {
-                InputPeerChat d = (InputPeerChat) inputPeer;
+            case InputPeerChat.ID -> {
+                var d = (InputPeerChat) inputPeer;
 
-                return ofChat(d.chatId());
+                yield ofChat(d.chatId());
             }
-            case InputPeerSelf.ID: return selfId;
-            case InputPeerUser.ID: {
-                InputPeerUser d = (InputPeerUser) inputPeer;
+            case InputPeerSelf.ID -> selfId;
+            case InputPeerUser.ID -> {
+                var d = (InputPeerUser) inputPeer;
 
-                return ofUser(d.userId(), d.accessHash());
+                yield ofUser(d.userId(), d.accessHash());
             }
-            case InputPeerUserFromMessage.ID: {
-                InputPeerUserFromMessage d = (InputPeerUserFromMessage) inputPeer;
+            case InputPeerUserFromMessage.ID -> {
+                var d = (InputPeerUserFromMessage) inputPeer;
 
-                return ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
+                yield ofUser(d.userId(), of(d.peer(), selfId), d.msgId());
             }
-            default: throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
-        }
+            default -> throw new IllegalArgumentException("Unknown input peer type: " + inputPeer);
+        };
     }
 
     /**
@@ -280,10 +282,7 @@ public final class Id implements Comparable<Id> {
      * @return The access hash of this id, if present and applicable.
      */
     public Optional<Long> getAccessHash() {
-        if (context instanceof Long) {
-            return Optional.of((long) context);
-        }
-        return Optional.empty();
+        return context instanceof Long l ? Optional.of(l) : Optional.empty();
     }
 
     /**
@@ -292,10 +291,7 @@ public final class Id implements Comparable<Id> {
      * @return The {@link MinInformation} for id, if present and applicable.
      */
     public Optional<MinInformation> getMinInformation() {
-        if (context instanceof MinInformation) {
-            return Optional.of((MinInformation) context);
-        }
-        return Optional.empty();
+        return context instanceof MinInformation m ? Optional.of(m) : Optional.empty();
     }
 
     /**
@@ -313,12 +309,11 @@ public final class Id implements Comparable<Id> {
      * @return The {@code Peer} identifier from this id.
      */
     public Peer asPeer() {
-        switch (type) {
-            case CHANNEL: return ImmutablePeerChannel.of(value);
-            case USER: return ImmutablePeerUser.of(value);
-            case CHAT: return ImmutablePeerChat.of(value);
-            default: throw new IllegalStateException();
-        }
+        return switch (type) {
+            case CHANNEL -> ImmutablePeerChannel.of(value);
+            case USER -> ImmutablePeerUser.of(value);
+            case CHAT -> ImmutablePeerChat.of(value);
+        };
     }
 
     /**
@@ -349,8 +344,9 @@ public final class Id implements Comparable<Id> {
 
     /**
      * Compares this id with the specified id.
-     * <p>
-     * The comparison is based on the {@link #getType()} and after {@link #asLong()}.
+     *
+     * <p> The comparison is based on the {@link #getType() type}
+     * and after by {@link #asLong() raw value} in natural order.
      *
      * @param o The other id to be compared.
      * @return The comparator value, negative if less, positive if greater.
@@ -368,9 +364,8 @@ public final class Id implements Comparable<Id> {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Id id = (Id) o;
-        return type == id.type && value == id.value;
+        if (!(o instanceof Id i)) return false;
+        return type == i.type && value == i.value;
     }
 
     @Override
@@ -380,19 +375,11 @@ public final class Id implements Comparable<Id> {
 
     @Override
     public String toString() {
-        String prefix;
-        switch (type) {
-            case USER:
-                prefix = "User";
-                break;
-            case CHAT:
-                prefix = "Chat";
-                break;
-            case CHANNEL:
-                prefix = "Channel";
-                break;
-            default: throw new IllegalStateException();
-        }
+        String prefix = switch (type) {
+            case USER -> "User";
+            case CHAT -> "Chat";
+            case CHANNEL -> "Channel";
+        };
         return prefix + "Id{" + value + '}';
     }
 
@@ -426,7 +413,7 @@ public final class Id implements Comparable<Id> {
          * @param messageId The id of message where this peer was seen.
          */
         public MinInformation(Id peerId, int messageId) {
-            Preconditions.requireArgument(messageId > 0);
+            Preconditions.requireArgument(messageId > 0, "messageId must be positive");
             this.peerId = Objects.requireNonNull(peerId);
             this.messageId = messageId;
         }
@@ -452,9 +439,8 @@ public final class Id implements Comparable<Id> {
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            MinInformation that = (MinInformation) o;
-            return messageId == that.messageId && peerId.equals(that.peerId);
+            if (!(o instanceof MinInformation m)) return false;
+            return messageId == m.messageId && peerId.equals(m.peerId);
         }
 
         @Override

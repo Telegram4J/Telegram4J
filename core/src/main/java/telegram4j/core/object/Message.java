@@ -15,6 +15,7 @@ import telegram4j.core.spec.EditMessageSpec;
 import telegram4j.core.spec.PinMessageFlags;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.Variant2;
 import telegram4j.core.util.parser.EntityParserSupport;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
@@ -27,7 +28,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static reactor.function.TupleUtils.function;
-import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 import static telegram4j.tl.BaseMessage.*;
 
 /**
@@ -36,24 +36,13 @@ import static telegram4j.tl.BaseMessage.*;
 public final class Message implements TelegramObject {
 
     private final MTProtoTelegramClient client;
-    @Nullable
-    private final BaseMessage baseData;
-    @Nullable
-    private final MessageService serviceData;
+    private final Variant2<BaseMessage, MessageService> data;
     private final Id resolvedChatId; // possibly chat id with access hash
 
-    public Message(MTProtoTelegramClient client, MessageService serviceData, Id resolvedChatId) {
+    public Message(MTProtoTelegramClient client, Variant2<BaseMessage, MessageService> data, Id resolvedChatId) {
         this.client = Objects.requireNonNull(client);
         this.resolvedChatId = Objects.requireNonNull(resolvedChatId);
-        this.baseData = null;
-        this.serviceData = Objects.requireNonNull(serviceData);
-    }
-
-    public Message(MTProtoTelegramClient client, BaseMessage baseData, Id resolvedChatId) {
-        this.client = Objects.requireNonNull(client);
-        this.baseData = Objects.requireNonNull(baseData);
-        this.resolvedChatId = Objects.requireNonNull(resolvedChatId);
-        this.serviceData = null;
+        this.data = Objects.requireNonNull(data);
     }
 
     @Override
@@ -67,7 +56,7 @@ public final class Message implements TelegramObject {
      * @return {@code true} if message is service notification.
      */
     public boolean isService() {
-        return serviceData != null;
+        return data.isT2Present();
     }
 
     /**
@@ -76,7 +65,7 @@ public final class Message implements TelegramObject {
      * @return The mutable {@link Set} of the message flags.
      */
     public Set<Flag> getFlags() {
-        return Flag.of0(getBaseData());
+        return data.map(Flag::of, Flag::of);
     }
 
     /**
@@ -88,7 +77,7 @@ public final class Message implements TelegramObject {
      * @return The id of message.
      */
     public int getId() {
-        return getBaseData().id();
+        return data.map(BaseMessage::id, MessageService::id);
     }
 
     /**
@@ -100,11 +89,11 @@ public final class Message implements TelegramObject {
      * @return The {@link Id} of the message author, if present.
      */
     public Optional<Id> getAuthorId() {
-        return Optional.ofNullable(getBaseData().fromId()).map(Id::of)
+        return Optional.ofNullable(data.map(BaseMessage::fromId, MessageService::fromId)).map(Id::of)
                 // it's relative for user accounts; tg may not set fromId
                 // for messages in DMs, but it is not difficult to handle
                 .or(() -> resolvedChatId.getType() == Id.Type.USER
-                        ? Optional.of(getBaseData().out() ? client.getSelfId() : resolvedChatId)
+                        ? Optional.of(data.map(BaseMessage::out, MessageService::out) ? client.getSelfId() : resolvedChatId)
                         : Optional.empty());
     }
 
@@ -127,11 +116,11 @@ public final class Message implements TelegramObject {
         return Mono.justOrEmpty(getAuthorId())
                 .flatMap(id -> {
                     var retriever = client.withRetrievalStrategy(strategy);
-                    switch (id.getType()) {
-                        case CHANNEL: return retriever.getChatById(id);
-                        case USER: return retriever.getUserById(id);
-                        default: return Mono.error(new IllegalStateException());
-                    }
+                    return switch (id.getType()) {
+                        case CHANNEL -> retriever.getChatById(id);
+                        case USER -> retriever.getUserById(id);
+                        default -> Mono.error(new IllegalStateException());
+                    };
                 })
                 .cast(MentionablePeer.class);
     }
@@ -170,7 +159,7 @@ public final class Message implements TelegramObject {
      * @return The header of the reply information, if present.
      */
     public Optional<MessageReplyHeader> getReplyTo() {
-        return Optional.ofNullable(getBaseData().replyTo())
+        return Optional.ofNullable(data.map(BaseMessage::replyTo, MessageService::replyTo))
                 .map(d -> new MessageReplyHeader(client, d, resolvedChatId));
     }
 
@@ -180,7 +169,7 @@ public final class Message implements TelegramObject {
      * @return The timestamp of the message creation.
      */
     public Instant getCreateTimestamp() {
-        return Instant.ofEpochSecond(getBaseData().date());
+        return Instant.ofEpochSecond(data.map(BaseMessage::date, MessageService::date));
     }
 
     /**
@@ -189,7 +178,7 @@ public final class Message implements TelegramObject {
      * @return The {@link Duration} of the message Time-To-Live, if present.
      */
     public Optional<Duration> getAutoDeleteDuration() {
-        return Optional.ofNullable(getBaseData().ttlPeriod()).map(Duration::ofSeconds);
+        return Optional.ofNullable(data.map(BaseMessage::ttlPeriod, MessageService::ttlPeriod)).map(Duration::ofSeconds);
     }
 
     /**
@@ -211,7 +200,7 @@ public final class Message implements TelegramObject {
      * @return The header of forward information, if message is not service and data present.
      */
     public Optional<MessageForwardHeader> getForwardedFrom() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::fwdFrom)
                 .map(d -> new MessageForwardHeader(client, d));
     }
@@ -222,7 +211,7 @@ public final class Message implements TelegramObject {
      * @return The {@link Id} of an inline bot that generated this message, if present.
      */
     public Optional<Id> getViaBotId() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::viaBotId)
                 .map(Id::ofUser);
     }
@@ -253,7 +242,7 @@ public final class Message implements TelegramObject {
      * @return The raw text of message, or empty string.
      */
     public String getContent() {
-        return baseData != null ? baseData.message() : "";
+        return data.map(BaseMessage::message, e -> "");
     }
 
     /**
@@ -262,7 +251,7 @@ public final class Message implements TelegramObject {
      * @return The media of message, if present.
      */
     public Optional<MessageMedia> getMedia() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::media)
                 .map(d -> EntityFactory.createMessageMedia(client, d, getId(), resolvedChatId));
     }
@@ -273,7 +262,7 @@ public final class Message implements TelegramObject {
      * @return The bot reply markup, if present.
      */
     public Optional<ReplyMarkup> getReplyMarkup() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::replyMarkup)
                 .map(d -> new ReplyMarkup(client, d));
     }
@@ -284,11 +273,11 @@ public final class Message implements TelegramObject {
      * @return The {@link List} of markup entities for {@link #getContent() text}, if present otherwise empty list.
      */
     public List<MessageEntity> getEntities() {
-        return Optional.ofNullable(baseData)
-                .map(BaseMessage::entities)
-                .map(list -> list.stream()
-                        .map(e -> new MessageEntity(client, e, baseData.message()))
-                        .collect(Collectors.toList()))
+        return data.getT1()
+                .flatMap(m -> Optional.ofNullable(m.entities())
+                        .map(list -> list.stream()
+                                .map(e -> new MessageEntity(client, e, m.message()))
+                                .collect(Collectors.toList())))
                 .orElse(List.of());
     }
 
@@ -298,7 +287,7 @@ public final class Message implements TelegramObject {
      * @return The views count of channel post, if present.
      */
     public Optional<Integer> getViews() {
-        return Optional.ofNullable(baseData).map(BaseMessage::views);
+        return data.getT1().map(BaseMessage::views);
     }
 
     /**
@@ -307,7 +296,7 @@ public final class Message implements TelegramObject {
      * @return The forwards count of message, if present.
      */
     public Optional<Integer> getForwards() {
-        return Optional.ofNullable(baseData).map(BaseMessage::forwards);
+        return data.getT1().map(BaseMessage::forwards);
     }
 
     /**
@@ -316,7 +305,7 @@ public final class Message implements TelegramObject {
      * @return The {@link MessageReplies} of message, if present.
      */
     public Optional<MessageReplies> getReplies() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::replies)
                 .map(d -> new MessageReplies(client, d));
     }
@@ -327,7 +316,7 @@ public final class Message implements TelegramObject {
      * @return The {@link Instant} of the last message editing, if present.
      */
     public Optional<Instant> getEditTimestamp() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::editDate)
                 .map(Instant::ofEpochSecond);
     }
@@ -338,7 +327,7 @@ public final class Message implements TelegramObject {
      * @return The display name of the channel post's author, if present.
      */
     public Optional<String> getPostAuthor() {
-        return Optional.ofNullable(baseData).map(BaseMessage::postAuthor);
+        return data.getT1().map(BaseMessage::postAuthor);
     }
 
     /**
@@ -347,7 +336,7 @@ public final class Message implements TelegramObject {
      * @return The id of the group of multimedia/album, if present.
      */
     public Optional<Long> getGroupedId() {
-        return Optional.ofNullable(baseData).map(BaseMessage::groupedId);
+        return data.getT1().map(BaseMessage::groupedId);
     }
 
     /**
@@ -357,7 +346,7 @@ public final class Message implements TelegramObject {
      * @return The immutable list of the {@link RestrictionReason}, if present otherwise empty list.
      */
     public List<RestrictionReason> getRestrictionReason() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::restrictionReason)
                 .orElse(List.of());
     }
@@ -368,7 +357,7 @@ public final class Message implements TelegramObject {
      * @return The information about reactions, if present.
      */
     public Optional<MessageReactions> getReactions() {
-        return Optional.ofNullable(baseData)
+        return data.getT1()
                 .map(BaseMessage::reactions)
                 .map(d -> new MessageReactions(client, d));
     }
@@ -381,9 +370,8 @@ public final class Message implements TelegramObject {
      * @return The service message action, if present.
      */
     public Optional<MessageAction> getAction() {
-        return Optional.ofNullable(serviceData)
-                .map(e -> unmapEmpty(e.action(), telegram4j.tl.MessageAction.class))
-                .map(e -> EntityFactory.createMessageAction(client, e, resolvedChatId, getId()));
+        return data.getT2()
+                .map(e -> EntityFactory.createMessageAction(client, e.action(), resolvedChatId, getId()));
     }
 
     // Interaction methods
@@ -441,13 +429,9 @@ public final class Message implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion range of message updates.
      */
     public Mono<AffectedMessages> delete(boolean revoke) {
-        return Mono.defer(() -> {
-            switch (resolvedChatId.getType()) {
-                case CHAT:
-                case USER: return client.deleteMessages(revoke, List.of(getId()));
-                case CHANNEL: return client.deleteChannelMessages(resolvedChatId, List.of(getId()));
-                default: throw new IllegalStateException();
-            }
+        return Mono.defer(() -> switch (resolvedChatId.getType()) {
+            case CHAT, USER -> client.deleteMessages(revoke, List.of(getId()));
+            case CHANNEL -> client.deleteChannelMessages(resolvedChatId, List.of(getId()));
         });
     }
 
@@ -470,17 +454,11 @@ public final class Message implements TelegramObject {
 
     // Private methods
 
-    private BaseMessageFields getBaseData() {
-        return baseData != null ? baseData : Objects.requireNonNull(serviceData);
-    }
-
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Message that = (Message) o;
-        return resolvedChatId.equals(that.resolvedChatId) &&
-                getId() == that.getId();
+        if (!(o instanceof Message m)) return false;
+        return resolvedChatId.equals(m.resolvedChatId) && getId() == m.getId();
     }
 
     @Override
@@ -490,7 +468,7 @@ public final class Message implements TelegramObject {
 
     @Override
     public String toString() {
-        return "Message{data=" + getBaseData() + "}";
+        return "Message{data=" + data + "}";
     }
 
     /** Available flag types of message. */
@@ -553,7 +531,9 @@ public final class Message implements TelegramObject {
          * @return The {@link Set} of the message service flags.
          */
         public static Set<Flag> of(telegram4j.tl.MessageService data) {
-            return of0(data);
+            var set = of0(data);
+            set.remove(ANONYMOUS_ADMIN);
+            return set;
         }
 
         /**
@@ -563,14 +543,19 @@ public final class Message implements TelegramObject {
          * @return The {@link Set} of the message flags.
          */
         public static Set<Flag> of(telegram4j.tl.BaseMessage data) {
-            return of0(data);
+            var set = of0(data);
+            // This determines whether the message has been sent to the supergroup
+            boolean anonymousAuthor = !data.post() && data.peerId().identifier() == PeerChannel.ID;
+            if (!anonymousAuthor) {
+                set.remove(ANONYMOUS_ADMIN);
+            }
+            return set;
         }
 
-        private static Set<Flag> of0(telegram4j.tl.BaseMessageFields data) {
+        private static Set<Flag> of0(telegram4j.tl.Message data) {
             var set = EnumSet.allOf(Flag.class);
             int flags = data.flags();
-            boolean anonymousAuthor = !data.post() && data.peerId().identifier() == PeerChannel.ID;
-            set.removeIf(value -> value == ANONYMOUS_ADMIN ? !anonymousAuthor : (flags & value.mask()) == 0);
+            set.removeIf(value -> (flags & value.mask()) == 0);
             return set;
         }
     }

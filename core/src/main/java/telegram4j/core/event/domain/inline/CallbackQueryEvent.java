@@ -14,7 +14,7 @@ import telegram4j.tl.ImmutableInputMessageID;
 import java.util.List;
 
 /** Event of ordinary inline button callback. */
-public class CallbackQueryEvent extends CallbackEvent {
+public final class CallbackQueryEvent extends CallbackEvent {
     private final int messageId;
     private final Chat chat;
 

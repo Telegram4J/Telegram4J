@@ -12,7 +12,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Container with found {@link Message}s with auxiliary {@link Chat} and {@link User} objects. */
-public class AuxiliaryMessages {
+public sealed class AuxiliaryMessages
+        permits AuxiliaryChannelMessages, AuxiliaryMessagesSlice {
+
     private final MTProtoTelegramClient client;
     private final List<Message> messages;
     private final Map<Id, Chat> chats;

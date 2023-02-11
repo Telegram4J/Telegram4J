@@ -2,18 +2,14 @@ package telegram4j.core.event.domain.chat;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.ExportedChatInvite;
 import telegram4j.core.object.User;
-import telegram4j.core.object.chat.Channel;
-import telegram4j.core.object.chat.Chat;
-import telegram4j.core.object.chat.ChatParticipant;
-import telegram4j.core.object.chat.GroupChat;
+import telegram4j.core.object.chat.*;
 
 import java.time.Instant;
 import java.util.Optional;
 
 /** Event of group chat participant modification, e.g. made admin, leaving, joining. */
-public class ChatParticipantUpdateEvent extends ChatEvent {
+public final class ChatParticipantUpdateEvent extends ChatEvent {
     private final Instant timestamp;
     @Nullable
     private final ChatParticipant oldParticipant;
@@ -21,6 +17,7 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
     private final ChatParticipant currentParticipant;
     @Nullable
     private final ExportedChatInvite invite;
+    private final boolean joinRequest;
     private final Chat chat;
     private final User actor;
 
@@ -28,12 +25,13 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
                                       @Nullable ChatParticipant oldParticipant,
                                       @Nullable ChatParticipant currentParticipant,
                                       @Nullable ExportedChatInvite invite,
-                                      Chat chat, User actor) {
+                                      boolean joinRequest, Chat chat, User actor) {
         super(client);
         this.timestamp = timestamp;
         this.oldParticipant = oldParticipant;
         this.currentParticipant = currentParticipant;
         this.invite = invite;
+        this.joinRequest = joinRequest;
         this.chat = chat;
         this.actor = actor;
     }
@@ -92,6 +90,11 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
         return Optional.ofNullable(invite);
     }
 
+    // TODO: rename method and add docs
+    // public boolean isByJoinRequest() {
+    //     return joinRequest;
+    // }
+
     /**
      * Gets chat where participant was updated.
      *
@@ -118,8 +121,9 @@ public class ChatParticipantUpdateEvent extends ChatEvent {
                 ", oldParticipant=" + oldParticipant +
                 ", currentParticipant=" + currentParticipant +
                 ", invite=" + invite +
+                ", joinRequest=" + joinRequest +
                 ", chat=" + chat +
                 ", actor=" + actor +
-                '}';
+                "} " + super.toString();
     }
 }
