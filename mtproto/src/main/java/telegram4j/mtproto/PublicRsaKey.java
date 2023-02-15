@@ -71,9 +71,8 @@ public final class PublicRsaKey {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PublicRsaKey publicKey = (PublicRsaKey) o;
-        return modulus.equals(publicKey.modulus) && exponent.equals(publicKey.exponent);
+        if (!(o instanceof PublicRsaKey that)) return false;
+        return modulus.equals(that.modulus) && exponent.equals(that.exponent);
     }
 
     @Override

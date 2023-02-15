@@ -11,6 +11,7 @@ import static io.netty.util.ReferenceCountUtil.safeRelease;
 
 /** Holder object used during authorization key generation. */
 public final class AuthorizationContext {
+    private final DhPrimeChecker dhPrimeChecker;
     private final PublicRsaKeyRegister publicRsaKeyRegister;
 
     private volatile ByteBuf nonce;
@@ -18,12 +19,13 @@ public final class AuthorizationContext {
     private volatile ByteBuf serverNonce;
     private volatile ByteBuf authKey;
     private volatile long serverSalt;
-    private volatile ByteBuf authAuxHash;
+    private volatile ByteBuf authKeyHash;
     private volatile ServerDHParams serverDHParams;
     private volatile int serverTimeDiff;
     private final AtomicInteger retry = new AtomicInteger();
 
-    public AuthorizationContext(PublicRsaKeyRegister publicRsaKeyRegister) {
+    public AuthorizationContext(DhPrimeChecker dhPrimeChecker, PublicRsaKeyRegister publicRsaKeyRegister) {
+        this.dhPrimeChecker = Objects.requireNonNull(dhPrimeChecker);
         this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
     }
 
@@ -67,12 +69,12 @@ public final class AuthorizationContext {
         this.serverSalt = serverSalt;
     }
 
-    public ByteBuf getAuthAuxHash() {
-        return authAuxHash;
+    public ByteBuf getAuthKeyHash() {
+        return authKeyHash;
     }
 
-    public void setAuthAuxHash(ByteBuf authAuxHash) {
-        this.authAuxHash = Objects.requireNonNull(authAuxHash);
+    public void setAuthKeyHash(ByteBuf authKeyHash) {
+        this.authKeyHash = Objects.requireNonNull(authKeyHash);
     }
 
     public ServerDHParams getServerDHParams() {
@@ -95,6 +97,10 @@ public final class AuthorizationContext {
         return publicRsaKeyRegister;
     }
 
+    public DhPrimeChecker getDhPrimeChecker() {
+        return dhPrimeChecker;
+    }
+
     public void setServerTimeDiff(int serverTimeDiff) {
         this.serverTimeDiff = serverTimeDiff;
     }
@@ -104,7 +110,7 @@ public final class AuthorizationContext {
         safeRelease(newNonce);
         safeRelease(serverNonce);
         safeRelease(authKey);
-        safeRelease(authAuxHash);
+        safeRelease(authKeyHash);
 
         nonce = null;
         newNonce = null;
@@ -112,7 +118,7 @@ public final class AuthorizationContext {
         authKey = null;
         serverSalt = 0;
         serverTimeDiff = 0;
-        authAuxHash = null;
+        authKeyHash = null;
         serverDHParams = null;
         retry.set(0);
     }

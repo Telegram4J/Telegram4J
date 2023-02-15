@@ -5,7 +5,6 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
 import reactor.core.Exceptions;
-import telegram4j.mtproto.PublicRsaKey;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -147,21 +146,15 @@ public final class CryptoUtil {
         return Unpooled.wrappedBuffer(sha1.digest());
     }
 
-    public static ByteBuf rsaEncrypt(ByteBuf src, PublicRsaKey key) {
-        BigInteger num = fromByteBuf(src);
-        return toByteBuf(num.modPow(key.getExponent(), key.getModulus()));
-    }
-
     public static ByteBuf alignKeyZero(ByteBuf src, int size) {
         if (src.readableBytes() == size) {
             return src;
-        }
-
-        if (src.readableBytes() > size) {
+        } else if (src.readableBytes() > size) {
             return src.slice(src.readableBytes() - size, size);
+        } else {
+            ByteBuf align = Unpooled.wrappedBuffer(new byte[size - src.readableBytes()]);
+            return Unpooled.wrappedBuffer(align, src);
         }
-        ByteBuf align = Unpooled.wrappedBuffer(new byte[size - src.readableBytes()]);
-        return Unpooled.wrappedBuffer(align, src);
     }
 
     public static ByteBuf xor(ByteBuf a, ByteBuf b) {
@@ -202,5 +195,14 @@ public final class CryptoUtil {
         sha256b.release();
 
         return new AES256IGECipher(!server, toByteArray(aesKey), aesIV);
+    }
+
+    // TODO: can be done with System.arraycopy()
+    public static ByteBuf reverse(ByteBuf buf) {
+        ByteBuf result = buf.alloc().buffer(buf.readableBytes());
+        for (int i = buf.writerIndex() - 1; i >= buf.readerIndex(); i--) {
+            result.writeByte(buf.getByte(i));
+        }
+        return result;
     }
 }

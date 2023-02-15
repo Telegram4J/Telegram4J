@@ -28,6 +28,8 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.*;
+import telegram4j.mtproto.auth.DhPrimeChecker;
+import telegram4j.mtproto.auth.DhPrimeCheckerCache;
 import telegram4j.mtproto.client.*;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.FileStoreLayout;
@@ -79,6 +81,7 @@ public final class MTProtoBootstrap {
     private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = options ->
             new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
+    private DhPrimeChecker dhPrimeChecker;
     private PublicRsaKeyRegister publicRsaKeyRegister;
     private DcOptions dcOptions;
     private InitConnectionParams initConnectionParams;
@@ -279,6 +282,18 @@ public final class MTProtoBootstrap {
     }
 
     /**
+     * Sets DH prime register with known primes, needed for auth key generation,
+     * by default the common {@link DhPrimeCheckerCache#instance()} will be used.
+     *
+     * @param dhPrimeChecker A new prime checker.
+     * @return This builder.
+     */
+    public MTProtoBootstrap setDhPrimeChecker(DhPrimeChecker dhPrimeChecker) {
+        this.dhPrimeChecker = Objects.requireNonNull(dhPrimeChecker);
+        return this;
+    }
+
+    /**
      * Sets list of known dc options, used in connection establishment,
      * by default {@link DcOptions#createDefault(boolean, boolean)} will be used.
      *
@@ -372,7 +387,7 @@ public final class MTProtoBootstrap {
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
                         var options = new MTProtoOptions(
                                 initTcpClient(), publicRsaKeyRegister,
-                                transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
+                                dhPrimeChecker, transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
                                 List.copyOf(responseTransformers),
                                 InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
                                         .layer(TlInfo.LAYER)

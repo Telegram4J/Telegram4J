@@ -5,6 +5,7 @@ import reactor.util.annotation.Nullable;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.ResponseTransformer;
+import telegram4j.mtproto.auth.DhPrimeChecker;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.TransportFactory;
 import telegram4j.tl.api.TlMethod;
@@ -19,6 +20,8 @@ public class MTProtoOptions {
     protected final TcpClient tcpClient;
     @Nullable
     protected final PublicRsaKeyRegister publicRsaKeyRegister;
+    @Nullable
+    protected final DhPrimeChecker dhPrimeChecker;
     protected final TransportFactory transport;
     protected final StoreLayout storeLayout;
     protected final RetryBackoffSpec connectionRetry;
@@ -28,12 +31,14 @@ public class MTProtoOptions {
     protected final int gzipWrappingSizeThreshold;
 
     public MTProtoOptions(TcpClient tcpClient, @Nullable PublicRsaKeyRegister publicRsaKeyRegister,
-                          TransportFactory transport, StoreLayout storeLayout, RetryBackoffSpec connectionRetry,
+                          @Nullable DhPrimeChecker dhPrimeChecker, TransportFactory transport,
+                          StoreLayout storeLayout, RetryBackoffSpec connectionRetry,
                           RetryBackoffSpec authRetry, List<ResponseTransformer> responseTransformers,
                           InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
                           int gzipWrappingSizeThreshold) {
         this.tcpClient = Objects.requireNonNull(tcpClient);
         this.publicRsaKeyRegister = publicRsaKeyRegister;
+        this.dhPrimeChecker = dhPrimeChecker;
         this.transport = Objects.requireNonNull(transport);
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.connectionRetry = Objects.requireNonNull(connectionRetry);
@@ -53,6 +58,10 @@ public class MTProtoOptions {
 
     public Optional<PublicRsaKeyRegister> getPublicRsaKeyRegister() {
         return Optional.ofNullable(publicRsaKeyRegister);
+    }
+
+    public Optional<DhPrimeChecker> getDhPrimeChecker() {
+        return Optional.ofNullable(dhPrimeChecker);
     }
 
     public StoreLayout getStoreLayout() {

@@ -1,19 +1,15 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
-import reactor.util.function.Tuple2;
-import reactor.util.function.Tuples;
 
 import java.math.BigInteger;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /** Map-like container with known public RSA keys, used for creating auth keys. */
 public final class PublicRsaKeyRegister {
-    private static final BigInteger commonExponent = new BigInteger("10001", 16);
-
     private final Map<Long, PublicRsaKey> map;
 
     private PublicRsaKeyRegister(Map<Long, PublicRsaKey> map) {
@@ -27,6 +23,8 @@ public final class PublicRsaKeyRegister {
      * @return A new {@code PublicRsaKeyRegister} instance with predefined keys.
      */
     public static PublicRsaKeyRegister createDefault() {
+        final BigInteger commonExponent = new BigInteger("10001", 16);
+
         return new PublicRsaKeyRegister(Map.of(
                 // prod dc 1
                 // -----BEGIN RSA PUBLIC KEY-----
@@ -195,7 +193,7 @@ public final class PublicRsaKeyRegister {
                         + Long.toHexString(fingerprint) + ", key: " + key);
             }
         }
-        return new PublicRsaKeyRegister(Collections.unmodifiableMap(map));
+        return new PublicRsaKeyRegister(Map.copyOf(map));
     }
 
     /**
@@ -214,14 +212,29 @@ public final class PublicRsaKeyRegister {
      * @param fingerprints An iterable with key's fingerprints.
      * @return The first key and his fingerprint, if present.
      */
-    public Optional<Tuple2<Long, PublicRsaKey>> findAny(Iterable<Long> fingerprints) {
+    public Optional<FoundPublicRsaKey> findAny(Iterable<Long> fingerprints) {
         for (long fingerprint : fingerprints) {
             var key = map.get(fingerprint);
             if (key != null) {
-                return Optional.of(Tuples.of(fingerprint, key));
+                return Optional.of(new FoundPublicRsaKey(key, fingerprint));
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The record for found public RSA key and their fingerprint.
+     *
+     * @param key The public RSA key.
+     * @param fingerprint The last 64-bits of SHA1 taken from
+     * serialized key.
+     * @see #findAny(Iterable)
+     */
+    public record FoundPublicRsaKey(PublicRsaKey key, long fingerprint) {
+
+        public FoundPublicRsaKey {
+            Objects.requireNonNull(key);
+        }
     }
 
     /**
@@ -236,8 +249,7 @@ public final class PublicRsaKeyRegister {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        PublicRsaKeyRegister that = (PublicRsaKeyRegister) o;
+        if (!(o instanceof PublicRsaKeyRegister that)) return false;
         return map.equals(that.map);
     }
 
