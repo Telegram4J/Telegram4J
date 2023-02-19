@@ -97,18 +97,18 @@ public final class ChatParticipant implements TelegramObject {
      * @return The id of participant.
      */
     public Id getId() {
-        switch (data.identifier()) {
-            case BaseChannelParticipant.ID: return Id.ofUser(((BaseChannelParticipant) data).userId());
-            case ChannelParticipantSelf.ID: return Id.ofUser(((ChannelParticipantSelf) data).userId());
-            case BaseChatParticipant.ID: return Id.ofUser(((BaseChatParticipant) data).userId());
-            case ChannelParticipantCreator.ID: return Id.ofUser(((ChannelParticipantCreator) data).userId());
-            case ChatParticipantCreator.ID: return Id.ofUser(((ChatParticipantCreator) data).userId());
-            case ChannelParticipantAdmin.ID: return Id.ofUser(((ChannelParticipantAdmin) data).userId());
-            case ChatParticipantAdmin.ID: return Id.ofUser(((ChatParticipantAdmin) data).userId());
-            case ChannelParticipantBanned.ID: return Id.of(((ChannelParticipantBanned) data).peer());
-            case ChannelParticipantLeft.ID: return Id.of(((ChannelParticipantLeft) data).peer());
-            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
-        }
+        return switch (data.identifier()) {
+            case BaseChannelParticipant.ID -> Id.ofUser(((BaseChannelParticipant) data).userId());
+            case ChannelParticipantSelf.ID -> Id.ofUser(((ChannelParticipantSelf) data).userId());
+            case BaseChatParticipant.ID -> Id.ofUser(((BaseChatParticipant) data).userId());
+            case ChannelParticipantCreator.ID -> Id.ofUser(((ChannelParticipantCreator) data).userId());
+            case ChatParticipantCreator.ID -> Id.ofUser(((ChatParticipantCreator) data).userId());
+            case ChannelParticipantAdmin.ID -> Id.ofUser(((ChannelParticipantAdmin) data).userId());
+            case ChatParticipantAdmin.ID -> Id.ofUser(((ChatParticipantAdmin) data).userId());
+            case ChannelParticipantBanned.ID -> Id.of(((ChannelParticipantBanned) data).peer());
+            case ChannelParticipantLeft.ID -> Id.of(((ChannelParticipantLeft) data).peer());
+            default -> throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
+        };
     }
 
     /**
@@ -117,18 +117,16 @@ public final class ChatParticipant implements TelegramObject {
      * @return The participant join timestamp, if present.
      */
     public Optional<Instant> getJoinTimestamp() {
-        switch (data.identifier()) {
-            case BaseChannelParticipant.ID: return Optional.of(Instant.ofEpochSecond(((BaseChannelParticipant) data).date()));
-            case ChannelParticipantSelf.ID: return Optional.of(Instant.ofEpochSecond(((ChannelParticipantSelf) data).date()));
-            case BaseChatParticipant.ID: return Optional.of(Instant.ofEpochSecond(((BaseChatParticipant) data).date()));
-            case ChannelParticipantAdmin.ID: return Optional.of(Instant.ofEpochSecond(((ChannelParticipantAdmin) data).date()));
-            case ChatParticipantAdmin.ID: return Optional.of(Instant.ofEpochSecond(((ChatParticipantAdmin) data).date()));
-            case ChannelParticipantBanned.ID: return Optional.of(Instant.ofEpochSecond(((ChannelParticipantBanned) data).date()));
-            case ChannelParticipantLeft.ID:
-            case ChannelParticipantCreator.ID:
-            case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
-        }
+        return switch (data.identifier()) {
+            case BaseChannelParticipant.ID -> Optional.of(Instant.ofEpochSecond(((BaseChannelParticipant) data).date()));
+            case ChannelParticipantSelf.ID -> Optional.of(Instant.ofEpochSecond(((ChannelParticipantSelf) data).date()));
+            case BaseChatParticipant.ID -> Optional.of(Instant.ofEpochSecond(((BaseChatParticipant) data).date()));
+            case ChannelParticipantAdmin.ID -> Optional.of(Instant.ofEpochSecond(((ChannelParticipantAdmin) data).date()));
+            case ChatParticipantAdmin.ID -> Optional.of(Instant.ofEpochSecond(((ChatParticipantAdmin) data).date()));
+            case ChannelParticipantBanned.ID -> Optional.of(Instant.ofEpochSecond(((ChannelParticipantBanned) data).date()));
+            case ChannelParticipantLeft.ID, ChannelParticipantCreator.ID, ChatParticipantCreator.ID -> Optional.empty();
+            default -> throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
+        };
     }
 
     /**
@@ -137,19 +135,16 @@ public final class ChatParticipant implements TelegramObject {
      * @return The id of inviter user, if present.
      */
     public Optional<Id> getInviterId() {
-        switch (data.identifier()) {
-            case ChannelParticipantSelf.ID: return Optional.of(Id.ofUser(((ChannelParticipantSelf) data).inviterId()));
-            case BaseChatParticipant.ID: return Optional.of(Id.ofUser(((BaseChatParticipant) data).inviterId()));
-            case ChannelParticipantAdmin.ID: return Optional.ofNullable(((ChannelParticipantAdmin) data).inviterId())
+        return switch (data.identifier()) {
+            case ChannelParticipantSelf.ID -> Optional.of(Id.ofUser(((ChannelParticipantSelf) data).inviterId()));
+            case BaseChatParticipant.ID -> Optional.of(Id.ofUser(((BaseChatParticipant) data).inviterId()));
+            case ChannelParticipantAdmin.ID -> Optional.ofNullable(((ChannelParticipantAdmin) data).inviterId())
                     .map(Id::ofUser);
-            case ChatParticipantAdmin.ID: return Optional.of(Id.ofUser(((ChatParticipantAdmin) data).inviterId()));
-            case BaseChannelParticipant.ID:
-            case ChannelParticipantBanned.ID:
-            case ChannelParticipantLeft.ID:
-            case ChannelParticipantCreator.ID:
-            case ChatParticipantCreator.ID: return Optional.empty();
-            default: throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
-        }
+            case ChatParticipantAdmin.ID -> Optional.of(Id.ofUser(((ChatParticipantAdmin) data).inviterId()));
+            case BaseChannelParticipant.ID, ChannelParticipantBanned.ID, ChannelParticipantLeft.ID,
+                    ChannelParticipantCreator.ID, ChatParticipantCreator.ID -> Optional.empty();
+            default -> throw new IllegalStateException("Unexpected ChatParticipant type: " + data);
+        };
     }
 
     /**
@@ -180,8 +175,7 @@ public final class ChatParticipant implements TelegramObject {
      * @return {@code true} if <i>current</i> user can edit this participant.
      */
     public boolean isCanEdit() {
-        return data.identifier() == ChannelParticipantAdmin.ID
-                && ((ChannelParticipantAdmin) data).canEdit();
+        return data instanceof ChannelParticipantAdmin p && p.canEdit();
     }
 
     /**
@@ -190,8 +184,7 @@ public final class ChatParticipant implements TelegramObject {
      * @return {@code true} if participant is <i>current</i> user and invited via request.
      */
     public boolean isInvitedViaRequest() {
-        return data.identifier() == ChannelParticipantSelf.ID
-                && ((ChannelParticipantSelf) data).viaRequest();
+        return data instanceof ChannelParticipantSelf p && p.viaRequest();
     }
 
     /**
@@ -200,11 +193,11 @@ public final class ChatParticipant implements TelegramObject {
      * @return The {@link Set} of permissions this participant, if it's admin and present.
      */
     public Optional<Set<AdminRight>> getAdminRights() {
-        switch (data.identifier()) {
-            case ChannelParticipantCreator.ID: return Optional.of(AdminRight.of(((ChannelParticipantCreator) data).adminRights()));
-            case ChannelParticipantAdmin.ID: return Optional.of(AdminRight.of(((ChannelParticipantAdmin) data).adminRights()));
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case ChannelParticipantCreator.ID -> Optional.of(AdminRight.of(((ChannelParticipantCreator) data).adminRights()));
+            case ChannelParticipantAdmin.ID -> Optional.of(AdminRight.of(((ChannelParticipantAdmin) data).adminRights()));
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -213,11 +206,11 @@ public final class ChatParticipant implements TelegramObject {
      * @return The rank of participant, if it's admin and present.
      */
     public Optional<String> getRank() {
-        switch (data.identifier()) {
-            case ChannelParticipantCreator.ID: return Optional.ofNullable(((ChannelParticipantCreator) data).rank());
-            case ChannelParticipantAdmin.ID: return Optional.ofNullable(((ChannelParticipantAdmin) data).rank());
-            default: return Optional.empty();
-        }
+        return switch (data.identifier()) {
+            case ChannelParticipantCreator.ID -> Optional.ofNullable(((ChannelParticipantCreator) data).rank());
+            case ChannelParticipantAdmin.ID -> Optional.ofNullable(((ChannelParticipantAdmin) data).rank());
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -229,8 +222,7 @@ public final class ChatParticipant implements TelegramObject {
      */
     public boolean isLeft() {
         return data.identifier() == ChannelParticipantLeft.ID ||
-                (data.identifier() == ChannelParticipantBanned.ID
-                && ((ChannelParticipantBanned) data).left());
+                (data instanceof ChannelParticipantBanned p && p.left());
     }
 
     /**
@@ -239,8 +231,8 @@ public final class ChatParticipant implements TelegramObject {
      * @return The id of admin which kicks participant, if participant was banned.
      */
     public Optional<Id> getKickerId() {
-        return data.identifier() == ChannelParticipantBanned.ID
-                ? Optional.of(((ChannelParticipantBanned) data).kickedBy()).map(Id::ofUser)
+        return data instanceof ChannelParticipantBanned p
+                ? Optional.of(Id.ofUser(p.kickedBy()))
                 : Optional.empty();
     }
 
@@ -270,8 +262,8 @@ public final class ChatParticipant implements TelegramObject {
      * @return The permissions overwrite for this participant, if participant was banned.
      */
     public Optional<ChatRestrictions> getRestrictions() {
-        return data.identifier() == ChannelParticipantBanned.ID
-                ? Optional.of(new ChatRestrictions(((ChannelParticipantBanned) data).bannedRights()))
+        return data instanceof ChannelParticipantBanned p
+                ? Optional.of(new ChatRestrictions(p.bannedRights()))
                 : Optional.empty();
     }
 
@@ -281,8 +273,8 @@ public final class ChatParticipant implements TelegramObject {
      * @return The id of user which promoted this participant to admins, if present.
      */
     public Optional<Id> getPromoterId() {
-        return data.identifier() == ChannelParticipantAdmin.ID
-                ? Optional.of((ChannelParticipantAdmin) data).map(d -> Id.ofUser(d.promotedBy()))
+        return data instanceof ChannelParticipantAdmin p
+                ? Optional.of(Id.ofUser(p.promotedBy()))
                 : Optional.empty();
     }
 
@@ -309,10 +301,8 @@ public final class ChatParticipant implements TelegramObject {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ChatParticipant that = (ChatParticipant) o;
-        return chatId.equals(that.chatId) &&
-                getId().equals(that.getId());
+        if (!(o instanceof ChatParticipant p)) return false;
+        return chatId.equals(p.chatId) && getId().equals(p.getId());
     }
 
     @Override
@@ -334,7 +324,7 @@ public final class ChatParticipant implements TelegramObject {
         DEFAULT,
 
         /** Status of chat/channel owner. */
-        CREATOR,
+        OWNER,
 
         /** Status of chat/channel admin or user with rank. */
         ADMIN,
@@ -366,18 +356,14 @@ public final class ChatParticipant implements TelegramObject {
         }
 
         private static Status of0(TlObject data) {
-            switch (data.identifier()) {
-                case BaseChannelParticipant.ID:
-                case ChannelParticipantSelf.ID:
-                case BaseChatParticipant.ID: return Status.DEFAULT;
-                case ChannelParticipantCreator.ID:
-                case ChatParticipantCreator.ID: return Status.CREATOR;
-                case ChannelParticipantAdmin.ID:
-                case ChatParticipantAdmin.ID: return Status.ADMIN;
-                case ChannelParticipantBanned.ID: return Status.BANNED;
-                case ChannelParticipantLeft.ID: return Status.LEFT;
-                default: throw new IllegalStateException("Unexpected ChatParticipant/ChannelParticipant type: " + data);
-            }
+            return switch (data.identifier()) {
+                case BaseChannelParticipant.ID, ChannelParticipantSelf.ID, BaseChatParticipant.ID -> Status.DEFAULT;
+                case ChannelParticipantCreator.ID, ChatParticipantCreator.ID -> Status.OWNER;
+                case ChannelParticipantAdmin.ID, ChatParticipantAdmin.ID -> Status.ADMIN;
+                case ChannelParticipantBanned.ID -> Status.BANNED;
+                case ChannelParticipantLeft.ID -> Status.LEFT;
+                default -> throw new IllegalStateException("Unexpected ChatParticipant/ChannelParticipant type: " + data);
+            };
         }
     }
 }
