@@ -24,6 +24,16 @@ dependencies {
 ### Maven
 
 ```xml
+<repositories>
+  <repository>
+    <id>s01.oss.sonatype.org-snapshot</id>
+    <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+    <snapshots>
+      <enabled>true</enabled>
+    </snapshots>
+  </repository>
+</repositories>
+
 <dependencies>
   <dependency>
     <groupId>com.telegram4j</groupId>
