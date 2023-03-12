@@ -1,6 +1,5 @@
 package telegram4j.mtproto.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.service.Compatible.Type;
@@ -72,10 +71,6 @@ public class HelpService extends RpcService {
     public Mono<BaseDeepLinkInfo> getDeepLinkInfo(String path) {
         return sendMain(ImmutableGetDeepLinkInfo.of(path))
                 .ofType(BaseDeepLinkInfo.class);
-    }
-
-    public Mono<JsonNode> getAppConfig() {
-        return sendMain(GetAppConfig.instance());
     }
 
     public Mono<Boolean> saveAppLog(Iterable<? extends InputAppEvent> events) {

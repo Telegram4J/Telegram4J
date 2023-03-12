@@ -331,7 +331,6 @@ public class EntityFactory {
             case MessageActionTopicEdit.ID -> new MessageAction.TopicEdit(client, (MessageActionTopicEdit) data);
             case MessageActionSuggestProfilePhoto.ID -> new MessageAction.SuggestProfilePhoto(client, (MessageActionSuggestProfilePhoto) data,
                     Context.createActionContext(peer.asPeer(), messageId));
-            case MessageActionAttachMenuBotAllowed.ID -> new MessageAction(client, MessageAction.Type.ATTACH_MENU_BOT_ALLOWED);
             default -> throw new IllegalArgumentException("Unknown MessageAction type: " + data);
         };
     }

@@ -96,12 +96,6 @@ public class ChatService extends RpcService {
         return Mono.defer(() -> sendMain(ImmutableSendEncryptedService.of(peer, randomId, data)));
     }
 
-    public Mono<SimpleWebViewResult> requestSimpleWebView(InputUser bot, String url, String platform,
-                                                          @Nullable String themeParamsJson) {
-        return sendMain(ImmutableRequestSimpleWebView.of(bot, url, platform)
-                .withThemeParams(themeParamsJson != null ? ImmutableDataJSON.of(themeParamsJson) : null));
-    }
-
     public Mono<WebViewMessageSent> sendWebViewResultMessage(String botQueryId, InputBotInlineResult result) {
         return sendMain(ImmutableSendWebViewResultMessage.of(botQueryId, result));
     }
@@ -729,10 +723,6 @@ public class ChatService extends RpcService {
 
     public Mono<Updates> setChatTheme(InputPeer peer, String emoticon) {
         return sendMain(ImmutableSetChatTheme.of(peer, emoticon));
-    }
-
-    public Mono<List<Long>> getMessageReadParticipants(InputPeer peer, int msgId) {
-        return sendMain(ImmutableGetMessageReadParticipants.of(peer, msgId));
     }
 
     public Mono<Boolean> setInlineBotResults(SetInlineBotResults request) {

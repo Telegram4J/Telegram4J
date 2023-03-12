@@ -31,32 +31,33 @@ public abstract class RpcService {
     }
 
     protected Mono<Peer> toPeer(InputPeer inputPeer) {
-        return Mono.defer(() -> {
-            switch (inputPeer.identifier()) {
-                case InputPeerSelf.ID:
-                    return storeLayout.getSelfId()
-                            .map(ImmutablePeerUser::of)
-                            .switchIfEmpty(Mono.error(() -> new IllegalStateException(
-                                    "Failed to load self user id from store")));
-                case InputPeerChannel.ID:
-                    var inputPeerChannel = (InputPeerChannel) inputPeer;
-                    return Mono.just(ImmutablePeerChannel.of(inputPeerChannel.channelId()));
-                case InputPeerChannelFromMessage.ID:
-                    var inputPeerChannelFromMessage = (InputPeerChannelFromMessage) inputPeer;
-                    return Mono.just(ImmutablePeerChannel.of(inputPeerChannelFromMessage.channelId()));
-                case InputPeerChat.ID:
-                    var inputPeerChat = (InputPeerChat) inputPeer;
-                    return Mono.just(ImmutablePeerChat.of(inputPeerChat.chatId()));
-                case InputPeerUser.ID:
-                    var inputPeerUser = (InputPeerUser) inputPeer;
-                    return Mono.just(ImmutablePeerUser.of(inputPeerUser.userId()));
-                case InputPeerUserFromMessage.ID:
-                    var inputPeerUserFromMessage = (InputPeerUserFromMessage) inputPeer;
-                    return Mono.just(ImmutablePeerUser.of(inputPeerUserFromMessage.userId()));
-                default:
-                    return Mono.error(new IllegalArgumentException("Unknown input peer type: 0x"
-                            + Integer.toHexString(inputPeer.identifier())));
+        return Mono.defer(() -> switch (inputPeer.identifier()) {
+            case InputPeerSelf.ID -> storeLayout.getSelfId()
+                    .map(ImmutablePeerUser::of)
+                    .switchIfEmpty(Mono.error(() -> new IllegalStateException(
+                            "Failed to load self user id from store")));
+            case InputPeerChannel.ID -> {
+                var inputPeerChannel = (InputPeerChannel) inputPeer;
+                yield Mono.just(ImmutablePeerChannel.of(inputPeerChannel.channelId()));
             }
+            case InputPeerChannelFromMessage.ID -> {
+                var inputPeerChannelFromMessage = (InputPeerChannelFromMessage) inputPeer;
+                yield Mono.just(ImmutablePeerChannel.of(inputPeerChannelFromMessage.channelId()));
+            }
+            case InputPeerChat.ID -> {
+                var inputPeerChat = (InputPeerChat) inputPeer;
+                yield Mono.just(ImmutablePeerChat.of(inputPeerChat.chatId()));
+            }
+            case InputPeerUser.ID -> {
+                var inputPeerUser = (InputPeerUser) inputPeer;
+                yield Mono.just(ImmutablePeerUser.of(inputPeerUser.userId()));
+            }
+            case InputPeerUserFromMessage.ID -> {
+                var inputPeerUserFromMessage = (InputPeerUserFromMessage) inputPeer;
+                yield Mono.just(ImmutablePeerUser.of(inputPeerUserFromMessage.userId()));
+            }
+            default -> Mono.error(new IllegalArgumentException("Unknown input peer type: 0x"
+                    + Integer.toHexString(inputPeer.identifier())));
         });
     }
 

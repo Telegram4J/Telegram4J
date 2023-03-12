@@ -38,8 +38,8 @@ public class StickersService extends RpcService {
     }
 
     @Compatible(Type.BOT)
-    public Mono<StickerSet> setStickerSetThumb(InputStickerSet stickerSet, InputDocument thumb) {
-        return sendMain(ImmutableSetStickerSetThumb.of(stickerSet, thumb));
+    public Mono<StickerSet> setStickerSetThumb(SetStickerSetThumb request) {
+        return sendMain(request);
     }
 
     public Mono<Boolean> checkShortName(String shortName) {

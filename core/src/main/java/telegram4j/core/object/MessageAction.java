@@ -146,8 +146,6 @@ public sealed class MessageAction implements TelegramObject {
 
         SUGGEST_PROFILE_PHOTO,
 
-        ATTACH_MENU_BOT_ALLOWED,
-
         REQUESTED_PEER
     }
 
