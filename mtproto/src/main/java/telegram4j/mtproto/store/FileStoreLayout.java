@@ -86,17 +86,19 @@ public class FileStoreLayout implements StoreLayout {
             int mainDcId = buf.readUnsignedShortLE();
             long selfId = buf.readLongLE();
             int authKeysCount = buf.readUnsignedShortLE();
-            Map<Integer, AuthorizationKeyHolder> authKeys = new HashMap<>(authKeysCount);
+            var authKeys = new HashMap<Integer, AuthorizationKeyHolder>(authKeysCount);
             for (int i = 0; i < authKeysCount; i++) {
                 int dcId = buf.readUnsignedShortLE();
-                long authKeyId = buf.readLongLE();
+                // unused authKeyId
+                buf.readLongLE();
+
                 ByteBuf authKey = TlSerialUtil.deserializeBytes(buf);
-                authKeys.put(dcId, new AuthorizationKeyHolder(authKey, authKeyId));
+                authKeys.put(dcId, new AuthorizationKeyHolder(authKey));
             }
 
             byte dcOptionsFlags = buf.readByte();
             int dcOptionsCount = buf.readUnsignedShortLE();
-            List<DataCenter> options = new ArrayList<>(dcOptionsCount);
+            var options = new ArrayList<DataCenter>(dcOptionsCount);
             for (int i = 0; i < dcOptionsCount; i++) {
                 DataCenter.Type type = DataCenter.Type.values()[buf.readUnsignedByte()];
                 int id = buf.readUnsignedShortLE();
@@ -115,7 +117,54 @@ public class FileStoreLayout implements StoreLayout {
                     (dcOptionsFlags & PREFER_IPV6_MASK) != 0);
 
             int publicRsaKeyCount = buf.readUnsignedShortLE();
-            List<PublicRsaKey> keys = new ArrayList<>(publicRsaKeyCount);
+            var keys = new ArrayList<PublicRsaKey>(publicRsaKeyCount);
+            for (int i = 0; i < publicRsaKeyCount; i++) {
+                BigInteger exponent = CryptoUtil.fromByteBuf(TlSerialUtil.deserializeBytes(buf).retain());
+                BigInteger modulus  = CryptoUtil.fromByteBuf(TlSerialUtil.deserializeBytes(buf).retain());
+                keys.add(PublicRsaKey.create(exponent, modulus));
+            }
+            var publicRsaKeyRegister = PublicRsaKeyRegister.create(keys);
+            State state = buf.readByte() == 1 ? TlDeserializer.deserialize(buf) : null;
+            return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state);
+        }
+    }
+
+    static class Rev1Deserializer implements Deserializer {
+
+        @Override
+        public Settings deserialize(ByteBuf buf) {
+            int mainDcId = buf.readUnsignedShortLE();
+            long selfId = buf.readLongLE();
+            int authKeysCount = buf.readUnsignedShortLE();
+            var authKeys = new HashMap<Integer, AuthorizationKeyHolder>(authKeysCount);
+            for (int i = 0; i < authKeysCount; i++) {
+                int dcId = buf.readUnsignedShortLE();
+                ByteBuf authKey = TlSerialUtil.deserializeBytes(buf);
+                authKeys.put(dcId, new AuthorizationKeyHolder(authKey));
+            }
+
+            byte dcOptionsFlags = buf.readByte();
+            int dcOptionsCount = buf.readUnsignedShortLE();
+            var options = new ArrayList<DataCenter>(dcOptionsCount);
+            for (int i = 0; i < dcOptionsCount; i++) {
+                DataCenter.Type type = DataCenter.Type.values()[buf.readUnsignedByte()];
+                int id = buf.readUnsignedShortLE();
+                int port = buf.readUnsignedShortLE();
+                byte flags = buf.readByte();
+                byte[] addb = new byte[(flags & IPV6_MASK) != 0 ? 16 : 4];
+                buf.readBytes(addb);
+                String address = NetUtil.bytesToIpAddress(addb);
+                ByteBuf secret = (flags & SECRET_MASK) != 0 ? TlSerialUtil.deserializeBytes(buf) : null;
+                options.add(DataCenter.create(type, (flags & TEST_MASK) != 0, id,
+                        address, port, (flags & TCPO_ONLY_MASK) != 0,
+                        (flags & STATIC_MASK) != 0, (flags & THIS_PORT_ONLY_MASK) != 0, secret));
+            }
+
+            var dcOptions = DcOptions.create(options, (dcOptionsFlags & TEST_MASK) != 0,
+                    (dcOptionsFlags & PREFER_IPV6_MASK) != 0);
+
+            int publicRsaKeyCount = buf.readUnsignedShortLE();
+            var keys = new ArrayList<PublicRsaKey>(publicRsaKeyCount);
             for (int i = 0; i < publicRsaKeyCount; i++) {
                 BigInteger exponent = CryptoUtil.fromByteBuf(TlSerialUtil.deserializeBytes(buf).retain());
                 BigInteger modulus  = CryptoUtil.fromByteBuf(TlSerialUtil.deserializeBytes(buf).retain());
@@ -129,7 +178,8 @@ public class FileStoreLayout implements StoreLayout {
 
     enum Version {
         REVISION0(new Rev0Deserializer()),
-        CURRENT(REVISION0);
+        REVISION1(new Rev1Deserializer()),
+        CURRENT(REVISION1);
 
         final Deserializer deser;
         final short revision;
@@ -145,10 +195,11 @@ public class FileStoreLayout implements StoreLayout {
         }
 
         static Version of(int s) {
-            switch (s) {
-                case 0: return REVISION0;
-                default: throw new IllegalStateException("Unknown version id: " + s);
-            }
+            return switch (s) {
+                case 0 ->  REVISION0;
+                case 1 -> REVISION1;
+                default -> throw new IllegalStateException("Unknown version id: " + s);
+            };
         }
     }
 
@@ -179,26 +230,12 @@ public class FileStoreLayout implements StoreLayout {
         return flags;
     }
 
-    static class Settings {
-        final int mainDcId;
-        final long selfId;
-        final Map<Integer, AuthorizationKeyHolder> authKeys;
-        final DcOptions dcOptions;
-        final PublicRsaKeyRegister publicRsaKeyRegister;
-        @Nullable
-        final State state;
-
-        Settings(int mainDcId, long selfId, Map<Integer, AuthorizationKeyHolder> authKeys,
-                 DcOptions dcOptions, PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
+    record Settings(int mainDcId, long selfId, Map<Integer, AuthorizationKeyHolder> authKeys, DcOptions dcOptions,
+                    PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
+        Settings {
             requireSize(authKeys, "authKeys");
             requireSize(dcOptions.getBackingList(), "dcOptions");
             requireSize(publicRsaKeyRegister.getBackingMap(), "pubRsaKeyRegister");
-            this.mainDcId = mainDcId;
-            this.selfId = selfId;
-            this.authKeys = authKeys;
-            this.dcOptions = dcOptions;
-            this.publicRsaKeyRegister = publicRsaKeyRegister;
-            this.state = state;
         }
 
         void serialize(ByteBuf buf) {
@@ -208,7 +245,6 @@ public class FileStoreLayout implements StoreLayout {
             buf.writeShortLE(authKeys.size());
             authKeys.forEach((dcId, authKey) -> {
                 buf.writeShortLE(dcId);
-                buf.writeLongLE(authKey.getAuthKeyId());
                 TlSerialUtil.serializeBytes(buf, authKey.getAuthKey());
             });
             buf.writeByte(computeFlags(dcOptions));

@@ -15,17 +15,6 @@ public class AuthorizationKeyHolder {
     private final long id;
 
     /**
-     * Constructs a {@code AuthorizationKeyHolder} with given dc id, key and id.
-     *
-     * @param value The auth key in the {@link ByteBuf}.
-     * @param id The id of auth key.
-     */
-    public AuthorizationKeyHolder(ByteBuf value, long id) {
-        this.value = value.asReadOnly();
-        this.id = id;
-    }
-
-    /**
      * Constructs a {@code AuthorizationKeyHolder} with given dc id and key.
      * And precomputes id of auth key.
      *
