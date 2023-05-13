@@ -27,7 +27,6 @@ import telegram4j.tl.request.channels.ImmutableReadHistory;
 import telegram4j.tl.request.channels.ImmutableReadMessageContents;
 import telegram4j.tl.request.channels.ImmutableReportSpam;
 import telegram4j.tl.request.channels.*;
-import telegram4j.tl.request.folders.ImmutableDeleteFolder;
 import telegram4j.tl.request.folders.ImmutableEditPeerFolders;
 import telegram4j.tl.request.messages.DeleteHistory;
 import telegram4j.tl.request.messages.DeleteMessages;
@@ -847,10 +846,6 @@ public class ChatService extends RpcService {
 
     public Mono<Updates> editPeerFolders(Iterable<? extends InputFolderPeer> peers) {
         return Mono.defer(() -> sendMain(ImmutableEditPeerFolders.of(peers)));
-    }
-
-    public Mono<Updates> deleteFolder(int folderId) {
-        return sendMain(ImmutableDeleteFolder.of(folderId));
     }
 
     // channels namespace

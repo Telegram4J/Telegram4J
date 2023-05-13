@@ -224,10 +224,6 @@ public class AccountService extends RpcService {
         return sendMain(ImmutableGetWallPaper.of(wallPaper));
     }
 
-    public Mono<WallPaper> uploadWallPaper(InputFile file, String mimeType, WallPaperSettings settings) {
-        return sendMain(ImmutableUploadWallPaper.of(file, mimeType, settings));
-    }
-
     public Mono<Boolean> saveWallPaper(InputWallPaper wallPaper, boolean unsave, WallPaperSettings settings) {
         return sendMain(ImmutableSaveWallPaper.of(wallPaper, unsave, settings));
     }
