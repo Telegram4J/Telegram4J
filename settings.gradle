@@ -1,4 +1,0 @@
-rootProject.name = 'Telegram4J'
-
-include 'core'
-include 'mtproto'
