@@ -7,7 +7,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
-import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
@@ -54,6 +53,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
@@ -90,6 +91,7 @@ public final class MTProtoBootstrap {
     private int gzipWrappingSizeThreshold = 16 * 1024;
     private TcpClientResources tcpClientResources;
     private UpdateDispatcher updateDispatcher;
+    private ExecutorService resultPublisher;
 
     MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorisationHandler authHandler) {
         this.authResources = authResources;
@@ -166,6 +168,11 @@ public final class MTProtoBootstrap {
      */
     public MTProtoBootstrap setEventDispatcher(EventDispatcher eventDispatcher) {
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
+        return this;
+    }
+
+    public MTProtoBootstrap setResultPublisher(ExecutorService resultPublisher) {
+        this.resultPublisher = Objects.requireNonNull(resultPublisher);
         return this;
     }
 
@@ -385,19 +392,20 @@ public final class MTProtoBootstrap {
                             .switchIfEmpty(Mono.fromSupplier(() -> initDataCenter(dcOptions))));
             composite.add(loadMainDc
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
+                        var tcpClientResources = initTcpClientResources();
                         var options = new MTProtoOptions(
-                                initTcpClientResources(), publicRsaKeyRegister,
+                                tcpClientResources, publicRsaKeyRegister,
                                 dhPrimeChecker, transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
                                 List.copyOf(responseTransformers),
                                 InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
                                         .layer(TlInfo.LAYER)
                                         .query(initConnection())
-                                        .build(), gzipWrappingSizeThreshold);
+                                        .build(), gzipWrappingSizeThreshold, initResultPublisher());
 
                         ClientFactory clientFactory = this.clientFactory.apply(options);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
                                 new MTProtoClientGroupOptions(mainDc, clientFactory,
-                                        storeLayout, initUpdateDispatcher()));
+                                        storeLayout, initUpdateDispatcher(), options));
 
                         return tryConnect(clientGroup, storeLayout, dcOptions)
                                 .flatMap(ignored -> initializeClient(clientGroup, storeLayout));
@@ -415,7 +423,7 @@ public final class MTProtoBootstrap {
 
             sink.onCancel(mainClient.connect()
                     .onErrorResume(e -> clientGroup.close()
-                            .then(Mono.fromRunnable(() -> sink.error(e)))
+                            .doOnSuccess(any -> sink.error(e))
                             .then(Mono.never()))
                     .then(Mono.defer(() -> {
                         if (authHandler != null) {
@@ -442,7 +450,7 @@ public final class MTProtoBootstrap {
                                         .doOnSuccess(ign -> sink.success(clientGroup)));
                     }))
                     .onErrorResume(e -> clientGroup.close()
-                            .then(Mono.fromRunnable(() -> sink.error(e))))
+                            .doOnSuccess(any -> sink.error(e)))
                     .subscribe());
         });
     }
@@ -461,12 +469,6 @@ public final class MTProtoBootstrap {
                     authResources, clientGroup,
                     mtProtoResources, updatesManagerFactory, selfId,
                     serviceHolder, entityRetrievalStrategy, onDisconnect.asMono());
-
-            Runnable disconnect = () -> {
-                eventDispatcher.shutdown();
-                telegramClient.getUpdatesManager().shutdown();
-                onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-            };
 
             var composite = Disposables.composite();
 
@@ -492,7 +494,12 @@ public final class MTProtoBootstrap {
             composite.add(clientGroup.main().state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> switch (state) {
-                        case CLOSED -> Mono.fromRunnable(disconnect);
+                        case CLOSED -> Mono.fromRunnable(() -> {
+                                    eventDispatcher.shutdown();
+                                    telegramClient.getUpdatesManager().shutdown();
+                                    onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                                });
+
                         case READY -> Mono.defer(() -> {
                                     // bot user id writes before ':' char
                                     if (parseBotIdFromToken && authResources.isBot()) {
@@ -587,7 +594,7 @@ public final class MTProtoBootstrap {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        return new DefaultEventDispatcher(ForkJoinPoolScheduler.create("t4j-events", 4),
+        return new DefaultEventDispatcher(Schedulers.newParallel("t4j-events", 4, true),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 Sinks.EmitFailureHandler.FAIL_FAST);
     }
@@ -633,5 +640,12 @@ public final class MTProtoBootstrap {
             return authRetry;
         }
         return Retry.fixedDelay(5, Duration.ofSeconds(3));
+    }
+
+    private ExecutorService initResultPublisher() {
+        if (resultPublisher != null) {
+            return resultPublisher;
+        }
+        return ForkJoinPool.commonPool();
     }
 }

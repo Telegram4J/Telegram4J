@@ -10,7 +10,8 @@ public class SinksUpdateDispatcher implements UpdateDispatcher {
     private final Sinks.EmitFailureHandler emitFailureHandler;
 
     public SinksUpdateDispatcher() {
-        this(Sinks.many().multicast().onBackpressureBuffer(Queues.XS_BUFFER_SIZE), Sinks.EmitFailureHandler.FAIL_FAST);
+        this(Sinks.many().multicast().onBackpressureBuffer(Queues.XS_BUFFER_SIZE, false),
+                Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     public SinksUpdateDispatcher(Sinks.Many<Updates> sink, Sinks.EmitFailureHandler emitFailureHandler) {

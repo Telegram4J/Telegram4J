@@ -91,7 +91,6 @@ public final class TransportCodec extends ChannelDuplexHandler {
                     // b.release();
                     // b may already be released in Transport.encode(...)
                     // ReferenceCountUtil.safeRelease(b);
-                    // System.out.println(b);
                 }
                 ctx.write(encoded, promise);
             } else {

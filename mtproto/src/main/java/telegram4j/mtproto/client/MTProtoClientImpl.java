@@ -9,7 +9,6 @@ import io.netty.util.AttributeKey;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.*;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -39,6 +38,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -193,12 +193,12 @@ class MTProtoClientImpl implements MTProtoClient {
         public void channelInactive(ChannelHandlerContext ctx) {
             channel = null;
 
+            pingEmitter.cancel();
             if (localState == State.DISCONNECTED) {
                 if (log.isDebugEnabled()) {
                     log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
                 }
 
-                pingEmitter.cancel();
                 ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
             } else { // State.CLOSED
                 if (log.isDebugEnabled()) {
@@ -349,7 +349,7 @@ class MTProtoClientImpl implements MTProtoClient {
                         return Mono.empty();
                     }
 
-                    RequestMono sink = new RequestMono(options.getResultPublishScheduler());
+                    RequestMono sink = new RequestMono(options.getResultPublisher());
                     channel.writeAndFlush(new RpcQuery(method, sink));
                     if (method.identifier() != Ping.ID && method.identifier() != PingDelayDisconnect.ID) {
                         stats.incrementQueriesCount();
@@ -387,9 +387,15 @@ class MTProtoClientImpl implements MTProtoClient {
     @Override
     public Mono<Void> close() {
         return Mono.create(sink -> {
+            var curretChannel = channel;
+            if (curretChannel == null) {
+                sink.success();
+                return;
+            }
+
             emitState(State.CLOSED);
 
-            channel.close()
+            curretChannel.close()
                     .addListener(notify -> {
                         // cancelRequests();
 
@@ -1151,14 +1157,14 @@ class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        final Scheduler publishScheduler;
+        final ExecutorService publishScheduler;
 
         volatile boolean once;
         volatile boolean cancelled;
 
         CoreSubscriber<? super Object> subscriber;
 
-        RequestMono(Scheduler publishScheduler) {
+        RequestMono(ExecutorService publishScheduler) {
             this.publishScheduler = publishScheduler;
         }
 
@@ -1177,7 +1183,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 return;
             }
 
-            publishScheduler.schedule(() -> {
+            publishScheduler.execute(() -> {
                 subscriber.onNext(obj);
                 subscriber.onComplete();
             });
@@ -1188,7 +1194,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 return;
             }
 
-            publishScheduler.schedule(() -> subscriber.onError(e));
+            publishScheduler.execute(() -> subscriber.onError(e));
         }
 
         @Override

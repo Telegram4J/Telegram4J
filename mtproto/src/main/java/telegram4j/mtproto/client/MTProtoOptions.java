@@ -1,7 +1,5 @@
 package telegram4j.mtproto.client;
 
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.annotation.Nullable;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.PublicRsaKeyRegister;
@@ -17,6 +15,7 @@ import telegram4j.tl.request.InvokeWithLayer;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 public class MTProtoOptions {
     protected final TcpClientResources tcpClientResources;
@@ -31,16 +30,14 @@ public class MTProtoOptions {
     protected final List<ResponseTransformer> responseTransformers;
     protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
     protected final int gzipWrappingSizeThreshold;
-
-    // TODO
-    protected final Scheduler resultPublishScheduler = Schedulers.newParallel("t4j-result", 4);
+    protected final ExecutorService resultPublisher;
 
     public MTProtoOptions(TcpClientResources tcpClientResources, @Nullable PublicRsaKeyRegister publicRsaKeyRegister,
                           @Nullable DhPrimeChecker dhPrimeChecker, TransportFactory transport,
                           StoreLayout storeLayout, RetryBackoffSpec connectionRetry,
                           RetryBackoffSpec authRetry, List<ResponseTransformer> responseTransformers,
                           InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
-                          int gzipWrappingSizeThreshold) {
+                          int gzipWrappingSizeThreshold, ExecutorService resultPublisher) {
         this.tcpClientResources = Objects.requireNonNull(tcpClientResources);
         this.publicRsaKeyRegister = publicRsaKeyRegister;
         this.dhPrimeChecker = dhPrimeChecker;
@@ -51,6 +48,7 @@ public class MTProtoOptions {
         this.responseTransformers = Objects.requireNonNull(responseTransformers);
         this.initConnection = Objects.requireNonNull(initConnection);
         this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
+        this.resultPublisher = Objects.requireNonNull(resultPublisher);
     }
 
     public TcpClientResources getTcpClientResources() {
@@ -93,7 +91,7 @@ public class MTProtoOptions {
         return gzipWrappingSizeThreshold;
     }
 
-    public Scheduler getResultPublishScheduler() {
-        return resultPublishScheduler;
+    public ExecutorService getResultPublisher() {
+        return resultPublisher;
     }
 }

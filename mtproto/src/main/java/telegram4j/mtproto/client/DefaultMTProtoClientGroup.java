@@ -84,7 +84,11 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 .flatMap(dc -> Stream.concat(Arrays.stream(dc.downloadClients),
                         Arrays.stream(dc.uploadClients))), Stream.of(main))
                 .map(MTProtoClient::close)
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList()))
+                .then(Mono.fromRunnable(() -> {
+                    options.mtProtoOptions().getTcpClientResources().dispose();
+                    options.mtProtoOptions().getResultPublisher().shutdown();
+                }));
     }
 
     @Override
@@ -196,28 +200,32 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
         static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
 
-        public final Duration checkinPeriod;
-        public final Duration inactiveUploadPeriod;
-        public final Duration inactiveDownloadPeriod;
-        public final int maxDownloadClientsCount;
-        public final int maxUploadClientsCount;
+        final Duration checkinPeriod;
+        final Duration inactiveUploadPeriod;
+        final Duration inactiveDownloadPeriod;
+        final int maxDownloadClientsCount;
+        final int maxUploadClientsCount;
 
         public Options(MTProtoClientGroupOptions options) {
-            this(options.mainDc, options.clientFactory, options.storeLayout, options.updateDispatcher);
+            this(options.mainDc, options.clientFactory, options.storeLayout,
+                    options.updateDispatcher, options.mtProtoOptions);
         }
 
-        public Options(DataCenter mainDc, ClientFactory clientFactory, StoreLayout storeLayout, UpdateDispatcher updateDispatcher) {
-            this(mainDc, clientFactory, storeLayout, updateDispatcher,
+        public Options(DataCenter mainDc, ClientFactory clientFactory,
+                       StoreLayout storeLayout, UpdateDispatcher updateDispatcher,
+                       MTProtoOptions mtProtoOptions) {
+            this(mainDc, clientFactory, storeLayout, updateDispatcher, mtProtoOptions,
                     DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
                     INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT,
                     DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
         }
 
         public Options(DataCenter mainDc, ClientFactory clientFactory, StoreLayout storeLayout,
-                       UpdateDispatcher updateDispatcher, Duration checkinPeriod,
+                       UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions,
+                       Duration checkinPeriod,
                        Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod,
                        int maxDownloadClientsCount, int maxUploadClientsCount) {
-            super(mainDc, clientFactory, storeLayout, updateDispatcher);
+            super(mainDc, clientFactory, storeLayout, updateDispatcher, mtProtoOptions);
             if (maxDownloadClientsCount <= 0)
                 throw new IllegalArgumentException("Download client count must be equal or greater than 1");
             if (maxUploadClientsCount <= 0)
@@ -227,6 +235,26 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             this.inactiveDownloadPeriod = inactiveDownloadPeriod;
             this.maxDownloadClientsCount = maxDownloadClientsCount;
             this.maxUploadClientsCount = maxUploadClientsCount;
+        }
+
+        public Duration checkinPeriod() {
+            return checkinPeriod;
+        }
+
+        public Duration inactiveUploadPeriod() {
+            return inactiveUploadPeriod;
+        }
+
+        public Duration inactiveDownloadPeriod() {
+            return inactiveDownloadPeriod;
+        }
+
+        public int maxDownloadClientsCount() {
+            return maxDownloadClientsCount;
+        }
+
+        public int maxUploadClientsCount() {
+            return maxUploadClientsCount;
         }
     }
 

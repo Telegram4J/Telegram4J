@@ -53,26 +53,11 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (msg instanceof MTProtoObject obj) {
             switch (obj.identifier()) {
-                case ResPQ.ID -> {
-                    var resPQ = (ResPQ) obj;
-                    handleResPQ(ctx, resPQ);
-                }
-                case ServerDHParams.ID -> {
-                    var serverDHParams = (ServerDHParams) obj;
-                    handleServerDHParams(ctx, serverDHParams);
-                }
-                case DhGenOk.ID -> {
-                    var dhGenOk = (DhGenOk) obj;
-                    handleDhGenOk(ctx, dhGenOk);
-                }
-                case DhGenRetry.ID -> {
-                    var dhGenRetry = (DhGenRetry) obj;
-                    handleDhGenRetry(ctx, dhGenRetry);
-                }
-                case DhGenFail.ID -> {
-                    var dhGenFail = (DhGenFail) obj;
-                    handleDhGenFail(ctx, dhGenFail);
-                }
+                case ResPQ.ID -> handleResPQ(ctx, (ResPQ) obj);
+                case ServerDHParams.ID -> handleServerDHParams(ctx, (ServerDHParams) obj);
+                case DhGenOk.ID -> handleDhGenOk(ctx, (DhGenOk) obj);
+                case DhGenRetry.ID -> handleDhGenRetry(ctx, (DhGenRetry) obj);
+                case DhGenFail.ID -> handleDhGenFail(ctx, (DhGenFail) obj);
                 default -> throw new AuthorizationException("Unexpected MTProto object: " + obj);
             }
         } else {
