@@ -18,14 +18,27 @@ public final class CryptoUtil {
     private CryptoUtil() {
     }
 
-    public static final SecureRandom random = new SecureRandom();
+    public static final SecureRandom random;
 
-    private static final FastThreadLocal<MessageDigest> SHA256 = new FastThreadLocal<>() {
-        @Override
-        protected MessageDigest initialValue() throws Exception {
-            return MessageDigest.getInstance("SHA-256");
+    private static final FastThreadLocal<MessageDigest> SHA256;
+
+    static {
+        SecureRandom possibleStrong;
+        try {
+            possibleStrong = SecureRandom.getInstanceStrong();
+        } catch (NoSuchAlgorithmException e) {
+            possibleStrong = new SecureRandom();
         }
-    };
+
+        random = possibleStrong;
+
+        SHA256 = new FastThreadLocal<>() {
+            @Override
+            protected MessageDigest initialValue() throws Exception {
+                return MessageDigest.getInstance("SHA-256");
+            }
+        };
+    }
 
     public static BigInteger fromByteArray(byte[] data) {
         return new BigInteger(1, data);
