@@ -1,7 +1,7 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.mtproto.client.MainMTProtoClient;
+import telegram4j.mtproto.client.MTProtoClient;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -181,7 +181,7 @@ public final class DcId implements Comparable<DcId> {
 
     /** Types of purpose of the mtproto client. */
     public enum Type {
-        /** Represents a {@link MainMTProtoClient}. */
+        /** Represents a {@link MTProtoClient}. */
         MAIN,
         /** Represents an upload client. */
         UPLOAD,

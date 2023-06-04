@@ -12,9 +12,9 @@ public interface MTProtoClientGroup {
      * Gets main MTProto client which can be used to received lifetime updates
      * and interact with methods.
      *
-     * @return The {@link MainMTProtoClient main client}.
+     * @return The {@link MTProtoClient main client}.
      */
-    MainMTProtoClient main();
+    MTProtoClient main();
 
     /**
      * Configures a new main client for this group. Old client will be closed.
@@ -22,7 +22,7 @@ public interface MTProtoClientGroup {
      * @param dc The dc to which main client will associate.
      * @return A {@link Mono} emitting on successful completion new main client.
      */
-    Mono<MainMTProtoClient> setMain(DataCenter dc);
+    Mono<MTProtoClient> setMain(DataCenter dc);
 
     /**
      * Sends TL method to specified datacenter.
@@ -35,6 +35,8 @@ public interface MTProtoClientGroup {
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
     <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method);
+
+    UpdateDispatcher updates();
 
     /**
      * Starts a service task to automatically disconnect inactive clients

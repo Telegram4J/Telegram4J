@@ -36,8 +36,6 @@ import telegram4j.tl.request.messages.*;
 import java.util.List;
 import java.util.Objects;
 
-import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
-
 /** Rpc service with chat and channel related methods. */
 public class ChatService extends RpcService {
 
@@ -164,7 +162,7 @@ public class ChatService extends RpcService {
         return sendMain(request)
                 .ofType(BaseUpdates.class)
                 .flatMapMany(updates -> {
-                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                    clientGroup.updates().publish(updates);
 
                     return Flux.fromIterable(updates.updates())
                             .mapNotNull(u -> {
@@ -522,7 +520,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> updatePinnedMessage(UpdatePinnedMessage request) {
         return sendMain(request)
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     public Mono<Updates> sendVote(InputPeer peer, int msgId, Iterable<? extends ByteBuf> options) {
@@ -713,7 +711,7 @@ public class ChatService extends RpcService {
     public Mono<Void> setHistoryTtl(InputPeer peer, int period) {
         return sendMain(ImmutableSetHistoryTTL.of(peer, period))
                 // Typically: UpdatePeerHistoryTTL, UpdateNewMessage(service message)
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     public Mono<CheckedHistoryImportPeer> checkHistoryImportPeer(InputPeer peer) {
@@ -743,7 +741,7 @@ public class ChatService extends RpcService {
         return sendMain(request)
                 .flatMap(u -> transformMessageUpdate(request, u))
                 .map(TupleUtils.function((message, updates) -> {
-                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                    clientGroup.updates().publish(updates);
                     return message;
                 }));
     }
@@ -766,7 +764,7 @@ public class ChatService extends RpcService {
                     return pollSaving.thenReturn(tuple);
                 })
                 .map(TupleUtils.function((message, updates) -> {
-                    clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                    clientGroup.updates().publish(updates);
                     return message;
                 }));
     }
@@ -793,7 +791,7 @@ public class ChatService extends RpcService {
                                 if (newMessage instanceof MessageEmpty) {
                                     return Mono.error(new IllegalStateException("Received MessageEmpty on EditMessage updates"));
                                 }
-                                clientGroup.main().updates().emitNext(updates, FAIL_FAST);
+                                clientGroup.updates().publish(updates);
                                 return Mono.just(newMessage);
                             }
                         }
@@ -818,13 +816,13 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editChatTitle(long chatId, String title) {
         return sendMain(ImmutableEditChatTitle.of(chatId, title))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     @Compatible(Type.BOTH)
     public Mono<Void> editChatPhoto(long chatId, InputChatPhoto photo) {
         return sendMain(ImmutableEditChatPhoto.of(chatId, photo))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     public Mono<Updates> addChatUser(long chatId, InputUser user, int forwardLimit) {
@@ -834,7 +832,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> deleteChatUser(long chatId, InputUser userId, boolean revokeHistory) {
         return sendMain(ImmutableDeleteChatUser.builder().revokeHistory(revokeHistory).chatId(chatId).userId(userId).build())
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     public Mono<Updates> createChat(Iterable<? extends InputUser> users, String title) {
@@ -909,7 +907,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableEditAdmin.of(channel, user, rights, rank))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
-                    clientGroup.main().updates().emitNext(u, FAIL_FAST);
+                    clientGroup.updates().publish(u);
                     return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
@@ -917,7 +915,7 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editTitle(InputChannel channel, String title) {
         return sendMain(ImmutableEditTitle.of(channel, title))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     @Compatible(Type.BOTH)
@@ -925,7 +923,7 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableEditBanned.of(channel, participant, rights))
                 .cast(BaseUpdates.class)
                 .flatMap(u -> {
-                    clientGroup.main().updates().emitNext(u, FAIL_FAST);
+                    clientGroup.updates().publish(u);
                     return Mono.justOrEmpty(u.chats().get(0));
                 });
     }
@@ -933,13 +931,13 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOTH)
     public Mono<Void> editPhoto(InputChannel channel, InputChatPhoto photo) {
         return sendMain(ImmutableEditPhoto.of(channel, photo))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     @Compatible(Type.BOTH)
     public Mono<Void> leaveChannel(InputChannel channel) {
         return sendMain(ImmutableLeaveChannel.of(channel))
-                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.main().updates().emitNext(u, FAIL_FAST)));
+                .flatMap(u -> Mono.fromRunnable(() -> clientGroup.updates().publish(u)));
     }
 
     @Compatible(Type.BOTH)

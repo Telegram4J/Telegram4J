@@ -3,6 +3,7 @@ package telegram4j.mtproto.client;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcId;
 import telegram4j.tl.api.TlMethod;
 
 import java.time.Instant;
@@ -45,6 +46,8 @@ public interface MTProtoClient {
      * @return The {@link DataCenter} to which the client is configured.
      */
     DataCenter getDatacenter();
+
+    DcId.Type getType();
 
     /**
      * Gets mutable statistic for client.

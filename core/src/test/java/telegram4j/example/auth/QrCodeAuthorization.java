@@ -52,32 +52,30 @@ public class QrCodeAuthorization {
             String apiHash = authResources.getApiHash();
             ResettableInterval inter = new ResettableInterval(Schedulers.boundedElastic());
 
-            var listenTokens = clientGroup.main().updates().asFlux()
+            var listenTokens = clientGroup.updates()
+                    .on(UpdateShort.class)
                     .takeUntil(u -> complete.get())
-                    .ofType(UpdateShort.class)
                     .filter(u -> u.update().identifier() == UpdateLoginToken.ID)
                     .publishOn(Schedulers.boundedElastic()) // do not block to wait 2FA password
                     .flatMap(l -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
-                    .flatMap(token -> {
-                        switch (token.identifier()) {
-                            case LoginTokenSuccess.ID:
-                                var success = (LoginTokenSuccess) token;
-                                return Mono.just(success.authorization());
-                            case LoginTokenMigrateTo.ID:
-                                var migrate = (LoginTokenMigrateTo) token;
-
-                                log.info("Redirecting to the DC {}", migrate.dcId());
-                                return storeLayout.getDcOptions()
-                                        // TODO: request help.GetConfig if DC not found
-                                        .map(dcOpts -> dcOpts.find(DataCenter.Type.REGULAR, migrate.dcId())
-                                                .orElseThrow(() -> new IllegalStateException("Could not find DC " + migrate.dcId()
-                                                        + " for redirecting main client")))
-                                        .flatMap(clientGroup::setMain)
-                                        .flatMap(client -> client.sendAwait(ImmutableImportLoginToken.of(migrate.token())))
-                                        .cast(LoginTokenSuccess.class);
-                            default:
-                                return Flux.error(new IllegalStateException("Unexpected type of LoginToken: " + token));
+                    .flatMap(token -> switch (token.identifier()) {
+                        case LoginTokenSuccess.ID -> {
+                            var success = (LoginTokenSuccess) token;
+                            yield Mono.just(success.authorization());
                         }
+                        case LoginTokenMigrateTo.ID -> {
+                            var migrate = (LoginTokenMigrateTo) token;
+                            log.info("Redirecting to the DC {}", migrate.dcId());
+                            yield storeLayout.getDcOptions()
+                                    // TODO: request help.GetConfig if DC not found
+                                    .map(dcOpts -> dcOpts.find(DataCenter.Type.REGULAR, migrate.dcId())
+                                            .orElseThrow(() -> new IllegalStateException("Could not find DC " + migrate.dcId()
+                                                    + " for redirecting main client")))
+                                    .flatMap(clientGroup::setMain)
+                                    .flatMap(client -> client.sendAwait(ImmutableImportLoginToken.of(migrate.token())))
+                                    .cast(LoginTokenSuccess.class);
+                        }
+                        default -> Flux.error(new IllegalStateException("Unexpected type of LoginToken: " + token));
                     })
                     .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> {
                         TwoFactorAuthHandler tfa = new TwoFactorAuthHandler(clientGroup, sink);

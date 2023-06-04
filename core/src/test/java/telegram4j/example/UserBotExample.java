@@ -62,7 +62,7 @@ public class UserBotExample {
                                 true)))
                 .withConnection(client -> {
 
-                    Mono<Void> eventLog = client.getMtProtoClientGroup().main().updates().asFlux()
+                    Mono<Void> eventLog = client.getMtProtoClientGroup().updates().all()
                             .publishOn(Schedulers.boundedElastic())
                             .flatMap(u -> Mono.fromCallable(() -> mapper.writeValueAsString(u)))
                             .doOnNext(log::info)

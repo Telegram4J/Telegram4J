@@ -20,35 +20,46 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
-    private static final VarHandle CA = MethodHandles.arrayElementVarHandle(MTProtoClient[].class);
+    private static final VarHandle CA;
+    private static final VarHandle MAIN;
+
+    static {
+        var lookup = MethodHandles.lookup();
+        try {
+            MAIN = lookup.findVarHandle(DefaultMTProtoClientGroup.class, "main", MTProtoClient.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+
+        CA = MethodHandles.arrayElementVarHandle(MTProtoClient[].class);
+    }
 
     private final Options options;
     private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.parallel(),
             Sinks.many().unicast().onBackpressureError());
     private final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
-    private final AtomicReference<MainMTProtoClient> main = new AtomicReference<>();
+    private volatile MTProtoClient main;
 
     public DefaultMTProtoClientGroup(Options options) {
         this.options = options;
 
-        this.main.setPlain(options.mainClient);
+        MAIN.set(this, options.clientFactory.create(this, DcId.Type.MAIN, options.mainDc));
     }
 
     @Override
-    public MainMTProtoClient main() {
-        return main.get();
+    public MTProtoClient main() {
+        return main;
     }
 
     @Override
-    public Mono<MainMTProtoClient> setMain(DataCenter dc) {
-        MainMTProtoClient upd = options.clientFactory.createMain(dc);
-        MainMTProtoClient old = main.getAndSet(upd);
+    public Mono<MTProtoClient> setMain(DataCenter dc) {
+        var upd = options.clientFactory.create(this, DcId.Type.MAIN, dc);
+        var old = (MTProtoClient) MAIN.getAndSet(this, upd);
         return old.close()
                 .and(upd.connect())
                 .thenReturn(upd);
@@ -61,12 +72,17 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     }
 
     @Override
+    public UpdateDispatcher updates() {
+        return options.updateDispatcher;
+    }
+
+    @Override
     public Mono<Void> close() {
         activityMonitoring.dispose();
 
         return Mono.whenDelayError(Stream.concat(dcs.values().stream()
                 .flatMap(dc -> Stream.concat(Arrays.stream(dc.downloadClients),
-                        Arrays.stream(dc.uploadClients))), Stream.of(main.get()))
+                        Arrays.stream(dc.uploadClients))), Stream.of(main))
                 .map(MTProtoClient::close)
                 .collect(Collectors.toList()));
     }
@@ -115,7 +131,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     @Override
     public Mono<MTProtoClient> getOrCreateClient(DcId id) {
         return switch (id.getType()) {
-            case MAIN -> Mono.just(main.get());
+            case MAIN -> Mono.just(main);
             case UPLOAD, DOWNLOAD -> {
                 int dcId = id.getId().orElseThrow();
                 if (id.isAutoShift()) {
@@ -140,7 +156,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
                                 .flatMap(dc -> {
-                                    MTProtoClient created = options.clientFactory.create(dc);
+                                    MTProtoClient created = options.clientFactory.create(this, id.getType(), dc);
                                     MTProtoClient c = dcInfo.setClient(id.getType(), created);
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 });
@@ -164,7 +180,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
                                 .flatMap(dc -> {
-                                    MTProtoClient created = options.clientFactory.create(dc);
+                                    MTProtoClient created = options.clientFactory.create(this, id.getType(), dc);
                                     MTProtoClient c = dcInfo.setClient(id.getType(), index, created);
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 })));
@@ -187,18 +203,21 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         public final int maxUploadClientsCount;
 
         public Options(MTProtoClientGroupOptions options) {
-            this(options.mainClient, options.clientFactory, options.storeLayout);
+            this(options.mainDc, options.clientFactory, options.storeLayout, options.updateDispatcher);
         }
 
-        public Options(MainMTProtoClient mainClient, ClientFactory clientFactory, StoreLayout storeLayout) {
-            this(mainClient, clientFactory, storeLayout, DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
-                    INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT, DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
+        public Options(DataCenter mainDc, ClientFactory clientFactory, StoreLayout storeLayout, UpdateDispatcher updateDispatcher) {
+            this(mainDc, clientFactory, storeLayout, updateDispatcher,
+                    DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
+                    INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT,
+                    DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
         }
 
-        public Options(MainMTProtoClient mainClient, ClientFactory clientFactory, StoreLayout storeLayout,
-                       Duration checkinPeriod, Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod,
+        public Options(DataCenter mainDc, ClientFactory clientFactory, StoreLayout storeLayout,
+                       UpdateDispatcher updateDispatcher, Duration checkinPeriod,
+                       Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod,
                        int maxDownloadClientsCount, int maxUploadClientsCount) {
-            super(mainClient, clientFactory, storeLayout);
+            super(mainDc, clientFactory, storeLayout, updateDispatcher);
             if (maxDownloadClientsCount <= 0)
                 throw new IllegalArgumentException("Download client count must be equal or greater than 1");
             if (maxUploadClientsCount <= 0)

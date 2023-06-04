@@ -13,7 +13,6 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationException;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
@@ -49,7 +48,7 @@ import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
-class NextMTProtoClient implements MainMTProtoClient {
+class MTProtoClientImpl implements MTProtoClient {
     private static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
     private static final String HANDSHAKE       = "mtproto.handshake";
     private static final String TRANSPORT       = "mtproto.transport";
@@ -72,11 +71,12 @@ class NextMTProtoClient implements MainMTProtoClient {
 
     private State localState = State.DISCONNECTED;
     private boolean inflightPing;
+    private Trigger pingEmitter;
 
     private volatile Channel channel;
 
-    private Trigger pingEmitter;
-
+    private final MTProtoClientGroup group;
+    private final DcId.Type type;
     private final AuthData authData;
     private final ArrayList<Long> acknowledgments = new ArrayList<>();
     private final HashMap<Long, Request> requests = new HashMap<>();
@@ -84,13 +84,13 @@ class NextMTProtoClient implements MainMTProtoClient {
     private final InnerStats stats = new InnerStats();
     private final Sinks.Many<State> state = Sinks.many().replay()
             .latestOrDefault(State.DISCONNECTED);
-    private final Sinks.Many<Updates> updates = Sinks.many().multicast()
-            .onBackpressureBuffer(Queues.XS_BUFFER_SIZE);
 
     private final MTProtoOptions options;
     private final Bootstrap bootstrap;
 
-    NextMTProtoClient(DataCenter dc, MTProtoOptions options) {
+    MTProtoClientImpl(MTProtoClientGroup group, DcId.Type type, DataCenter dc, MTProtoOptions options) {
+        this.group = group;
+        this.type = type;
         this.authData = new AuthData(dc);
         this.options = options;
 
@@ -119,11 +119,6 @@ class NextMTProtoClient implements MainMTProtoClient {
         var ack = ImmutableMsgsAck.of(batch);
         batch.clear();
         return ack;
-    }
-
-    @Override
-    public Sinks.Many<Updates> updates() {
-        return updates;
     }
 
     @Sharable
@@ -214,10 +209,13 @@ class NextMTProtoClient implements MainMTProtoClient {
 
         @Override
         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
-            if (evt instanceof HandshakeCompleteEvent e) {
-                authData.authKey(e.authKey());
-                authData.serverSalt(e.serverSalt());
-                authData.timeOffset(e.serverTimeDiff());
+            if (evt instanceof HandshakeCompleteEvent event) {
+                authData.authKey(event.authKey());
+                authData.serverSalt(event.serverSalt());
+                authData.timeOffset(event.serverTimeDiff());
+
+                options.getStoreLayout().updateAuthKey(authData.dc(), event.authKey())
+                        .subscribe(null, e -> exceptionCaught(ctx, e));
 
                 ctx.pipeline().remove(HANDSHAKE);
                 ctx.pipeline().remove(HANDSHAKE_CODEC);
@@ -232,10 +230,10 @@ class NextMTProtoClient implements MainMTProtoClient {
             var tr = ctx.pipeline().get(TransportCodec.class).delegate();
             ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, new MTProtoEncryption(tr));
 
-            if (NextMTProtoClient.this instanceof MainMTProtoClient) {
-                options.getStoreLayout().updateDataCenter(authData.dc()).subscribe();
+            if (type == DcId.Type.MAIN) {
+                options.getStoreLayout().updateDataCenter(authData.dc())
+                        .subscribe(null, e -> exceptionCaught(ctx, e));
             }
-            options.getStoreLayout().updateAuthKey(authData.dc(), authData.authKey()).subscribe();
 
             Duration period = switch (authData.dc().getType()) {
                 case MEDIA, CDN -> PING_QUERY_PERIOD_MEDIA;
@@ -268,7 +266,7 @@ class NextMTProtoClient implements MainMTProtoClient {
         }
 
         private void initializeChannel(ChannelHandlerContext ctx, Transport tr) {
-            if (NextMTProtoClient.this instanceof MainMTProtoClient) {
+            if (type == DcId.Type.MAIN) {
                 log.info("[C:0x{}] Connected to main DC {}", id, authData.dc().getId());
             } else {
                 log.info("[C:0x{}] Connected to {} DC {}", id,
@@ -295,11 +293,6 @@ class NextMTProtoClient implements MainMTProtoClient {
                 configure(ctx);
             }
         }
-    }
-
-    protected void emitUpdates(Updates updates) {
-        this.updates.emitNext(updates, FAIL_FAST);
-        // throw new UnsupportedOperationException("Received update on non-main client 0x" + id);
     }
 
     @Override
@@ -379,6 +372,11 @@ class NextMTProtoClient implements MainMTProtoClient {
     @Override
     public DataCenter getDatacenter() {
         return authData.dc();
+    }
+
+    @Override
+    public DcId.Type getType() {
+        return type;
     }
 
     @Override
@@ -678,6 +676,11 @@ class NextMTProtoClient implements MainMTProtoClient {
                         .toList().toString());
             }
 
+            var currentAuthKey = authData.authKey();
+            if (currentAuthKey == null) {
+                throw new MTProtoException("No auth key");
+            }
+
             TlObject method = req.method;
             int size = TlSerializer.sizeOf(req.method);
             if (size >= options.getGzipWrappingSizeThreshold()) {
@@ -784,8 +787,8 @@ class NextMTProtoClient implements MainMTProtoClient {
             random.nextBytes(paddingb);
             message.writeBytes(paddingb);
 
-            ByteBuf authKey = authData.authKey().value();
-            ByteBuf authKeyId = Unpooled.copyLong(Long.reverseBytes(authData.authKey().id()));
+            ByteBuf authKey = currentAuthKey.value();
+            ByteBuf authKeyId = Unpooled.copyLong(Long.reverseBytes(currentAuthKey.id()));
 
             ByteBuf messageKeyHash = sha256Digest(authKey.slice(88, 32), message);
 
@@ -971,7 +974,7 @@ class NextMTProtoClient implements MainMTProtoClient {
                     rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
                 }
 
-                emitUpdates(updates);
+                group.updates().publish(updates);
                 return;
             }
 
@@ -1198,5 +1201,4 @@ class NextMTProtoClient implements MainMTProtoClient {
             cancelled = true;
         }
     }
-
 }
