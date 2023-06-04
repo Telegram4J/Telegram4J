@@ -24,12 +24,19 @@ import telegram4j.tl.TlSerializer;
 import telegram4j.tl.Updates;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
+import telegram4j.tl.auth.Authorization;
+import telegram4j.tl.auth.LoginTokenSuccess;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.InvokeWithLayer;
+import telegram4j.tl.request.account.GetPassword;
+import telegram4j.tl.request.auth.CheckPassword;
+import telegram4j.tl.request.auth.ExportLoginToken;
+import telegram4j.tl.request.auth.ImportLoginToken;
 import telegram4j.tl.request.mtproto.DestroySession;
 import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
 import telegram4j.tl.request.mtproto.Ping;
 import telegram4j.tl.request.mtproto.PingDelayDisconnect;
+import telegram4j.tl.request.updates.GetState;
 
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
@@ -550,7 +557,7 @@ class MTProtoClientImpl implements MTProtoClient {
         }
     }
 
-    private void emitUnwrappedContainer(ContainerRequest container) {
+    private void emitUnwrappedContainer(ChannelHandlerContext ctx, ContainerRequest container) {
         for (long msgId : container.msgIds) {
             var inner = (RpcRequest) requests.remove(msgId);
             // If inner is null this mean response for mean was received
@@ -568,27 +575,27 @@ class MTProtoClientImpl implements MTProtoClient {
                             ? new RpcQuery(query.method, query.sink)
                             : new RpcRequest(inner.method);
 
-                    channel.writeAndFlush(single);
+                    ctx.channel().writeAndFlush(single);
                 }
             }
         }
     }
 
-    private void emitUnwrapped(long possibleCntMsgId) {
+    private void emitUnwrapped(ChannelHandlerContext ctx, long possibleCntMsgId) {
         Request request = requests.get(possibleCntMsgId);
         if (request instanceof ContainerRequest container) {
             requests.remove(possibleCntMsgId);
 
-            emitUnwrappedContainer(container);
+            emitUnwrappedContainer(ctx, container);
         } else if (request instanceof ContainerizedRequest cntMessage) {
             var cnt = (ContainerRequest) requests.remove(cntMessage.containerMsgId());
             if (cnt != null) {
-                emitUnwrappedContainer(cnt);
+                emitUnwrappedContainer(ctx, cnt);
             }
         } else if (request instanceof RpcRequest rpcRequest) {
             requests.remove(possibleCntMsgId);
 
-            channel.writeAndFlush(rpcRequest);
+            ctx.channel().writeAndFlush(rpcRequest);
         }
     }
 
@@ -641,6 +648,7 @@ class MTProtoClientImpl implements MTProtoClient {
 
     class MTProtoEncryption extends ChannelDuplexHandler {
         private final Transport transport;
+        private final ArrayDeque<RpcQuery> delayedUntilAuth = new ArrayDeque<>();
 
         MTProtoEncryption(Transport transport) {
             this.transport = transport;
@@ -667,7 +675,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 throw new TransportException(val);
             }
 
-            decryptPayload(payload);
+            decryptPayload(ctx, payload);
         }
 
         @Override
@@ -680,6 +688,14 @@ class MTProtoClientImpl implements MTProtoClient {
                 log.trace("[C:0x{}] {}", id, requests.entrySet().stream()
                         .map(e -> "0x" + Long.toHexString(e.getKey()) + ": " + e.getValue())
                         .toList().toString());
+            }
+
+            if (authData.unauthorized() && msg instanceof RpcQuery query
+                    && query.method != GetState.instance()
+                    && !isAuthMethod(query.method)) {
+
+                delayedUntilAuth.addLast(query);
+                return;
             }
 
             var currentAuthKey = authData.authKey();
@@ -833,7 +849,7 @@ class MTProtoClientImpl implements MTProtoClient {
             ctx.writeAndFlush(packet);
         }
 
-        private void decryptPayload(ByteBuf data) {
+        private void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) {
             long authKeyId = data.readLongLE();
 
             var currentAuthKey = authData.authKey();
@@ -888,7 +904,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 decrypted.release();
             }
 
-            handleServiceMessage(obj, messageId);
+            handleServiceMessage(ctx, obj, messageId);
         }
 
         private Object ungzip(Object obj) {
@@ -927,7 +943,7 @@ class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        private void handleServiceMessage(Object obj, long messageId) {
+        private void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) {
             if (obj instanceof RpcResult rpcResult) {
                 messageId = rpcResult.reqMsgId();
                 obj = ungzip(rpcResult.result());
@@ -942,6 +958,10 @@ class MTProtoClientImpl implements MTProtoClient {
                 acknowledgments.add(messageId);
 
                 if (obj instanceof RpcError rpcError) {
+                    if (rpcError.errorCode() == 401) {
+                        authData.unauthorized(true);
+                    }
+
                     if (rpcLog.isDebugEnabled()) {
                         rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc error, code: {}, message: {}",
                                 id, Long.toHexString(messageId), rpcError.errorCode(), rpcError.errorMessage());
@@ -955,6 +975,15 @@ class MTProtoClientImpl implements MTProtoClient {
                     }
 
                     query.sink.emitValue(obj);
+
+                    if (authData.unauthorized() && (obj instanceof Authorization || obj instanceof LoginTokenSuccess)) {
+                        authData.unauthorized(false);
+
+                        RpcQuery pendingQuery;
+                        while ((pendingQuery = delayedUntilAuth.poll()) != null) {
+                            ctx.channel().writeAndFlush(pendingQuery);
+                        }
+                    }
                 }
 
                 return;
@@ -968,7 +997,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 }
 
                 for (Message message : messageContainer.messages()) {
-                    handleServiceMessage(message.body(), message.msgId());
+                    handleServiceMessage(ctx, message.body(), message.msgId());
                 }
                 return;
             }
@@ -1051,7 +1080,7 @@ class MTProtoClientImpl implements MTProtoClient {
                 }
 
                 authData.updateTimeOffset((int) (messageId >> 32));
-                emitUnwrapped(badMsgNotification.badMsgId());
+                emitUnwrapped(ctx, badMsgNotification.badMsgId());
                 return;
             }
 
@@ -1086,7 +1115,7 @@ class MTProtoClientImpl implements MTProtoClient {
                         int state = c.getByte(i) & 7;
                         switch (state) {
                             // not received, resend
-                            case 1, 2, 3 -> emitUnwrapped(msgId);
+                            case 1, 2, 3 -> emitUnwrapped(ctx, msgId);
                             case 4 -> { // acknowledged
                                 var sub = (RpcRequest) requests.get(msgId);
                                 if (sub == null) {
@@ -1136,6 +1165,18 @@ class MTProtoClientImpl implements MTProtoClient {
 
             log.warn("[C:0x{}] Unhandled payload: {}", id, obj);
         }
+    }
+
+    static boolean isAuthMethod(TlMethod<?> method) {
+        return switch (method.identifier()) {
+            case ImportLoginToken.ID:
+            case ExportLoginToken.ID:
+            case GetPassword.ID:
+            case CheckPassword.ID:
+                yield true;
+            default:
+                yield false;
+        };
     }
 
     record ContainerMessage(long messageId, int seqNo, int size, TlObject method) {

@@ -26,6 +26,7 @@ public final class AuthData {
     private long sessionId = random.nextLong();
     private long serverSalt;
     private int seqNo;
+    private boolean unauthorized;
 
     private final DataCenter dc;
     private final InboundMessageIdRegister messageIdRegister = new InboundMessageIdRegister(DEFAULT_IMSG_ID_REGISTER_SIZE);
@@ -85,6 +86,14 @@ public final class AuthData {
         long old = sessionId;
         sessionId = random.nextLong();
         return old;
+    }
+
+    public boolean unauthorized() {
+        return unauthorized;
+    }
+
+    public void unauthorized(boolean state) {
+        unauthorized = state;
     }
 
     @Nullable
