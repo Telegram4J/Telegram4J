@@ -41,21 +41,14 @@ public final class DcOptions {
             int d = Integer.compare(dcId, dc.getId());
             return d == 0 ? -1 : 1;
         })
-        .thenComparing(dc -> {
-            switch (type) {
-                case MAIN:
-                    return dc.getType() == Type.REGULAR ? -1 : 1;
-                case UPLOAD:
-                case DOWNLOAD:
-                    // prefer MEDIA dcs for downloading/uploading
-                    switch (dc.getType()) {
-                        case MEDIA: return -2;
-                        case REGULAR: return -1;
-                        case CDN: return 2;
-                        default: throw new IllegalStateException();
-                    }
-                default: throw new IllegalStateException();
-            }
+        .thenComparing(dc -> switch (type) {
+            case MAIN -> dc.getType() == Type.REGULAR ? -1 : 1;
+            // prefer MEDIA dcs for downloading/uploading
+            case UPLOAD, DOWNLOAD -> switch (dc.getType()) {
+                case MEDIA -> -2;
+                case REGULAR -> -1;
+                case CDN -> 2;
+            };
         })
         .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
     }
@@ -263,8 +256,7 @@ public final class DcOptions {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        DcOptions dcOptions = (DcOptions) o;
+        if (!(o instanceof DcOptions dcOptions)) return false;
         return flags == dcOptions.flags && options.equals(dcOptions.options);
     }
 

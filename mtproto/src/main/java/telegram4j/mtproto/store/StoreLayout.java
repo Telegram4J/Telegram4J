@@ -5,7 +5,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
-import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.store.object.ChatData;
 import telegram4j.mtproto.store.object.MessagePoll;
 import telegram4j.mtproto.store.object.PeerData;
@@ -56,9 +56,9 @@ public interface StoreLayout extends UpdatesStore, ResultsStore {
      *
      * @param dc The id of datacenter.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link AuthorizationKeyHolder} object with auth key and id.
+     * the {@link AuthKey} object with auth key and id.
      */
-    Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc);
+    Mono<AuthKey> getAuthKey(DataCenter dc);
 
     /**
      * Retrieve self user id.
@@ -316,13 +316,13 @@ public interface StoreLayout extends UpdatesStore, ResultsStore {
     Mono<Void> updatePublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister);
 
     /**
-     * Updates the local auth key state of the store according to the given {@link AuthorizationKeyHolder auth key}.
+     * Updates the local auth key state of the store according to the given {@link AuthKey auth key}.
      *
      * @param dc The id of dc that the auth key is associated with.
      * @param authKey The new auth key.
      * @return A {@link Mono} completing the operation is done.
      */
-    Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey);
+    Mono<Void> updateAuthKey(DataCenter dc, AuthKey authKey);
 
     /**
      * Updates the local {@link ChannelFull#pts() channel pts} state of the store according to the given pts.

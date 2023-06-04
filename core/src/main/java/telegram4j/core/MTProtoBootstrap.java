@@ -7,7 +7,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
-import reactor.netty.tcp.TcpClient;
 import reactor.scheduler.forkjoin.ForkJoinPoolScheduler;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -31,6 +30,7 @@ import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.DhPrimeChecker;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
 import telegram4j.mtproto.client.*;
+import telegram4j.mtproto.resource.TcpClientResources;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayout;
@@ -67,7 +67,6 @@ public final class MTProtoBootstrap {
     private final AuthorisationHandler authHandler;
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
-    private TcpClient tcpClient;
     private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
     private Function<MTProtoOptions, ClientFactory> clientFactory = DefaultClientFactory::new;
     private RetryBackoffSpec connectionRetry;
@@ -89,6 +88,7 @@ public final class MTProtoBootstrap {
     private EventDispatcher eventDispatcher;
     private DataCenter dataCenter;
     private int gzipWrappingSizeThreshold = 16 * 1024;
+    private TcpClientResources tcpClientResources;
 
     MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorisationHandler authHandler) {
         this.authResources = authResources;
@@ -135,16 +135,9 @@ public final class MTProtoBootstrap {
         return this;
     }
 
-    /**
-     * Sets netty's TCP client for all MTProto clients.
-     * <p>
-     * If custom client doesn't set, {@link TcpClient#newConnection()} implementation will be used.
-     *
-     * @param tcpClient A new netty's {@link TcpClient} for MTProto clients.
-     * @return This builder.
-     */
-    public MTProtoBootstrap setTcpClient(TcpClient tcpClient) {
-        this.tcpClient = Objects.requireNonNull(tcpClient);
+    // TODO docs
+    public MTProtoBootstrap setTcpClientResources(TcpClientResources tcpClientResources) {
+        this.tcpClientResources = Objects.requireNonNull(tcpClientResources);
         return this;
     }
 
@@ -386,7 +379,7 @@ public final class MTProtoBootstrap {
             composite.add(loadMainDc
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
                         var options = new MTProtoOptions(
-                                initTcpClient(), publicRsaKeyRegister,
+                                tcpClientResources, publicRsaKeyRegister,
                                 dhPrimeChecker, transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
                                 List.copyOf(responseTransformers),
                                 InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
@@ -466,7 +459,6 @@ public final class MTProtoBootstrap {
                 eventDispatcher.shutdown();
                 telegramClient.getUpdatesManager().shutdown();
                 onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                log.info("MTProto client disconnected");
             };
 
             var composite = Disposables.composite();
@@ -491,37 +483,32 @@ public final class MTProtoBootstrap {
             AtomicBoolean emit = new AtomicBoolean(true);
             composite.add(clientGroup.main().state()
                     .takeUntilOther(onDisconnect.asMono())
-                    .flatMap(state -> {
-                        switch (state) {
-                            case CLOSED:
-                                return Mono.fromRunnable(disconnect);
-                            case READY:
-                                return Mono.defer(() -> {
-                                            // bot user id writes before ':' char
-                                            if (parseBotIdFromToken && authResources.isBot()) {
-                                                return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
-                                                        .map(t -> Long.parseLong(t.split(":", 2)[0]))
-                                                        .orElseThrow()));
-                                            }
-                                            return storeLayout.getSelfId().map(Id::ofUser);
-                                        })
-                                        .switchIfEmpty(serviceHolder.getUserService()
-                                                .getFullUser(InputUserSelf.instance())
-                                                .map(user -> {
-                                                    var self = (BaseUser) user.users().get(0);
-                                                    long ac = Objects.requireNonNull(self.accessHash());
-                                                    return Id.ofUser(user.fullUser().id(), ac);
-                                                }))
-                                        .doOnNext(id -> {
-                                            if (emit.compareAndSet(true, false)) {
-                                                selfId[0] = id;
-                                                sink.success(telegramClient);
-                                            }
-                                        })
-                                        .then(telegramClient.getUpdatesManager().fillGap());
-                            default:
-                                return Mono.empty();
-                        }
+                    .flatMap(state -> switch (state) {
+                        case CLOSED -> Mono.fromRunnable(disconnect);
+                        case READY -> Mono.defer(() -> {
+                                    // bot user id writes before ':' char
+                                    if (parseBotIdFromToken && authResources.isBot()) {
+                                        return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
+                                                .map(t -> Long.parseLong(t.split(":", 2)[0]))
+                                                .orElseThrow()));
+                                    }
+                                    return storeLayout.getSelfId().map(Id::ofUser);
+                                })
+                                .switchIfEmpty(serviceHolder.getUserService()
+                                        .getFullUser(InputUserSelf.instance())
+                                        .map(user -> {
+                                            var self = (BaseUser) user.users().get(0);
+                                            long ac = Objects.requireNonNull(self.accessHash());
+                                            return Id.ofUser(user.fullUser().id(), ac);
+                                        }))
+                                .doOnNext(id -> {
+                                    if (emit.compareAndSet(true, false)) {
+                                        selfId[0] = id;
+                                        sink.success(telegramClient);
+                                    }
+                                })
+                                .then(telegramClient.getUpdatesManager().fillGap());
+                        default -> Mono.empty();
                     })
                     .subscribe(null, t -> log.error("State handler terminated with an error", t),
                             () -> log.debug("State handler completed")));
@@ -581,11 +568,11 @@ public final class MTProtoBootstrap {
         return initConnection.build();
     }
 
-    private TcpClient initTcpClient() {
-        if (tcpClient != null) {
-            return tcpClient;
+    private TcpClientResources initTcpClientResources() {
+        if (tcpClientResources != null) {
+            return tcpClientResources;
         }
-        return TcpClient.newConnection();
+        return TcpClientResources.create();
     }
 
     private EventDispatcher initEventDispatcher() {

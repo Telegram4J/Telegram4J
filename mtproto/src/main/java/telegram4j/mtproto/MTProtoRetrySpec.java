@@ -81,8 +81,7 @@ public class MTProtoRetrySpec extends Retry {
                         copy.failure()));
             }
 
-            if (currentFailure instanceof RpcException) {
-                var exc = (RpcException) currentFailure;
+            if (currentFailure instanceof RpcException exc) {
                 if (exc.getError().errorCode() == 420 &&
                     exc.getError().errorMessage().startsWith("FLOOD_WAIT_")) {
                     Duration delay = parse(exc.getError());

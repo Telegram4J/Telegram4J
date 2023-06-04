@@ -8,7 +8,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
-import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatFull;
@@ -46,7 +46,7 @@ public class StoreLayoutImpl implements StoreLayout {
     // TODO: make weak or limit by size?
     private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<DcKey, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
+    private final ConcurrentMap<DcKey, AuthKey> authKeys = new ConcurrentHashMap<>();
 
     private volatile DataCenter dataCenter;
     private volatile long selfId;
@@ -366,7 +366,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc) {
+    public Mono<AuthKey> getAuthKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authKeys.get(DcKey.create(dc)));
     }
 
@@ -585,7 +585,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
+    public Mono<Void> updateAuthKey(DataCenter dc, AuthKey authKey) {
         Objects.requireNonNull(dc);
         Objects.requireNonNull(authKey);
         return Mono.fromRunnable(() -> authKeys.put(DcKey.create(dc), authKey));

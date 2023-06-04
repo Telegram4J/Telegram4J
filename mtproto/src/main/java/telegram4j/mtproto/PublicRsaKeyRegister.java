@@ -185,11 +185,11 @@ public final class PublicRsaKeyRegister {
      * @return A new {@code PublicRsaKeyRegister} containing all specified public RSA keys associated with their fingerprints.
      */
     public static PublicRsaKeyRegister create(Iterable<PublicRsaKey> keys) {
-        Map<Long, PublicRsaKey> map = new HashMap<>();
+        var map = new HashMap<Long, PublicRsaKey>();
         for (PublicRsaKey key : keys) {
             long fingerprint = PublicRsaKey.computeTail(key);
-            if (map.put(fingerprint, key) != null) {
-                throw new IllegalArgumentException("Detected public RSA key duplicate, fingerprint: 0x"
+            if (map.putIfAbsent(fingerprint, key) != null) {
+                throw new IllegalArgumentException("Duplicate public RSA key, fingerprint: 0x"
                         + Long.toHexString(fingerprint) + ", key: " + key);
             }
         }

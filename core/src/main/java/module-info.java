@@ -1,9 +1,9 @@
 module telegram4j.core {
     requires reactor.core;
     requires org.reactivestreams;
-    requires io.netty.codec.http;
     requires io.netty.buffer;
-    requires reactor.netty.core;
+    requires io.netty.common;
+    requires io.netty.transport;
     requires reactor.extra;
     requires com.fasterxml.jackson.databind;
     requires com.github.benmanes.caffeine;
@@ -15,7 +15,6 @@ module telegram4j.core {
     exports telegram4j.core;
     exports telegram4j.core.auxiliary;
     exports telegram4j.core.event;
-    exports telegram4j.core.event.dispatcher;
     exports telegram4j.core.event.domain;
     exports telegram4j.core.event.domain.chat;
     exports telegram4j.core.event.domain.inline;

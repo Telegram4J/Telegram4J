@@ -7,7 +7,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /** Interface for mapping rpc responses. */
-@FunctionalInterface
 public interface ResponseTransformer {
 
     /**

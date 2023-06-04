@@ -1,12 +1,14 @@
 module telegram4j.mtproto {
     requires reactor.core;
     requires reactor.extra;
-    requires reactor.netty.core;
     requires org.reactivestreams;
     requires io.netty.buffer;
+    requires io.netty.handler;
     requires io.netty.codec;
     requires io.netty.common;
     requires io.netty.transport;
+    requires io.netty.transport.classes.epoll;
+    requires io.netty.transport.classes.kqueue;
     requires com.github.benmanes.caffeine;
     requires com.fasterxml.jackson.databind;
 
@@ -21,4 +23,5 @@ module telegram4j.mtproto {
     exports telegram4j.mtproto.util;
     exports telegram4j.mtproto.store.object;
     exports telegram4j.mtproto.client;
+    exports telegram4j.mtproto.resource;
 }

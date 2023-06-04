@@ -3,7 +3,6 @@ package telegram4j.mtproto.client;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
-import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.store.StoreLayout;
@@ -31,14 +30,14 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     private final Options options;
     private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.parallel(),
-            Sinks.many().unicast().onBackpressureBuffer(Queues.<Long>get(Queues.XS_BUFFER_SIZE).get()));
+            Sinks.many().unicast().onBackpressureError());
     private final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
     private final AtomicReference<MainMTProtoClient> main = new AtomicReference<>();
 
     public DefaultMTProtoClientGroup(Options options) {
         this.options = options;
 
-        this.main.set(options.mainClient);
+        this.main.setPlain(options.mainClient);
     }
 
     @Override
@@ -67,8 +66,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
         return Mono.whenDelayError(Stream.concat(dcs.values().stream()
                 .flatMap(dc -> Stream.concat(Arrays.stream(dc.downloadClients),
-                        Arrays.stream(dc.uploadClients))),
-                        Stream.of(main.get()))
+                        Arrays.stream(dc.uploadClients))), Stream.of(main.get()))
                 .map(MTProtoClient::close)
                 .collect(Collectors.toList()));
     }
@@ -116,11 +114,9 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     @Override
     public Mono<MTProtoClient> getOrCreateClient(DcId id) {
-        switch (id.getType()) {
-            case MAIN:
-                return Mono.just(main.get());
-            case UPLOAD:
-            case DOWNLOAD: {
+        return switch (id.getType()) {
+            case MAIN -> Mono.just(main.get());
+            case UPLOAD, DOWNLOAD -> {
                 int dcId = id.getId().orElseThrow();
                 if (id.isAutoShift()) {
                     Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
@@ -139,7 +135,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
                     if (lessLoaded == null || lessLoaded.getStats().getQueriesCount() != 0 &&
                             dcInfo.activeDownloadClientsCount.get() < arr.length) {
-                        return options.storeLayout.getDcOptions()
+                        yield options.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
@@ -149,20 +145,20 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 });
                     }
-                    return Mono.just(lessLoaded);
+                    yield Mono.just(lessLoaded);
                 }
 
                 int index = id.getShift().orElseThrow();
                 int max = id.getType() == DcId.Type.UPLOAD ? options.maxUploadClientsCount : options.maxDownloadClientsCount;
                 if (index >= max) {
-                    return Mono.error(new IllegalArgumentException("Too big " + id.getType().name()
+                    yield Mono.error(new IllegalArgumentException("Too big " + id.getType().name()
                             .toLowerCase(Locale.US) + " client shift: " + id.getShift() +
                             " >= " + max));
                 }
 
                 Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
                 var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
-                return Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
+                yield Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
                         .switchIfEmpty(Mono.defer(() -> options.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
@@ -173,9 +169,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 })));
             }
-            default:
-                return Mono.error(new IllegalStateException());
-        }
+        };
     }
 
     public static class Options extends MTProtoClientGroupOptions {

@@ -13,11 +13,11 @@ public class DefaultClientFactory implements ClientFactory {
 
     @Override
     public MainMTProtoClient createMain(DataCenter dc) {
-        return new DefaultMainMTProtoClient(dc, options);
+        return new NextMTProtoClient(dc, options);
     }
 
     @Override
     public MTProtoClient create(DataCenter dc) {
-        return new BaseMTProtoClient(dc, options);
+        return new NextMTProtoClient(dc, options);
     }
 }
