@@ -30,22 +30,22 @@ public final class InlineMessageId {
      * @return The new {@code InlineMessageId} from raw data.
      */
     public static InlineMessageId from(InputBotInlineMessageID id) {
-        switch (id.identifier()) {
-            case InputBotInlineMessageID64.ID: {
+        return switch (id.identifier()) {
+            case InputBotInlineMessageID64.ID -> {
                 InputBotInlineMessageID64 d = (InputBotInlineMessageID64) id;
 
-                return new InlineMessageId(d.dcId(), d.ownerId(), d.id(), d.accessHash());
+                yield new InlineMessageId(d.dcId(), d.ownerId(), d.id(), d.accessHash());
             }
-            case BaseInputBotInlineMessageID.ID: {
+            case BaseInputBotInlineMessageID.ID -> {
                 BaseInputBotInlineMessageID d = (BaseInputBotInlineMessageID) id;
 
                 long ownerId = d.id() >> 32;
                 int msgId = (int) d.id();
 
-                return new InlineMessageId(d.dcId(), ownerId, msgId, d.accessHash());
+                yield new InlineMessageId(d.dcId(), ownerId, msgId, d.accessHash());
             }
-            default: throw new IllegalArgumentException("Unknown input bot inline message id: " + id);
-        }
+            default -> throw new IllegalArgumentException("Unknown input bot inline message id: " + id);
+        };
     }
 
     /**
@@ -109,8 +109,7 @@ public final class InlineMessageId {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        InlineMessageId that = (InlineMessageId) o;
+        if (!(o instanceof InlineMessageId that)) return false;
         return dcId == that.dcId && ownerId == that.ownerId && id == that.id && accessHash == that.accessHash;
     }
 

@@ -20,7 +20,6 @@ import telegram4j.tl.Peer;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.StreamSupport;
 
 public class MappingUtil {
     private MappingUtil() {}
@@ -30,9 +29,11 @@ public class MappingUtil {
     public static <E extends Enum<E> & BitFlag> int getMaskValue(Iterable<E> values) {
         if (values instanceof ImmutableEnumSet<E> e)
             return e.getValue();
-        return StreamSupport.stream(values.spliterator(), false)
-                .map(E::mask)
-                .reduce(0, (l, r) -> l | r);
+        int mask = 0;
+        for (E value : values) {
+            mask |= value.mask();
+        }
+        return mask;
     }
 
     public static <E extends Enum<E>> EnumSet<E> copyAsEnumSet(Class<E> type, Iterable<E> iterable) {

@@ -131,8 +131,9 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     }
 
     @Override
-    public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData.restrictionReason());
+    public List<RestrictionReason> getRestrictionReasons() {
+        var res = minData.restrictionReason();
+        return res != null ? res : List.of();
     }
 
     @Override

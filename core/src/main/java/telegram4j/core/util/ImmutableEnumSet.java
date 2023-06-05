@@ -117,10 +117,8 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
 
     @Override
     public boolean containsAll(Collection<?> c) {
-        if (!(c instanceof ImmutableEnumSet<?>))
+        if (!(c instanceof ImmutableEnumSet<?> e))
             return super.containsAll(c);
-
-        ImmutableEnumSet<?> e = (ImmutableEnumSet<?>) c;
         if (e.elementType != elementType)
             return e.value == 0;
         return (e.value & value) == 0;
@@ -129,13 +127,12 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
     @Override
     public boolean equals(Object o) {
         if (o == null) return false;
-        if (o.getClass() != getClass())
-            return super.equals(o);
-
-        ImmutableEnumSet<?> e = (ImmutableEnumSet<?>) o;
-        if (e.elementType != elementType)
-            return value == 0 && e.value == 0;
-        return e.value == value;
+        if (o instanceof ImmutableEnumSet<?> e) {
+            if (e.elementType != elementType)
+                return value == 0 && e.value == 0;
+            return e.value == value;
+        }
+        return super.equals(o);
     }
 
     @Override

@@ -200,8 +200,9 @@ public final class User implements MentionablePeer {
      * @return The list of reasons for why access to this user must be restricted, if present.
      */
     @Override
-    public Optional<List<RestrictionReason>> getRestrictionReason() {
-        return Optional.ofNullable(minData.restrictionReason());
+    public List<RestrictionReason> getRestrictionReasons() {
+        var res = minData.restrictionReason();
+        return res != null ? res : List.of();
     }
 
     /**

@@ -56,7 +56,7 @@ public sealed interface Channel extends Chat, MentionablePeer permits BaseChanne
      * @return The list of reasons for why access to this channel must be restricted, if present.
      */
     @Override
-    Optional<List<RestrictionReason>> getRestrictionReason();
+    List<RestrictionReason> getRestrictionReasons();
 
     /**
      * Gets current participants count, if present

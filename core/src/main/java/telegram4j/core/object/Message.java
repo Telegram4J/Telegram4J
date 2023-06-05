@@ -33,7 +33,7 @@ import static telegram4j.tl.BaseMessage.*;
 /**
  * Representation for default and service messages.
  */
-public final class Message implements TelegramObject {
+public final class Message implements Restrictable {
 
     private final MTProtoTelegramClient client;
     private final Variant2<BaseMessage, MessageService> data;
@@ -345,7 +345,8 @@ public final class Message implements TelegramObject {
      *
      * @return The immutable list of the {@link RestrictionReason}, if present otherwise empty list.
      */
-    public List<RestrictionReason> getRestrictionReason() {
+    @Override
+    public List<RestrictionReason> getRestrictionReasons() {
         return data.getT1()
                 .map(BaseMessage::restrictionReason)
                 .orElse(List.of());

@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 /** Interface for {@link User} and {@link Channel} peers which can have username. */
-public sealed interface MentionablePeer extends PeerEntity
+public sealed interface MentionablePeer extends PeerEntity, Restrictable
         permits User, Channel {
 
     /**
@@ -56,5 +56,6 @@ public sealed interface MentionablePeer extends PeerEntity
      *
      * @return The list of reasons for why access to this peer must be restricted, if present.
      */
-    Optional<List<RestrictionReason>> getRestrictionReason();
+    @Override
+    List<RestrictionReason> getRestrictionReasons();
 }

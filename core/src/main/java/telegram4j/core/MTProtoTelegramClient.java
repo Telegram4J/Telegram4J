@@ -846,7 +846,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     // Internal methods
     // ===========================
 
-    private Optional<FileReferenceId> findMessageAction(AuxiliaryMessages messages, int messageId) {
+    private static Optional<FileReferenceId> findMessageAction(AuxiliaryMessages messages, int messageId) {
         return messages.getMessages().stream()
                 .filter(msg -> msg.getId() == messageId)
                 .findFirst()
