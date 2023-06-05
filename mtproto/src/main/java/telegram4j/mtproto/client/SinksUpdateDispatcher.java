@@ -5,6 +5,8 @@ import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
 import telegram4j.tl.Updates;
 
+import java.util.Objects;
+
 public class SinksUpdateDispatcher implements UpdateDispatcher {
     private final Sinks.Many<Updates> sink;
     private final Sinks.EmitFailureHandler emitFailureHandler;
@@ -15,19 +17,13 @@ public class SinksUpdateDispatcher implements UpdateDispatcher {
     }
 
     public SinksUpdateDispatcher(Sinks.Many<Updates> sink, Sinks.EmitFailureHandler emitFailureHandler) {
-        this.sink = sink;
-        this.emitFailureHandler = emitFailureHandler;
+        this.sink = Objects.requireNonNull(sink);
+        this.emitFailureHandler = Objects.requireNonNull(emitFailureHandler);
     }
 
     @Override
     public Flux<Updates> all() {
         return sink.asFlux();
-    }
-
-    @Override
-    public <T extends Updates> Flux<T> on(Class<T> type) {
-        return sink.asFlux()
-                .ofType(type);
     }
 
     @Override

@@ -5,7 +5,6 @@ import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
-import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.api.TlMethod;
 
@@ -155,7 +154,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
                     if (lessLoaded == null || lessLoaded.getStats().getQueriesCount() != 0 &&
                             dcInfo.activeDownloadClientsCount.get() < arr.length) {
-                        yield options.storeLayout.getDcOptions()
+                        yield options.mtProtoOptions.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
@@ -179,7 +178,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
                 var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
                 yield Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
-                        .switchIfEmpty(Mono.defer(() -> options.storeLayout.getDcOptions()
+                        .switchIfEmpty(Mono.defer(() -> options.mtProtoOptions.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
@@ -192,7 +191,12 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         };
     }
 
-    public static class Options extends MTProtoClientGroupOptions {
+    public record Options(DataCenter mainDc, ClientFactory clientFactory,
+                          UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions,
+                          Duration checkinPeriod, Duration inactiveUploadPeriod,
+                          Duration inactiveDownloadPeriod, int maxDownloadClientsCount,
+                          int maxUploadClientsCount)
+            implements MTProtoClientGroup.Options {
 
         static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
         static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(2);
@@ -200,61 +204,23 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
         static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
 
-        final Duration checkinPeriod;
-        final Duration inactiveUploadPeriod;
-        final Duration inactiveDownloadPeriod;
-        final int maxDownloadClientsCount;
-        final int maxUploadClientsCount;
-
-        public Options(MTProtoClientGroupOptions options) {
-            this(options.mainDc, options.clientFactory, options.storeLayout,
-                    options.updateDispatcher, options.mtProtoOptions);
+        public Options(MTProtoClientGroup.Options options) {
+            this(options.mainDc(), options.clientFactory(), options.updateDispatcher(), options.mtProtoOptions());
         }
 
         public Options(DataCenter mainDc, ClientFactory clientFactory,
-                       StoreLayout storeLayout, UpdateDispatcher updateDispatcher,
-                       MTProtoOptions mtProtoOptions) {
-            this(mainDc, clientFactory, storeLayout, updateDispatcher, mtProtoOptions,
+                       UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions) {
+            this(mainDc, clientFactory, updateDispatcher, mtProtoOptions,
                     DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
                     INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT,
                     DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
         }
 
-        public Options(DataCenter mainDc, ClientFactory clientFactory, StoreLayout storeLayout,
-                       UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions,
-                       Duration checkinPeriod,
-                       Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod,
-                       int maxDownloadClientsCount, int maxUploadClientsCount) {
-            super(mainDc, clientFactory, storeLayout, updateDispatcher, mtProtoOptions);
+        public Options {
             if (maxDownloadClientsCount <= 0)
                 throw new IllegalArgumentException("Download client count must be equal or greater than 1");
             if (maxUploadClientsCount <= 0)
                 throw new IllegalArgumentException("Upload client count must be equal or greater than 1");
-            this.checkinPeriod = checkinPeriod;
-            this.inactiveUploadPeriod = inactiveUploadPeriod;
-            this.inactiveDownloadPeriod = inactiveDownloadPeriod;
-            this.maxDownloadClientsCount = maxDownloadClientsCount;
-            this.maxUploadClientsCount = maxUploadClientsCount;
-        }
-
-        public Duration checkinPeriod() {
-            return checkinPeriod;
-        }
-
-        public Duration inactiveUploadPeriod() {
-            return inactiveUploadPeriod;
-        }
-
-        public Duration inactiveDownloadPeriod() {
-            return inactiveDownloadPeriod;
-        }
-
-        public int maxDownloadClientsCount() {
-            return maxDownloadClientsCount;
-        }
-
-        public int maxUploadClientsCount() {
-            return maxUploadClientsCount;
         }
     }
 

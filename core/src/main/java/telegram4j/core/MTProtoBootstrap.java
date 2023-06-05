@@ -78,7 +78,7 @@ public final class MTProtoBootstrap {
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options(c));
-    private Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory = options ->
+    private Function<MTProtoClientGroup.Options, MTProtoClientGroup> clientGroupFactory = options ->
             new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
     private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private DhPrimeChecker dhPrimeChecker;
@@ -106,7 +106,7 @@ public final class MTProtoBootstrap {
      * @param clientGroupFactory A new factory for client group.
      * @return This builder.
      */
-    public MTProtoBootstrap setClientGroupManager(Function<MTProtoClientGroupOptions, MTProtoClientGroup> clientGroupFactory) {
+    public MTProtoBootstrap setClientGroupManager(Function<MTProtoClientGroup.Options, MTProtoClientGroup> clientGroupFactory) {
         this.clientGroupFactory = Objects.requireNonNull(clientGroupFactory);
         return this;
     }
@@ -404,8 +404,8 @@ public final class MTProtoBootstrap {
 
                         ClientFactory clientFactory = this.clientFactory.apply(options);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
-                                new MTProtoClientGroupOptions(mainDc, clientFactory,
-                                        storeLayout, initUpdateDispatcher(), options));
+                                MTProtoClientGroup.Options.of(mainDc, clientFactory,
+                                        initUpdateDispatcher(), options));
 
                         return tryConnect(clientGroup, storeLayout, dcOptions)
                                 .flatMap(ignored -> initializeClient(clientGroup, storeLayout));

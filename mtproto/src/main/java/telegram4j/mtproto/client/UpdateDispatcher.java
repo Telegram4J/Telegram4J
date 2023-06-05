@@ -7,7 +7,10 @@ public interface UpdateDispatcher {
 
     Flux<Updates> all();
 
-    <T extends Updates> Flux<T> on(Class<T> type);
+    default <T extends Updates> Flux<T> on(Class<T> type) {
+        return all()
+                .ofType(type);
+    }
 
     void publish(Updates updates);
 }

@@ -5,6 +5,8 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
 import telegram4j.tl.api.TlMethod;
 
+import java.util.Objects;
+
 /** The group of MTProto clients which associated to one user.  */
 public interface MTProtoClientGroup {
 
@@ -59,4 +61,32 @@ public interface MTProtoClientGroup {
      * @param id The id of client.
      */
     Mono<MTProtoClient> getOrCreateClient(DcId id);
+
+    interface Options {
+
+        static Options of(DataCenter mainDc, ClientFactory clientFactory,
+                          UpdateDispatcher updateDispatcher,
+                          MTProtoOptions mtProtoOptions) {
+            return new OptionsImpl(mainDc, clientFactory, updateDispatcher, mtProtoOptions);
+        }
+
+        DataCenter mainDc();
+
+        ClientFactory clientFactory();
+
+        UpdateDispatcher updateDispatcher();
+
+        MTProtoOptions mtProtoOptions();
+    }
+}
+
+record OptionsImpl(DataCenter mainDc, ClientFactory clientFactory,
+                   UpdateDispatcher updateDispatcher,
+                   MTProtoOptions mtProtoOptions) implements MTProtoClientGroup.Options {
+    OptionsImpl {
+        Objects.requireNonNull(mainDc);
+        Objects.requireNonNull(clientFactory);
+        Objects.requireNonNull(updateDispatcher);
+        Objects.requireNonNull(mtProtoOptions);
+    }
 }
