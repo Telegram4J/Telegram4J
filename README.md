@@ -10,14 +10,15 @@ Reactive Java library for Telegram [MTProto](https://core.telegram.org/mtproto) 
 
 ### Gradle
 
-```groovy
+```kotlin
 repositories {
     mavenCentral()
-    maven { url 'https://s01.oss.sonatype.org/content/repositories/snapshots' }
+    // This repository is necessary to use the snapshot version
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
 }
 
 dependencies {
-    implementation 'com.telegram4j:telegram4j-core:0.1.0-SNAPSHOT'
+    implementation("com.telegram4j:telegram4j-core:0.1.0-SNAPSHOT")
 }
 ```
 
