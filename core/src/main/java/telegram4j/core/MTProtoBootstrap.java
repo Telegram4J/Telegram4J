@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
 public final class MTProtoBootstrap {
@@ -490,7 +489,7 @@ public final class MTProtoBootstrap {
                     .subscribe(null, t -> log.error("Updates manager terminated with an error", t),
                             () -> log.debug("Updates manager completed")));
 
-            AtomicBoolean emit = new AtomicBoolean(true);
+            boolean[] emit = {true};
             composite.add(clientGroup.main().state()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(state -> switch (state) {
@@ -517,7 +516,8 @@ public final class MTProtoBootstrap {
                                             return Id.ofUser(user.fullUser().id(), ac);
                                         }))
                                 .doOnNext(id -> {
-                                    if (emit.compareAndSet(true, false)) {
+                                    if (emit[0]) {
+                                        emit[0] = false;
                                         selfId[0] = id;
                                         sink.success(telegramClient);
                                     }
