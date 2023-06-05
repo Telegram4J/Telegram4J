@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.concurrent.FastThreadLocal;
 import reactor.core.Exceptions;
 
 import java.math.BigInteger;
@@ -17,9 +18,27 @@ public final class CryptoUtil {
     private CryptoUtil() {
     }
 
-    public static final SecureRandom random = new SecureRandom();
+    public static final SecureRandom random;
 
-    private static final ThreadLocal<MessageDigest> SHA256 = ThreadLocal.withInitial(() -> createDigest("SHA-256"));
+    private static final FastThreadLocal<MessageDigest> SHA256;
+
+    static {
+        SecureRandom possibleStrong;
+        try {
+            possibleStrong = SecureRandom.getInstanceStrong();
+        } catch (NoSuchAlgorithmException e) {
+            possibleStrong = new SecureRandom();
+        }
+
+        random = possibleStrong;
+
+        SHA256 = new FastThreadLocal<>() {
+            @Override
+            protected MessageDigest initialValue() throws Exception {
+                return MessageDigest.getInstance("SHA-256");
+            }
+        };
+    }
 
     public static BigInteger fromByteArray(byte[] data) {
         return new BigInteger(1, data);
@@ -176,8 +195,8 @@ public final class CryptoUtil {
         return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(paddingb));
     }
 
-    public static AES256IGECipher createAesCipher(ByteBuf messageKey, ByteBuf authKey, boolean server) {
-        int x = server ? 8 : 0;
+    public static AES256IGECipher createAesCipher(ByteBuf messageKey, ByteBuf authKey, boolean inbound) {
+        int x = inbound ? 8 : 0;
 
         ByteBuf sha256a = sha256Digest(messageKey, authKey.slice(x, 36));
         ByteBuf sha256b = sha256Digest(authKey.slice(x + 40, 36), messageKey);
@@ -194,7 +213,7 @@ public final class CryptoUtil {
         sha256a.release();
         sha256b.release();
 
-        return new AES256IGECipher(!server, toByteArray(aesKey), aesIV);
+        return new AES256IGECipher(!inbound, toByteArray(aesKey), aesIV);
     }
 
     // TODO: can be done with System.arraycopy()

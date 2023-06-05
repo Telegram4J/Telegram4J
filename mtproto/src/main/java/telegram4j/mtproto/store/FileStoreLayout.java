@@ -10,7 +10,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.*;
-import telegram4j.mtproto.auth.AuthorizationKeyHolder;
+import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
@@ -41,12 +41,12 @@ public class FileStoreLayout implements StoreLayout {
 
     final StoreLayout entityDelegate;
     final Path dataFile;
-    final ConcurrentHashMap<Integer, AuthorizationKeyHolder> authKeys = new ConcurrentHashMap<>();
+    final ConcurrentHashMap<Integer, AuthKey> authKeys = new ConcurrentHashMap<>();
 
     volatile int mainDcId;
     volatile long selfId;
-    volatile DcOptions dcOptions;
-    volatile PublicRsaKeyRegister publicRsaKeyRegister;
+    volatile DcOptions dcOptions = DcOptions.createDefault(false);
+    volatile PublicRsaKeyRegister publicRsaKeyRegister = PublicRsaKeyRegister.createDefault();
     volatile State state;
     final AtomicBoolean saving = new AtomicBoolean();
 
@@ -86,14 +86,14 @@ public class FileStoreLayout implements StoreLayout {
             int mainDcId = buf.readUnsignedShortLE();
             long selfId = buf.readLongLE();
             int authKeysCount = buf.readUnsignedShortLE();
-            var authKeys = new HashMap<Integer, AuthorizationKeyHolder>(authKeysCount);
+            var authKeys = new HashMap<Integer, AuthKey>(authKeysCount);
             for (int i = 0; i < authKeysCount; i++) {
                 int dcId = buf.readUnsignedShortLE();
                 // unused authKeyId
                 buf.readLongLE();
 
                 ByteBuf authKey = TlSerialUtil.deserializeBytes(buf);
-                authKeys.put(dcId, new AuthorizationKeyHolder(authKey));
+                authKeys.put(dcId, new AuthKey(authKey));
             }
 
             byte dcOptionsFlags = buf.readByte();
@@ -136,11 +136,11 @@ public class FileStoreLayout implements StoreLayout {
             int mainDcId = buf.readUnsignedShortLE();
             long selfId = buf.readLongLE();
             int authKeysCount = buf.readUnsignedShortLE();
-            var authKeys = new HashMap<Integer, AuthorizationKeyHolder>(authKeysCount);
+            var authKeys = new HashMap<Integer, AuthKey>(authKeysCount);
             for (int i = 0; i < authKeysCount; i++) {
                 int dcId = buf.readUnsignedShortLE();
                 ByteBuf authKey = TlSerialUtil.deserializeBytes(buf);
-                authKeys.put(dcId, new AuthorizationKeyHolder(authKey));
+                authKeys.put(dcId, new AuthKey(authKey));
             }
 
             byte dcOptionsFlags = buf.readByte();
@@ -230,7 +230,7 @@ public class FileStoreLayout implements StoreLayout {
         return flags;
     }
 
-    record Settings(int mainDcId, long selfId, Map<Integer, AuthorizationKeyHolder> authKeys, DcOptions dcOptions,
+    record Settings(int mainDcId, long selfId, Map<Integer, AuthKey> authKeys, DcOptions dcOptions,
                     PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
         Settings {
             requireSize(authKeys, "authKeys");
@@ -245,7 +245,7 @@ public class FileStoreLayout implements StoreLayout {
             buf.writeShortLE(authKeys.size());
             authKeys.forEach((dcId, authKey) -> {
                 buf.writeShortLE(dcId);
-                TlSerialUtil.serializeBytes(buf, authKey.getAuthKey());
+                TlSerialUtil.serializeBytes(buf, authKey.value());
             });
             buf.writeByte(computeFlags(dcOptions));
             buf.writeShortLE(dcOptions.getBackingList().size());
@@ -363,7 +363,7 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<AuthorizationKeyHolder> getAuthKey(DataCenter dc) {
+    public Mono<AuthKey> getAuthKey(DataCenter dc) {
         return Mono.fromSupplier(() -> authKeys.get(dc.getId()));
     }
 
@@ -437,8 +437,8 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Void> updateAuthorizationKey(DataCenter dc, AuthorizationKeyHolder authKey) {
-        return entityDelegate.updateAuthorizationKey(dc, authKey)
+    public Mono<Void> updateAuthKey(DataCenter dc, AuthKey authKey) {
+        return entityDelegate.updateAuthKey(dc, authKey)
                 .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     authKeys.put(dc.getId(), authKey);

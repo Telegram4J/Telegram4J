@@ -3,7 +3,7 @@ package telegram4j.mtproto.client;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
-import telegram4j.tl.api.MTProtoObject;
+import telegram4j.mtproto.DcId;
 import telegram4j.tl.api.TlMethod;
 
 import java.time.Instant;
@@ -34,18 +34,11 @@ public interface MTProtoClient {
     <R, T extends TlMethod<R>> Mono<R> sendAwait(T method);
 
     /**
-     * Send auth api request for which result is not applicable.
-     *
-     * @param method An auth api request.
-     * @return A {@link Mono} emitting empty signals immediately after request is prepared.
-     */
-    Mono<Void> sendAuth(TlMethod<? extends MTProtoObject> method);
-
-    /**
      * Gets a {@link Flux} of {@link State} displaying current status of the client.
      *
      * @return A {@link Flux} emitting a {@link State}.
      */
+    // TODO: At the moment, the impl allows IO thread to leak.
     Flux<State> state();
 
     /**
@@ -53,14 +46,16 @@ public interface MTProtoClient {
      *
      * @return The {@link DataCenter} to which the client is configured.
      */
-    DataCenter getDatacenter();
+    DataCenter dc();
+
+    DcId.Type type();
 
     /**
      * Gets mutable statistic for client.
      *
      * @return The statistic for client.
      */
-    Stats getStats();
+    Stats stats();
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.
@@ -104,14 +99,14 @@ public interface MTProtoClient {
          *
          * @return The timestamp of last send query call, if present.
          */
-        Optional<Instant> getLastQueryTimestamp();
+        Optional<Instant> lastQueryTimestamp();
 
         /**
          * Gets current count of pending queries.
          *
          * @return The current count of pending queries.
          */
-        int getQueriesCount();
+        int queriesCount();
 
         /**
          * Creates new immutable copy of this statistics.
@@ -119,7 +114,7 @@ public interface MTProtoClient {
          * @return A new immutable copy of this statistics.
          */
         default Stats copy() {
-            return new ImmutableStats(getLastQueryTimestamp().orElse(null), getQueriesCount());
+            return new ImmutableStats(lastQueryTimestamp().orElse(null), queriesCount());
         }
     }
 }

@@ -1,11 +1,22 @@
 dependencies {
-    api(rootProject.libs.tl.parser)
-    api(rootProject.libs.reactor.netty.core)
-    api(rootProject.libs.reactor.netty.core)
-    api(rootProject.libs.reactor.addons.extra)
+    api(libs.tl.parser)
+    api(libs.reactor.addons.extra)
+    api(libs.netty.handler)
 
-    api(rootProject.libs.jackson.databind)
-    api(rootProject.libs.caffeine)
+    compileOnly(libs.netty.native.epoll) {
+        artifact {
+            classifier = osdetector.classifier
+        }
+    }
+
+    compileOnly(libs.netty.native.kqueue) /*{
+        artifact {
+            classifier = osdetector.classifier
+        }
+    }*/
+
+    api(libs.jackson.databind)
+    api(libs.caffeine)
 }
 
 description = "TCP client written with Reactor Netty for the Telegram API"

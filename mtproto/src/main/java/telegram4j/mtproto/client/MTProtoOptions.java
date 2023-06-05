@@ -1,11 +1,11 @@
 package telegram4j.mtproto.client;
 
-import reactor.netty.tcp.TcpClient;
 import reactor.util.annotation.Nullable;
 import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.auth.DhPrimeChecker;
+import telegram4j.mtproto.resource.TcpClientResources;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.transport.TransportFactory;
 import telegram4j.tl.api.TlMethod;
@@ -15,9 +15,10 @@ import telegram4j.tl.request.InvokeWithLayer;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 public class MTProtoOptions {
-    protected final TcpClient tcpClient;
+    protected final TcpClientResources tcpClientResources;
     @Nullable
     protected final PublicRsaKeyRegister publicRsaKeyRegister;
     @Nullable
@@ -29,14 +30,15 @@ public class MTProtoOptions {
     protected final List<ResponseTransformer> responseTransformers;
     protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
     protected final int gzipWrappingSizeThreshold;
+    protected final ExecutorService resultPublisher;
 
-    public MTProtoOptions(TcpClient tcpClient, @Nullable PublicRsaKeyRegister publicRsaKeyRegister,
+    public MTProtoOptions(TcpClientResources tcpClientResources, @Nullable PublicRsaKeyRegister publicRsaKeyRegister,
                           @Nullable DhPrimeChecker dhPrimeChecker, TransportFactory transport,
                           StoreLayout storeLayout, RetryBackoffSpec connectionRetry,
                           RetryBackoffSpec authRetry, List<ResponseTransformer> responseTransformers,
                           InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
-                          int gzipWrappingSizeThreshold) {
-        this.tcpClient = Objects.requireNonNull(tcpClient);
+                          int gzipWrappingSizeThreshold, ExecutorService resultPublisher) {
+        this.tcpClientResources = Objects.requireNonNull(tcpClientResources);
         this.publicRsaKeyRegister = publicRsaKeyRegister;
         this.dhPrimeChecker = dhPrimeChecker;
         this.transport = Objects.requireNonNull(transport);
@@ -46,10 +48,11 @@ public class MTProtoOptions {
         this.responseTransformers = Objects.requireNonNull(responseTransformers);
         this.initConnection = Objects.requireNonNull(initConnection);
         this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
+        this.resultPublisher = Objects.requireNonNull(resultPublisher);
     }
 
-    public TcpClient getTcpClient() {
-        return tcpClient;
+    public TcpClientResources getTcpClientResources() {
+        return tcpClientResources;
     }
 
     public TransportFactory getTransport() {
@@ -86,5 +89,9 @@ public class MTProtoOptions {
 
     public int getGzipWrappingSizeThreshold() {
         return gzipWrappingSizeThreshold;
+    }
+
+    public ExecutorService getResultPublisher() {
+        return resultPublisher;
     }
 }

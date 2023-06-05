@@ -1,7 +1,7 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.mtproto.client.MainMTProtoClient;
+import telegram4j.mtproto.client.MTProtoClient;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -154,9 +154,8 @@ public final class DcId implements Comparable<DcId> {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        DcId dcId = (DcId) o;
-        return value == dcId.value;
+        if (!(o instanceof DcId that)) return false;
+        return value == that.value;
     }
 
     @Override
@@ -172,20 +171,17 @@ public final class DcId implements Comparable<DcId> {
     @Override
     public String toString() {
         Type type = getType();
-        switch (type) {
-            case MAIN: return "main";
-            case UPLOAD:
-            case DOWNLOAD:
-                return type.name().toLowerCase(Locale.US) +
+        return switch (type) {
+            case MAIN -> "main";
+            case UPLOAD, DOWNLOAD -> type.name().toLowerCase(Locale.US) +
                     ":" + getId().orElseThrow() + "+" +
-                        getShift().map(Object::toString).orElse("auto");
-            default: throw new IllegalStateException();
-        }
+                    getShift().map(Object::toString).orElse("auto");
+        };
     }
 
     /** Types of purpose of the mtproto client. */
     public enum Type {
-        /** Represents a {@link MainMTProtoClient}. */
+        /** Represents a {@link MTProtoClient}. */
         MAIN,
         /** Represents an upload client. */
         UPLOAD,
@@ -193,12 +189,12 @@ public final class DcId implements Comparable<DcId> {
         DOWNLOAD;
 
         private static Type of(int type) {
-            switch (type) {
-                case 0: return MAIN;
-                case 1: return UPLOAD;
-                case 2: return DOWNLOAD;
-                default: throw new IllegalArgumentException("Unknown type: " + type);
-            }
+            return switch (type) {
+                case 0 -> MAIN;
+                case 1 -> UPLOAD;
+                case 2 -> DOWNLOAD;
+                default -> throw new IllegalArgumentException("Unknown type: " + type);
+            };
         }
     }
 }

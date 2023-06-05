@@ -25,11 +25,11 @@ public final class DataCenter {
     private final int id;
     private final String address;
     private final int port;
-    private final byte flags;
+    private final int flags;
     @Nullable
     private final ByteBuf secret;
 
-    DataCenter(Type type, int id, String address, int port, byte flags, @Nullable ByteBuf secret) {
+    DataCenter(Type type, int id, String address, int port, int flags, @Nullable ByteBuf secret) {
         this.type = Objects.requireNonNull(type);
         this.id = id;
         this.address = Objects.requireNonNull(address);
@@ -54,16 +54,15 @@ public final class DataCenter {
      * @see <a href="https://core.telegram.org/mtproto/mtproto-transports#transport-obfuscation">Transport Obfuscation</a>
      * @return The new datacenter identifier.
      */
-    // TODO: replace parameters with builder
     public static DataCenter create(Type type, boolean test, int id, String address, int port,
                                     boolean tcpoOnly, boolean isStatic, boolean thisPortOnly,
                                     @Nullable ByteBuf secret) {
         if (port < 0 || port > 0xFFFF)
             throw new IllegalArgumentException("Port out of range: " + port);
         if (id < 0 || id > 0xFFFF)
-            throw new IllegalArgumentException("Id out of range: " + port);
+            throw new IllegalArgumentException("Id out of range: " + id);
 
-        byte flags = test ? TEST_MASK : 0;
+        int flags = test ? TEST_MASK : 0;
         flags |= tcpoOnly ? TCPO_ONLY_MASK : 0;
         flags |= isStatic ? STATIC_MASK : 0;
         flags |= thisPortOnly ? THIS_PORT_ONLY_MASK : 0;
@@ -92,13 +91,20 @@ public final class DataCenter {
      * @return A new datacenter identifier from specified raw data.
      */
     public static DataCenter from(Config config, DcOption dc) {
-        Type type = dc.cdn() ? Type.CDN :
-                dc.mediaOnly() ? Type.MEDIA : Type.REGULAR;
-        byte flags = config.testMode() ? TEST_MASK : 0;
+        return new DataCenter(Type.from(dc), dc.id(), dc.ipAddress(),
+                dc.port(), flagsFrom(config, dc), dc.secret());
+    }
+
+    private static int flagsFrom(Config config, DcOption dc) {
+        int flags = config.testMode() ? TEST_MASK : 0;
         flags |= dc.tcpoOnly() ? TCPO_ONLY_MASK : 0;
         flags |= dc.isStatic() ? STATIC_MASK : 0;
         flags |= dc.thisPortOnly() ? THIS_PORT_ONLY_MASK : 0;
-        return new DataCenter(type, dc.id(), dc.ipAddress(), dc.port(), flags, dc.secret());
+        return flags;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     /**
@@ -254,9 +260,105 @@ public final class DataCenter {
         MEDIA,
 
         /**
-         * Represents DC which should be used to download files from big channels.
+         * Represents DC which should be used to download files from big telegram channels.
          * @see <a href="https://core.telegram.org/cdn">Encrypted CDNs</a>
          */
-        CDN
+        CDN;
+
+        /**
+         * Determines type of {@code DcOption} by him flags.
+         *
+         * @param dc The dc option.
+         * @return A type of dc option.
+         */
+        public static Type from(DcOption dc) {
+            return dc.cdn() ? Type.CDN : dc.mediaOnly() ? Type.MEDIA : Type.REGULAR;
+        }
+    }
+
+    public static class Builder {
+        private Type type;
+        private int id;
+        private String address;
+        private int port;
+        private int flags;
+        @Nullable
+        private ByteBuf secret;
+
+        private Builder() {}
+
+        public Builder from(DataCenter dc) {
+            type = dc.type;
+            id = dc.id;
+            address = dc.address;
+            port = dc.port;
+            flags = dc.flags;
+            secret = dc.secret;
+            return this;
+        }
+
+        public Builder from(Config config, DcOption dc) {
+            type = Type.from(dc);
+            id = dc.id();
+            address = dc.ipAddress();
+            port = dc.port();
+            flags = flagsFrom(config, dc);
+            var tmp = dc.secret();
+            secret = tmp != null ? TlEncodingUtil.copyAsUnpooled(tmp) : null;
+            return this;
+        }
+
+        public Builder type(Type type) {
+            this.type = Objects.requireNonNull(type);
+            return this;
+        }
+
+        public Builder id(int id) {
+            if (id < 0 || id > 0xFFFF)
+                throw new IllegalArgumentException("DC id out of range: " + id);
+            this.id = id;
+            return this;
+        }
+
+        public Builder address(String address) {
+            this.address = Objects.requireNonNull(address);
+            return this;
+        }
+
+        public Builder port(int port) {
+            if (port < 0 || port > 0xFFFF)
+                throw new IllegalArgumentException("DC id out of range: " + port);
+            this.port = port;
+            return this;
+        }
+
+        public Builder secret(@Nullable ByteBuf secret) {
+            this.secret = secret != null ? TlEncodingUtil.copyAsUnpooled(secret) : null;
+            return this;
+        }
+
+        public Builder test(boolean test) {
+            flags = TlEncodingUtil.mask(flags, TEST_MASK, test);
+            return this;
+        }
+
+        public Builder isStatic(boolean test) {
+            flags = TlEncodingUtil.mask(flags, STATIC_MASK, test);
+            return this;
+        }
+
+        public Builder tcpObfuscatedOnly(boolean test) {
+            flags = TlEncodingUtil.mask(flags, TCPO_ONLY_MASK, test);
+            return this;
+        }
+
+        public Builder thisPortOnly(boolean test) {
+            flags = TlEncodingUtil.mask(flags, THIS_PORT_ONLY_MASK, test);
+            return this;
+        }
+
+        public DataCenter build() {
+            return new DataCenter(type, id, address, port, flags, secret);
+        }
     }
 }

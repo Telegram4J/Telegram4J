@@ -1,7 +1,6 @@
 package telegram4j.mtproto.util;
 
 import io.netty.buffer.ByteBuf;
-import reactor.core.Exceptions;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -9,6 +8,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
+import java.security.GeneralSecurityException;
 
 public final class AES256IGECipher {
     private static final VarHandle LONG_VIEW = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.BIG_ENDIAN);
@@ -107,16 +107,16 @@ public final class AES256IGECipher {
     static Cipher newCipher(String algorithm) {
         try {
             return Cipher.getInstance(algorithm);
-        } catch (Throwable t) {
-            throw Exceptions.propagate(t);
+        } catch (GeneralSecurityException t) {
+            throw new RuntimeException(t);
         }
     }
 
     static void initCipher(Cipher cipher, int mode, SecretKey secretKey) {
         try {
             cipher.init(mode, secretKey);
-        } catch (Throwable t) {
-            throw Exceptions.propagate(t);
+        } catch (GeneralSecurityException t) {
+            throw new RuntimeException(t);
         }
     }
 
@@ -124,8 +124,8 @@ public final class AES256IGECipher {
         try {
             int blockSize = cipher.getBlockSize();
             cipher.doFinal(buffer, 0, blockSize, buffer, blockSize);
-        } catch (Throwable t) {
-            throw Exceptions.propagate(t);
+        } catch (GeneralSecurityException t) {
+            throw new RuntimeException(t);
         }
     }
 }

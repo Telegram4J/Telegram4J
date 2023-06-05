@@ -1,6 +1,8 @@
 package telegram4j.mtproto.client;
 
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.client.impl.MTProtoClientImpl;
 
 import java.util.Objects;
 
@@ -12,12 +14,7 @@ public class DefaultClientFactory implements ClientFactory {
     }
 
     @Override
-    public MainMTProtoClient createMain(DataCenter dc) {
-        return new DefaultMainMTProtoClient(dc, options);
-    }
-
-    @Override
-    public MTProtoClient create(DataCenter dc) {
-        return new BaseMTProtoClient(dc, options);
+    public MTProtoClient create(MTProtoClientGroup group, DcId.Type type, DataCenter dc) {
+        return new MTProtoClientImpl(group, type, dc, options);
     }
 }

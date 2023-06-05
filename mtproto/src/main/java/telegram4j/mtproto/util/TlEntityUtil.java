@@ -178,14 +178,6 @@ public class TlEntityUtil {
     }
 
     @Nullable
-    public static <T extends TlObject, R extends T> R unmapEmpty(@Nullable T obj, Class<R> impl) {
-        if (obj == null || obj instanceof EmptyObject) {
-            return null;
-        }
-        return impl.cast(obj);
-    }
-
-    @Nullable
     public static <T extends TlObject> T unmapEmpty(@Nullable T obj) {
         if (obj == null || obj instanceof EmptyObject) {
             return null;

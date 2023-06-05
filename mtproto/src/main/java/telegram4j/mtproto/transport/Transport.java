@@ -4,7 +4,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import reactor.util.annotation.Nullable;
 
-/** An MTProto TCP transport wrapping. */
+/**
+ * An MTProto TCP transport wrapping.
+ *
+ * <p> This class is only used in one thread
+ * and no any synchronization is required.
+ */
 public interface Transport {
 
     /** Quick acknowledgement bit-mask, which can be applied to the wrapped payload size. */
@@ -21,7 +26,7 @@ public interface Transport {
 
     /**
      * Gets wrapped payload.
-     * This method should release incoming {@link ByteBuf}.
+     * This method should not release incoming {@link ByteBuf}.
      *
      * @param payload The original buffer payload.
      * @param quickAck The state of quick ack.
@@ -31,27 +36,17 @@ public interface Transport {
 
     /**
      * Gets unwrapped payload if readable.
-     * This method is called only on one thread.
      *
      * @param payload The wrapped buffer payload.
      * @return The unwrapped slice of payload if readable or {@code null} for cases when more bytes are needed.
      */
     @Nullable
-    ByteBuf decode(ByteBuf payload);
+    ByteBuf tryDecode(ByteBuf payload);
 
     /**
      * Gets current quick acknowledgment mode state.
      *
      * @return The {@literal true} if quick ack is enabled, otherwise {@code false}.
      */
-    boolean supportQuickAck();
-
-    /**
-     * Toggle quick acknowledgment mode.
-     * This method should be called only during/after authorization,
-     * which allows you not to try to check the {@link Transport#QUICK_ACK_MASK}
-     *
-     * @param enable The new state.
-     */
-    void setQuickAckState(boolean enable);
+    boolean supportsQuickAck();
 }

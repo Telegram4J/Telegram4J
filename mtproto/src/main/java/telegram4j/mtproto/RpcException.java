@@ -3,12 +3,14 @@ package telegram4j.mtproto;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.RpcError;
 
+import java.io.Serial;
 import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
 
 /** Subtype of {@link MTProtoException} which receives on RPC response. */
-public class RpcException extends MTProtoException {
+public final class RpcException extends MTProtoException {
+    @Serial
     private static final long serialVersionUID = 909166276209425603L;
 
     private final RpcError error;
@@ -29,14 +31,7 @@ public class RpcException extends MTProtoException {
      * on {@code RpcException} with one of specified error codes.
      */
     public static Predicate<Throwable> isErrorCode(int... codes) {
-        return t -> {
-            if (t instanceof RpcException) {
-                RpcException t0 = (RpcException) t;
-
-                return IntStream.of(codes).anyMatch(c -> t0.error.errorCode() == c);
-            }
-            return false;
-        };
+        return t -> t instanceof RpcException t0 && IntStream.of(codes).anyMatch(c -> t0.error.errorCode() == c);
     }
 
     /**
@@ -45,15 +40,8 @@ public class RpcException extends MTProtoException {
      * @return A {@link Predicate} for throwable which matches on flood wait errors.
      */
     public static Predicate<Throwable> isFloodWait() {
-        return t -> {
-            if (t instanceof RpcException) {
-                RpcException t0 = (RpcException) t;
-
-                return t0.error.errorCode() == 420 &&
-                        t0.error.errorMessage().startsWith("FLOOD_WAIT_");
-            }
-            return false;
-        };
+        return t -> t instanceof RpcException t0 && t0.error.errorCode() == 420 &&
+                t0.error.errorMessage().startsWith("FLOOD_WAIT_");
     }
 
     /**
@@ -63,13 +51,7 @@ public class RpcException extends MTProtoException {
      * @return A {@link Predicate} for throwable which matches on specified error message.
      */
     public static Predicate<Throwable> isErrorMessage(String message) {
-        return t -> {
-            if (t instanceof RpcException) {
-                RpcException t0 = (RpcException) t;
-                return t0.error.errorMessage().equals(message);
-            }
-            return false;
-        };
+        return t -> t instanceof RpcException t0 && t0.error.errorMessage().equals(message);
     }
 
     /**

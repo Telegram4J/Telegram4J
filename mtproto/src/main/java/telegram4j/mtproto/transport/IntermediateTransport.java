@@ -8,7 +8,7 @@ import io.netty.buffer.Unpooled;
 public class IntermediateTransport implements Transport {
     public static final int ID = 0xeeeeeeee;
 
-    private volatile boolean useQuickAck;
+    private final boolean useQuickAck;
 
     public IntermediateTransport(boolean useQuickAck) {
         this.useQuickAck = useQuickAck;
@@ -30,17 +30,12 @@ public class IntermediateTransport implements Transport {
     }
 
     @Override
-    public boolean supportQuickAck() {
+    public boolean supportsQuickAck() {
         return useQuickAck;
     }
 
     @Override
-    public void setQuickAckState(boolean enable) {
-        this.useQuickAck = enable;
-    }
-
-    @Override
-    public ByteBuf decode(ByteBuf payload) {
+    public ByteBuf tryDecode(ByteBuf payload) {
         if (!payload.isReadable(4)) {
             return null;
         }

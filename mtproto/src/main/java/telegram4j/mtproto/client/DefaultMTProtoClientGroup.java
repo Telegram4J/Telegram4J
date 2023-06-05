@@ -3,10 +3,8 @@ package telegram4j.mtproto.client;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
-import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
-import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.api.TlMethod;
 
@@ -21,35 +19,46 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
-    private static final VarHandle CA = MethodHandles.arrayElementVarHandle(MTProtoClient[].class);
+    private static final VarHandle CA;
+    private static final VarHandle MAIN;
+
+    static {
+        var lookup = MethodHandles.lookup();
+        try {
+            MAIN = lookup.findVarHandle(DefaultMTProtoClientGroup.class, "main", MTProtoClient.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+
+        CA = MethodHandles.arrayElementVarHandle(MTProtoClient[].class);
+    }
 
     private final Options options;
     private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.parallel(),
-            Sinks.many().unicast().onBackpressureBuffer(Queues.<Long>get(Queues.XS_BUFFER_SIZE).get()));
+            Sinks.many().unicast().onBackpressureError());
     private final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
-    private final AtomicReference<MainMTProtoClient> main = new AtomicReference<>();
+    private volatile MTProtoClient main;
 
     public DefaultMTProtoClientGroup(Options options) {
         this.options = options;
 
-        this.main.set(options.mainClient);
+        MAIN.set(this, options.clientFactory.create(this, DcId.Type.MAIN, options.mainDc));
     }
 
     @Override
-    public MainMTProtoClient main() {
-        return main.get();
+    public MTProtoClient main() {
+        return main;
     }
 
     @Override
-    public Mono<MainMTProtoClient> setMain(DataCenter dc) {
-        MainMTProtoClient upd = options.clientFactory.createMain(dc);
-        MainMTProtoClient old = main.getAndSet(upd);
+    public Mono<MTProtoClient> setMain(DataCenter dc) {
+        var upd = options.clientFactory.create(this, DcId.Type.MAIN, dc);
+        var old = (MTProtoClient) MAIN.getAndSet(this, upd);
         return old.close()
                 .and(upd.connect())
                 .thenReturn(upd);
@@ -62,15 +71,23 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     }
 
     @Override
+    public UpdateDispatcher updates() {
+        return options.updateDispatcher;
+    }
+
+    @Override
     public Mono<Void> close() {
         activityMonitoring.dispose();
 
         return Mono.whenDelayError(Stream.concat(dcs.values().stream()
                 .flatMap(dc -> Stream.concat(Arrays.stream(dc.downloadClients),
-                        Arrays.stream(dc.uploadClients))),
-                        Stream.of(main.get()))
+                        Arrays.stream(dc.uploadClients))), Stream.of(main))
                 .map(MTProtoClient::close)
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList()))
+                .then(Mono.fromRunnable(() -> {
+                    options.mtProtoOptions().getTcpClientResources().dispose();
+                    options.mtProtoOptions().getResultPublisher().shutdown();
+                }));
     }
 
     @Override
@@ -87,7 +104,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             MTProtoClient d = (MTProtoClient) CA.getVolatile(dc.downloadClients, i);
                             if (d == null) continue;
 
-                            if (d.getStats().getLastQueryTimestamp()
+                            if (d.stats().lastQueryTimestamp()
                                     .map(ts -> ts.plus(options.inactiveDownloadPeriod).isBefore(Instant.now()))
                                     .orElse(true)) {
                                 CA.setVolatile(dc.downloadClients, i, null);
@@ -100,7 +117,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             MTProtoClient u = (MTProtoClient) CA.getVolatile(dc.uploadClients, i);
                             if (u == null) continue;
 
-                            if (u.getStats().getLastQueryTimestamp()
+                            if (u.stats().lastQueryTimestamp()
                                     .map(ts -> ts.plus(options.inactiveUploadPeriod).isBefore(Instant.now()))
                                     .orElse(true)) {
                                 CA.setVolatile(dc.uploadClients, i, null);
@@ -116,11 +133,9 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     @Override
     public Mono<MTProtoClient> getOrCreateClient(DcId id) {
-        switch (id.getType()) {
-            case MAIN:
-                return Mono.just(main.get());
-            case UPLOAD:
-            case DOWNLOAD: {
+        return switch (id.getType()) {
+            case MAIN -> Mono.just(main);
+            case UPLOAD, DOWNLOAD -> {
                 int dcId = id.getId().orElseThrow();
                 if (id.isAutoShift()) {
                     Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
@@ -132,53 +147,56 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             continue;
                         }
 
-                        if (lessLoaded == null || v.getStats().getQueriesCount() < lessLoaded.getStats().getQueriesCount()) {
+                        if (lessLoaded == null || v.stats().queriesCount() < lessLoaded.stats().queriesCount()) {
                             lessLoaded = v;
                         }
                     }
 
-                    if (lessLoaded == null || lessLoaded.getStats().getQueriesCount() != 0 &&
+                    if (lessLoaded == null || lessLoaded.stats().queriesCount() != 0 &&
                             dcInfo.activeDownloadClientsCount.get() < arr.length) {
-                        return options.storeLayout.getDcOptions()
+                        yield options.mtProtoOptions.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
                                 .flatMap(dc -> {
-                                    MTProtoClient created = options.clientFactory.create(dc);
+                                    MTProtoClient created = options.clientFactory.create(this, id.getType(), dc);
                                     MTProtoClient c = dcInfo.setClient(id.getType(), created);
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 });
                     }
-                    return Mono.just(lessLoaded);
+                    yield Mono.just(lessLoaded);
                 }
 
                 int index = id.getShift().orElseThrow();
                 int max = id.getType() == DcId.Type.UPLOAD ? options.maxUploadClientsCount : options.maxDownloadClientsCount;
                 if (index >= max) {
-                    return Mono.error(new IllegalArgumentException("Too big " + id.getType().name()
+                    yield Mono.error(new IllegalArgumentException("Too big " + id.getType().name()
                             .toLowerCase(Locale.US) + " client shift: " + id.getShift() +
                             " >= " + max));
                 }
 
                 Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
                 var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
-                return Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
-                        .switchIfEmpty(Mono.defer(() -> options.storeLayout.getDcOptions()
+                yield Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
+                        .switchIfEmpty(Mono.defer(() -> options.mtProtoOptions.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
                                 .flatMap(dc -> {
-                                    MTProtoClient created = options.clientFactory.create(dc);
+                                    MTProtoClient created = options.clientFactory.create(this, id.getType(), dc);
                                     MTProtoClient c = dcInfo.setClient(id.getType(), index, created);
                                     return c == created ? c.connect().thenReturn(c) : Mono.just(c);
                                 })));
             }
-            default:
-                return Mono.error(new IllegalStateException());
-        }
+        };
     }
 
-    public static class Options extends MTProtoClientGroupOptions {
+    public record Options(DataCenter mainDc, ClientFactory clientFactory,
+                          UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions,
+                          Duration checkinPeriod, Duration inactiveUploadPeriod,
+                          Duration inactiveDownloadPeriod, int maxDownloadClientsCount,
+                          int maxUploadClientsCount)
+            implements MTProtoClientGroup.Options {
 
         static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
         static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(2);
@@ -186,34 +204,23 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
         static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
 
-        public final Duration checkinPeriod;
-        public final Duration inactiveUploadPeriod;
-        public final Duration inactiveDownloadPeriod;
-        public final int maxDownloadClientsCount;
-        public final int maxUploadClientsCount;
-
-        public Options(MTProtoClientGroupOptions options) {
-            this(options.mainClient, options.clientFactory, options.storeLayout);
+        public Options(MTProtoClientGroup.Options options) {
+            this(options.mainDc(), options.clientFactory(), options.updateDispatcher(), options.mtProtoOptions());
         }
 
-        public Options(MainMTProtoClient mainClient, ClientFactory clientFactory, StoreLayout storeLayout) {
-            this(mainClient, clientFactory, storeLayout, DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
-                    INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT, DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
+        public Options(DataCenter mainDc, ClientFactory clientFactory,
+                       UpdateDispatcher updateDispatcher, MTProtoOptions mtProtoOptions) {
+            this(mainDc, clientFactory, updateDispatcher, mtProtoOptions,
+                    DEFAULT_CHECKIN, INACTIVE_UPLOAD_DURATION,
+                    INACTIVE_DOWNLOAD_DURATION, DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT,
+                    DEFAULT_MAX_UPLOAD_CLIENTS_COUNT);
         }
 
-        public Options(MainMTProtoClient mainClient, ClientFactory clientFactory, StoreLayout storeLayout,
-                       Duration checkinPeriod, Duration inactiveUploadPeriod, Duration inactiveDownloadPeriod,
-                       int maxDownloadClientsCount, int maxUploadClientsCount) {
-            super(mainClient, clientFactory, storeLayout);
+        public Options {
             if (maxDownloadClientsCount <= 0)
                 throw new IllegalArgumentException("Download client count must be equal or greater than 1");
             if (maxUploadClientsCount <= 0)
                 throw new IllegalArgumentException("Upload client count must be equal or greater than 1");
-            this.checkinPeriod = checkinPeriod;
-            this.inactiveUploadPeriod = inactiveUploadPeriod;
-            this.inactiveDownloadPeriod = inactiveDownloadPeriod;
-            this.maxDownloadClientsCount = maxDownloadClientsCount;
-            this.maxUploadClientsCount = maxUploadClientsCount;
         }
     }
 

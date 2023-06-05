@@ -1,6 +1,7 @@
 [versions]
 tl-parser = "0.1.2-SNAPSHOT"
 reactor-bom = "2020.0.24"
+netty-bom = "4.1.92.Final"
 jackson = "2.14.0"
 caffeine = "3.1.1"
 
@@ -12,12 +13,17 @@ tl-parser = { module = "com.telegram4j:tl-parser", version.ref = "tl-parser" }
 junit = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
 logback = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+netty-bom = { module = "io.netty:netty-bom", version.ref = "netty-bom" }
+netty-handler = { module = "io.netty:netty-handler" }
+netty-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
+netty-native-kqueue = { module = "io.netty:netty-transport-native-kqueue" }
 reactor-bom = { module = "io.projectreactor:reactor-bom", version.ref = "reactor-bom" }
 reactor-netty = { module = "io.projectreactor.netty:reactor-netty" }
-reactor-netty-core = { module = "io.projectreactor.netty:reactor-netty-core" }
-reactor-addons-extra = {module = "io.projectreactor.addons:reactor-extra" }
+#reactor-netty-core = { module = "io.projectreactor.netty:reactor-netty-core" }
+reactor-addons-extra = { module = "io.projectreactor.addons:reactor-extra" }
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
 jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
 
 [plugins]
 versions = { id = "com.github.ben-manes.versions", version = "0.45.0" }
+osdetector = { id = "com.google.osdetector", version = "1.7.3" }

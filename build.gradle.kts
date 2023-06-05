@@ -3,15 +3,21 @@ plugins {
     `maven-publish`
     signing
     alias(libs.plugins.versions)
+    alias(libs.plugins.osdetector)
 }
 
 val isJitpack = System.getenv("JITPACK") == "true"
 val isSnapshot = version.toString().endsWith("-SNAPSHOT")
 
+if (osdetector.classifier !in listOf("linux-x86_64", "osx-x86_64", "osx-aarch_64", "windows-x86_64")) {
+    throw IllegalStateException("Invalid os specifier: ${osdetector.classifier}")
+}
+
 subprojects {
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
     apply(plugin = "com.github.ben-manes.versions")
+    apply(plugin = "com.google.osdetector")
 
     if (!isJitpack && !isSnapshot) {
         apply(plugin = "signing")
@@ -21,6 +27,7 @@ subprojects {
 
     dependencies {
         api(platform(rootProject.libs.reactor.bom))
+        api(platform(rootProject.libs.netty.bom))
 
         compileOnly(rootProject.libs.jsr305)
 
