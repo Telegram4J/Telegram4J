@@ -392,19 +392,23 @@ public class MTProtoClientImpl implements MTProtoClient {
                 return;
             }
 
-            emitState(State.CLOSED);
+            curretChannel.eventLoop().execute(() -> {
+                emitState(State.CLOSED);
 
-            curretChannel.close()
-                    .addListener(notify -> {
-                        cancelRequests();
+                curretChannel.close()
+                        .addListener(notify -> {
+                            cancelRequests();
 
-                        Throwable t = notify.cause();
-                        if (t != null) {
-                            sink.error(t);
-                        } else if (notify.isSuccess()) {
-                            sink.success();
-                        }
-                    });
+                            Throwable t = notify.cause();
+                            if (t != null) {
+                                sink.error(t);
+                            } else if (notify.isSuccess()) {
+                                sink.success();
+                            }
+                        });
+            });
+
+
         });
     }
 
