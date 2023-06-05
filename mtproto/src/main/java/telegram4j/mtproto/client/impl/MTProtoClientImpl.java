@@ -618,8 +618,27 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     static class InnerStats implements Stats {
-        Instant lastQueryTimestamp;
-        int queriesCount;
+        static final VarHandle QUERIES_COUNT;
+
+        static {
+            try {
+                var l = MethodHandles.lookup();
+                QUERIES_COUNT = l.findVarHandle(InnerStats.class, "queriesCount", int.class);
+            } catch (ReflectiveOperationException e) {
+                throw new ExceptionInInitializerError(e);
+            }
+        }
+
+        volatile Instant lastQueryTimestamp;
+        volatile int queriesCount;
+
+        void incrementQueriesCount() {
+            QUERIES_COUNT.getAndAdd(this, 1);
+        }
+
+        void decrementQueriesCount() {
+            QUERIES_COUNT.getAndAdd(this, -1);
+        }
 
         @Override
         public Optional<Instant> lastQueryTimestamp() {
@@ -684,7 +703,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             if (!isPingPacket(req.method)) {
-                stats.queriesCount++;
+                stats.incrementQueriesCount();
                 stats.lastQueryTimestamp = Instant.now();
             }
 
@@ -965,7 +984,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                     return;
                 }
 
-                stats.queriesCount--;
+                stats.decrementQueriesCount();
                 decContainer(query);
                 acknowledgments.add(messageId);
 
