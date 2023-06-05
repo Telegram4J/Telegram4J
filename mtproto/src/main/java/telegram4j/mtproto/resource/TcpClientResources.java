@@ -2,10 +2,11 @@ package telegram4j.mtproto.resource;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import reactor.core.Disposable;
 
 import java.util.concurrent.ThreadFactory;
 
-public final class TcpClientResources {
+public final class TcpClientResources implements Disposable {
     private final ThreadFactory threadFactory;
     private final EventLoopResources eventLoopResources;
     private final EventLoopGroup eventLoopGroup;
@@ -40,5 +41,15 @@ public final class TcpClientResources {
         var eventLoopGroup = eventLoopResources.createEventLoopGroup(ioWorkerCount, threadFactory);
 
         return new TcpClientResources(threadFactory, eventLoopResources, eventLoopGroup);
+    }
+
+    @Override
+    public void dispose() {
+        eventLoopGroup.shutdownGracefully();
+    }
+
+    @Override
+    public boolean isDisposed() {
+        return eventLoopGroup.isShutdown();
     }
 }
