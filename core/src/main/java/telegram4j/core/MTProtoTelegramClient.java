@@ -1,5 +1,7 @@
 package telegram4j.core;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -36,6 +38,9 @@ import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -218,7 +223,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     int ps = UploadService.suggestPartSize(size, partSize);
                     return serviceHolder.getUploadService()
                             .saveFile(UploadOptions.builder()
-                                    .data(ByteBufFlux.fromPath(path, ps))
+                                    .data(fromPath(path, ps, ByteBufAllocator.DEFAULT))
                                     .size(size)
                                     .partSize(ps)
                                     .name(filename)
@@ -858,7 +863,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 .map(Document::getFileReferenceId);
     }
 
-    private Optional<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, FileReferenceId original,
+    private static Optional<FileReferenceId> findMessageMedia(AuxiliaryMessages messages, FileReferenceId original,
                                                        MessageMediaContext context) {
         return messages.getMessages().stream()
                 .filter(msg -> msg.getId() == context.getMessageId())
@@ -879,5 +884,31 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     }
                 })
                 .map(Document::getFileReferenceId);
+    }
+
+    private static Flux<ByteBuf> fromPath(Path path, int maxChunkSize, ByteBufAllocator allocator) {
+        return Flux.generate(() -> FileChannel.open(path), (fc, sink) -> {
+            ByteBuf buf = allocator.buffer();
+            try {
+                if (buf.writeBytes(fc, maxChunkSize) < 0) {
+                    buf.release();
+                    sink.complete();
+                } else {
+                    sink.next(buf);
+                }
+            } catch (IOException e) {
+                buf.release();
+                sink.error(e);
+            }
+            return fc;
+        }, MTProtoTelegramClient::closeFileChannel);
+    }
+
+    private static void closeFileChannel(FileChannel fc) {
+        try {
+            fc.close();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
