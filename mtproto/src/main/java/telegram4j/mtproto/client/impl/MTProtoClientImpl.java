@@ -338,18 +338,6 @@ public class MTProtoClientImpl implements MTProtoClient {
         });
     }
 
-    static boolean isResultAwait(TlMethod<?> object) {
-        return switch (object.identifier()) {
-            case MsgsAck.ID:
-            case DestroySession.ID:
-                // for this message MsgsStateInfo is response
-                // case MsgsStateReq.ID:
-                yield false;
-            default:
-                yield true;
-        };
-    }
-
     @Override
     @SuppressWarnings("unchecked")
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
@@ -365,10 +353,6 @@ public class MTProtoClientImpl implements MTProtoClient {
 
                     RequestMono sink = new RequestMono(options.getResultPublisher());
                     channel.writeAndFlush(new RpcQuery(method, sink));
-                    if (method.identifier() != Ping.ID && method.identifier() != PingDelayDisconnect.ID) {
-                        stats.incrementQueriesCount();
-                        stats.lastQueryTimestamp = Instant.now();
-                    }
 
                     return (Mono<R>) sink;
                 })
@@ -384,17 +368,17 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     @Override
-    public DataCenter getDatacenter() {
+    public DataCenter dc() {
         return authData.dc();
     }
 
     @Override
-    public DcId.Type getType() {
+    public DcId.Type type() {
         return type;
     }
 
     @Override
-    public Stats getStats() {
+    public Stats stats() {
         return stats;
     }
 
@@ -421,6 +405,18 @@ public class MTProtoClientImpl implements MTProtoClient {
                         }
                     });
         });
+    }
+
+    static boolean isResultAwait(TlMethod<?> object) {
+        return switch (object.identifier()) {
+            case MsgsAck.ID:
+            case DestroySession.ID:
+                // for this message MsgsStateInfo is response
+                // case MsgsStateReq.ID:
+                yield false;
+            default:
+                yield true;
+        };
     }
 
     // name in format: 'users.getFullUser'
@@ -607,35 +603,16 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     static class InnerStats implements Stats {
-        static final VarHandle QUERIES_COUNT;
-
-        static {
-            try {
-                var l = MethodHandles.lookup();
-                QUERIES_COUNT = l.findVarHandle(InnerStats.class, "queriesCount", int.class);
-            } catch (ReflectiveOperationException e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
-        volatile Instant lastQueryTimestamp;
-        volatile int queriesCount;
-
-        void incrementQueriesCount() {
-            QUERIES_COUNT.getAndAdd(this, 1);
-        }
-
-        void decrementQueriesCount() {
-            QUERIES_COUNT.getAndAdd(this, -1);
-        }
+        Instant lastQueryTimestamp;
+        int queriesCount;
 
         @Override
-        public Optional<Instant> getLastQueryTimestamp() {
+        public Optional<Instant> lastQueryTimestamp() {
             return Optional.ofNullable(lastQueryTimestamp);
         }
 
         @Override
-        public int getQueriesCount() {
+        public int queriesCount() {
             return queriesCount;
         }
 
@@ -689,6 +666,11 @@ public class MTProtoClientImpl implements MTProtoClient {
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
             if (!(msg instanceof RpcRequest req)) {
                 throw new IllegalArgumentException("Unexpected type of message to encrypt: " + msg);
+            }
+
+            if (!isPingPacket(req.method)) {
+                stats.queriesCount++;
+                stats.lastQueryTimestamp = Instant.now();
             }
 
             if (log.isTraceEnabled() && !requests.isEmpty()) {
@@ -960,7 +942,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                     return;
                 }
 
-                stats.decrementQueriesCount();
+                stats.queriesCount--;
                 decContainer(query);
                 acknowledgments.add(messageId);
 
@@ -1172,6 +1154,13 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             log.warn("[C:0x{}] Unhandled payload: {}", id, obj);
         }
+    }
+
+    private static boolean isPingPacket(TlMethod<?> method) {
+        return switch (method.identifier()) {
+            case PingDelayDisconnect.ID, Ping.ID -> true;
+            default -> false;
+        };
     }
 
     static boolean isAuthMethod(TlMethod<?> method) {

@@ -16,12 +16,12 @@ public class ImmutableStats implements MTProtoClient.Stats {
     }
 
     @Override
-    public Optional<Instant> getLastQueryTimestamp() {
+    public Optional<Instant> lastQueryTimestamp() {
         return Optional.ofNullable(lastQueryTimestamp);
     }
 
     @Override
-    public int getQueriesCount() {
+    public int queriesCount() {
         return queriesCount;
     }
 

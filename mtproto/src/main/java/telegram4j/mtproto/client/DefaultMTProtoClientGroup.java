@@ -104,7 +104,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             MTProtoClient d = (MTProtoClient) CA.getVolatile(dc.downloadClients, i);
                             if (d == null) continue;
 
-                            if (d.getStats().getLastQueryTimestamp()
+                            if (d.stats().lastQueryTimestamp()
                                     .map(ts -> ts.plus(options.inactiveDownloadPeriod).isBefore(Instant.now()))
                                     .orElse(true)) {
                                 CA.setVolatile(dc.downloadClients, i, null);
@@ -117,7 +117,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             MTProtoClient u = (MTProtoClient) CA.getVolatile(dc.uploadClients, i);
                             if (u == null) continue;
 
-                            if (u.getStats().getLastQueryTimestamp()
+                            if (u.stats().lastQueryTimestamp()
                                     .map(ts -> ts.plus(options.inactiveUploadPeriod).isBefore(Instant.now()))
                                     .orElse(true)) {
                                 CA.setVolatile(dc.uploadClients, i, null);
@@ -147,12 +147,12 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                             continue;
                         }
 
-                        if (lessLoaded == null || v.getStats().getQueriesCount() < lessLoaded.getStats().getQueriesCount()) {
+                        if (lessLoaded == null || v.stats().queriesCount() < lessLoaded.stats().queriesCount()) {
                             lessLoaded = v;
                         }
                     }
 
-                    if (lessLoaded == null || lessLoaded.getStats().getQueriesCount() != 0 &&
+                    if (lessLoaded == null || lessLoaded.stats().queriesCount() != 0 &&
                             dcInfo.activeDownloadClientsCount.get() < arr.length) {
                         yield options.mtProtoOptions.storeLayout.getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)

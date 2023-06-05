@@ -755,7 +755,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of bot that is used for anonymous admins.
      */
     public Id getGroupAnonymousBotId() {
-        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 552888 : 1087968824, 0L);
+        return Id.ofUser(mtProtoClientGroup.main().dc().isTest() ? 552888 : 1087968824, 0L);
     }
 
     /**
@@ -764,7 +764,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of bot that is used for anonymous admins.
      */
     public Id getChannelBotId() {
-        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 936174 : 136817688, 0L);
+        return Id.ofUser(mtProtoClientGroup.main().dc().isTest() ? 936174 : 136817688, 0L);
     }
 
     /**
@@ -773,7 +773,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of bot that used to keep track of replies to your comments in channels.
      */
     public Id getRepliesBotId() {
-        return Id.ofUser(mtProtoClientGroup.main().getDatacenter().isTest() ? 708513 : 1271266957, 0L);
+        return Id.ofUser(mtProtoClientGroup.main().dc().isTest() ? 708513 : 1271266957, 0L);
     }
 
     /**

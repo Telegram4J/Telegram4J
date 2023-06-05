@@ -45,16 +45,16 @@ public interface MTProtoClient {
      *
      * @return The {@link DataCenter} to which the client is configured.
      */
-    DataCenter getDatacenter();
+    DataCenter dc();
 
-    DcId.Type getType();
+    DcId.Type type();
 
     /**
      * Gets mutable statistic for client.
      *
      * @return The statistic for client.
      */
-    Stats getStats();
+    Stats stats();
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.
@@ -98,14 +98,14 @@ public interface MTProtoClient {
          *
          * @return The timestamp of last send query call, if present.
          */
-        Optional<Instant> getLastQueryTimestamp();
+        Optional<Instant> lastQueryTimestamp();
 
         /**
          * Gets current count of pending queries.
          *
          * @return The current count of pending queries.
          */
-        int getQueriesCount();
+        int queriesCount();
 
         /**
          * Creates new immutable copy of this statistics.
@@ -113,7 +113,7 @@ public interface MTProtoClient {
          * @return A new immutable copy of this statistics.
          */
         default Stats copy() {
-            return new ImmutableStats(getLastQueryTimestamp().orElse(null), getQueriesCount());
+            return new ImmutableStats(lastQueryTimestamp().orElse(null), queriesCount());
         }
     }
 }
