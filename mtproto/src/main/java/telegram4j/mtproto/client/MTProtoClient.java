@@ -38,6 +38,7 @@ public interface MTProtoClient {
      *
      * @return A {@link Flux} emitting a {@link State}.
      */
+    // TODO: At the moment, the impl allows IO thread to leak.
     Flux<State> state();
 
     /**

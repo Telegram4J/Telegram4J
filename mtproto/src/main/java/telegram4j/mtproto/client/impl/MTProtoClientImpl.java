@@ -420,7 +420,7 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     // name in format: 'users.getFullUser'
-    static String prettyMethodName(TlObject method) {
+    static String prettyTypeName(Object method) {
         String name = method.getClass().getSimpleName();
         if (name.startsWith("Immutable"))
             name = name.substring(9);
@@ -451,7 +451,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcRequest{" + prettyMethodName(method) + '}';
+            return "RpcRequest{" + prettyTypeName(method) + '}';
         }
     }
 
@@ -465,7 +465,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcQuery{" + prettyMethodName(method) + '}';
+            return "RpcQuery{" + prettyTypeName(method) + '}';
         }
     }
 
@@ -518,7 +518,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         public String toString() {
             return "RpcContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", method=" + prettyMethodName(method) +
+                    ", method=" + prettyTypeName(method) +
                     '}';
         }
 
@@ -545,7 +545,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         public String toString() {
             return "QueryContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", method=" + prettyMethodName(method) +
+                    ", method=" + prettyTypeName(method) +
                     '}';
         }
 
@@ -820,16 +820,16 @@ public class MTProtoClientImpl implements MTProtoClient {
                 if (containerOrRequest instanceof ContainerRequest) {
                     rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", id,
                             Long.toHexString(containerMsgId), messages.stream()
-                                    .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + prettyMethodName(m.method))
+                                    .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + prettyTypeName(m.method))
                                     .collect(Collectors.joining(", ")));
                 } else {
                     if (quickAck) {
                         rpcLog.debug("[C:0x{}, M:0x{}, Q:0x{}] Sending request: {}", id,
                                 Long.toHexString(requestMessageId), Integer.toHexString(quickAckToken),
-                                prettyMethodName(req.method));
+                                prettyTypeName(req.method));
                     } else {
                         rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
-                                Long.toHexString(requestMessageId), prettyMethodName(req.method));
+                                Long.toHexString(requestMessageId), prettyTypeName(req.method));
                     }
                 }
             }
@@ -904,7 +904,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         static RpcException createRpcException(RpcError error, RpcRequest request) {
             String format = String.format("%s returned code: %d, message: %s",
-                    prettyMethodName(request.method), error.errorCode(),
+                    prettyTypeName(request.method), error.errorCode(),
                     error.errorMessage());
 
             return new RpcException(format, error, request.method);
@@ -979,10 +979,10 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             if (obj instanceof MessageContainer messageContainer) {
-                if (rpcLog.isTraceEnabled()) {
-                    rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer);
-                } else if (rpcLog.isDebugEnabled()) {
-                    rpcLog.debug("[C:0x{}] Handling message container", id);
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer.messages().stream()
+                            .map(msg -> "0x" + Long.toHexString(msg.msgId()) + ": " + prettyTypeName(msg.body()))
+                            .collect(Collectors.joining(", ", "{", "}")));
                 }
 
                 for (Message message : messageContainer.messages()) {
