@@ -14,8 +14,7 @@ import telegram4j.tl.InputMessage;
 
 import java.util.Objects;
 
-/** Additional wrapping for {@code EntityRetriever} which delegates methods to 2 {@link EntityRetriever}s. */
-public class FallbackEntityRetriever implements EntityRetriever {
+class FallbackEntityRetriever implements EntityRetriever {
     private final EntityRetriever first;
     private final EntityRetriever second;
 

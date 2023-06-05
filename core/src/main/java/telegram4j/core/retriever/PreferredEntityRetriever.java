@@ -34,12 +34,11 @@ public class PreferredEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<User> getUserById(Id userId) {
-        switch (userPreference) {
-            case MIN: return delegate.getUserMinById(userId);
-            case FULL: return delegate.getUserFullById(userId);
-            case NONE: return delegate.getUserById(userId);
-            default: throw new IllegalStateException();
-        }
+        return switch (userPreference) {
+            case MIN -> delegate.getUserMinById(userId);
+            case FULL -> delegate.getUserFullById(userId);
+            case NONE -> delegate.getUserById(userId);
+        };
     }
 
     @Override
@@ -54,12 +53,11 @@ public class PreferredEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<Chat> getChatById(Id chatId) {
-        switch (chatPreference) {
-            case MIN: return delegate.getChatMinById(chatId);
-            case FULL: return delegate.getChatFullById(chatId);
-            case NONE: return delegate.getChatById(chatId);
-            default: throw new IllegalStateException();
-        }
+        return switch (chatPreference) {
+            case MIN -> delegate.getChatMinById(chatId);
+            case FULL -> delegate.getChatFullById(chatId);
+            case NONE -> delegate.getChatById(chatId);
+        };
     }
 
     @Override
