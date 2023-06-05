@@ -1,4 +1,4 @@
-package telegram4j.mtproto.client;
+package telegram4j.mtproto.client.impl;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -15,7 +15,10 @@ import reactor.util.Loggers;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationException;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
-import telegram4j.mtproto.client.impl.*;
+import telegram4j.mtproto.client.ImmutableStats;
+import telegram4j.mtproto.client.MTProtoClient;
+import telegram4j.mtproto.client.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoOptions;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.TlDeserializer;
@@ -55,7 +58,7 @@ import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
-class MTProtoClientImpl implements MTProtoClient {
+public class MTProtoClientImpl implements MTProtoClient {
     private static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
     private static final String HANDSHAKE       = "mtproto.handshake";
     private static final String TRANSPORT       = "mtproto.transport";
@@ -95,7 +98,7 @@ class MTProtoClientImpl implements MTProtoClient {
     private final MTProtoOptions options;
     private final Bootstrap bootstrap;
 
-    MTProtoClientImpl(MTProtoClientGroup group, DcId.Type type, DataCenter dc, MTProtoOptions options) {
+    public MTProtoClientImpl(MTProtoClientGroup group, DcId.Type type, DataCenter dc, MTProtoOptions options) {
         this.group = group;
         this.type = type;
         this.authData = new AuthData(dc);
@@ -200,7 +203,10 @@ class MTProtoClientImpl implements MTProtoClient {
         public void channelInactive(ChannelHandlerContext ctx) {
             channel = null;
 
-            pingEmitter.cancel();
+            if (pingEmitter != null) {
+                pingEmitter.cancel();
+            }
+
             if (localState == State.DISCONNECTED) {
                 if (log.isDebugEnabled()) {
                     log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
@@ -287,10 +293,11 @@ class MTProtoClientImpl implements MTProtoClient {
                 options.getStoreLayout().getAuthKey(authData.dc())
                         .switchIfEmpty(Mono.fromRunnable(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
-                            ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(authData,
-                                    new HandshakeContext(
-                                            DhPrimeCheckerCache.instance(),
-                                            PublicRsaKeyRegister.createDefault())));
+
+                            var handshakeCtx = new HandshakeContext(
+                                    DhPrimeCheckerCache.instance(),
+                                    PublicRsaKeyRegister.createDefault());
+                            ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
                         }))
                         .subscribe(loaded -> ctx.executor().execute(() -> {
                             authData.authKey(loaded);

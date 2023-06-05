@@ -2,6 +2,7 @@ package telegram4j.mtproto.client;
 
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.client.impl.MTProtoClientImpl;
 
 import java.util.Objects;
 

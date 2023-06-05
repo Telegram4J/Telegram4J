@@ -21,10 +21,9 @@ public final class DhPrimeCheckerCache implements DhPrimeChecker {
     private static final DhPrimeCheckerCache instance = new DhPrimeCheckerCache();
 
     private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
-    private final Map<String, PrimeStatus> knownPrimes;
+    private final Map<String, PrimeStatus> knownPrimes = new HashMap<>();
 
     private DhPrimeCheckerCache() {
-        this.knownPrimes = new HashMap<>();
         this.knownPrimes.put(ByteBufUtil.hexDump(builtInGoodPrime), PrimeStatus.GOOD);
     }
 

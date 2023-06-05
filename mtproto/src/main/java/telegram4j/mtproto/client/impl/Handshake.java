@@ -20,21 +20,22 @@ import telegram4j.tl.request.mtproto.ImmutableSetClientDHParams;
 import telegram4j.tl.request.mtproto.ReqDHParams;
 
 import java.math.BigInteger;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
 public final class Handshake extends ChannelInboundHandlerAdapter {
 
-    private static final Logger log = Loggers.getLogger(Handshake.class);
+    private static final Logger log = Loggers.getLogger("telegram4j.mtproto.Handshake");
 
+    private final String clientId;
     private final AuthData authData;
     private final HandshakeContext context;
 
-    public Handshake(AuthData authData, HandshakeContext context) {
-        this.authData = Objects.requireNonNull(authData);
-        this.context = Objects.requireNonNull(context);
+    public Handshake(String clientId, AuthData authData, HandshakeContext context) {
+        this.clientId = clientId;
+        this.authData = authData;
+        this.context = context;
     }
 
     @Override
@@ -46,6 +47,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         ByteBuf nonce = Unpooled.wrappedBuffer(nonceb);
         context.nonce(nonce);
 
+        log.debug("[C:0x{}] Sending ReqPqMulti", clientId);
         ctx.writeAndFlush(ImmutableReqPqMulti.of(nonce));
     }
 
@@ -69,6 +71,8 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     // ====================
 
     private void handleResPQ(ChannelHandlerContext ctx, ResPQ resPQ) {
+        log.debug("[C:0x{}] Receiving ResPQ", clientId);
+
         ByteBuf nonce = resPQ.nonce();
 
         if (!nonce.equals(context.nonce())) throw new AuthorizationException("nonce mismatch");
@@ -113,6 +117,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         ByteBuf pqInnerDataBuf = TlSerializer.serialize(ctx.alloc(), pqInnerData);
         ByteBuf encryptedData = rsa(pqInnerDataBuf, foundKey.key());
 
+        log.debug("[C:0x{}] Sending ReqDHParams", clientId);
         ctx.writeAndFlush(ReqDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(resPQ.serverNonce())
@@ -136,7 +141,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     // Adapted version of:
     // https://github.com/andrew-ld/LL-mtproto/blob/217d27ac04151c085dcf0a2173f9a868e97e4cec/ll_mtproto/crypto/public_rsa.py#L86
     // FIXME: it's not working right now; don't know what's wrong yet
-    private static ByteBuf rsePad(ByteBuf data, PublicRsaKey key) {
+    private static ByteBuf rsaPad(ByteBuf data, PublicRsaKey key) {
         if (data.readableBytes() > 144)
             throw new AuthorizationException("Plain data length is more that 144 bytes");
 
@@ -171,6 +176,8 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     }
 
     private void handleServerDHParams(ChannelHandlerContext ctx, ServerDHParams serverDHParams) {
+        log.debug("[C:0x{}] Receiving ServerDHParams", clientId);
+
         if (!serverDHParams.nonce().equals(context.nonce())) throw new AuthorizationException("nonce mismatch");
         if (!serverDHParams.serverNonce().equals(context.serverNonce())) throw new AuthorizationException("serverNonce mismatch");
 
@@ -325,10 +332,13 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
 
         dataWithHashEnc.release();
 
+        log.debug("[C:0x{}] Sending SetClientDHParam", clientId);
         ctx.writeAndFlush(req);
     }
 
     private void handleDhGenOk(ChannelHandlerContext ctx, DhGenOk dhGenOk) {
+        log.debug("[C:0x{}] Receiving DhGenOk", clientId);
+
         ByteBuf newNonceHash = sha1Digest(context.newNonce(), Unpooled.wrappedBuffer(new byte[]{1}), context.authKeyHash())
                 .slice(4, 16);
 
@@ -342,6 +352,8 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     }
 
     private void handleDhGenRetry(ChannelHandlerContext ctx, DhGenRetry dhGenRetry) {
+        log.debug("[C:0x{}] Receiving DhGenRetry", clientId);
+
         ByteBuf newNonceHash = sha1Digest(context.newNonce(), Unpooled.wrappedBuffer(new byte[]{2}), context.authKeyHash())
                 .slice(4, 16);
 
@@ -356,6 +368,8 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
     }
 
     private void handleDhGenFail(ChannelHandlerContext ctx, DhGenFail dhGenFail) {
+        log.debug("[C:0x{}] Receiving DhGenFail", clientId);
+
         ByteBuf newNonceHash = sha1Digest(context.newNonce(), Unpooled.wrappedBuffer(new byte[]{3}), context.authKeyHash())
                 .slice(4, 16);
 
