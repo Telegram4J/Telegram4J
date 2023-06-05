@@ -5,11 +5,6 @@ import io.netty.util.internal.SystemPropertyUtil;
 final class Transports {
 
     static final boolean preferNative = SystemPropertyUtil.getBoolean("telegram4j.netty.native", true);
-    static final boolean hasNative;
-
-    static {
-        hasNative = Epoll.available || KQueue.available;
-    }
 
     static class Epoll {
         static final boolean available;
