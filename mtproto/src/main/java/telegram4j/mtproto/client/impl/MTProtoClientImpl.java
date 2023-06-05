@@ -872,9 +872,17 @@ public class MTProtoClientImpl implements MTProtoClient {
                 throw new MTProtoException("Incorrect session identifier");
             }
             long messageId = decrypted.readLongLE();
-            if (!authData.isValidInboundMessageId(messageId)) {
-                throw new MTProtoException("Invalid message id");
+            var res = authData.isValidInboundMessageId(messageId);
+            if (res != null) {
+                String reason = switch (res) {
+                    case DUPLICATE -> "Duplicate";
+                    case INVALID_TIME -> "Too old or too new";
+                    case EVEN -> "Even";
+                };
+
+                throw new MTProtoException(reason + " message id received: 0x" + Long.toHexString(messageId));
             }
+
             decrypted.readIntLE(); // seq_no
             int length = decrypted.readIntLE();
             if (length % 4 != 0) {

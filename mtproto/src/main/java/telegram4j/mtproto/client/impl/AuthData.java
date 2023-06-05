@@ -17,7 +17,7 @@ import java.util.Objects;
 import static telegram4j.mtproto.util.CryptoUtil.random;
 
 public final class AuthData {
-    private static final int DEFAULT_IMSG_ID_REGISTER_SIZE = 32;
+    private static final int DEFAULT_IMSG_ID_REGISTER_SIZE = 128;
 
     @Nullable
     private AuthKey authKey;
@@ -118,19 +118,28 @@ public final class AuthData {
     }
 
     // https://github.com/tdlib/td/blob/4041ecb535802ba1c55fcd11adf5d3ada41c2be7/td/mtproto/AuthData.cpp#L132
-    public boolean isValidInboundMessageId(long messageId) {
+    @Nullable
+    public InvalidInboundMsgIdReason isValidInboundMessageId(long messageId) {
         if ((messageId & 1) == 0) {
-            return false;
+            return InvalidInboundMsgIdReason.EVEN;
         }
 
         long serverTime = timeOffset + (System.currentTimeMillis()/1000);
         long timeFromMessageId = messageId / (1L << 32);
         boolean timeCheck = serverTime - 300 < timeFromMessageId && timeFromMessageId < serverTime + 30;
         if (!timeCheck) {
-            return false;
+            return InvalidInboundMsgIdReason.INVALID_TIME;
         }
+        if (!messageIdRegister.check(messageId)) {
+            return InvalidInboundMsgIdReason.DUPLICATE;
+        }
+        return null;
+    }
 
-        return messageIdRegister.check(messageId);
+    public enum InvalidInboundMsgIdReason {
+        EVEN,
+        INVALID_TIME,
+        DUPLICATE
     }
 
     public static boolean isContentRelated(TlMethod<?> object) {
