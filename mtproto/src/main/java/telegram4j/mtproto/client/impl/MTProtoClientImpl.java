@@ -8,6 +8,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.util.AttributeKey;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
+import reactor.core.Exceptions;
 import reactor.core.publisher.*;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
@@ -395,7 +396,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             curretChannel.close()
                     .addListener(notify -> {
-                        // cancelRequests();
+                        cancelRequests();
 
                         Throwable t = notify.cause();
                         if (t != null) {
@@ -405,6 +406,16 @@ public class MTProtoClientImpl implements MTProtoClient {
                         }
                     });
         });
+    }
+
+    private void cancelRequests() {
+        RuntimeException exc = Exceptions.failWithCancel();
+        for (var e : requests.entrySet()) {
+            var req = e.getValue();
+            if (req instanceof RpcQuery q) {
+                q.sink.emitError(exc);
+            }
+        }
     }
 
     static boolean isResultAwait(TlMethod<?> object) {
@@ -1223,6 +1234,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
+        // TODO: guard with new state to prevent repeat emission
         public void emitValue(Object obj) {
             if (cancelled) {
                 return;
@@ -1234,7 +1246,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             });
         }
 
-        public void emitError(RpcException e) {
+        public void emitError(RuntimeException e) {
             if (cancelled) {
                 return;
             }
