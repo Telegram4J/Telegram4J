@@ -6,6 +6,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.AttributeKey;
+import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Exceptions;
@@ -13,6 +14,7 @@ import reactor.core.publisher.*;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationException;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
@@ -80,16 +82,16 @@ public class MTProtoClientImpl implements MTProtoClient {
 
     private static final AttributeKey<MonoSink<Void>> NOTIFY = AttributeKey.valueOf("notify");
 
-    private State localState = State.DISCONNECTED;
+    private volatile Channel channel;
+    private volatile State localState = State.DISCONNECTED;
     private boolean inflightPing;
     private Trigger pingEmitter;
-
-    private volatile Channel channel;
 
     private final MTProtoClientGroup group;
     private final DcId.Type type;
     private final AuthData authData;
     private final ArrayList<Long> acknowledgments = new ArrayList<>();
+    private final MpscArrayQueue<RpcRequest> pendingRequests = new MpscArrayQueue<>(Queues.SMALL_BUFFER_SIZE);
     private final HashMap<Long, Request> requests = new HashMap<>();
     private final String id = Integer.toHexString(hashCode());
     private final InnerStats stats = new InnerStats();
@@ -119,7 +121,9 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     private void emitState(State st) {
-        log.debug("[C:0x{}] Updating state: {}->{}", id, localState, st);
+        if (log.isDebugEnabled()) {
+            log.debug("[C:0x{}] Updating state: {}->{}", id, localState, st);
+        }
         localState = st;
         state.emitNext(st, FAIL_FAST);
     }
@@ -268,9 +272,17 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             sendAwait(options.getInitConnection())
                     .subscribe(res -> ctx.executor().execute(() -> {
-                        emitState(State.READY);
+                        emitState(State.CONNECTED);
                         var sinkAttr = ctx.channel().attr(NOTIFY);
                         var sink = sinkAttr.get();
+
+                        // Send all pending requests on next tick
+                        ctx.executor().execute(() -> {
+                            RpcRequest req;
+                            while ((req = pendingRequests.poll()) != null) {
+                                ctx.writeAndFlush(req);
+                            }
+                        });
 
                         if (sink != null) {
                             sink.success();
@@ -343,23 +355,56 @@ public class MTProtoClientImpl implements MTProtoClient {
     @SuppressWarnings("unchecked")
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
         return Mono.defer(() -> {
-                    var channel = this.channel;
-                    if (channel == null) {
-                        return Mono.error(new MTProtoException("Client has been closed"));
-                    }
-                    if (!isResultAwait(method)) {
-                        channel.writeAndFlush(new RpcRequest(method));
-                        return Mono.empty();
-                    }
+            var currentState = localState;
+            if (currentState == State.CONNECTED || isBootrapMethod(method)) {
+                var channel = this.channel;
+                if (channel == null) {
+                    return Mono.error(new MTProtoException("Client has been closed"));
+                }
 
-                    RequestMono sink = new RequestMono(options.getResultPublisher());
-                    channel.writeAndFlush(new RpcQuery(method, sink));
+                if (!isResultAwait(method)) {
+                    channel.writeAndFlush(new RpcRequest(method));
+                    return Mono.empty();
+                }
 
-                    return (Mono<R>) sink;
-                })
-                .transform(options.getResponseTransformers().stream()
-                        .map(tr -> tr.transform(method))
-                        .reduce(Function.identity(), Function::andThen));
+                RequestMono sink = new RequestMono(options.getResultPublisher());
+                channel.writeAndFlush(new RpcQuery(method, sink));
+
+                return (Mono<R>) sink;
+            } else if (currentState == State.DISCONNECTED) {
+                if (log.isDebugEnabled())
+                    log.debug("[C:0x{}] Delaying request: {}", id, prettyTypeName(method));
+
+                if (!isResultAwait(method)) {
+                    if (!pendingRequests.offer(new RpcRequest(method))) {
+                        return Mono.error(new IllegalStateException()); // TODO: error message
+                    }
+                    return Mono.empty();
+                }
+
+                RequestMono sink = new RequestMono(options.getResultPublisher());
+
+                if (!pendingRequests.offer(new RpcQuery(method, sink))) {
+                    return Mono.error(new IllegalStateException()); // TODO: error message
+                }
+
+                return (Mono<R>) sink;
+            } else if (currentState == State.CLOSED) {
+                return Mono.error(new MTProtoException("Client has been closed"));
+            } else {
+                return Mono.error(new IllegalStateException());
+            }
+        })
+        .transform(options.getResponseTransformers().stream()
+                .map(tr -> tr.transform(method))
+                .reduce(Function.identity(), Function::andThen));
+    }
+
+    private boolean isBootrapMethod(TlMethod<?> method) {
+        return switch (method.identifier()) {
+            case InvokeWithLayer.ID, PingDelayDisconnect.ID, Ping.ID -> true;
+            default -> false;
+        };
     }
 
     @Override

@@ -19,7 +19,7 @@ public interface MTProtoClient {
     /**
      * Gets a {@link Mono} with empty signals which starts client on subscribe.
      *
-     * @return A {@link Mono} which emitting signals on client {@link State#READY} state.
+     * @return A {@link Mono} which emitting signals on client {@link State#CONNECTED} state.
      */
     Mono<Void> connect();
 
@@ -69,26 +69,11 @@ public interface MTProtoClient {
         /** The state in which the client must reconnect. */
         DISCONNECTED,
 
-        /** The state in which the client must fully shutdown without the possibility of resuming. */
-        CLOSED,
-
-        /** The state indicates client's willingness to send requests, i.e. after sending a transport id. */
-        CONFIGURED,
-
-        /** The state in which the client is connected to the dc. */
+        /** The state in which the client is ready to send requests to the dc. */
         CONNECTED,
 
-        /** The state in which the client is ready to send requests to the dc. */
-        READY,
-
-        /** The state in which the client is starts the auth key gen. */
-        AUTHORIZATION_BEGIN,
-
-        /** The state in which the client is ends the auth key gen. */
-        AUTHORIZATION_END,
-
-        /** The intermediate state indicating reconnection of the client to the dc. */
-        RECONNECT
+        /** The state in which the client must fully shutdown without the possibility of resuming. */
+        CLOSED
     }
 
     /** Interface for client statistic. */

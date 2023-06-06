@@ -499,7 +499,7 @@ public final class MTProtoBootstrap {
                                     onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                                 });
 
-                        case READY -> Mono.defer(() -> {
+                        case CONNECTED -> Mono.defer(() -> {
                                     // bot user id writes before ':' char
                                     if (parseBotIdFromToken && authResources.isBot()) {
                                         return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
