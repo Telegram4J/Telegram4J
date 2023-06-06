@@ -34,6 +34,6 @@ public final class AuthKey {
 
     @Override
     public int hashCode() {
-        return value.hashCode();
+        return Long.hashCode(id);
     }
 }
