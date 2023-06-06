@@ -5,7 +5,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.util.NetUtil;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
@@ -23,12 +22,16 @@ import telegram4j.tl.messages.Messages;
 import telegram4j.tl.updates.State;
 import telegram4j.tl.users.UserFull;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static telegram4j.mtproto.util.CryptoUtil.toByteBuf;
@@ -50,13 +53,20 @@ public class FileStoreLayout implements StoreLayout {
     volatile State state;
     final AtomicBoolean saving = new AtomicBoolean();
 
+    final ExecutorService persistExecutor;
+
     public FileStoreLayout(StoreLayout entityDelegate) {
-        this(entityDelegate, DEFAULT_DATA_FILE);
+        this(entityDelegate, DEFAULT_DATA_FILE, Executors.newSingleThreadExecutor());
     }
 
     public FileStoreLayout(StoreLayout entityDelegate, Path dataFile) {
+        this(entityDelegate, dataFile, Executors.newSingleThreadExecutor());
+    }
+
+    public FileStoreLayout(StoreLayout entityDelegate, Path dataFile, ExecutorService persistExecutor) {
         this.dataFile = Objects.requireNonNull(dataFile);
         this.entityDelegate = Objects.requireNonNull(entityDelegate);
+        this.persistExecutor = persistExecutor;
     }
 
     public Path getDataFile() {
@@ -146,8 +156,9 @@ public class FileStoreLayout implements StoreLayout {
             byte dcOptionsFlags = buf.readByte();
             int dcOptionsCount = buf.readUnsignedShortLE();
             var options = new ArrayList<DataCenter>(dcOptionsCount);
+            var values = DataCenter.Type.values();
             for (int i = 0; i < dcOptionsCount; i++) {
-                DataCenter.Type type = DataCenter.Type.values()[buf.readUnsignedByte()];
+                DataCenter.Type type = values[buf.readUnsignedByte()];
                 int id = buf.readUnsignedShortLE();
                 int port = buf.readUnsignedShortLE();
                 byte flags = buf.readByte();
@@ -290,33 +301,45 @@ public class FileStoreLayout implements StoreLayout {
         return selfId != 0;
     }
 
-    private Mono<Void> save() {
-        return Mono.fromCallable(() -> {
+    private Mono<Void> trySave() {
+        return Mono.create(sink -> {
             if (!isAssociatedToUser()) {
-                return null;
+                sink.success();
+                return;
             }
 
-            if (saving.compareAndSet(false, true)) {
+            if (!saving.get() && saving.compareAndSet(false, true)) {
                 Settings settings = copySettings();
 
-                if (log.isDebugEnabled())
-                    log.debug("Saving information for main DC {} to {}", settings.mainDcId, dataFile);
+                persistExecutor.execute(() -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Saving information for main DC {} to {}", settings.mainDcId, dataFile);
+                    }
 
-                ByteBuf data = Unpooled.buffer();
-                settings.serialize(data);
-                Files.write(dataFile, CryptoUtil.toByteArray(data), StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+                    try {
+                        ByteBuf data = Unpooled.buffer();
+                        settings.serialize(data);
+                        Files.write(dataFile, CryptoUtil.toByteArray(data), StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+                    } catch (IOException e) {
+                        sink.error(e);
+                        saving.set(false);
+                        return;
+                    }
 
-                saving.set(false);
+                    saving.set(false);
+                    sink.success();
+                });
+            } else {
+                sink.success();
             }
-            return null;
         });
     }
 
     @Override
     public Mono<Void> initialize() {
-        return Mono.fromCallable(() -> {
+        return Mono.fromRunnable(() -> {
             if (Files.notExists(dataFile)) {
-                return null;
+                return;
             }
 
             try {
@@ -330,13 +353,13 @@ public class FileStoreLayout implements StoreLayout {
                 publicRsaKeyRegister = sett.publicRsaKeyRegister;
                 state = sett.state;
 
-                if (log.isDebugEnabled())
+                if (log.isDebugEnabled()) {
                     log.debug("Loaded information for main DC {} from {}", sett.mainDcId, dataFile);
-            } catch (Exception e) {
+                }
+            } catch (IOException e) {
                 log.warn("Failed to load information from " + dataFile, e);
+                throw new UncheckedIOException(e);
             }
-
-            return null;
         });
     }
 
@@ -376,73 +399,67 @@ public class FileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> updateDataCenter(DataCenter dc) {
         return entityDelegate.updateDataCenter(dc)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
-                    if (dc.getId() == mainDcId) {
+                    if (mainDcId == dc.getId()) {
                         return Mono.empty();
                     }
 
                     this.mainDcId = dc.getId();
-                    return save();
+                    return trySave();
                 }));
     }
 
     @Override
     public Mono<Void> updateState(State state) {
         return entityDelegate.updateState(state)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     if (state.equals(this.state)) {
                         return Mono.empty();
                     }
                     this.state = state;
-                    return save();
+                    return trySave();
                 }));
     }
 
     @Override
     public Mono<Void> updateDcOptions(DcOptions dcOptions) {
         return entityDelegate.updateDcOptions(dcOptions)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     if (dcOptions.equals(this.dcOptions)) {
                         return Mono.empty();
                     }
                     this.dcOptions = dcOptions;
-                    return save();
+                    return trySave();
                 }));
     }
 
     @Override
     public Mono<Void> updatePublicRsaKeyRegister(PublicRsaKeyRegister publicRsaKeyRegister) {
         return entityDelegate.updatePublicRsaKeyRegister(publicRsaKeyRegister)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     if (publicRsaKeyRegister.equals(this.publicRsaKeyRegister)) {
                         return Mono.empty();
                     }
                     this.publicRsaKeyRegister = publicRsaKeyRegister;
-                    return save();
+                    return trySave();
                 }));
     }
 
     @Override
     public Mono<Void> onAuthorization(BaseAuthorization auth) {
         return entityDelegate.onAuthorization(auth)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     this.selfId = auth.user().id();
-                    return save();
+                    return trySave();
                 }));
     }
 
     @Override
     public Mono<Void> updateAuthKey(DataCenter dc, AuthKey authKey) {
         return entityDelegate.updateAuthKey(dc, authKey)
-                .publishOn(Schedulers.boundedElastic())
                 .and(Mono.defer(() -> {
                     authKeys.put(dc.getId(), authKey);
-                    return save();
+                    return trySave();
                 }));
     }
 
