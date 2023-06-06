@@ -1,8 +1,9 @@
 package telegram4j.mtproto.client.impl;
 
+import reactor.util.Logger;
+import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
-import telegram4j.mtproto.MTProtoException;
 import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.MessageContainer;
@@ -13,6 +14,7 @@ import telegram4j.tl.request.mtproto.Ping;
 import telegram4j.tl.request.mtproto.PingDelayDisconnect;
 
 import java.util.Objects;
+import java.util.StringJoiner;
 
 import static telegram4j.mtproto.util.CryptoUtil.random;
 
@@ -158,6 +160,8 @@ public final class AuthData {
 
     static class InboundMessageIdRegister {
 
+        private static final Logger log = Loggers.getLogger("telegram4j.mtproto.InboundMessageIdRegister");
+
         // The implementation of ordered set
         // with fixed size. If new messageId's are added
         // then the oldest id of set will be replaced by new value.
@@ -211,7 +215,15 @@ public final class AuthData {
                         return false;
                     }
                 }
-                throw new MTProtoException("Non-incremental messageId received: 0x" + Long.toHexString(messageId));
+                if (log.isDebugEnabled()) {
+                    StringJoiner dump = new StringJoiner(", ", "{", "}");
+                    for (long msgId : buffer) {
+                        dump.add("0x" + Long.toHexString(msgId));
+                    }
+
+                    log.debug("Received non-incremental messageId. Current set: " + dump);
+                }
+                return true;
             }
         }
     }
