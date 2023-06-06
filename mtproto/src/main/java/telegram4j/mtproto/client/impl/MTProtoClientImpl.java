@@ -1077,8 +1077,8 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             if (obj instanceof NewSession newSession) {
                 if (rpcLog.isDebugEnabled()) {
-                    rpcLog.debug("[C:0x{}] Receiving new session creation, new server salt: 0x{}, first id: 0x{}",
-                            id, Long.toHexString(newSession.serverSalt()), Long.toHexString(newSession.firstMsgId()));
+                    rpcLog.debug("[C:0x{}] Receiving new session creation, first message id: 0x{}",
+                            id, Long.toHexString(newSession.firstMsgId()));
                 }
 
                 authData.serverSalt(newSession.serverSalt());
@@ -1096,13 +1096,11 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (obj instanceof BadMsgNotification badMsgNotification) {
                 if (rpcLog.isDebugEnabled()) {
                     if (badMsgNotification instanceof BadServerSalt badServerSalt) {
-                        rpcLog.debug("[C:0x{}, M:0x{}] Updating server salt, seqno: {}, new server salt: 0x{}", id,
-                                Long.toHexString(badServerSalt.badMsgId()), badServerSalt.badMsgSeqno(),
-                                Long.toHexString(badServerSalt.newServerSalt()));
+                        rpcLog.debug("[C:0x{}, M:0x{}] Updating server salt", id,
+                                Long.toHexString(badServerSalt.badMsgId()));
                     } else {
-                        rpcLog.debug("[C:0x{}, M:0x{}] Receiving notification, code: {}, seqno: {}", id,
-                                Long.toHexString(badMsgNotification.badMsgId()), badMsgNotification.errorCode(),
-                                badMsgNotification.badMsgSeqno());
+                        rpcLog.debug("[C:0x{}, M:0x{}] Receiving notification, code: {}", id,
+                                Long.toHexString(badMsgNotification.badMsgId()), badMsgNotification.errorCode());
                     }
                 }
 
