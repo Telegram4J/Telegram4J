@@ -3,15 +3,12 @@ package telegram4j.core.event;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
-import reactor.util.Logger;
-import reactor.util.Loggers;
 import telegram4j.core.event.domain.Event;
 
 import java.util.Objects;
 
 /** Default event dispatcher implementation based on {@link Sinks.Many} processor. */
 public class DefaultEventDispatcher implements EventDispatcher {
-    private static final Logger log = Loggers.getLogger(DefaultEventDispatcher.class);
 
     private final Scheduler eventScheduler;
     private final Sinks.Many<Event> sink;
@@ -24,10 +21,9 @@ public class DefaultEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public <E extends Event> Flux<E> on(Class<E> type) {
+    public Flux<Event> all() {
         return sink.asFlux()
-                .publishOn(eventScheduler)
-                .ofType(type);
+                .publishOn(eventScheduler);
     }
 
     @Override
@@ -42,5 +38,6 @@ public class DefaultEventDispatcher implements EventDispatcher {
     @Override
     public void shutdown() {
         sink.emitComplete(emissionHandler);
+        eventScheduler.dispose();
     }
 }

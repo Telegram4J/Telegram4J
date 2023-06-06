@@ -5,6 +5,7 @@ import io.netty.buffer.Unpooled;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.event.EventAdapter;
 import telegram4j.core.event.domain.inline.CallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineCallbackQueryEvent;
 import telegram4j.core.event.domain.inline.InlineQueryEvent;
@@ -52,53 +53,15 @@ public class BotButtonExample {
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
                         Path.of("core/src/test/resources/t4j-bot.bin")))
                 .withConnection(client -> {
+                    var updateCommands = client.setCommands(
+                                    BotCommandScopeSpec.of(BotCommandScopeSpec.Type.DEFAULT),
+                                    "en", commands.stream()
+                                            .map(Command::getInfo)
+                                            .collect(Collectors.toUnmodifiableList()));
 
-                    Mono<Void> updateCommands = client.setCommands(
-                            BotCommandScopeSpec.of(BotCommandScopeSpec.Type.DEFAULT),
-                            "en", commands.stream()
-                                    .map(Command::getInfo)
-                                    .collect(Collectors.toUnmodifiableList()))
-                            .then();
+                    var listenEvents = client.on(new BotEventAdapter());
 
-                    Mono<Void> listenMessages = client.on(SendMessageEvent.class)
-                            .flatMap(e -> {
-                                String message = e.getMessage().getContent();
-                                return Mono.justOrEmpty(e.getMessage().getEntities().stream()
-                                        .filter(p -> p.getType() == MessageEntity.Type.BOT_COMMAND &&
-                                                p.getContent().equals(message)) // in this case will always allow commands without args
-                                        .map(MessageEntity::getContent)
-                                        .findFirst())
-                                        .map(s -> s.substring(1)) // substring first '/' char
-                                        .mapNotNull(commandsMap::get)
-                                        .flatMap(s -> Mono.from(s.execute(e)));
-                            })
-                            .then();
-
-                    Mono<Void> listenCallbackQuery = client.on(CallbackQueryEvent.class)
-                            .flatMap(e -> e.getChat().sendMessage("**Callback data:** " + e.getData()
-                                    .map(ByteBufUtil::hexDump)
-                                    .orElseThrow()))
-                            .then();
-
-                    Mono<Void> listenInlineQuery = client.on(InlineQueryEvent.class)
-                            .flatMap(e -> e.answer(AnswerInlineCallbackQuerySpec.of(Duration.ZERO,
-                                    List.of(InlineResultArticleSpec.of("The most updated and never abandoned site!",
-                                            "https://core.telegram.org/schema", "one",
-                                            InlineMessageSpec.text("Link to site: https://core.telegram.org/schema")
-                                                    .withReplyMarkup(ReplyMarkupSpec.inlineKeyboard(List.of(
-                                                            List.of(InlineButtonSpec.callback("Inline callback button",
-                                                            false, Unpooled.copyLong(e.getQueryId())))))))))))
-                            .then();
-
-                    Mono<Void> listenInlineCallbackQuery = client.on(InlineCallbackQueryEvent.class)
-                            .flatMap(e -> e.edit(EditMessageSpec.of()
-                                    .withMessage("**Inline callback data:** " + e.getData()
-                                            .map(ByteBufUtil::hexDump)
-                                            .orElseThrow())))
-                            .then();
-
-                    return Mono.when(updateCommands, listenMessages,
-                            listenCallbackQuery, listenInlineQuery, listenInlineCallbackQuery);
+                    return Mono.when(updateCommands, listenEvents);
                 })
                 .block();
     }
@@ -113,7 +76,7 @@ public class BotButtonExample {
                             .withReplyTo(event.getMessage())
                             .withReplyMarkup(ReplyMarkupSpec.inlineKeyboard(List.of(
                                     List.of(InlineButtonSpec.callback("Callback button", false,
-                                            Unpooled.copyInt(ThreadLocalRandom.current().nextInt())),
+                                                    Unpooled.copyInt(ThreadLocalRandom.current().nextInt())),
                                             InlineButtonSpec.userProfile("User profile redirect button",
                                                     event.getMessage().getAuthorId()
                                                             .orElseGet(event.getClient()::getSelfId))),
@@ -143,6 +106,47 @@ public class BotButtonExample {
                                     "_Note: I have different keyboards in groups and private chats_")
                             .withReplyMarkup(chat.getType() == Chat.Type.PRIVATE ? dmMarkup : groupsMarkup)
                             .withReplyTo(event.getMessage())));
+        }
+    }
+
+    static class BotEventAdapter extends EventAdapter {
+        @Override
+        public Publisher<?> onInlineCallbackQuery(InlineCallbackQueryEvent event) {
+            return event.edit(EditMessageSpec.of()
+                    .withMessage("**Inline callback data:** " + event.getData()
+                            .map(ByteBufUtil::hexDump)
+                            .orElseThrow()));
+        }
+
+        @Override
+        public Publisher<?> onInlineQuery(InlineQueryEvent event) {
+            return event.answer(AnswerInlineCallbackQuerySpec.of(Duration.ZERO,
+                    List.of(InlineResultArticleSpec.of("The most updated and never abandoned site!",
+                            "https://core.telegram.org/schema", "one",
+                            InlineMessageSpec.text("Link to site: https://core.telegram.org/schema")
+                                    .withReplyMarkup(ReplyMarkupSpec.inlineKeyboard(List.of(
+                                            List.of(InlineButtonSpec.callback("Inline callback button",
+                                                    false, Unpooled.copyLong(event.getQueryId()))))))))));
+        }
+
+        @Override
+        public Publisher<?> onCallbackQuery(CallbackQueryEvent event) {
+            return event.getChat().sendMessage("**Callback data:** " + event.getData()
+                    .map(ByteBufUtil::hexDump)
+                    .orElseThrow());
+        }
+
+        @Override
+        public Publisher<?> onSendMessage(SendMessageEvent event) {
+            String message = event.getMessage().getContent();
+            return Mono.justOrEmpty(event.getMessage().getEntities().stream()
+                            .filter(p -> p.getType() == MessageEntity.Type.BOT_COMMAND &&
+                                    p.getContent().equals(message)) // in this case will always allow commands without args
+                            .map(MessageEntity::getContent)
+                            .findFirst())
+                    .map(s -> s.substring(1)) // substring first '/' char
+                    .mapNotNull(commandsMap::get)
+                    .flatMap(s -> Mono.from(s.execute(event)));
         }
     }
 }

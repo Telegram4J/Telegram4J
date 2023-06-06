@@ -8,6 +8,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryStickerSet;
+import telegram4j.core.event.EventAdapter;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
@@ -170,6 +171,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public <E extends Event> Flux<E> on(Class<E> type) {
         return mtProtoResources.getEventDispatcher().on(type);
+    }
+
+    public Flux<Event> on(EventAdapter adapter) {
+        return mtProtoResources.getEventDispatcher().on(adapter);
     }
 
     // Interaction methods
