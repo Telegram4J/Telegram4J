@@ -229,7 +229,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 authData.timeOffset(event.serverTimeDiff());
 
                 options.getStoreLayout().updateAuthKey(authData.dc(), event.authKey())
-                        .subscribe(null, e -> exceptionCaught(ctx, e));
+                        .subscribe(null, ctx::fireExceptionCaught);
 
                 ctx.pipeline().remove(HANDSHAKE);
                 ctx.pipeline().remove(HANDSHAKE_CODEC);
@@ -246,7 +246,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             if (type == DcId.Type.MAIN) {
                 options.getStoreLayout().updateDataCenter(authData.dc())
-                        .subscribe(null, e -> exceptionCaught(ctx, e));
+                        .subscribe(null, ctx::fireExceptionCaught);
             }
 
             Duration period = switch (authData.dc().getType()) {
@@ -267,16 +267,16 @@ public class MTProtoClientImpl implements MTProtoClient {
             }, ctx.executor(), period);
 
             sendAwait(options.getInitConnection())
-                    .subscribe(res -> {
+                    .subscribe(res -> ctx.executor().execute(() -> {
                         emitState(State.READY);
-
                         var sinkAttr = ctx.channel().attr(NOTIFY);
                         var sink = sinkAttr.get();
+
                         if (sink != null) {
                             sink.success();
                             sinkAttr.set(null);
                         }
-                    }, e -> exceptionCaught(ctx, e));
+                    }), ctx::fireExceptionCaught);
         }
 
         private void initializeChannel(ChannelHandlerContext ctx, Transport tr) {
@@ -303,7 +303,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                         .subscribe(loaded -> ctx.executor().execute(() -> {
                             authData.authKey(loaded);
                             configure(ctx);
-                        }), e -> exceptionCaught(ctx, e));
+                        }), ctx::fireExceptionCaught);
             } else {
                 configure(ctx);
             }
