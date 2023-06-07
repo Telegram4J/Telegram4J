@@ -355,20 +355,17 @@ public class MTProtoClientImpl implements MTProtoClient {
     @SuppressWarnings("unchecked")
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
         return Mono.defer(() -> {
-            var currentState = localState;
-            if (currentState == State.CONNECTED || isBootrapMethod(method)) {
-                var channel = this.channel;
-                if (channel == null) {
-                    return Mono.error(new MTProtoException("Client has been closed"));
-                }
+            State currentState = localState;
+            Channel currentChannel = channel;
 
+            if (currentChannel != null && (currentState == State.CONNECTED || isBootrapMethod(method))) {
                 if (!isResultAwait(method)) {
-                    channel.writeAndFlush(new RpcRequest(method));
+                    currentChannel.writeAndFlush(new RpcRequest(method));
                     return Mono.empty();
                 }
 
                 RequestMono sink = new RequestMono(options.getResultPublisher());
-                channel.writeAndFlush(new RpcQuery(method, sink));
+                currentChannel.writeAndFlush(new RpcQuery(method, sink));
 
                 return (Mono<R>) sink;
             } else if (currentState == State.DISCONNECTED) {
