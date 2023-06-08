@@ -38,10 +38,7 @@ import telegram4j.tl.request.account.GetPassword;
 import telegram4j.tl.request.auth.CheckPassword;
 import telegram4j.tl.request.auth.ExportLoginToken;
 import telegram4j.tl.request.auth.ImportLoginToken;
-import telegram4j.tl.request.mtproto.DestroySession;
-import telegram4j.tl.request.mtproto.ImmutablePingDelayDisconnect;
-import telegram4j.tl.request.mtproto.Ping;
-import telegram4j.tl.request.mtproto.PingDelayDisconnect;
+import telegram4j.tl.request.mtproto.*;
 import telegram4j.tl.request.updates.GetState;
 
 import java.io.IOException;
@@ -60,6 +57,7 @@ import static io.netty.channel.ChannelHandler.Sharable;
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.*;
+import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 
 public class MTProtoClientImpl implements MTProtoClient {
     private static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
@@ -217,6 +215,8 @@ public class MTProtoClientImpl implements MTProtoClient {
                     log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
                 }
 
+                authData.resetSessionId();
+
                 ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
             } else { // State.CLOSED
                 if (log.isDebugEnabled()) {
@@ -270,15 +270,24 @@ public class MTProtoClientImpl implements MTProtoClient {
                 ctx.close();
             }, ctx.executor(), period);
 
-            sendAwait(options.getInitConnection())
-                    .subscribe(res -> ctx.executor().execute(() -> {
+            if (authData.oldSessionId() != 0) {
+                send(ImmutableDestroySession.of(authData.oldSessionId()))
+                        .subscribe(null, ctx::fireExceptionCaught);
+            }
+
+            send(options.getInitConnection())
+                    .subscribe(notify -> {
                         emitState(State.CONNECTED);
                         var sinkAttr = ctx.channel().attr(NOTIFY);
                         var sink = sinkAttr.get();
 
                         // Send all pending requests on next tick
                         ctx.executor().execute(() -> {
-                            RpcRequest req;
+                            if (log.isDebugEnabled()) {
+                                log.debug("[C:0x{}] Sending pending requests: {}", id, pendingRequests.size());
+                            }
+
+                            RpcRequest req; // TODO send all in container
                             while ((req = pendingRequests.poll()) != null) {
                                 ctx.writeAndFlush(req);
                             }
@@ -288,7 +297,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                             sink.success();
                             sinkAttr.set(null);
                         }
-                    }), ctx::fireExceptionCaught);
+                    }, ctx::fireExceptionCaught);
         }
 
         private void initializeChannel(ChannelHandlerContext ctx, Transport tr) {
@@ -304,14 +313,14 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             if (authData.authKey() == null) {
                 options.getStoreLayout().getAuthKey(authData.dc())
-                        .switchIfEmpty(Mono.fromRunnable(() -> {
+                        .switchIfEmpty(Mono.fromRunnable(() -> ctx.executor().execute(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
 
-                            var handshakeCtx = new HandshakeContext(
+                            var handshakeCtx = new HandshakeContext( // TODO make configurable
                                     DhPrimeCheckerCache.instance(),
                                     PublicRsaKeyRegister.createDefault());
                             ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
-                        }))
+                        })))
                         .subscribe(loaded -> ctx.executor().execute(() -> {
                             authData.authKey(loaded);
                             configure(ctx);
@@ -352,49 +361,61 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
-        return Mono.defer(() -> {
-            State currentState = localState;
-            Channel currentChannel = channel;
-
-            if (currentChannel != null && (currentState == State.CONNECTED || isBootrapMethod(method))) {
-                if (!isResultAwait(method)) {
-                    currentChannel.writeAndFlush(new RpcRequest(method));
-                    return Mono.empty();
-                }
-
-                RequestMono sink = new RequestMono(options.getResultPublisher());
-                currentChannel.writeAndFlush(new RpcQuery(method, sink));
-
-                return (Mono<R>) sink;
-            } else if (currentState == State.DISCONNECTED) {
-                if (log.isDebugEnabled())
-                    log.debug("[C:0x{}] Delaying request: {}", id, prettyTypeName(method));
-
-                if (!isResultAwait(method)) {
-                    if (!pendingRequests.offer(new RpcRequest(method))) {
-                        return Mono.error(new IllegalStateException()); // TODO: error message
-                    }
-                    return Mono.empty();
-                }
-
-                RequestMono sink = new RequestMono(options.getResultPublisher());
-
-                if (!pendingRequests.offer(new RpcQuery(method, sink))) {
-                    return Mono.error(new IllegalStateException()); // TODO: error message
-                }
-
-                return (Mono<R>) sink;
-            } else if (currentState == State.CLOSED) {
-                return Mono.error(new MTProtoException("Client has been closed"));
-            } else {
-                return Mono.error(new IllegalStateException());
-            }
-        })
+        return Mono.defer(() -> send0(method, false))
         .transform(options.getResponseTransformers().stream()
                 .map(tr -> tr.transform(method))
                 .reduce(Function.identity(), Function::andThen));
+    }
+
+    private <R, T extends TlMethod<R>> Mono<R> send(T method) {
+        return send0(method, true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <R, T extends TlMethod<R>> Mono<R> send0(T method, boolean internal) {
+        State currentState = localState;
+        Channel currentChannel = channel;
+
+        if (currentChannel != null && (currentState == State.CONNECTED ||
+                internal && isBootrapMethod(method))) {
+
+            if (!isResultAwait(method)) {
+                currentChannel.writeAndFlush(new RpcRequest(method));
+                return Mono.empty();
+            }
+
+            RequestMono sink = new RequestMono(internal);
+            currentChannel.writeAndFlush(new RpcQuery(method, sink));
+
+            return (Mono<R>) sink;
+        } else if (currentState == State.DISCONNECTED) {
+            if (!isResultAwait(method)) {
+                if (!pendingRequests.offer(new RpcRequest(method))) {
+                    return Mono.error(new DiscardedRpcRequestException(method));
+                }
+
+                if (log.isDebugEnabled()) {
+                    log.debug("[C:0x{}] Delaying request: {}", id, schemaTypeName(method));
+                }
+                return Mono.empty();
+            }
+
+            RequestMono sink = new RequestMono(internal);
+            if (!pendingRequests.offer(new RpcQuery(method, sink))) {
+                return Mono.error(new DiscardedRpcRequestException(method));
+            }
+
+            if (log.isDebugEnabled()) {
+                log.debug("[C:0x{}] Delaying request: {}", id, schemaTypeName(method));
+            }
+
+            return (Mono<R>) sink;
+        } else if (currentState == State.CLOSED) {
+            return Mono.error(new MTProtoException("Client has been closed"));
+        } else {
+            return Mono.error(new IllegalStateException("Unexpected client state: " + currentState));
+        }
     }
 
     private boolean isBootrapMethod(TlMethod<?> method) {
@@ -437,10 +458,10 @@ public class MTProtoClientImpl implements MTProtoClient {
             curretChannel.eventLoop().execute(() -> {
                 emitState(State.CLOSED);
 
+                cancelRequests(curretChannel.eventLoop());
+
                 curretChannel.close()
                         .addListener(notify -> {
-                            cancelRequests();
-
                             Throwable t = notify.cause();
                             if (t != null) {
                                 sink.error(t);
@@ -449,17 +470,19 @@ public class MTProtoClientImpl implements MTProtoClient {
                             }
                         });
             });
-
-
         });
     }
 
-    private void cancelRequests() {
+    private void cancelRequests(EventLoop eventLoop) {
         RuntimeException exc = Exceptions.failWithCancel();
         for (var e : requests.entrySet()) {
             var req = e.getValue();
             if (req instanceof RpcQuery q) {
-                q.sink.emitError(exc);
+                var resultPublisher = q.sink.isPublishOnEventLoop()
+                        ? eventLoop
+                        : options.getResultPublisher();
+
+                q.sink.emitError(resultPublisher, exc);
             }
         }
     }
@@ -476,27 +499,6 @@ public class MTProtoClientImpl implements MTProtoClient {
         };
     }
 
-    // name in format: 'users.getFullUser'
-    static String prettyTypeName(Object method) {
-        String name = method.getClass().getSimpleName();
-        if (name.startsWith("Immutable"))
-            name = name.substring(9);
-
-        String namespace = method.getClass().getPackageName();
-        if (namespace.startsWith("telegram4j.tl."))
-            namespace = namespace.substring(14);
-        if (namespace.startsWith("request"))
-            namespace = namespace.substring(7);
-        if (namespace.startsWith("."))
-            namespace = namespace.substring(1);
-        name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
-
-        if (namespace.isEmpty()) {
-            return name;
-        }
-        return namespace + '.' + name;
-    }
-
     // request types
 
     static sealed class RpcRequest implements Request {
@@ -508,7 +510,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcRequest{" + prettyTypeName(method) + '}';
+            return "RpcRequest{" + schemaTypeName(method) + '}';
         }
     }
 
@@ -522,7 +524,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public String toString() {
-            return "RpcQuery{" + prettyTypeName(method) + '}';
+            return "RpcQuery{" + schemaTypeName(method) + '}';
         }
     }
 
@@ -575,7 +577,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         public String toString() {
             return "RpcContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", method=" + prettyTypeName(method) +
+                    ", method=" + schemaTypeName(method) +
                     '}';
         }
 
@@ -602,7 +604,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         public String toString() {
             return "QueryContainerRequest{" +
                     "containerMsgId=0x" + Long.toHexString(containerMsgId) +
-                    ", method=" + prettyTypeName(method) +
+                    ", method=" + schemaTypeName(method) +
                     '}';
         }
 
@@ -896,16 +898,16 @@ public class MTProtoClientImpl implements MTProtoClient {
                 if (containerOrRequest instanceof ContainerRequest) {
                     rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", id,
                             Long.toHexString(containerMsgId), messages.stream()
-                                    .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + prettyTypeName(m.method))
+                                    .map(m -> "0x" + Long.toHexString(m.messageId) + ": " + schemaTypeName(m.method))
                                     .collect(Collectors.joining(", ")));
                 } else {
                     if (quickAck) {
                         rpcLog.debug("[C:0x{}, M:0x{}, Q:0x{}] Sending request: {}", id,
                                 Long.toHexString(requestMessageId), Integer.toHexString(quickAckToken),
-                                prettyTypeName(req.method));
+                                schemaTypeName(req.method));
                     } else {
                         rpcLog.debug("[C:0x{}, M:0x{}] Sending request: {}", id,
-                                Long.toHexString(requestMessageId), prettyTypeName(req.method));
+                                Long.toHexString(requestMessageId), schemaTypeName(req.method));
                     }
                 }
             }
@@ -988,7 +990,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         static RpcException createRpcException(RpcError error, RpcRequest request) {
             String format = String.format("%s returned code: %d, message: %s",
-                    prettyTypeName(request.method), error.errorCode(),
+                    schemaTypeName(request.method), error.errorCode(),
                     error.errorMessage());
 
             return new RpcException(format, error, request.method);
@@ -1030,6 +1032,10 @@ public class MTProtoClientImpl implements MTProtoClient {
                 decContainer(query);
                 acknowledgments.add(messageId);
 
+                var resultPublisher = query.sink.isPublishOnEventLoop()
+                        ? ctx.executor()
+                        : options.getResultPublisher();
+
                 if (obj instanceof RpcError rpcError) {
                     if (rpcError.errorCode() == 401) {
                         authData.unauthorized(true);
@@ -1041,13 +1047,13 @@ public class MTProtoClientImpl implements MTProtoClient {
                     }
 
                     RpcException e = createRpcException(rpcError, query);
-                    query.sink.emitError(e);
+                    query.sink.emitError(resultPublisher, e);
                 } else {
                     if (rpcLog.isDebugEnabled()) {
                         rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
                     }
 
-                    query.sink.emitValue(obj);
+                    query.sink.emitValue(resultPublisher, obj);
 
                     if (authData.unauthorized() && (obj instanceof Authorization || obj instanceof LoginTokenSuccess)) {
                         authData.unauthorized(false);
@@ -1065,7 +1071,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (obj instanceof MessageContainer messageContainer) {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer.messages().stream()
-                            .map(msg -> "0x" + Long.toHexString(msg.msgId()) + ": " + prettyTypeName(msg.body()))
+                            .map(msg -> "0x" + Long.toHexString(msg.msgId()) + ": " + schemaTypeName(msg.body()))
                             .collect(Collectors.joining(", ", "{", "}")));
                 }
 
@@ -1099,7 +1105,11 @@ public class MTProtoClientImpl implements MTProtoClient {
                 inflightPing = false;
 
                 if (query instanceof RpcQuery q) {
-                    q.sink.emitValue(pong);
+                    var resultPublisher = q.sink.isPublishOnEventLoop()
+                            ? ctx.executor()
+                            : options.getResultPublisher();
+
+                    q.sink.emitValue(resultPublisher, pong);
                 }
 
                 return;
@@ -1276,15 +1286,19 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        final ExecutorService publishScheduler;
+        final boolean publishOnEventLoop;
 
         volatile boolean once;
         volatile boolean cancelled;
 
         CoreSubscriber<? super Object> subscriber;
 
-        RequestMono(ExecutorService publishScheduler) {
-            this.publishScheduler = publishScheduler;
+        RequestMono(boolean publishOnEventLoop) {
+            this.publishOnEventLoop = publishOnEventLoop;
+        }
+
+        public boolean isPublishOnEventLoop() {
+            return publishOnEventLoop;
         }
 
         @Override
@@ -1298,23 +1312,23 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
 
         // TODO: guard with new state to prevent repeat emission
-        public void emitValue(Object obj) {
+        public void emitValue(ExecutorService resultPublisher, Object obj) {
             if (cancelled) {
                 return;
             }
 
-            publishScheduler.execute(() -> {
+            resultPublisher.execute(() -> {
                 subscriber.onNext(obj);
                 subscriber.onComplete();
             });
         }
 
-        public void emitError(RuntimeException e) {
+        public void emitError(ExecutorService resultPublisher, RuntimeException e) {
             if (cancelled) {
                 return;
             }
 
-            publishScheduler.execute(() -> subscriber.onError(e));
+            resultPublisher.execute(() -> subscriber.onError(e));
         }
 
         @Override

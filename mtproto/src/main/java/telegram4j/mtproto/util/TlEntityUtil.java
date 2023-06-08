@@ -205,4 +205,25 @@ public class TlEntityUtil {
             default -> false;
         };
     }
+
+    // name in format: 'users.getFullUser'
+    public static String schemaTypeName(Object method) {
+        String name = method.getClass().getSimpleName();
+        if (name.startsWith("Immutable"))
+            name = name.substring(9);
+
+        String namespace = method.getClass().getPackageName();
+        if (namespace.startsWith("telegram4j.tl."))
+            namespace = namespace.substring(14);
+        if (namespace.startsWith("request"))
+            namespace = namespace.substring(7);
+        if (namespace.startsWith("."))
+            namespace = namespace.substring(1);
+        name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
+
+        if (namespace.isEmpty()) {
+            return name;
+        }
+        return namespace + '.' + name;
+    }
 }

@@ -25,6 +25,7 @@ public final class AuthData {
     private AuthKey authKey;
     private int timeOffset;
     private long lastMessageId;
+    private long oldSessionId;
     private long sessionId = random.nextLong();
     private long serverSalt;
     private int seqNo;
@@ -84,10 +85,13 @@ public final class AuthData {
         return sessionId;
     }
 
-    public long resetSessionId() {
-        long old = sessionId;
-        sessionId = random.nextLong();
-        return old;
+    public void resetSessionId() {
+        seqNo = 0;
+        oldSessionId = sessionId;
+
+        do {
+            sessionId = random.nextLong();
+        } while (sessionId == oldSessionId);
     }
 
     public boolean unauthorized() {
@@ -136,6 +140,10 @@ public final class AuthData {
             return InvalidInboundMsgIdReason.DUPLICATE;
         }
         return null;
+    }
+
+    public long oldSessionId() {
+        return oldSessionId;
     }
 
     public enum InvalidInboundMsgIdReason {
