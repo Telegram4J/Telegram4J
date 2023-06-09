@@ -66,7 +66,8 @@ class TwoFactorAuthHandler {
                 if (hint != null) {
                     System.out.print(" (Hint \"" + hint + "\")");
                 }
-                System.out.print(": ");
+                System.out.println(": ");
+                System.out.println();
             }
 
             var password = sc.nextLine();

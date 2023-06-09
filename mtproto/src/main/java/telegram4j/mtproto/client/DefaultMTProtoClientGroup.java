@@ -85,8 +85,8 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 .map(MTProtoClient::close)
                 .collect(Collectors.toList()))
                 .then(Mono.fromRunnable(() -> {
-                    options.mtProtoOptions().getTcpClientResources().dispose();
-                    options.mtProtoOptions().getResultPublisher().shutdown();
+                    options.mtProtoOptions().tcpClientResources().dispose();
+                    options.mtProtoOptions().resultPublisher().shutdown();
                 }));
     }
 
@@ -154,7 +154,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
                     if (lessLoaded == null || lessLoaded.stats().queriesCount() != 0 &&
                             dcInfo.activeDownloadClientsCount.get() < arr.length) {
-                        yield options.mtProtoOptions.storeLayout.getDcOptions()
+                        yield options.mtProtoOptions.storeLayout().getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))
@@ -178,7 +178,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
                 var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
                 yield Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
-                        .switchIfEmpty(Mono.defer(() -> options.mtProtoOptions.storeLayout.getDcOptions()
+                        .switchIfEmpty(Mono.defer(() -> options.mtProtoOptions.storeLayout().getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
                                                 "No dc found for specified id: " + id)))

@@ -16,10 +16,10 @@ import reactor.core.publisher.Operators;
 import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthorizationException;
-import telegram4j.mtproto.auth.DhPrimeCheckerCache;
 import telegram4j.mtproto.client.ImmutableStats;
 import telegram4j.mtproto.client.MTProtoClient;
 import telegram4j.mtproto.client.MTProtoClientGroup;
@@ -64,7 +64,7 @@ import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 public class MTProtoClientImpl implements MTProtoClient {
     private static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
     private static final String HANDSHAKE       = "mtproto.handshake";
-    private static final String TRANSPORT       = "mtproto.transport";
+    private static final String TRANSPORT       = "mtproto.transportFactory";
     private static final String ENCRYPTION      = "mtproto.encryption";
     private static final String CORE            = "mtproto.core";
 
@@ -82,8 +82,18 @@ public class MTProtoClientImpl implements MTProtoClient {
 
     private static final AttributeKey<MonoSink<Void>> NOTIFY = AttributeKey.valueOf("notify");
 
-    private volatile Channel channel;
-    private volatile State localState = State.DISCONNECTED;
+    private static final VarHandle CHANNEL_STATE;
+    static {
+        var lookup = MethodHandles.lookup();
+        try {
+            CHANNEL_STATE = lookup.findVarHandle(MTProtoClientImpl.class, "channelState", ChannelState.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    private int oldState = ChannelState.DISCONNECTED;
+    private volatile ChannelState channelState = ChannelState.DISCONNECTED_STATE;
     private boolean inflightPing;
     private Trigger pingEmitter;
 
@@ -106,7 +116,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         this.authData = new AuthData(dc);
         this.options = options;
 
-        var tcpClientRes = options.getTcpClientResources();
+        var tcpClientRes = options.tcpClientResources();
         this.bootstrap = new Bootstrap()
                 .channelFactory(tcpClientRes.getEventLoopResources().getChannelFactory())
                 .group(tcpClientRes.getEventLoopGroup())
@@ -117,13 +127,6 @@ public class MTProtoClientImpl implements MTProtoClient {
                         ch.pipeline().addLast(CORE, new MTProtoClientHandler());
                     }
                 });
-    }
-
-    private void emitState(State st) {
-        if (log.isDebugEnabled()) {
-            log.debug("[C:0x{}] Updating state: {}->{}", id, localState, st);
-        }
-        localState = st;
     }
 
     private MsgsAck collectAcks() {
@@ -141,7 +144,8 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (t instanceof IOException) {
                 log.error("[C:0x" + id + "] Internal exception: " + t.getMessage());
 
-                emitState(State.DISCONNECTED);
+                logStateChange(ChannelState.DISCONNECTED);
+                channelState = ChannelState.DISCONNECTED_STATE;
                 ctx.close();
                 return;
             }
@@ -156,7 +160,8 @@ public class MTProtoClientImpl implements MTProtoClient {
                 log.error("[C:0x" + id + "] Unexpected client exception", t);
             }
 
-            emitState(State.CLOSED);
+            logStateChange(ChannelState.CLOSED);
+            channelState = ChannelState.CLOSED_STATE;
             ctx.close();
 
             var sinkAttr = ctx.channel().attr(NOTIFY);
@@ -169,18 +174,22 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) {
-            channel = ctx.channel();
-
             if (log.isDebugEnabled()) {
-                log.debug("[C:0x{}] Sending transport identifier to the datacenter {}", id, authData.dc());
+                log.debug("[C:0x{}] Sending transportFactory identifier to the datacenter {}", id, authData.dc());
             }
 
-            Transport tr = options.getTransport().create(authData.dc());
+            Transport tr = options.transportFactory().create(authData.dc());
             ctx.writeAndFlush(tr.identifier(ctx.alloc()))
                     .addListener(notify -> initializeChannel(ctx, tr));
         }
 
         private void reconnect() {
+            var currentState = channelState;
+            if (currentState == ChannelState.CLOSED_STATE) {
+                closeClient();
+                return;
+            }
+
             var future = bootstrap.connect();
             future.addListener(notify -> {
                 Throwable t = notify.cause();
@@ -205,35 +214,37 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
-            var st = localState;
-            if (st == State.CONNECTED) {
-                // Connection was reset by peer
-                emitState(State.DISCONNECTED);
-            }
-
-            channel = null;
+            var oldState = channelState;
 
             if (pingEmitter != null) {
                 pingEmitter.cancel();
             }
 
-            switch (st) {
-                case CONNECTED, DISCONNECTED -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
-                    }
-
-                    authData.resetSessionId();
-
-                    ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
-                }
-                case CLOSED -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
-                    }
-                    onClose.emitEmpty(FAIL_FAST);
-                }
+            if (oldState.state == ChannelState.CONNECTED) {
+                // connection was reset by peer; consider it as reason for reconnection
+                logStateChange(ChannelState.DISCONNECTED);
             }
+
+            if (oldState == ChannelState.CLOSED_STATE) {
+                closeClient();
+            } else {
+                channelState = ChannelState.DISCONNECTED_STATE;
+
+                if (log.isDebugEnabled()) {
+                    log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
+                }
+
+                authData.resetSessionId();
+
+                ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
+            }
+        }
+
+        private void closeClient() {
+            if (log.isDebugEnabled()) {
+                log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
+            }
+            onClose.emitEmpty(FAIL_FAST);
         }
 
         @Override
@@ -243,7 +254,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 authData.serverSalt(event.serverSalt());
                 authData.timeOffset(event.serverTimeDiff());
 
-                options.getStoreLayout().updateAuthKey(authData.dc(), event.authKey())
+                options.storeLayout().updateAuthKey(authData.dc(), event.authKey())
                         .subscribe(null, ctx::fireExceptionCaught);
 
                 ctx.pipeline().remove(HANDSHAKE);
@@ -260,7 +271,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, new MTProtoEncryption(tr));
 
             if (type == DcId.Type.MAIN) {
-                options.getStoreLayout().updateDataCenter(authData.dc())
+                options.storeLayout().updateDataCenter(authData.dc())
                         .subscribe(null, ctx::fireExceptionCaught);
             }
 
@@ -277,18 +288,22 @@ public class MTProtoClientImpl implements MTProtoClient {
                 }
 
                 log.debug("[C:0x{}] Closing by ping timeout", id);
-                emitState(State.DISCONNECTED);
+
+                logStateChange(ChannelState.DISCONNECTED);
+                channelState = ChannelState.DISCONNECTED_STATE;
                 ctx.close();
             }, ctx.executor(), period);
 
             if (authData.oldSessionId() != 0) {
-                send(ImmutableDestroySession.of(authData.oldSessionId()))
+                send(ctx, ImmutableDestroySession.of(authData.oldSessionId()))
                         .subscribe(null, ctx::fireExceptionCaught);
             }
 
-            send(options.getInitConnection())
+            send(ctx, options.initConnection())
                     .subscribe(notify -> {
-                        emitState(State.CONNECTED);
+                        logStateChange(ChannelState.CONNECTED);
+                        channelState = new ChannelState(ctx.channel(), ChannelState.CONNECTED);
+
                         var sinkAttr = ctx.channel().attr(NOTIFY);
                         var sink = sinkAttr.get();
 
@@ -298,10 +313,8 @@ public class MTProtoClientImpl implements MTProtoClient {
                                 log.debug("[C:0x{}] Sending pending requests: {}", id, pendingRequests.size());
                             }
 
-                            RpcRequest req; // TODO send all in container
-                            while ((req = pendingRequests.poll()) != null) {
-                                ctx.writeAndFlush(req);
-                            }
+                            // TODO send all in container
+                            pendingRequests.drain(ctx::writeAndFlush);
                         });
 
                         if (sink != null) {
@@ -323,13 +336,11 @@ public class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addFirst(TRANSPORT, new TransportCodec(tr));
 
             if (authData.authKey() == null) {
-                options.getStoreLayout().getAuthKey(authData.dc())
+                options.storeLayout().getAuthKey(authData.dc())
                         .switchIfEmpty(Mono.fromRunnable(() -> ctx.executor().execute(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
 
-                            var handshakeCtx = new HandshakeContext( // TODO make configurable
-                                    DhPrimeCheckerCache.instance(),
-                                    PublicRsaKeyRegister.createDefault());
+                            var handshakeCtx = new HandshakeContext(options.dhPrimeChecker(), options.publicRsaKeyRegister());
                             ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
                         })))
                         .subscribe(loaded -> ctx.executor().execute(() -> {
@@ -342,11 +353,22 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
     }
 
+    private void logStateChange(int newState) {
+        if (log.isDebugEnabled()) {
+            log.debug("[C:0x{}] Updating state: {}->{}", id, ChannelState.stateName(oldState), ChannelState.stateName(newState));
+        }
+        oldState = newState;
+    }
+
     @Override
     public Mono<Void> connect() {
         return Mono.create(sink -> {
-            if (channel != null) {
-                sink.error(new IllegalStateException("Client already connected"));
+            var currentState = channelState;
+            if (currentState == ChannelState.CLOSED_STATE) {
+                sink.error(new MTProtoException("Client has been closed"));
+                return;
+            } else if (currentState != ChannelState.DISCONNECTED_STATE) {
+                sink.error(new MTProtoException("Client already connected"));
                 return;
             }
 
@@ -371,69 +393,66 @@ public class MTProtoClientImpl implements MTProtoClient {
         });
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
-        return Mono.defer(() -> send0(method, false))
-        .transform(options.getResponseTransformers().stream()
-                .map(tr -> tr.transform(method))
-                .reduce(Function.identity(), Function::andThen));
-    }
+        return Mono.defer(() -> {
+            var currentState = channelState;
 
-    private <R, T extends TlMethod<R>> Mono<R> send(T method) {
-        return send0(method, true);
-    }
+            if (currentState == ChannelState.CLOSED_STATE) {
+                return Mono.error(new MTProtoException("Client has been closed"));
+            } else if (currentState == ChannelState.DISCONNECTED_STATE) {
+                if (!isResultAwait(method)) {
+                    if (!pendingRequests.offer(new RpcRequest(method))) {
+                        return Mono.error(new DiscardedRpcRequestException(method));
+                    }
 
-    @SuppressWarnings("unchecked")
-    private <R, T extends TlMethod<R>> Mono<R> send0(T method, boolean internal) {
-        State currentState = localState;
-        Channel currentChannel = channel;
+                    if (log.isDebugEnabled()) {
+                        log.debug("[C:0x{}] Delaying request: {}", id, schemaTypeName(method));
+                    }
+                    return Mono.empty();
+                }
 
-        if (currentChannel != null && (currentState == State.CONNECTED ||
-                internal && isBootrapMethod(method))) {
-
-            if (!isResultAwait(method)) {
-                currentChannel.writeAndFlush(new RpcRequest(method));
-                return Mono.empty();
-            }
-
-            RequestMono sink = new RequestMono(internal);
-            currentChannel.writeAndFlush(new RpcQuery(method, sink));
-
-            return (Mono<R>) sink;
-        } else if (currentState == State.DISCONNECTED) {
-            if (!isResultAwait(method)) {
-                if (!pendingRequests.offer(new RpcRequest(method))) {
+                RequestMono sink = new RequestMono(false);
+                if (!pendingRequests.offer(new RpcQuery(method, sink))) {
                     return Mono.error(new DiscardedRpcRequestException(method));
                 }
 
                 if (log.isDebugEnabled()) {
                     log.debug("[C:0x{}] Delaying request: {}", id, schemaTypeName(method));
                 }
-                return Mono.empty();
-            }
+                return (Mono<R>) sink;
+            } else { // CONNECTED
+                var ch = channelState.channel;
+                if (ch == null) {
+                    return Mono.error(new MTProtoException("Illegal client state"));
+                }
 
-            RequestMono sink = new RequestMono(internal);
-            if (!pendingRequests.offer(new RpcQuery(method, sink))) {
-                return Mono.error(new DiscardedRpcRequestException(method));
-            }
+                if (!isResultAwait(method)) {
+                    ch.writeAndFlush(new RpcRequest(method));
+                    return Mono.empty();
+                }
 
-            if (log.isDebugEnabled()) {
-                log.debug("[C:0x{}] Delaying request: {}", id, schemaTypeName(method));
+                RequestMono sink = new RequestMono(false);
+                ch.writeAndFlush(new RpcQuery(method, sink));
+                return (Mono<R>) sink;
             }
-
-            return (Mono<R>) sink;
-        } else if (currentState == State.CLOSED) {
-            return Mono.error(new MTProtoException("Client has been closed"));
-        } else {
-            return Mono.error(new IllegalStateException("Unexpected client state: " + currentState));
-        }
+        })
+        .transform(options.responseTransformers().stream()
+                .map(tr -> tr.transform(method))
+                .reduce(Function.identity(), Function::andThen));
     }
 
-    private boolean isBootrapMethod(TlMethod<?> method) {
-        return switch (method.identifier()) {
-            case InvokeWithLayer.ID, PingDelayDisconnect.ID, Ping.ID -> true;
-            default -> false;
-        };
+    @SuppressWarnings("unchecked")
+    private <R, T extends TlMethod<R>> Mono<R> send(ChannelHandlerContext ctx, T method) {
+        if (!isResultAwait(method)) {
+            ctx.channel().writeAndFlush(new RpcRequest(method));
+            return Mono.empty();
+        }
+
+        RequestMono sink = new RequestMono(true);
+        ctx.channel().writeAndFlush(new RpcQuery(method, sink));
+        return (Mono<R>) sink;
     }
 
     @Override
@@ -454,27 +473,31 @@ public class MTProtoClientImpl implements MTProtoClient {
     @Override
     public Mono<Void> close() {
         return Mono.create(sink -> {
-            var curretChannel = channel;
-            if (curretChannel == null) {
+            var cs = channelState;
+            if (cs == ChannelState.CLOSED_STATE) {
                 sink.success();
-                return;
+            } else if (cs == ChannelState.DISCONNECTED_STATE) {
+                channelState = ChannelState.CLOSED_STATE;
+            } else {
+                EventLoop eventLoop = cs.channel.eventLoop();
+
+                eventLoop.execute(() -> {
+                    logStateChange(ChannelState.CLOSED);
+                    channelState = ChannelState.CLOSED_STATE;
+
+                    cancelRequests(eventLoop);
+
+                    cs.channel.close()
+                            .addListener(notify -> {
+                                Throwable t = notify.cause();
+                                if (t != null) {
+                                    sink.error(t);
+                                } else if (notify.isSuccess()) {
+                                    sink.success();
+                                }
+                            });
+                });
             }
-
-            curretChannel.eventLoop().execute(() -> {
-                emitState(State.CLOSED);
-
-                cancelRequests(curretChannel.eventLoop());
-
-                curretChannel.close()
-                        .addListener(notify -> {
-                            Throwable t = notify.cause();
-                            if (t != null) {
-                                sink.error(t);
-                            } else if (notify.isSuccess()) {
-                                sink.success();
-                            }
-                        });
-            });
         });
     }
 
@@ -490,7 +513,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (req instanceof RpcQuery q) {
                 var resultPublisher = q.sink.isPublishOnEventLoop()
                         ? eventLoop
-                        : options.getResultPublisher();
+                        : options.resultPublisher();
 
                 q.sink.emitError(resultPublisher, exc);
             }
@@ -782,7 +805,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             TlObject method = req.method;
             int size = TlSerializer.sizeOf(req.method);
-            if (size >= options.getGzipWrappingSizeThreshold()) {
+            if (size >= options.gzipWrappingSizeThreshold()) {
                 ByteBuf serialized = ctx.alloc().ioBuffer(size);
                 TlSerializer.serialize(serialized, method);
                 ByteBuf gzipped = TlSerialUtil.compressGzip(ctx.alloc(), 9, serialized);
@@ -794,7 +817,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             long containerMsgId = -1;
-            // server returns -404 transport error when this packet placed in container
+            // server returns -404 transportFactory error when this packet placed in container
             boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
 
             Request containerOrRequest = req;
@@ -992,7 +1015,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             handleServiceMessage(ctx, obj, messageId);
         }
 
-        private Object ungzip(Object obj) {
+        private Object decompressIfApplicable(Object obj) {
             return obj instanceof GzipPacked gzipPacked
                     ? TlSerialUtil.decompressGzip(gzipPacked.packedData())
                     : obj;
@@ -1031,7 +1054,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         private void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) {
             if (obj instanceof RpcResult rpcResult) {
                 messageId = rpcResult.reqMsgId();
-                obj = ungzip(rpcResult.result());
+                obj = decompressIfApplicable(rpcResult.result());
 
                 var query = (RpcQuery) requests.remove(messageId);
                 if (query == null) {
@@ -1041,10 +1064,6 @@ public class MTProtoClientImpl implements MTProtoClient {
                 stats.decrementQueriesCount();
                 decContainer(query);
                 acknowledgments.add(messageId);
-
-                var resultPublisher = query.sink.isPublishOnEventLoop()
-                        ? ctx.executor()
-                        : options.getResultPublisher();
 
                 if (obj instanceof RpcError rpcError) {
                     if (rpcError.errorCode() == 401) {
@@ -1057,18 +1076,28 @@ public class MTProtoClientImpl implements MTProtoClient {
                     }
 
                     RpcException e = createRpcException(rpcError, query);
-                    query.sink.emitError(resultPublisher, e);
+
+                    if (query.sink.isPublishOnEventLoop()) {
+                        query.sink.emitError(e);
+                    } else {
+                        query.sink.emitError(options.resultPublisher(), e);
+                    }
                 } else {
                     if (rpcLog.isDebugEnabled()) {
                         rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result", id, Long.toHexString(messageId));
                     }
 
-                    query.sink.emitValue(resultPublisher, obj);
+                    if (query.sink.isPublishOnEventLoop()) {
+                        query.sink.emitValue(obj);
+                    } else {
+                        query.sink.emitValue(options.resultPublisher(), obj);
+                    }
 
                     if (authData.unauthorized() && (obj instanceof Authorization || obj instanceof LoginTokenSuccess)) {
                         authData.unauthorized(false);
 
                         RpcQuery pendingQuery;
+                        // TODO send all in container
                         while ((pendingQuery = delayedUntilAuth.poll()) != null) {
                             ctx.channel().writeAndFlush(pendingQuery);
                         }
@@ -1080,7 +1109,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             if (obj instanceof MessageContainer messageContainer) {
                 if (rpcLog.isDebugEnabled()) {
-                    rpcLog.trace("[C:0x{}] Handling message container: {}", id, messageContainer.messages().stream()
+                    rpcLog.debug("[C:0x{}] Handling message container: {}", id, messageContainer.messages().stream()
                             .map(msg -> "0x" + Long.toHexString(msg.msgId()) + ": " + schemaTypeName(msg.body()))
                             .collect(Collectors.joining(", ", "{", "}")));
                 }
@@ -1092,7 +1121,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             // Applicable for updates
-            obj = ungzip(obj);
+            obj = decompressIfApplicable(obj);
             if (obj instanceof Updates updates) {
                 if (rpcLog.isTraceEnabled()) {
                     rpcLog.trace("[C:0x{}] Receiving updates: {}", id, updates);
@@ -1115,11 +1144,11 @@ public class MTProtoClientImpl implements MTProtoClient {
                 inflightPing = false;
 
                 if (query instanceof RpcQuery q) {
-                    var resultPublisher = q.sink.isPublishOnEventLoop()
-                            ? ctx.executor()
-                            : options.getResultPublisher();
-
-                    q.sink.emitValue(resultPublisher, pong);
+                    if (q.sink.isPublishOnEventLoop()) {
+                        q.sink.emitValue(obj);
+                    } else {
+                        q.sink.emitValue(options.resultPublisher(), obj);
+                    }
                 }
 
                 return;
@@ -1321,7 +1350,15 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        // TODO: guard with new state to prevent repeat emission
+        public void emitValue(Object obj) {
+            if (cancelled) {
+                return;
+            }
+
+            subscriber.onNext(obj);
+            subscriber.onComplete();
+        }
+
         public void emitValue(ExecutorService resultPublisher, Object obj) {
             if (cancelled) {
                 return;
@@ -1331,6 +1368,14 @@ public class MTProtoClientImpl implements MTProtoClient {
                 subscriber.onNext(obj);
                 subscriber.onComplete();
             });
+        }
+
+        public void emitError(RuntimeException e) {
+            if (cancelled) {
+                return;
+            }
+
+            subscriber.onError(e);
         }
 
         public void emitError(ExecutorService resultPublisher, RuntimeException e) {
@@ -1352,15 +1397,29 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
     }
 
-    /** Client initialization stages. */
-    enum State {
-        /** The state in which the client must reconnect. */
-        DISCONNECTED,
+    static class ChannelState {
+        public static final int DISCONNECTED = 0;
+        public static final int CONNECTED = 1;
+        public static final int CLOSED = 2;
 
-        /** The state in which the client is ready to send requests to the dc. */
-        CONNECTED,
+        static final ChannelState DISCONNECTED_STATE = new ChannelState(null, DISCONNECTED);
+        static final ChannelState CLOSED_STATE = new ChannelState(null, CLOSED);
 
-        /** The state in which the client must fully shutdown without the possibility of resuming. */
-        CLOSED
+        final Channel channel;
+        final int state;
+
+        ChannelState(@Nullable Channel channel, int state) {
+            this.channel = channel;
+            this.state = state;
+        }
+
+        private static String stateName(int state) {
+            return switch (state) {
+                case DISCONNECTED -> "DISCONNECTED";
+                case CONNECTED -> "CONNECTED";
+                case CLOSED -> "CLOSED";
+                default -> throw new IllegalStateException();
+            };
+        }
     }
 }

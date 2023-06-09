@@ -5,14 +5,13 @@ import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
+import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
-import reactor.util.retry.Retry;
-import reactor.util.retry.RetryBackoffSpec;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.EventDispatcher;
@@ -50,7 +49,6 @@ import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.users.ImmutableGetUsers;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -69,8 +67,6 @@ public final class MTProtoBootstrap {
 
     private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
     private Function<MTProtoOptions, ClientFactory> clientFactory = DefaultClientFactory::new;
-    private RetryBackoffSpec connectionRetry;
-    private RetryBackoffSpec authRetry;
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
@@ -90,7 +86,9 @@ public final class MTProtoBootstrap {
     private int gzipWrappingSizeThreshold = 16 * 1024;
     private TcpClientResources tcpClientResources;
     private UpdateDispatcher updateDispatcher;
+
     private ExecutorService resultPublisher;
+    private Scheduler updatesPublisher;
 
     MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorisationHandler authHandler) {
         this.authResources = authResources;
@@ -175,6 +173,11 @@ public final class MTProtoBootstrap {
         return this;
     }
 
+    public MTProtoBootstrap setUpdatesPublisher(Scheduler updatesPublisher) {
+        this.updatesPublisher = updatesPublisher;
+        return this;
+    }
+
     // TODO docs
     public MTProtoBootstrap setUpdateDispatcher(UpdateDispatcher updateDispatcher) {
         this.updateDispatcher = Objects.requireNonNull(updateDispatcher);
@@ -207,32 +210,6 @@ public final class MTProtoBootstrap {
      */
     public MTProtoBootstrap setUpdatesManager(Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory) {
         this.updatesManagerFactory = Objects.requireNonNull(updatesManagerFactory);
-        return this;
-    }
-
-    /**
-     * Sets retry strategy for mtproto client reconnection.
-     * <p>
-     * If custom doesn't set, {@code Retry.fixedDelay(Integer.MAX_VALUE, Duration.ofSeconds(5))} will be used.
-     *
-     * @param connectionRetry A new retry strategy for mtproto client reconnection.
-     * @return This builder.
-     */
-    public MTProtoBootstrap setConnectionRetry(RetryBackoffSpec connectionRetry) {
-        this.connectionRetry = Objects.requireNonNull(connectionRetry);
-        return this;
-    }
-
-    /**
-     * Sets retry strategy for auth key generation.
-     * <p>
-     * If custom doesn't set, {@code Retry.fixedDelay(5, Duration.ofSeconds(3))} will be used.
-     *
-     * @param authRetry A new retry strategy for auth key generation.
-     * @return This builder.
-     */
-    public MTProtoBootstrap setAuthRetry(RetryBackoffSpec authRetry) {
-        this.authRetry = Objects.requireNonNull(authRetry);
         return this;
     }
 
@@ -389,25 +366,28 @@ public final class MTProtoBootstrap {
             var loadMainDc = loadDcOptions
                     .zipWhen(dcOptions -> storeLayout.getDataCenter()
                             .switchIfEmpty(Mono.fromSupplier(() -> initDataCenter(dcOptions))));
+
             composite.add(loadMainDc
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
                         var tcpClientResources = initTcpClientResources();
+                        var initConnectionRequest = InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
+                                .layer(TlInfo.LAYER)
+                                .query(initConnection())
+                                .build();
                         var options = new MTProtoOptions(
-                                tcpClientResources, publicRsaKeyRegister,
-                                dhPrimeChecker, transportFactory, storeLayout, initConnectionRetry(), initAuthRetry(),
+                                tcpClientResources, initPublicRsaKeyRegister(),
+                                initDhPrimeChecker(), transportFactory, storeLayout,
                                 List.copyOf(responseTransformers),
-                                InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
-                                        .layer(TlInfo.LAYER)
-                                        .query(initConnection())
-                                        .build(), gzipWrappingSizeThreshold, initResultPublisher());
+                                initConnectionRequest, gzipWrappingSizeThreshold,
+                                initResultPublisher(), initUpdatesPublisher());
 
                         ClientFactory clientFactory = this.clientFactory.apply(options);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
                                 MTProtoClientGroup.Options.of(mainDc, clientFactory,
-                                        initUpdateDispatcher(), options));
+                                        initUpdateDispatcher(options.updatesPublisher()), options));
 
                         return authorizeClient(clientGroup, storeLayout, dcOptions)
-                                .flatMap(selfId -> initializeClient(selfId, clientGroup, storeLayout));
+                                .flatMap(selfId -> initializeClient(selfId, clientGroup, options));
                     }))
                     .subscribe(sink::success, sink::error));
 
@@ -461,14 +441,15 @@ public final class MTProtoBootstrap {
         return Id.ofUser(b.id(), b.accessHash());
     }
 
-    private Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+    private Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientGroup clientGroup,
+                                                         MTProtoOptions options) {
         return Mono.create(sink -> {
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
-            MTProtoResources mtProtoResources = new MTProtoResources(storeLayout, eventDispatcher,
+            MTProtoResources mtProtoResources = new MTProtoResources(options.storeLayout(), eventDispatcher,
                     defaultEntityParserFactory, unavailableChatPolicy);
-            ServiceHolder serviceHolder = new ServiceHolder(clientGroup, storeLayout);
+            ServiceHolder serviceHolder = new ServiceHolder(clientGroup, options.storeLayout());
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, clientGroup,
@@ -561,6 +542,13 @@ public final class MTProtoBootstrap {
         return initConnection.build();
     }
 
+    private PublicRsaKeyRegister initPublicRsaKeyRegister() {
+        if (publicRsaKeyRegister != null) {
+            return publicRsaKeyRegister;
+        }
+        return PublicRsaKeyRegister.createDefault();
+    }
+
     private TcpClientResources initTcpClientResources() {
         if (tcpClientResources != null) {
             return tcpClientResources;
@@ -568,20 +556,37 @@ public final class MTProtoBootstrap {
         return TcpClientResources.create();
     }
 
+    private Scheduler initUpdatesPublisher() {
+        if (updatesPublisher != null) {
+            return updatesPublisher;
+        }
+        return Schedulers.newParallel("t4j-events", 4, true);
+    }
+
     private EventDispatcher initEventDispatcher() {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        return new DefaultEventDispatcher(Schedulers.newParallel("t4j-events", 4, true),
+        // By default, all events will be published on the same thread pool as updates
+        return new DefaultEventDispatcher(Schedulers.immediate(),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
-    private UpdateDispatcher initUpdateDispatcher() {
+    private UpdateDispatcher initUpdateDispatcher(Scheduler updatesPublisher) {
         if (updateDispatcher != null) {
             return updateDispatcher;
         }
-        return new SinksUpdateDispatcher();
+        return new SinksUpdateDispatcher(updatesPublisher,
+                Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
+                Sinks.EmitFailureHandler.FAIL_FAST);
+    }
+
+    private DhPrimeChecker initDhPrimeChecker() {
+        if (dhPrimeChecker != null) {
+            return dhPrimeChecker;
+        }
+        return DhPrimeCheckerCache.instance();
     }
 
     private StoreLayout initStoreLayout() {
@@ -604,20 +609,6 @@ public final class MTProtoBootstrap {
             return dcOptions;
         }
         return DcOptions.createDefault(false);
-    }
-
-    private RetryBackoffSpec initConnectionRetry() {
-        if (connectionRetry != null) {
-            return connectionRetry;
-        }
-        return Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(5));
-    }
-
-    private RetryBackoffSpec initAuthRetry() {
-        if (authRetry != null) {
-            return authRetry;
-        }
-        return Retry.fixedDelay(5, Duration.ofSeconds(3));
     }
 
     private ExecutorService initResultPublisher() {

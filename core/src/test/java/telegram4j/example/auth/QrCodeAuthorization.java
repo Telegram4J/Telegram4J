@@ -52,11 +52,9 @@ public class QrCodeAuthorization {
             String apiHash = authResources.getApiHash();
             ResettableInterval inter = new ResettableInterval(Schedulers.boundedElastic());
 
-            var listenTokens = clientGroup.updates()
-                    .on(UpdateShort.class)
+            var listenTokens = clientGroup.updates().on(UpdateShort.class)
                     .takeUntil(u -> complete.get())
                     .filter(u -> u.update().identifier() == UpdateLoginToken.ID)
-                    .publishOn(Schedulers.boundedElastic()) // do not block to wait 2FA password
                     .flatMap(l -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
                     .flatMap(token -> switch (token.identifier()) {
                         case LoginTokenSuccess.ID -> {
@@ -78,6 +76,7 @@ public class QrCodeAuthorization {
                         default -> Flux.error(new IllegalStateException("Unexpected type of LoginToken: " + token));
                     })
                     .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> {
+                        inter.dispose();
                         TwoFactorAuthHandler tfa = new TwoFactorAuthHandler(clientGroup, sink);
                         return tfa.begin2FA()
                                 .retryWhen(Retry.indefinitely()

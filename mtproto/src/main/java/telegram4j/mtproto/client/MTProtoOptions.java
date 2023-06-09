@@ -1,7 +1,6 @@
 package telegram4j.mtproto.client;
 
-import reactor.util.annotation.Nullable;
-import reactor.util.retry.RetryBackoffSpec;
+import reactor.core.scheduler.Scheduler;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.auth.DhPrimeChecker;
@@ -14,84 +13,24 @@ import telegram4j.tl.request.InvokeWithLayer;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
-public class MTProtoOptions {
-    protected final TcpClientResources tcpClientResources;
-    @Nullable
-    protected final PublicRsaKeyRegister publicRsaKeyRegister;
-    @Nullable
-    protected final DhPrimeChecker dhPrimeChecker;
-    protected final TransportFactory transport;
-    protected final StoreLayout storeLayout;
-    protected final RetryBackoffSpec connectionRetry;
-    protected final RetryBackoffSpec authRetry;
-    protected final List<ResponseTransformer> responseTransformers;
-    protected final InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection;
-    protected final int gzipWrappingSizeThreshold;
-    protected final ExecutorService resultPublisher;
+public record MTProtoOptions(TcpClientResources tcpClientResources, PublicRsaKeyRegister publicRsaKeyRegister,
+                             DhPrimeChecker dhPrimeChecker, TransportFactory transportFactory, StoreLayout storeLayout,
+                             List<ResponseTransformer> responseTransformers,
+                             InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
+                             int gzipWrappingSizeThreshold, ExecutorService resultPublisher,
+                             Scheduler updatesPublisher) {
 
-    public MTProtoOptions(TcpClientResources tcpClientResources, @Nullable PublicRsaKeyRegister publicRsaKeyRegister,
-                          @Nullable DhPrimeChecker dhPrimeChecker, TransportFactory transport,
-                          StoreLayout storeLayout, RetryBackoffSpec connectionRetry,
-                          RetryBackoffSpec authRetry, List<ResponseTransformer> responseTransformers,
-                          InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
-                          int gzipWrappingSizeThreshold, ExecutorService resultPublisher) {
-        this.tcpClientResources = Objects.requireNonNull(tcpClientResources);
-        this.publicRsaKeyRegister = publicRsaKeyRegister;
-        this.dhPrimeChecker = dhPrimeChecker;
-        this.transport = Objects.requireNonNull(transport);
-        this.storeLayout = Objects.requireNonNull(storeLayout);
-        this.connectionRetry = Objects.requireNonNull(connectionRetry);
-        this.authRetry = Objects.requireNonNull(authRetry);
-        this.responseTransformers = Objects.requireNonNull(responseTransformers);
-        this.initConnection = Objects.requireNonNull(initConnection);
-        this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
-        this.resultPublisher = Objects.requireNonNull(resultPublisher);
-    }
-
-    public TcpClientResources getTcpClientResources() {
-        return tcpClientResources;
-    }
-
-    public TransportFactory getTransport() {
-        return transport;
-    }
-
-    public Optional<PublicRsaKeyRegister> getPublicRsaKeyRegister() {
-        return Optional.ofNullable(publicRsaKeyRegister);
-    }
-
-    public Optional<DhPrimeChecker> getDhPrimeChecker() {
-        return Optional.ofNullable(dhPrimeChecker);
-    }
-
-    public StoreLayout getStoreLayout() {
-        return storeLayout;
-    }
-
-    public RetryBackoffSpec getConnectionRetry() {
-        return connectionRetry;
-    }
-
-    public RetryBackoffSpec getAuthRetry() {
-        return authRetry;
-    }
-
-    public List<ResponseTransformer> getResponseTransformers() {
-        return responseTransformers;
-    }
-
-    public InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> getInitConnection() {
-        return initConnection;
-    }
-
-    public int getGzipWrappingSizeThreshold() {
-        return gzipWrappingSizeThreshold;
-    }
-
-    public ExecutorService getResultPublisher() {
-        return resultPublisher;
+    public MTProtoOptions {
+        Objects.requireNonNull(tcpClientResources);
+        Objects.requireNonNull(publicRsaKeyRegister);
+        Objects.requireNonNull(dhPrimeChecker);
+        Objects.requireNonNull(transportFactory);
+        Objects.requireNonNull(storeLayout);
+        Objects.requireNonNull(responseTransformers);
+        Objects.requireNonNull(initConnection);
+        Objects.requireNonNull(resultPublisher);
+        Objects.requireNonNull(updatesPublisher);
     }
 }
