@@ -46,7 +46,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -55,7 +54,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final MTProtoClientGroup mtProtoClientGroup;
     private final MTProtoResources mtProtoResources;
     private final UpdatesManager updatesManager;
-    private final Id[] selfIdHolder;
+    private final Id selfId;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
     private final Mono<Void> onDisconnect;
@@ -63,14 +62,14 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     MTProtoTelegramClient(AuthorizationResources authResources,
                           MTProtoClientGroup mtProtoClientGroup, MTProtoResources mtProtoResources,
                           Function<MTProtoTelegramClient, UpdatesManager> updatesManager,
-                          Id[] selfIdHolder, ServiceHolder serviceHolder,
+                          Id selfId, ServiceHolder serviceHolder,
                           EntityRetrievalStrategy entityRetriever,
                           Mono<Void> onDisconnect) {
         this.authResources = authResources;
         this.mtProtoClientGroup = mtProtoClientGroup;
         this.mtProtoResources = mtProtoResources;
         this.serviceHolder = serviceHolder;
-        this.selfIdHolder = selfIdHolder;
+        this.selfId = selfId;
         this.entityRetriever = entityRetriever.apply(this);
         this.updatesManager = updatesManager.apply(this);
         this.onDisconnect = onDisconnect;
@@ -120,7 +119,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return The id of <i>current</i> user.
      */
     public Id getSelfId() {
-        return Objects.requireNonNull(selfIdHolder[0]);
+        return selfId;
     }
 
     /**

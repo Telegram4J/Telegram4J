@@ -1,6 +1,5 @@
 package telegram4j.mtproto.client;
 
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
@@ -34,14 +33,6 @@ public interface MTProtoClient {
     <R, T extends TlMethod<R>> Mono<R> sendAwait(T method);
 
     /**
-     * Gets a {@link Flux} of {@link State} displaying current status of the client.
-     *
-     * @return A {@link Flux} emitting a {@link State}.
-     */
-    // TODO: At the moment, the impl allows IO thread to leak.
-    Flux<State> state();
-
-    /**
      * Gets the client datacenter.
      *
      * @return The {@link DataCenter} to which the client is configured.
@@ -64,17 +55,7 @@ public interface MTProtoClient {
      */
     Mono<Void> close();
 
-    /** Client initialization stages. */
-    enum State {
-        /** The state in which the client must reconnect. */
-        DISCONNECTED,
-
-        /** The state in which the client is ready to send requests to the dc. */
-        CONNECTED,
-
-        /** The state in which the client must fully shutdown without the possibility of resuming. */
-        CLOSED
-    }
+    Mono<Void> onClose();
 
     /** Interface for client statistic. */
     interface Stats {

@@ -10,8 +10,10 @@ import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Exceptions;
-import reactor.core.publisher.*;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Mono;
+import reactor.core.publisher.MonoSink;
+import reactor.core.publisher.Operators;
+import reactor.core.publisher.Sinks;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
@@ -93,8 +95,7 @@ public class MTProtoClientImpl implements MTProtoClient {
     private final HashMap<Long, Request> requests = new HashMap<>();
     private final String id = Integer.toHexString(hashCode());
     private final InnerStats stats = new InnerStats();
-    private final Sinks.Many<State> state = Sinks.many().replay()
-            .latestOrDefault(State.DISCONNECTED);
+    private final Sinks.Empty<Void> onClose = Sinks.empty();
 
     private final MTProtoOptions options;
     private final Bootstrap bootstrap;
@@ -123,7 +124,6 @@ public class MTProtoClientImpl implements MTProtoClient {
             log.debug("[C:0x{}] Updating state: {}->{}", id, localState, st);
         }
         localState = st;
-        state.emitNext(st, FAIL_FAST);
     }
 
     private MsgsAck collectAcks() {
@@ -138,8 +138,9 @@ public class MTProtoClientImpl implements MTProtoClient {
     class MTProtoClientHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable t) {
-            // we don't throw IOException's anywhere and the only one who can do it is netty
             if (t instanceof IOException) {
+                log.error("[C:0x" + id + "] Internal exception: " + t.getMessage());
+
                 emitState(State.DISCONNECTED);
                 ctx.close();
                 return;
@@ -204,23 +205,33 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
+            var st = localState;
+            if (st == State.CONNECTED) {
+                // Connection was reset by peer
+                emitState(State.DISCONNECTED);
+            }
+
             channel = null;
 
             if (pingEmitter != null) {
                 pingEmitter.cancel();
             }
 
-            if (localState == State.DISCONNECTED) {
-                if (log.isDebugEnabled()) {
-                    log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
+            switch (st) {
+                case CONNECTED, DISCONNECTED -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
+                    }
+
+                    authData.resetSessionId();
+
+                    ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
                 }
-
-                authData.resetSessionId();
-
-                ctx.executor().schedule(this::reconnect, 5, TimeUnit.SECONDS);
-            } else { // State.CLOSED
-                if (log.isDebugEnabled()) {
-                    log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
+                case CLOSED -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
+                    }
+                    onClose.emitEmpty(FAIL_FAST);
                 }
             }
         }
@@ -426,12 +437,6 @@ public class MTProtoClientImpl implements MTProtoClient {
     }
 
     @Override
-    public Flux<State> state() {
-        return state.asFlux()
-                .publishOn(Schedulers.boundedElastic());
-    }
-
-    @Override
     public DataCenter dc() {
         return authData.dc();
     }
@@ -471,6 +476,11 @@ public class MTProtoClientImpl implements MTProtoClient {
                         });
             });
         });
+    }
+
+    @Override
+    public Mono<Void> onClose() {
+        return onClose.asMono();
     }
 
     private void cancelRequests(EventLoop eventLoop) {
@@ -1340,5 +1350,17 @@ public class MTProtoClientImpl implements MTProtoClient {
         public void cancel() {
             cancelled = true;
         }
+    }
+
+    /** Client initialization stages. */
+    enum State {
+        /** The state in which the client must reconnect. */
+        DISCONNECTED,
+
+        /** The state in which the client is ready to send requests to the dc. */
+        CONNECTED,
+
+        /** The state in which the client must fully shutdown without the possibility of resuming. */
+        CLOSED
     }
 }

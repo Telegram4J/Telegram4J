@@ -40,6 +40,7 @@ import telegram4j.mtproto.transport.TransportFactory;
 import telegram4j.tl.BaseUser;
 import telegram4j.tl.InputUserSelf;
 import telegram4j.tl.TlInfo;
+import telegram4j.tl.User;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.auth.BaseAuthorization;
@@ -47,7 +48,7 @@ import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
-import telegram4j.tl.request.updates.GetState;
+import telegram4j.tl.request.users.ImmutableGetUsers;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -59,7 +60,6 @@ import java.util.function.Function;
 
 public final class MTProtoBootstrap {
 
-    private static final boolean parseBotIdFromToken = Boolean.getBoolean("telegram4j.core.parseBotIdFromToken");
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
     private final AuthorizationResources authResources;
@@ -407,7 +407,7 @@ public final class MTProtoBootstrap {
                                         initUpdateDispatcher(), options));
 
                         return tryConnect(clientGroup, storeLayout, dcOptions)
-                                .flatMap(ignored -> initializeClient(clientGroup, storeLayout));
+                                .flatMap(selfId -> initializeClient(selfId, clientGroup, storeLayout));
                     }))
                     .subscribe(sink::success, sink::error));
 
@@ -415,8 +415,8 @@ public final class MTProtoBootstrap {
         });
     }
 
-    private Mono<MTProtoClientGroup> tryConnect(MTProtoClientGroup clientGroup,
-                                                StoreLayout storeLayout, DcOptions dcOptions) {
+    private Mono<Id> tryConnect(MTProtoClientGroup clientGroup,
+                                StoreLayout storeLayout, DcOptions dcOptions) {
         return Mono.create(sink -> {
             var mainClient = clientGroup.main();
 
@@ -427,15 +427,15 @@ public final class MTProtoBootstrap {
                     .then(Mono.defer(() -> {
                         if (authHandler != null) {
                             // to trigger user auth
-                            return mainClient.sendAwait(GetState.instance())
-                                    .doOnNext(ign -> sink.success(clientGroup))
+                            return mainClient.sendAwait(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
+                                    .doOnNext(ign -> sink.success(extractSelfId(ign.get(0))))
                                     .onErrorResume(RpcException.isErrorCode(401), t ->
                                             authHandler.process(clientGroup, storeLayout, authResources)
                                             // users can emit empty signals if they want to gracefully destroy the client
                                             .switchIfEmpty(Mono.defer(clientGroup::close)
                                                     .then(Mono.fromRunnable(sink::success)))
                                             .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                                    .doOnSuccess(ign -> sink.success(clientGroup)))
+                                                    .doOnSuccess(ign -> sink.success(extractSelfId(auth.user()))))
                                             .then(Mono.empty()));
                         }
                         return mainClient.sendAwait(ImmutableImportBotAuthorization.of(0,
@@ -446,7 +446,7 @@ public final class MTProtoBootstrap {
                                                 clientGroup, storeLayout, dcOptions))
                                 .cast(BaseAuthorization.class)
                                 .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                        .doOnSuccess(ign -> sink.success(clientGroup)));
+                                        .doOnSuccess(ign -> sink.success(extractSelfId(auth.user()))));
                     }))
                     .onErrorResume(e -> clientGroup.close()
                             .doOnSuccess(any -> sink.error(e)))
@@ -454,7 +454,14 @@ public final class MTProtoBootstrap {
         });
     }
 
-    private Mono<MTProtoTelegramClient> initializeClient(MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
+    private static Id extractSelfId(User user) {
+        if (!(user instanceof BaseUser b)) {
+            throw new IllegalStateException("Unexpected type of user from auth result");
+        }
+        return Id.ofUser(b.id(), b.accessHash());
+    }
+
+    private Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientGroup clientGroup, StoreLayout storeLayout) {
         return Mono.create(sink -> {
             EventDispatcher eventDispatcher = initEventDispatcher();
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
@@ -463,7 +470,6 @@ public final class MTProtoBootstrap {
                     defaultEntityParserFactory, unavailableChatPolicy);
             ServiceHolder serviceHolder = new ServiceHolder(clientGroup, storeLayout);
 
-            Id[] selfId = {null};
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
                     authResources, clientGroup,
                     mtProtoResources, updatesManagerFactory, selfId,
@@ -474,59 +480,31 @@ public final class MTProtoBootstrap {
             composite.add(clientGroup.start()
                     .takeUntilOther(onDisconnect.asMono())
                     .doOnError(sink::error)
-                    .subscribe(null, t -> log.error("MTProto client group terminated with an error", t),
-                            () -> log.debug("MTProto client group completed")));
+                    .subscribe(null, t -> log.error("MTProto client group terminated with an error", t)));
 
             composite.add(clientGroup.updates().all()
                     .takeUntilOther(onDisconnect.asMono())
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
-                    .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t),
-                            () -> log.debug("Event dispatcher completed")));
+                    .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t)));
 
             composite.add(telegramClient.getUpdatesManager().start()
                     .takeUntilOther(onDisconnect.asMono())
-                    .subscribe(null, t -> log.error("Updates manager terminated with an error", t),
-                            () -> log.debug("Updates manager completed")));
+                    .subscribe(null, t -> log.error("Updates manager terminated with an error", t)));
 
-            boolean[] emit = {true};
-            composite.add(clientGroup.main().state()
-                    .takeUntilOther(onDisconnect.asMono())
-                    .flatMap(state -> switch (state) {
-                        case CLOSED -> Mono.fromRunnable(() -> {
-                                    eventDispatcher.shutdown();
-                                    telegramClient.getUpdatesManager().shutdown();
-                                    onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                                });
-
-                        case CONNECTED -> Mono.defer(() -> {
-                                    // bot user id writes before ':' char
-                                    if (parseBotIdFromToken && authResources.isBot()) {
-                                        return Mono.fromSupplier(() -> Id.ofUser(authResources.getBotAuthToken()
-                                                .map(t -> Long.parseLong(t.split(":", 2)[0]))
-                                                .orElseThrow()));
-                                    }
-                                    return storeLayout.getSelfId().map(Id::ofUser);
-                                })
-                                .switchIfEmpty(serviceHolder.getUserService()
-                                        .getFullUser(InputUserSelf.instance())
-                                        .map(user -> {
-                                            var self = (BaseUser) user.users().get(0);
-                                            long ac = Objects.requireNonNull(self.accessHash());
-                                            return Id.ofUser(user.fullUser().id(), ac);
-                                        }))
-                                .doOnNext(id -> {
-                                    if (emit[0]) {
-                                        emit[0] = false;
-                                        selfId[0] = id;
-                                        sink.success(telegramClient);
-                                    }
-                                })
-                                .then(telegramClient.getUpdatesManager().fillGap());
-                        default -> Mono.empty();
+            composite.add(clientGroup.main().onClose()
+                    .doOnSuccess(any -> {
+                        eventDispatcher.shutdown();
+                        telegramClient.getUpdatesManager().shutdown();
+                        onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                     })
-                    .subscribe(null, t -> log.error("State handler terminated with an error", t),
-                            () -> log.debug("State handler completed")));
+                    .subscribe(null, t -> log.error("Exception while closing main client", t)));
+
+            composite.add(Mono.defer(() -> {
+                        sink.success(telegramClient);
+                        return telegramClient.getUpdatesManager().fillGap();
+                    })
+                    .subscribe(null, t -> log.error("Exception while preparing client resources", t)));
 
             sink.onCancel(composite);
         });
