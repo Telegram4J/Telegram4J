@@ -1,9 +1,9 @@
 [versions]
 tl-parser = "0.1.2-SNAPSHOT"
-reactor-bom = "2020.0.24"
-netty-bom = "4.1.92.Final"
-jackson = "2.14.0"
-caffeine = "3.1.1"
+reactor-bom = "2022.0.7"
+netty-bom = "4.1.93.Final"
+jackson = "2.15.2"
+caffeine = "3.1.6"
 
 junit = "5.9.0"
 logback = "1.3.0-alpha14"
@@ -28,5 +28,4 @@ reactor-core = { module = "io.projectreactor:reactor-core" }
 reactor-addons-extra = { module = "io.projectreactor.addons:reactor-extra" }
 
 [plugins]
-versions = { id = "com.github.ben-manes.versions", version = "0.45.0" }
-osdetector = { id = "com.google.osdetector", version = "1.7.3" }
+versions = { id = "com.github.ben-manes.versions", version = "0.47.0" }
