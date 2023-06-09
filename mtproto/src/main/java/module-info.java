@@ -7,10 +7,11 @@ module telegram4j.mtproto {
     requires io.netty.codec;
     requires io.netty.common;
     requires io.netty.transport;
-    requires io.netty.transport.classes.epoll;
-    requires io.netty.transport.classes.kqueue;
     requires com.github.benmanes.caffeine;
     requires com.fasterxml.jackson.databind;
+
+    requires static io.netty.transport.classes.epoll;
+    requires static io.netty.transport.classes.kqueue;
 
     requires transitive telegram4j.tl;
 
