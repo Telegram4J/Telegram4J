@@ -26,13 +26,18 @@ public final class DcOptions {
         this.flags = flags;
     }
 
-    static Comparator<DataCenter> dcComparator(DataCenter.Type type, int id, boolean preferIpv6) {
+    static Comparator<DataCenter> dcSearch(DataCenter.Type type, int id, boolean preferIpv6) {
         return Comparator.<DataCenter>comparingInt(dc -> {
                     int d = Integer.compare(id, dc.getId());
                     return d == 0 ? -1 : 1;
                 })
                 .thenComparingInt(dc -> type == dc.getType() ? -1 : 1)
-                .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
+                .thenComparingInt(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
+    }
+
+    static Comparator<DataCenter> dcFindFirst(DataCenter.Type type, boolean preferIpv6) {
+        return Comparator.<DataCenter>comparingInt(dc -> type == dc.getType() ? -1 : 1)
+                .thenComparingInt(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
     }
 
     static Comparator<DataCenter> dcIdComparator(DcId.Type type, int dcId, boolean preferIpv6) {
@@ -41,7 +46,7 @@ public final class DcOptions {
             int d = Integer.compare(dcId, dc.getId());
             return d == 0 ? -1 : 1;
         })
-        .thenComparing(dc -> switch (type) {
+        .thenComparingInt(dc -> switch (type) {
             case MAIN -> dc.getType() == Type.REGULAR ? -1 : 1;
             // prefer MEDIA dcs for downloading/uploading
             case UPLOAD, DOWNLOAD -> switch (dc.getType()) {
@@ -50,7 +55,7 @@ public final class DcOptions {
                 case CDN -> 2;
             };
         })
-        .thenComparing(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
+        .thenComparingInt(dc -> preferIpv6 == dc.isIpv6() ? -2 : -1);
     }
 
     /**
@@ -198,6 +203,14 @@ public final class DcOptions {
         return find(type, id, isPreferIpv6());
     }
 
+    public Optional<DataCenter> findFirst(DataCenter.Type type) {
+        return findFirst(type, isPreferIpv6());
+    }
+
+    public Optional<DataCenter> findFirst(DataCenter.Type type, boolean preferIpv6) {
+        return find0(dcFindFirst(type, preferIpv6));
+    }
+
     /**
      * Finds a DC option by specified type and id.
      *
@@ -207,7 +220,7 @@ public final class DcOptions {
      * @return A dc option found by specified type and id, if present.
      */
     public Optional<DataCenter> find(DataCenter.Type type, int id, boolean preferIpv6) {
-        return find0(dcComparator(type, id, preferIpv6));
+        return find0(dcSearch(type, id, preferIpv6));
     }
 
     private Optional<DataCenter> find0(Comparator<DataCenter> comp) {

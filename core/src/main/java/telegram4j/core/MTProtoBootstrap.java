@@ -406,7 +406,7 @@ public final class MTProtoBootstrap {
                                 MTProtoClientGroup.Options.of(mainDc, clientFactory,
                                         initUpdateDispatcher(), options));
 
-                        return tryConnect(clientGroup, storeLayout, dcOptions)
+                        return authorizeClient(clientGroup, storeLayout, dcOptions)
                                 .flatMap(selfId -> initializeClient(selfId, clientGroup, storeLayout));
                     }))
                     .subscribe(sink::success, sink::error));
@@ -415,8 +415,8 @@ public final class MTProtoBootstrap {
         });
     }
 
-    private Mono<Id> tryConnect(MTProtoClientGroup clientGroup,
-                                StoreLayout storeLayout, DcOptions dcOptions) {
+    private Mono<Id> authorizeClient(MTProtoClientGroup clientGroup,
+                                     StoreLayout storeLayout, DcOptions dcOptions) {
         return Mono.create(sink -> {
             var mainClient = clientGroup.main();
 
@@ -595,8 +595,8 @@ public final class MTProtoBootstrap {
         if (dataCenter != null) {
             return dataCenter;
         }
-        return opts.find(DataCenter.Type.REGULAR, 2)
-                .orElseThrow(() -> new IllegalStateException("Could not find DC 2 for main client in options: " + opts));
+        return opts.findFirst(DataCenter.Type.REGULAR)
+                .orElseThrow(() -> new IllegalStateException("Could not find any regular DC for main client in options: " + opts));
     }
 
     private DcOptions initDcOptions() {
