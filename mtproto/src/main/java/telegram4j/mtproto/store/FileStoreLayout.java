@@ -50,8 +50,9 @@ public class FileStoreLayout implements StoreLayout {
 
     protected volatile int mainDcId;
     protected volatile long selfId;
-    protected volatile DcOptions dcOptions;
-    protected volatile PublicRsaKeyRegister publicRsaKeyRegister;
+    // TODO remove default values
+    protected volatile DcOptions dcOptions = DcOptions.createDefault(false);
+    protected volatile PublicRsaKeyRegister publicRsaKeyRegister = PublicRsaKeyRegister.createDefault();
     protected volatile State state;
 
     public FileStoreLayout(StoreLayout entityDelegate) {
@@ -464,11 +465,14 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     // delegation
-    // TODO: persist in Settings
 
     @Override
     public Mono<Void> onUpdateConfig(Config config) {
-        return entityDelegate.onUpdateConfig(config);
+        return entityDelegate.onUpdateConfig(config)
+                .and(Mono.defer(() -> {
+                    this.dcOptions = DcOptions.from(config);
+                    return trySave();
+                }));
     }
 
     @Override
