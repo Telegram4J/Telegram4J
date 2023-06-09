@@ -18,7 +18,7 @@ public interface MTProtoClient {
     /**
      * Gets a {@link Mono} with empty signals which starts client on subscribe.
      *
-     * @return A {@link Mono} which emitting signals on client {@link State#CONNECTED} state.
+     * @return A {@link Mono} which emitting signals when client ready to handle requests.
      */
     Mono<Void> connect();
 
