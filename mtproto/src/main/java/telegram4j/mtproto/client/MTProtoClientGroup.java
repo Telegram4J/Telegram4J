@@ -29,14 +29,13 @@ public interface MTProtoClientGroup {
     /**
      * Sends TL method to specified datacenter.
      *
-     * @param <M> The type of TL method.
      * @param <R> The return type of method.
      * @param id The id of client.
      * @param method The method to send.
      * @see MTProtoClient#sendAwait(TlMethod)
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
-    <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method);
+    <R> Mono<R> send(DcId id, TlMethod<? extends R> method);
 
     UpdateDispatcher updates();
 

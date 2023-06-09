@@ -459,24 +459,22 @@ public final class MTProtoBootstrap {
             var composite = Disposables.composite();
 
             composite.add(clientGroup.start()
-                    .takeUntilOther(onDisconnect.asMono())
                     .doOnError(sink::error)
                     .subscribe(null, t -> log.error("MTProto client group terminated with an error", t)));
 
             composite.add(clientGroup.updates().all()
-                    .takeUntilOther(onDisconnect.asMono())
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
                     .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t)));
 
             composite.add(telegramClient.getUpdatesManager().start()
-                    .takeUntilOther(onDisconnect.asMono())
                     .subscribe(null, t -> log.error("Updates manager terminated with an error", t)));
 
             composite.add(clientGroup.main().onClose()
                     .doOnSuccess(any -> {
                         eventDispatcher.shutdown();
                         telegramClient.getUpdatesManager().shutdown();
+                        options.storeLayout().close().block();
                         onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
                     })
                     .subscribe(null, t -> log.error("Exception while closing main client", t)));

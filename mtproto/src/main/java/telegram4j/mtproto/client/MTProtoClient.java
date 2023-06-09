@@ -25,12 +25,11 @@ public interface MTProtoClient {
     /**
      * Send api request with result awaiting.
      *
-     * @param <T> Type of method.
      * @param <R> Type of result.
      * @param method An api request.
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
-    <R, T extends TlMethod<R>> Mono<R> sendAwait(T method);
+    <R> Mono<R> sendAwait(TlMethod<? extends R> method);
 
     /**
      * Gets the client datacenter.

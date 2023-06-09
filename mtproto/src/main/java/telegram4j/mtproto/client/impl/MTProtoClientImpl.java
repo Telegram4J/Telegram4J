@@ -52,7 +52,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.netty.channel.ChannelHandler.Sharable;
@@ -64,7 +63,7 @@ import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 public class MTProtoClientImpl implements MTProtoClient {
     private static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
     private static final String HANDSHAKE       = "mtproto.handshake";
-    private static final String TRANSPORT       = "mtproto.transportFactory";
+    private static final String TRANSPORT       = "mtproto.transport";
     private static final String ENCRYPTION      = "mtproto.encryption";
     private static final String CORE            = "mtproto.core";
 
@@ -175,7 +174,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         @Override
         public void channelActive(ChannelHandlerContext ctx) {
             if (log.isDebugEnabled()) {
-                log.debug("[C:0x{}] Sending transportFactory identifier to the datacenter {}", id, authData.dc());
+                log.debug("[C:0x{}] Sending transport identifier to the datacenter {}", id, authData.dc());
             }
 
             Transport tr = options.transportFactory().create(authData.dc());
@@ -244,6 +243,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (log.isDebugEnabled()) {
                 log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
             }
+            // TODO cancel all requests
             onClose.emitEmpty(FAIL_FAST);
         }
 
@@ -395,7 +395,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <R, T extends TlMethod<R>> Mono<R> sendAwait(T method) {
+    public <R> Mono<R> sendAwait(TlMethod<? extends R> method) {
         return Mono.defer(() -> {
             var currentState = channelState;
 
@@ -438,13 +438,16 @@ public class MTProtoClientImpl implements MTProtoClient {
                 return (Mono<R>) sink;
             }
         })
-        .transform(options.responseTransformers().stream()
-                .map(tr -> tr.transform(method))
-                .reduce(Function.identity(), Function::andThen));
+        .transform(mono -> {
+            for (ResponseTransformer tr : options.responseTransformers()) {
+                mono = tr.transform(mono, method);
+            }
+            return mono;
+        });
     }
 
     @SuppressWarnings("unchecked")
-    private <R, T extends TlMethod<R>> Mono<R> send(ChannelHandlerContext ctx, T method) {
+    private <R> Mono<R> send(ChannelHandlerContext ctx, TlMethod<R> method) {
         if (!isResultAwait(method)) {
             ctx.channel().writeAndFlush(new RpcRequest(method));
             return Mono.empty();
@@ -473,13 +476,15 @@ public class MTProtoClientImpl implements MTProtoClient {
     @Override
     public Mono<Void> close() {
         return Mono.create(sink -> {
-            var cs = channelState;
-            if (cs == ChannelState.CLOSED_STATE) {
+            var oldCs = (ChannelState) CHANNEL_STATE.getAndSet(this, ChannelState.CLOSED_STATE);
+            if (oldCs == ChannelState.CLOSED_STATE) {
                 sink.success();
-            } else if (cs == ChannelState.DISCONNECTED_STATE) {
-                channelState = ChannelState.CLOSED_STATE;
+            } else if (oldCs == ChannelState.DISCONNECTED_STATE) {
+                onClose.emitEmpty(FAIL_FAST);
+                // TODO cancel pending requests
+                sink.success();
             } else {
-                EventLoop eventLoop = cs.channel.eventLoop();
+                EventLoop eventLoop = oldCs.channel.eventLoop();
 
                 eventLoop.execute(() -> {
                     logStateChange(ChannelState.CLOSED);
@@ -487,7 +492,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
                     cancelRequests(eventLoop);
 
-                    cs.channel.close()
+                    oldCs.channel.close()
                             .addListener(notify -> {
                                 Throwable t = notify.cause();
                                 if (t != null) {
@@ -518,6 +523,18 @@ public class MTProtoClientImpl implements MTProtoClient {
                 q.sink.emitError(resultPublisher, exc);
             }
         }
+
+        pendingRequests.drain(request -> {
+            if (request instanceof RpcQuery q) {
+                var resultPublisher = q.sink.isPublishOnEventLoop()
+                        ? eventLoop
+                        : options.resultPublisher();
+
+                q.sink.emitError(resultPublisher, exc);
+            }
+        });
+
+
     }
 
     static boolean isResultAwait(TlMethod<?> object) {
@@ -817,7 +834,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             long containerMsgId = -1;
-            // server returns -404 transportFactory error when this packet placed in container
+            // server returns -404 transport error when this packet placed in container
             boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
 
             Request containerOrRequest = req;

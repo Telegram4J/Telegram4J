@@ -65,7 +65,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     }
 
     @Override
-    public <R, M extends TlMethod<R>> Mono<R> send(DcId id, M method) {
+    public <R> Mono<R> send(DcId id, TlMethod<? extends R> method) {
         return getOrCreateClient(id)
                 .flatMap(client -> client.sendAwait(method));
     }
@@ -85,6 +85,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 .map(MTProtoClient::close)
                 .collect(Collectors.toList()))
                 .then(Mono.fromRunnable(() -> {
+                    options.updateDispatcher().shutdown();
                     options.mtProtoOptions().tcpClientResources().dispose();
                     options.mtProtoOptions().resultPublisher().shutdown();
                 }));

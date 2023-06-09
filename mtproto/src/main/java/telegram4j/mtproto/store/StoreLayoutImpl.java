@@ -65,6 +65,11 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> close() {
+        return Mono.empty();
+    }
+
+    @Override
     public Mono<DataCenter> getDataCenter() {
         return Mono.justOrEmpty(dataCenter);
     }

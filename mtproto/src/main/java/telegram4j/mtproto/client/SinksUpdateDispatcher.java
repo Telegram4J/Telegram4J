@@ -29,4 +29,10 @@ public class SinksUpdateDispatcher implements UpdateDispatcher {
     public void publish(Updates updates) {
         sink.emitNext(updates, emitFailureHandler);
     }
+
+    @Override
+    public void shutdown() {
+        sink.emitComplete(emitFailureHandler);
+        scheduler.dispose();
+    }
 }

@@ -13,4 +13,6 @@ public interface UpdateDispatcher {
     }
 
     void publish(Updates updates);
+
+    void shutdown();
 }

@@ -27,6 +27,7 @@ import telegram4j.tl.users.UserFull;
 public interface StoreLayout extends UpdatesStore, ResultsStore {
 
     Mono<Void> initialize();
+    Mono<Void> close();
 
     // region retrieve methods
 

@@ -365,6 +365,13 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
+    public Mono<Void> close() {
+        return entityDelegate.close()
+                .and(trySave()
+                        .then(Mono.fromRunnable(persistExecutor::shutdown)));
+    }
+
+    @Override
     public Mono<DataCenter> getDataCenter() {
         return Mono.fromSupplier(() -> mainDcId)
                 .filter(id -> id != 0)

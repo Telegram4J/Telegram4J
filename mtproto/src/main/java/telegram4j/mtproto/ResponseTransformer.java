@@ -20,11 +20,11 @@ public interface ResponseTransformer {
     static ResponseTransformer empty(MethodPredicate methodPredicate, Predicate<? super Throwable> predicate) {
         return new ResponseTransformer() {
             @Override
-            public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
+            public <R> Mono<R> transform(Mono<R> mono, TlMethod<? extends R> method) {
                 if (methodPredicate.test(method)) {
-                    return mono -> mono.onErrorResume(predicate, t -> Mono.empty());
+                    return mono.onErrorResume(predicate, t -> Mono.empty());
                 }
-                return Function.identity();
+                return mono;
             }
         };
     }
@@ -40,11 +40,11 @@ public interface ResponseTransformer {
     static ResponseTransformer retryFloodWait(MethodPredicate methodPredicate, MTProtoRetrySpec retrySpec) {
         return new ResponseTransformer() {
             @Override
-            public <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method) {
+            public <R> Mono<R> transform(Mono<R> mono, TlMethod<? extends R> method) {
                 if (methodPredicate.test(method)) {
-                    return mono -> mono.retryWhen(retrySpec);
+                    return mono.retryWhen(retrySpec);
                 }
-                return Function.identity();
+                return mono;
             }
         };
     }
@@ -53,8 +53,9 @@ public interface ResponseTransformer {
      * Modifies specified reactive sequence with rpc response.
      *
      * @param <R> The type of method response.
+     * @param mono The mono for transformation.
      * @param method The method which returns this response.
      * @return A {@link Function} which modifies response sequence.
      */
-    <R> Function<Mono<R>, Mono<R>> transform(TlMethod<R> method);
+    <R> Mono<R> transform(Mono<R> mono, TlMethod<? extends R> method);
 }
