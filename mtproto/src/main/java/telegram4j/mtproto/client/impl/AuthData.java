@@ -152,7 +152,7 @@ public final class AuthData {
         DUPLICATE
     }
 
-    public static boolean isContentRelated(TlMethod<?> object) {
+    static boolean isContentRelated(TlMethod<?> object) {
         return switch (object.identifier()) {
             case MsgsAck.ID:
             case Ping.ID:
