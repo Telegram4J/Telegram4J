@@ -38,22 +38,22 @@ import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 /** Default in-memory store implementation. */
 public class StoreLayoutImpl implements StoreLayout {
 
-    private final Cache<MessageId, Message> messages;
-    private final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, MessagePoll> polls = new ConcurrentHashMap<>();
+    protected final Cache<MessageId, Message> messages;
+    protected final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<Long, MessagePoll> polls = new ConcurrentHashMap<>();
     // TODO: make weak or limit by size?
-    private final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
-    private final ConcurrentMap<DcKey, AuthKey> authKeys = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<DcKey, AuthKey> authKeys = new ConcurrentHashMap<>();
 
-    private volatile DataCenter dataCenter;
-    private volatile long selfId;
-    private volatile ImmutableState state;
-    private volatile PublicRsaKeyRegister publicRsaKeyRegister;
-    private volatile DcOptions dcOptions;
-    private volatile Config config;
+    protected volatile DataCenter dataCenter;
+    protected volatile long selfId;
+    protected volatile ImmutableState state;
+    protected volatile PublicRsaKeyRegister publicRsaKeyRegister;
+    protected volatile DcOptions dcOptions;
+    protected volatile Config config;
 
     public StoreLayoutImpl(Function<Caffeine<Object, Object>, Caffeine<Object, Object>> cacheFactory) {
         this.messages = cacheFactory.apply(Caffeine.newBuilder()).build();
@@ -478,7 +478,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 payload.pinned(), payload.messages()));
     }
 
-    private void onUpdatePinnedMessages0(Peer peer, boolean pinned, List<Integer> ids) {
+    protected void onUpdatePinnedMessages0(Peer peer, boolean pinned, List<Integer> ids) {
         long peerId = peer instanceof PeerChannel p ? p.channelId() : -1;
         for (int id : ids) {
             MessageId k = new MessageId(peerId, id);
@@ -713,7 +713,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return Mono.fromRunnable(() -> this.publicRsaKeyRegister = publicRsaKeyRegister);
     }
 
-    private void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
+    protected void saveContacts(Iterable<? extends Chat> chats, Iterable<? extends User> users) {
         for (Chat chat : chats) {
             saveChat(null, chat);
         }
@@ -723,7 +723,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    private void saveUser(@Nullable ImmutableUserFull anyUserFull, User anyUser) {
+    protected void saveUser(@Nullable ImmutableUserFull anyUserFull, User anyUser) {
         if (!(anyUser instanceof BaseUser user)) {
             return;
         }
@@ -768,7 +768,7 @@ public class StoreLayoutImpl implements StoreLayout {
         // then the *FromMessage peer would be saved in savePeer()
     }
 
-    private void saveChat(@Nullable ChatFull anyChatFull, Chat anyChat) {
+    protected void saveChat(@Nullable ChatFull anyChatFull, Chat anyChat) {
         switch (anyChat.identifier()) {
             case ChannelForbidden.ID -> {
                 ChannelForbidden channelForbidden = (ChannelForbidden) anyChat;
@@ -851,7 +851,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static Message copyMessage(Message object) {
+    protected static Message copyMessage(Message object) {
         if (object instanceof BaseMessage b) {
             return ImmutableBaseMessage.copyOf(b);
         } else if (object instanceof MessageService s) {
@@ -861,7 +861,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static Peer copyPeer(Peer peer) {
+    protected static Peer copyPeer(Peer peer) {
         if (peer instanceof PeerUser p) {
             return ImmutablePeerUser.copyOf(p);
         } else if (peer instanceof PeerChannel p) {
@@ -873,7 +873,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static ChannelParticipant copyChannelParticipant(ChannelParticipant object) {
+    protected static ChannelParticipant copyChannelParticipant(ChannelParticipant object) {
         return switch (object.identifier()) {
             case BaseChannelParticipant.ID -> ImmutableBaseChannelParticipant.copyOf((BaseChannelParticipant) object);
             case ChannelParticipantAdmin.ID -> ImmutableChannelParticipantAdmin.copyOf((ChannelParticipantAdmin) object);
@@ -885,7 +885,7 @@ public class StoreLayoutImpl implements StoreLayout {
         };
     }
 
-    static ChatParticipant copyChatParticipant(ChatParticipant object) {
+    protected static ChatParticipant copyChatParticipant(ChatParticipant object) {
         return switch (object.identifier()) {
             case BaseChatParticipant.ID -> ImmutableBaseChatParticipant.copyOf((BaseChatParticipant) object);
             case ChatParticipantAdmin.ID -> ImmutableChatParticipantAdmin.copyOf((ChatParticipantAdmin) object);
@@ -894,13 +894,13 @@ public class StoreLayoutImpl implements StoreLayout {
         };
     }
 
-    private boolean isBot() {
+    protected boolean isBot() {
         var userInfo = users.get(selfId());
         Objects.requireNonNull(userInfo);
         return userInfo.min.bot();
     }
 
-    private long selfId() {
+    protected long selfId() {
         long id = selfId;
         if (id == 0) {
             throw new IllegalStateException("No information about current user.");
@@ -908,7 +908,7 @@ public class StoreLayoutImpl implements StoreLayout {
         return id;
     }
 
-    private void saveUsernamePeer(TlObject object) {
+    protected void saveUsernamePeer(TlObject object) {
         switch (object.identifier()) {
             case BaseUser.ID -> {
                 var user = (BaseUser) object;
@@ -928,7 +928,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    private void savePeer0(Peer p, Peer peerId, int msgId) {
+    protected void savePeer0(Peer p, Peer peerId, int msgId) {
         switch (p.identifier()) {
             case PeerChat.ID -> {
                 var cp = ImmutablePeerChat.copyOf((PeerChat) p);
@@ -968,15 +968,15 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    private void savePeer(Peer p, MessageService message) {
+    protected void savePeer(Peer p, MessageService message) {
         savePeer0(p, message.peerId(), message.id());
     }
 
-    private void savePeer(Peer p, BaseMessage message) {
+    protected void savePeer(Peer p, BaseMessage message) {
         savePeer0(p, message.peerId(), message.id());
     }
 
-    private void addContact(Peer p, Consumer<Chat> chats, Consumer<User> users) {
+    protected void addContact(Peer p, Consumer<Chat> chats, Consumer<User> users) {
         switch (p.identifier()) {
             case PeerChat.ID -> {
                 var cp = (PeerChat) p;
@@ -1003,12 +1003,12 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    private void addContact(Peer peer, Collection<Chat> chats, Collection<User> users) {
+    protected void addContact(Peer peer, Collection<Chat> chats, Collection<User> users) {
         addContact(peer, chats::add, users::add);
     }
 
     @Nullable
-    private Message saveMessage(Message message) {
+    protected Message saveMessage(Message message) {
         Message old;
         if (message instanceof BaseMessage b) {
             MessageId key = MessageId.create(b);
@@ -1048,41 +1048,41 @@ public class StoreLayoutImpl implements StoreLayout {
         return old;
     }
 
-    static class ChannelInfo {
-        final ImmutableChannel min;
+    protected static class ChannelInfo {
+        protected final ImmutableChannel min;
         @Nullable
-        final ImmutableChannelFull full;
+        protected final ImmutableChannelFull full;
         @Nullable // initializes on demand
-        final ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants;
+        protected final ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants;
 
-        ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
+        protected ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
             this(min, full, null);
         }
 
-        ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full,
+        protected ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full,
                     @Nullable ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
             this.participants = participants;
         }
 
-        ChannelInfo withParticipants(@Nullable ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants) {
+        protected ChannelInfo withParticipants(@Nullable ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants) {
             if (this.participants == participants) return this;
             return new ChannelInfo(min, full, participants);
         }
 
-        ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants() {
+        protected ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants() {
             return participants != null ? participants : new ConcurrentHashMap<>();
         }
 
-        ChannelInfo withFull(UnaryOperator<ImmutableChannelFull> mapper) {
+        protected ChannelInfo withFull(UnaryOperator<ImmutableChannelFull> mapper) {
             if (this.full == null) return this;
             var full = mapper.apply(this.full);
             if (this.full == full) return this;
             return new ChannelInfo(min, full, participants);
         }
 
-        ChannelInfo withData(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
+        protected ChannelInfo withData(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
             if (this.min == min && this.full == full) return this;
             return new ChannelInfo(min, full, participants);
         }
@@ -1097,37 +1097,37 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class ChatInfo {
-        final ImmutableBaseChat min;
+    protected static class ChatInfo {
+        protected final ImmutableBaseChat min;
         @Nullable
-        final ImmutableBaseChatFull full;
+        protected final ImmutableBaseChatFull full;
         @Nullable // initializes on demand
-        final ConcurrentMap<Long, ChatParticipant> participants;
+        protected final ConcurrentMap<Long, ChatParticipant> participants;
 
-        ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
+        protected ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
             this(min, full, null);
         }
 
-        ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full,
+        protected ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full,
                  @Nullable ConcurrentMap<Long, ChatParticipant> participants) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
             this.participants = participants;
         }
 
-        ChatInfo withFull(UnaryOperator<ImmutableBaseChatFull> mapper) {
+        protected ChatInfo withFull(UnaryOperator<ImmutableBaseChatFull> mapper) {
             if (this.full == null) return this;
             var full = mapper.apply(this.full);
             if (this.full == full) return this;
             return new ChatInfo(min, full, participants);
         }
 
-        ChatInfo withParticipants(@Nullable ConcurrentMap<Long, ChatParticipant> participants) {
+        protected ChatInfo withParticipants(@Nullable ConcurrentMap<Long, ChatParticipant> participants) {
             if (this.participants == participants) return this;
             return new ChatInfo(min, full, participants);
         }
 
-        ConcurrentMap<Long, ChatParticipant> participants() {
+        protected ConcurrentMap<Long, ChatParticipant> participants() {
             return participants != null ? participants : new ConcurrentHashMap<>();
         }
 
@@ -1137,20 +1137,20 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class MessageId implements Comparable<MessageId> {
-        final long chatId; // -1 for DM/Group Chats
-        final int messageId;
+    protected static class MessageId implements Comparable<MessageId> {
+        protected final long chatId; // -1 for DM/Group Chats
+        protected final int messageId;
 
-        static MessageId create(Peer peerId, int messageId) {
+        protected static MessageId create(Peer peerId, int messageId) {
             long chatId = peerId instanceof PeerChannel c ? c.channelId() : -1;
             return new MessageId(chatId, messageId);
         }
 
-        static MessageId create(BaseMessage message) {
+        protected static MessageId create(BaseMessage message) {
             return create(message.peerId(), message.id());
         }
 
-        static MessageId create(MessageService message) {
+        protected static MessageId create(MessageService message) {
             return create(message.peerId(), message.id());
         }
 
@@ -1183,7 +1183,7 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class PartialFields<M, F> {
+    protected static class PartialFields<M, F> {
         final M min;
         @Nullable
         final F full;
@@ -1194,10 +1194,10 @@ public class StoreLayoutImpl implements StoreLayout {
         }
     }
 
-    static class DcKey implements Comparable<DcKey> {
-        final boolean test;
-        final DataCenter.Type type;
-        final int id;
+    protected static class DcKey implements Comparable<DcKey> {
+        protected final boolean test;
+        protected final DataCenter.Type type;
+        protected final int id;
 
         DcKey(boolean test, DataCenter.Type type, int id) {
             this.test = test;
@@ -1205,7 +1205,7 @@ public class StoreLayoutImpl implements StoreLayout {
             this.id = id;
         }
 
-        static DcKey create(DataCenter dc) {
+        protected static DcKey create(DataCenter dc) {
             return new DcKey(dc.isTest(), dc.getType(), dc.getId());
         }
 

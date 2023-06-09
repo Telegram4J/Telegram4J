@@ -38,22 +38,21 @@ import static telegram4j.mtproto.util.CryptoUtil.toByteBuf;
 
 public class FileStoreLayout implements StoreLayout {
 
-    private static final Logger log = Loggers.getLogger(FileStoreLayout.class);
+    protected static final Logger log = Loggers.getLogger(FileStoreLayout.class);
 
-    private static final Path DEFAULT_DATA_FILE = Path.of("./t4j.bin");
+    protected static final Path DEFAULT_DATA_FILE = Path.of("./t4j.bin");
 
-    final StoreLayout entityDelegate;
-    final Path dataFile;
-    final ConcurrentHashMap<Integer, AuthKey> authKeys = new ConcurrentHashMap<>();
+    protected final StoreLayout entityDelegate;
+    protected final Path dataFile;
+    protected final ConcurrentHashMap<Integer, AuthKey> authKeys = new ConcurrentHashMap<>();
+    protected final AtomicBoolean saving = new AtomicBoolean();
+    protected final ExecutorService persistExecutor;
 
-    volatile int mainDcId;
-    volatile long selfId;
-    volatile DcOptions dcOptions = DcOptions.createDefault(false);
-    volatile PublicRsaKeyRegister publicRsaKeyRegister = PublicRsaKeyRegister.createDefault();
-    volatile State state;
-    final AtomicBoolean saving = new AtomicBoolean();
-
-    final ExecutorService persistExecutor;
+    protected volatile int mainDcId;
+    protected volatile long selfId;
+    protected volatile DcOptions dcOptions;
+    protected volatile PublicRsaKeyRegister publicRsaKeyRegister;
+    protected volatile State state;
 
     public FileStoreLayout(StoreLayout entityDelegate) {
         this(entityDelegate, DEFAULT_DATA_FILE, Executors.newSingleThreadExecutor());
@@ -75,7 +74,7 @@ public class FileStoreLayout implements StoreLayout {
 
     // region serialization
 
-    static void serializeDc(ByteBuf buf, DataCenter dc) {
+    protected static void serializeDc(ByteBuf buf, DataCenter dc) {
         buf.writeByte(dc.getType().ordinal());
         buf.writeShortLE(dc.getId());
         buf.writeShortLE(dc.getPort());
@@ -84,12 +83,12 @@ public class FileStoreLayout implements StoreLayout {
         dc.getSecret().ifPresent(secret -> TlSerialUtil.serializeBytes(buf, secret));
     }
 
-    interface Deserializer {
+    protected interface Deserializer {
 
         Settings deserialize(ByteBuf buf);
     }
 
-    static class Rev0Deserializer implements Deserializer {
+    protected static class Rev0Deserializer implements Deserializer {
 
         @Override
         public Settings deserialize(ByteBuf buf) {
@@ -187,7 +186,7 @@ public class FileStoreLayout implements StoreLayout {
         }
     }
 
-    enum Version {
+    protected enum Version {
         REVISION0(new Rev0Deserializer()),
         REVISION1(new Rev1Deserializer()),
         CURRENT(REVISION1);
@@ -205,7 +204,7 @@ public class FileStoreLayout implements StoreLayout {
             this.revision = (short) ordinal();
         }
 
-        static Version of(int s) {
+        protected static Version of(int s) {
             return switch (s) {
                 case 0 ->  REVISION0;
                 case 1 -> REVISION1;
@@ -214,23 +213,23 @@ public class FileStoreLayout implements StoreLayout {
         }
     }
 
-    static final byte PREFER_IPV6_MASK = 0b10;
+    protected static final byte PREFER_IPV6_MASK = 0b10;
 
-    static byte computeFlags(DcOptions dcOptions) {
+    protected static byte computeFlags(DcOptions dcOptions) {
         byte flags = 0;
         flags |= dcOptions.isTest() ? TEST_MASK : 0;
         flags |= dcOptions.isPreferIpv6() ? PREFER_IPV6_MASK : 0;
         return flags;
     }
 
-    static final byte TEST_MASK           = 0b000001;
-    static final byte STATIC_MASK         = 0b000010;
-    static final byte TCPO_ONLY_MASK      = 0b000100;
-    static final byte SECRET_MASK         = 0b001000;
-    static final byte IPV6_MASK           = 0b010000;
-    static final byte THIS_PORT_ONLY_MASK = 0b100000;
+    protected static final byte TEST_MASK           = 0b000001;
+    protected static final byte STATIC_MASK         = 0b000010;
+    protected static final byte TCPO_ONLY_MASK      = 0b000100;
+    protected static final byte SECRET_MASK         = 0b001000;
+    protected static final byte IPV6_MASK           = 0b010000;
+    protected static final byte THIS_PORT_ONLY_MASK = 0b100000;
 
-    static byte computeFlags(DataCenter dc) {
+    protected static byte computeFlags(DataCenter dc) {
         byte flags = 0;
         flags |= dc.isTest() ? TEST_MASK : 0;
         flags |= dc.isStatic() ? STATIC_MASK : 0;
@@ -241,9 +240,10 @@ public class FileStoreLayout implements StoreLayout {
         return flags;
     }
 
-    record Settings(int mainDcId, long selfId, Map<Integer, AuthKey> authKeys, DcOptions dcOptions,
-                    PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
-        Settings {
+    protected record Settings(int mainDcId, long selfId, Map<Integer, AuthKey> authKeys, DcOptions dcOptions,
+                              PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
+
+        protected Settings {
             requireSize(authKeys, "authKeys");
             requireSize(dcOptions.getBackingList(), "dcOptions");
             requireSize(publicRsaKeyRegister.getBackingMap(), "pubRsaKeyRegister");
@@ -277,15 +277,15 @@ public class FileStoreLayout implements StoreLayout {
         }
     }
 
-    static final int MAX_COLLECTIONS_SIZE = 0xffff;
+    protected static final int MAX_COLLECTIONS_SIZE = 0xffff;
 
-    static void requireSize(Map<?, ?> c, String msg) {
+    protected static void requireSize(Map<?, ?> c, String msg) {
         if (c.size() > MAX_COLLECTIONS_SIZE) {
             throw new IllegalStateException("Too big " + msg + " collection");
         }
     }
 
-    static void requireSize(Collection<?> c, String msg) {
+    protected static void requireSize(Collection<?> c, String msg) {
         if (c.size() > MAX_COLLECTIONS_SIZE) {
             throw new IllegalStateException("Too big " + msg + " collection");
         }
@@ -293,15 +293,15 @@ public class FileStoreLayout implements StoreLayout {
 
     // endregion
 
-    private Settings copySettings() {
+    protected Settings copySettings() {
         return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state);
     }
 
-    private boolean isAssociatedToUser() {
+    protected boolean isAssociatedToUser() {
         return selfId != 0;
     }
 
-    private Mono<Void> trySave() {
+    protected Mono<Void> trySave() {
         return Mono.create(sink -> {
             if (!isAssociatedToUser()) {
                 sink.success();
