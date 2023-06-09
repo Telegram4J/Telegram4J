@@ -55,7 +55,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     protected final MTProtoTelegramClient client;
     protected final Options options;
-    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.parallel(),
+    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.single(),
             Sinks.many().unicast().onBackpressureBuffer(Queues.<Long>get(Queues.XS_BUFFER_SIZE).get()));
 
     protected volatile int pts = -1;

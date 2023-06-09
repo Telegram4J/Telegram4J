@@ -39,7 +39,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     }
 
     private final Options options;
-    private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.parallel(),
+    private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.single(),
             Sinks.many().unicast().onBackpressureError());
     private final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
     private volatile MTProtoClient main;
