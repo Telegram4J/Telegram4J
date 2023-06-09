@@ -750,7 +750,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
 
         @Override
-        public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws IOException {
             if (!(msg instanceof ByteBuf payload)) {
                 throw new IllegalArgumentException("Unexpected type of message to decrypt: " + msg);
             }
@@ -774,7 +774,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
 
         @Override
-        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+        public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws IOException {
             if (!(msg instanceof RpcRequest req)) {
                 throw new IllegalArgumentException("Unexpected type of message to encrypt: " + msg);
             }
@@ -949,7 +949,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             ctx.writeAndFlush(packet);
         }
 
-        private void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) {
+        private void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws IOException {
             long authKeyId = data.readLongLE();
 
             var currentAuthKey = authData.authKey();
@@ -1015,7 +1015,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             handleServiceMessage(ctx, obj, messageId);
         }
 
-        private Object decompressIfApplicable(Object obj) {
+        private Object decompressIfApplicable(Object obj) throws IOException {
             return obj instanceof GzipPacked gzipPacked
                     ? TlSerialUtil.decompressGzip(gzipPacked.packedData())
                     : obj;
@@ -1051,7 +1051,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        private void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) {
+        private void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) throws IOException {
             if (obj instanceof RpcResult rpcResult) {
                 messageId = rpcResult.reqMsgId();
                 obj = decompressIfApplicable(rpcResult.result());
