@@ -34,6 +34,10 @@ subprojects {
         withSourcesJar()
     }
 
+    configurations.all {
+        resolutionStrategy.cacheChangingModulesFor(1, TimeUnit.HOURS)
+    }
+
     tasks.withType<JavaCompile> {
         options.javaModuleVersion.set(version.toString())
         options.encoding = "UTF-8"

@@ -29,6 +29,7 @@ import java.util.Scanner;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
 class TwoFactorAuthHandler {
+    static final String delimiter = "=".repeat(32);
 
     final MTProtoClientGroup clientGroup;
     final Scanner sc = new Scanner(System.in);
@@ -55,7 +56,7 @@ class TwoFactorAuthHandler {
             }
 
             synchronized (System.out) {
-                System.out.println(CodeAuthorization.delimiter);
+                System.out.println(delimiter);
                 if (first2fa) {
                     first2fa = false;
                     System.out.print("The account is protected by 2FA, please write password");
