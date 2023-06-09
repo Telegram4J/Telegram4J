@@ -243,8 +243,8 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
 
         void configure(ChannelHandlerContext ctx) {
-            var tr = ctx.pipeline().get(TransportCodec.class).delegate();
-            ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, new MTProtoEncryption(MTProtoClientImpl.this, tr));
+            var transportCodec = ctx.pipeline().get(TransportCodec.class);
+            ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, new MTProtoEncryption(MTProtoClientImpl.this, transportCodec));
 
             if (type == DcId.Type.MAIN) {
                 options.storeLayout().updateDataCenter(authData.dc())

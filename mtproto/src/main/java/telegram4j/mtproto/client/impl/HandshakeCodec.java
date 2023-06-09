@@ -10,14 +10,12 @@ import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.api.MTProtoObject;
 
-import java.util.Objects;
-
 public final class HandshakeCodec extends ChannelDuplexHandler {
 
     private final AuthData authData;
 
     public HandshakeCodec(AuthData authData) {
-        this.authData = Objects.requireNonNull(authData);
+        this.authData = authData;
     }
 
     @Override

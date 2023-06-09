@@ -23,8 +23,8 @@ public final class HandshakeContext {
     private int retry;
 
     public HandshakeContext(DhPrimeChecker dhPrimeChecker, PublicRsaKeyRegister publicRsaKeyRegister) {
-        this.dhPrimeChecker = Objects.requireNonNull(dhPrimeChecker);
-        this.publicRsaKeyRegister = Objects.requireNonNull(publicRsaKeyRegister);
+        this.dhPrimeChecker = dhPrimeChecker;
+        this.publicRsaKeyRegister = publicRsaKeyRegister;
     }
 
     public DhPrimeChecker dhPrimeChecker() {

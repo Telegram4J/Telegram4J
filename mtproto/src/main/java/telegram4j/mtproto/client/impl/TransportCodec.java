@@ -6,21 +6,19 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.netty.util.AttributeKey;
 import telegram4j.mtproto.transport.Transport;
 
 import java.util.List;
-import java.util.Objects;
 
 public final class TransportCodec extends ChannelDuplexHandler {
-    public static final AttributeKey<Boolean> quickAck = AttributeKey.valueOf("quickAck");
-
     private final Transport transport;
     private final Decoder decoder = new Decoder();
     private final Encoder encoder = new Encoder();
 
+    private boolean quickAck;
+
     public TransportCodec(Transport transport) {
-        this.transport = Objects.requireNonNull(transport);
+        this.transport = transport;
     }
 
     public Transport delegate() {
@@ -49,8 +47,6 @@ public final class TransportCodec extends ChannelDuplexHandler {
 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-        ctx.channel().attr(quickAck).set(false);
-
         try {
             decoder.handlerAdded(ctx);
         } finally {
@@ -60,13 +56,15 @@ public final class TransportCodec extends ChannelDuplexHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        ctx.channel().attr(quickAck).set(null);
-
         try {
             decoder.handlerRemoved(ctx);
         } finally {
             encoder.handlerRemoved(ctx);
         }
+    }
+
+    public void setQuickAck(boolean quickAck) {
+        this.quickAck = quickAck;
     }
 
     class Decoder extends ByteToMessageDecoder {
@@ -83,7 +81,6 @@ public final class TransportCodec extends ChannelDuplexHandler {
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
             if (msg instanceof ByteBuf b) {
-                boolean quickAck = ctx.channel().attr(TransportCodec.quickAck).get();
                 ByteBuf encoded;
                 try {
                     encoded = transport.encode(b, quickAck);

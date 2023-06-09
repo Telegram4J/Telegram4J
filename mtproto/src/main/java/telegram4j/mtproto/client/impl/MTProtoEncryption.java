@@ -8,7 +8,6 @@ import io.netty.channel.ChannelPromise;
 import telegram4j.mtproto.MTProtoException;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.TransportException;
-import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerialUtil;
@@ -42,12 +41,12 @@ class MTProtoEncryption extends ChannelDuplexHandler {
     static final int MAX_CONTAINER_LENGTH = 1 << 15; // length in bytes
 
     final MTProtoClientImpl client;
-    final Transport transport;
+    final TransportCodec transportCodec;
     final ArrayList<Long> acknowledgments = new ArrayList<>(32);
 
-    MTProtoEncryption(MTProtoClientImpl client, Transport transport) {
+    MTProtoEncryption(MTProtoClientImpl client, TransportCodec transportCodec) {
         this.client = client;
-        this.transport = transport;
+        this.transportCodec = transportCodec;
     }
 
     @Override
@@ -60,7 +59,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             int val = payload.readIntLE();
             payload.release();
 
-            if (!TransportException.isError(val) && transport.supportsQuickAck()) {
+            if (!TransportException.isError(val) && transportCodec.delegate().supportsQuickAck()) {
                 if (rpcLog.isDebugEnabled()) {
                     rpcLog.debug("[C:0x{}, Q:0x{}] Received quick ack",
                             client.id, Integer.toHexString(val));
@@ -217,7 +216,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
 
         boolean quickAck = false;
         int quickAckToken = -1;
-        if (!containerize && AuthData.isContentRelated(req.method) && transport.supportsQuickAck()) {
+        if (!containerize && AuthData.isContentRelated(req.method) && transportCodec.delegate().supportsQuickAck()) {
             quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
             quickAck = true;
         }
@@ -246,7 +245,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             }
         }
 
-        ctx.channel().attr(TransportCodec.quickAck).set(quickAck);
+        transportCodec.setQuickAck(quickAck);
         ctx.writeAndFlush(packet);
     }
 
