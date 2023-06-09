@@ -1,6 +1,7 @@
 package telegram4j.example;
 
 import io.netty.util.ResourceLeakDetector;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -38,8 +39,12 @@ public class MTProtoBotExample {
 
     public static void main(String[] args) {
 
-        // only for testing, do not copy it to your production code
+        // only for testing, do not copy it to your production code!!!
+        Hooks.onOperatorDebug();
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+
+
+
 
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
         String apiHash = System.getenv("T4J_API_HASH");

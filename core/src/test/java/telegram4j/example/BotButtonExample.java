@@ -2,7 +2,9 @@ package telegram4j.example;
 
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import io.netty.util.ResourceLeakDetector;
 import org.reactivestreams.Publisher;
+import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.EventAdapter;
@@ -43,6 +45,12 @@ public class BotButtonExample {
             .collect(Collectors.toUnmodifiableMap(c -> c.getInfo().command(), Function.identity()));
 
     public static void main(String[] args) {
+
+        // only for testing, do not copy it to your production code!!!
+        Hooks.onOperatorDebug();
+        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+
+
 
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
         String apiHash = System.getenv("T4J_API_HASH");
