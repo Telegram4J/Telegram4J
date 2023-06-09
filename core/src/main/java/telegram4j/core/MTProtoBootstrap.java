@@ -49,6 +49,7 @@ import telegram4j.tl.request.auth.ImmutableImportBotAuthorization;
 import telegram4j.tl.request.help.GetConfig;
 import telegram4j.tl.request.users.ImmutableGetUsers;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -86,6 +87,7 @@ public final class MTProtoBootstrap {
     private int gzipWrappingSizeThreshold = 16 * 1024;
     private TcpClientResources tcpClientResources;
     private UpdateDispatcher updateDispatcher;
+    private Duration reconnectionInterval = Duration.ofSeconds(3);
 
     private ExecutorService resultPublisher;
     private Scheduler updatesPublisher;
@@ -181,6 +183,11 @@ public final class MTProtoBootstrap {
     // TODO docs
     public MTProtoBootstrap setUpdateDispatcher(UpdateDispatcher updateDispatcher) {
         this.updateDispatcher = Objects.requireNonNull(updateDispatcher);
+        return this;
+    }
+
+    public MTProtoBootstrap setReconnectionInterval(Duration reconnectionInterval) {
+        this.reconnectionInterval = Objects.requireNonNull(reconnectionInterval);
         return this;
     }
 
@@ -379,7 +386,7 @@ public final class MTProtoBootstrap {
                                 initDhPrimeChecker(), transportFactory, storeLayout,
                                 List.copyOf(responseTransformers),
                                 initConnectionRequest, gzipWrappingSizeThreshold,
-                                initResultPublisher(), initUpdatesPublisher());
+                                initResultPublisher(), initUpdatesPublisher(), reconnectionInterval);
 
                         ClientFactory clientFactory = this.clientFactory.apply(options);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(

@@ -11,26 +11,29 @@ import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.request.InitConnection;
 import telegram4j.tl.request.InvokeWithLayer;
 
+import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.ExecutorService;
+
+import static java.util.Objects.requireNonNull;
 
 public record MTProtoOptions(TcpClientResources tcpClientResources, PublicRsaKeyRegister publicRsaKeyRegister,
                              DhPrimeChecker dhPrimeChecker, TransportFactory transportFactory, StoreLayout storeLayout,
                              List<ResponseTransformer> responseTransformers,
                              InvokeWithLayer<Object, InitConnection<Object, TlMethod<?>>> initConnection,
                              int gzipWrappingSizeThreshold, ExecutorService resultPublisher,
-                             Scheduler updatesPublisher) {
+                             Scheduler updatesPublisher, Duration reconnectionInterval) {
 
     public MTProtoOptions {
-        Objects.requireNonNull(tcpClientResources);
-        Objects.requireNonNull(publicRsaKeyRegister);
-        Objects.requireNonNull(dhPrimeChecker);
-        Objects.requireNonNull(transportFactory);
-        Objects.requireNonNull(storeLayout);
-        Objects.requireNonNull(responseTransformers);
-        Objects.requireNonNull(initConnection);
-        Objects.requireNonNull(resultPublisher);
-        Objects.requireNonNull(updatesPublisher);
+        requireNonNull(tcpClientResources);
+        requireNonNull(publicRsaKeyRegister);
+        requireNonNull(dhPrimeChecker);
+        requireNonNull(transportFactory);
+        requireNonNull(storeLayout);
+        requireNonNull(responseTransformers);
+        requireNonNull(initConnection);
+        requireNonNull(resultPublisher);
+        requireNonNull(updatesPublisher);
+        requireNonNull(reconnectionInterval);
     }
 }

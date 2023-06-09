@@ -211,8 +211,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
                 authData.resetSessionId();
 
-                // TODO increase for tests
-                ctx.executor().schedule(() -> reconnect(ctx), 5, TimeUnit.SECONDS);
+                ctx.executor().schedule(() -> reconnect(ctx), options.reconnectionInterval().toNanos(), TimeUnit.NANOSECONDS);
             }
         }
 
