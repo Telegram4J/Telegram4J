@@ -246,7 +246,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         }
 
         transportCodec.setQuickAck(quickAck);
-        ctx.writeAndFlush(packet);
+        ctx.writeAndFlush(packet, ctx.voidPromise());
     }
 
     void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws IOException {
@@ -606,7 +606,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                             ? new RpcQuery(query.method, query.sink)
                             : new RpcRequest(inner.method);
 
-                    ctx.channel().writeAndFlush(single);
+                    ctx.channel().writeAndFlush(single, ctx.voidPromise());
                 }
             }
         }
@@ -626,7 +626,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         } else if (request instanceof RpcRequest rpcRequest) {
             client.requests.remove(possibleCntMsgId);
 
-            ctx.channel().writeAndFlush(rpcRequest);
+            ctx.channel().writeAndFlush(rpcRequest, ctx.voidPromise());
         }
     }
 

@@ -259,7 +259,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             pingEmitter = Trigger.create(() -> {
                 if (!inflightPing) {
                     inflightPing = true;
-                    ctx.writeAndFlush(new RpcRequest(ImmutablePingDelayDisconnect.of(System.nanoTime(), PING_TIMEOUT)));
+                    ctx.writeAndFlush(new RpcRequest(ImmutablePingDelayDisconnect.of(System.nanoTime(), PING_TIMEOUT)), ctx.voidPromise());
                     return;
                 }
 
@@ -396,7 +396,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 return (Mono<R>) sink;
             } else { // CONNECTED
                 RequestMono sink = new RequestMono(false);
-                channelState.channel.writeAndFlush(new RpcQuery(method, sink));
+                channelState.channel.writeAndFlush(new RpcQuery(method, sink), channelState.channel.voidPromise());
                 return (Mono<R>) sink;
             }
         })
@@ -411,12 +411,12 @@ public class MTProtoClientImpl implements MTProtoClient {
     @SuppressWarnings("unchecked")
     <R> Mono<R> send(ChannelHandlerContext ctx, TlMethod<R> method) {
         if (!isResultAwait(method)) {
-            ctx.channel().writeAndFlush(new RpcRequest(method));
+            ctx.channel().writeAndFlush(new RpcRequest(method), ctx.channel().voidPromise());
             return Mono.empty();
         }
 
         RequestMono sink = new RequestMono(true);
-        ctx.channel().writeAndFlush(new RpcQuery(method, sink));
+        ctx.channel().writeAndFlush(new RpcQuery(method, sink), ctx.channel().voidPromise());
         return (Mono<R>) sink;
     }
 

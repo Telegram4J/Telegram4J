@@ -48,7 +48,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         context.nonce(nonce);
 
         log.debug("[C:0x{}] Sending ReqPqMulti", clientId);
-        ctx.writeAndFlush(ImmutableReqPqMulti.of(nonce));
+        ctx.writeAndFlush(ImmutableReqPqMulti.of(nonce), ctx.voidPromise());
     }
 
     @Override
@@ -125,7 +125,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
                 .p(pb)
                 .q(qb)
                 .publicKeyFingerprint(foundKey.fingerprint())
-                .build());
+                .build(), ctx.voidPromise());
     }
 
     private static ByteBuf rsa(ByteBuf data, PublicRsaKey key) {
@@ -333,7 +333,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         dataWithHashEnc.release();
 
         log.debug("[C:0x{}] Sending SetClientDHParam", clientId);
-        ctx.writeAndFlush(req);
+        ctx.writeAndFlush(req, ctx.voidPromise());
     }
 
     private void handleDhGenOk(ChannelHandlerContext ctx, DhGenOk dhGenOk) {
