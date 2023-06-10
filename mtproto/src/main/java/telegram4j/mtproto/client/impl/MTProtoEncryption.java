@@ -105,7 +105,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
 
         TlObject method = req.method;
         int size = TlSerializer.sizeOf(req.method);
-        if (size >= client.options.gzipWrappingSizeThreshold()) {
+        if (size >= client.options.gzipCompressionSizeThreshold()) {
             ByteBuf serialized = ctx.alloc().ioBuffer(size);
             TlSerializer.serialize(serialized, method);
             ByteBuf gzipped = TlSerialUtil.compressGzip(ctx.alloc(), 9, serialized);
@@ -380,7 +380,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                 if (query.sink.isPublishOnEventLoop()) {
                     query.sink.emitError(e);
                 } else {
-                    query.sink.emitError(client.options.resultPublisher(), e);
+                    query.sink.emitError(client.mtProtoOptions.resultPublisher(), e);
                 }
             } else {
                 if (rpcLog.isDebugEnabled()) {
@@ -390,7 +390,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                 if (query.sink.isPublishOnEventLoop()) {
                     query.sink.emitValue(obj);
                 } else {
-                    query.sink.emitValue(client.options.resultPublisher(), obj);
+                    query.sink.emitValue(client.mtProtoOptions.resultPublisher(), obj);
                 }
 
                 if (client.authData.unauthorized() && (obj instanceof Authorization || obj instanceof LoginTokenSuccess)) {
@@ -449,7 +449,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                 if (q.sink.isPublishOnEventLoop()) {
                     q.sink.emitValue(obj);
                 } else {
-                    q.sink.emitValue(client.options.resultPublisher(), obj);
+                    q.sink.emitValue(client.mtProtoOptions.resultPublisher(), obj);
                 }
             }
 

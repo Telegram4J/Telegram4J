@@ -36,11 +36,7 @@ import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.mtproto.transport.IntermediateTransport;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.mtproto.transport.TransportFactory;
-import telegram4j.tl.BaseUser;
-import telegram4j.tl.InputUserSelf;
-import telegram4j.tl.TlInfo;
-import telegram4j.tl.User;
-import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.*;
 import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.auth.BaseAuthorization;
 import telegram4j.tl.request.InitConnection;
@@ -55,6 +51,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public final class MTProtoBootstrap {
@@ -67,7 +64,7 @@ public final class MTProtoBootstrap {
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
-    private Function<MTProtoOptions, ClientFactory> clientFactory = DefaultClientFactory::new;
+    private BiFunction<MTProtoOptions, MTProtoClient.Options, ClientFactory> clientFactory = DefaultClientFactory::new;
 
     @Nullable
     private EntityParserFactory defaultEntityParserFactory;
@@ -84,9 +81,10 @@ public final class MTProtoBootstrap {
     private StoreLayout storeLayout;
     private EventDispatcher eventDispatcher;
     private DataCenter dataCenter;
-    private int gzipWrappingSizeThreshold = 16 * 1024;
+    private int gzipCompressionSizeThreshold = 16 * 1024;
     private TcpClientResources tcpClientResources;
     private UpdateDispatcher updateDispatcher;
+    private Duration pingInterval = Duration.ofSeconds(10);
     private Duration reconnectionInterval = Duration.ofSeconds(3);
 
     private ExecutorService resultPublisher;
@@ -188,6 +186,11 @@ public final class MTProtoBootstrap {
 
     public MTProtoBootstrap setReconnectionInterval(Duration reconnectionInterval) {
         this.reconnectionInterval = Objects.requireNonNull(reconnectionInterval);
+        return this;
+    }
+
+    public MTProtoBootstrap setPingInterval(Duration pingInterval) {
+        this.pingInterval = Objects.requireNonNull(pingInterval);
         return this;
     }
 
@@ -311,13 +314,13 @@ public final class MTProtoBootstrap {
     /**
      * Sets size threshold for gzip packing mtproto queries, by default equals to 16KB.
      *
-     * @throws IllegalArgumentException if {@code gzipWrappingSizeThreshold} is negative.
-     * @param gzipWrappingSizeThreshold The new request's size threshold.
+     * @throws IllegalArgumentException if {@code gzipCompressionSizeThreshold} is negative.
+     * @param gzipCompressionSizeThreshold The new request's size threshold.
      * @return This builder.
      */
-    public MTProtoBootstrap setGzipWrappingSizeThreshold(int gzipWrappingSizeThreshold) {
-        Preconditions.requireArgument(gzipWrappingSizeThreshold > 0, "Invalid threshold value");
-        this.gzipWrappingSizeThreshold = gzipWrappingSizeThreshold;
+    public MTProtoBootstrap setGzipCompressionSizeThreshold(int gzipCompressionSizeThreshold) {
+        Preconditions.requireArgument(gzipCompressionSizeThreshold > 0, "Invalid threshold value");
+        this.gzipCompressionSizeThreshold = gzipCompressionSizeThreshold;
         return this;
     }
 
@@ -327,7 +330,7 @@ public final class MTProtoBootstrap {
      * @param clientFactory The new client factory constructor.
      * @return This builder.
      */
-    public MTProtoBootstrap setClientFactory(Function<MTProtoOptions, ClientFactory> clientFactory) {
+    public MTProtoBootstrap setClientFactory(BiFunction<MTProtoOptions, MTProtoClient.Options, ClientFactory> clientFactory) {
         this.clientFactory = Objects.requireNonNull(clientFactory);
         return this;
     }
@@ -377,24 +380,27 @@ public final class MTProtoBootstrap {
             composite.add(loadMainDc
                     .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
                         var tcpClientResources = initTcpClientResources();
-                        var initConnectionRequest = InvokeWithLayer.<Object, InitConnection<Object, TlMethod<?>>>builder()
+                        var initConnectionRequest = InvokeWithLayer.<Config, InitConnection<Config, GetConfig>>builder()
                                 .layer(TlInfo.LAYER)
                                 .query(initConnection())
                                 .build();
-                        var options = new MTProtoOptions(
+                        var responseTransformers = List.copyOf(this.responseTransformers);
+                        var clientOptions = new MTProtoClient.Options(
+                                transportFactory, initConnectionRequest,
+                                pingInterval, reconnectionInterval,
+                                gzipCompressionSizeThreshold, responseTransformers);
+                        var mtProtoOptions = new MTProtoOptions(
                                 tcpClientResources, initPublicRsaKeyRegister(),
-                                initDhPrimeChecker(), transportFactory, storeLayout,
-                                List.copyOf(responseTransformers),
-                                initConnectionRequest, gzipWrappingSizeThreshold,
-                                initResultPublisher(), initUpdatesPublisher(), reconnectionInterval);
+                                initDhPrimeChecker(), storeLayout,
+                                initResultPublisher());
 
-                        ClientFactory clientFactory = this.clientFactory.apply(options);
+                        ClientFactory clientFactory = this.clientFactory.apply(mtProtoOptions, clientOptions);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
                                 MTProtoClientGroup.Options.of(mainDc, clientFactory,
-                                        initUpdateDispatcher(options.updatesPublisher()), options));
+                                        initUpdateDispatcher(initUpdatesPublisher()), mtProtoOptions));
 
                         return authorizeClient(clientGroup, storeLayout, dcOptions)
-                                .flatMap(selfId -> initializeClient(selfId, clientGroup, options));
+                                .flatMap(selfId -> initializeClient(selfId, clientGroup, mtProtoOptions));
                     }))
                     .subscribe(sink::success, sink::error));
 
@@ -526,12 +532,12 @@ public final class MTProtoBootstrap {
     // Resources initialization
     // ==========================
 
-    private InitConnection<Object, TlMethod<?>> initConnection() {
+    private InitConnection<Config, GetConfig> initConnection() {
         InitConnectionParams params = initConnectionParams != null
                 ? initConnectionParams
                 : InitConnectionParams.getDefault();
 
-        var initConnection = InitConnection.builder()
+        var initConnection = InitConnection.<Config, GetConfig>builder()
                 .apiId(authResources.getApiId())
                 .appVersion(params.getAppVersion())
                 .deviceModel(params.getDeviceModel())

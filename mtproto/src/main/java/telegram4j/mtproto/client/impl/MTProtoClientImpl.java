@@ -39,7 +39,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -60,8 +59,6 @@ public class MTProtoClientImpl implements MTProtoClient {
     static final Logger log = Loggers.getLogger("telegram4j.mtproto.MTProtoClient");
     static final Logger rpcLog = Loggers.getLogger("telegram4j.mtproto.rpc");
 
-    static final Duration PING_QUERY_PERIOD = Duration.ofSeconds(5);
-    static final Duration PING_QUERY_PERIOD_MEDIA = PING_QUERY_PERIOD.multipliedBy(2);
     static final int PING_TIMEOUT = 60;
 
     static final AttributeKey<MonoSink<Void>> NOTIFY = AttributeKey.valueOf("notify");
@@ -91,16 +88,20 @@ public class MTProtoClientImpl implements MTProtoClient {
     final InnerStats stats = new InnerStats();
     final Sinks.Empty<Void> onClose = Sinks.empty();
 
-    final MTProtoOptions options;
+    final MTProtoOptions mtProtoOptions;
+    final Options options;
     final Bootstrap bootstrap;
 
-    public MTProtoClientImpl(MTProtoClientGroup group, DcId.Type type, DataCenter dc, MTProtoOptions options) {
+    public MTProtoClientImpl(MTProtoClientGroup group, DcId.Type type,
+                             DataCenter dc, MTProtoOptions mtProtoOptions,
+                             Options options) {
         this.group = group;
         this.type = type;
         this.authData = new AuthData(dc);
+        this.mtProtoOptions = mtProtoOptions;
         this.options = options;
 
-        var tcpClientRes = options.tcpClientResources();
+        var tcpClientRes = mtProtoOptions.tcpClientResources();
         this.bootstrap = new Bootstrap()
                 .channelFactory(tcpClientRes.getEventLoopResources().getChannelFactory())
                 .group(tcpClientRes.getEventLoopGroup())
@@ -241,7 +242,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 authData.serverSalt(event.serverSalt());
                 authData.timeOffset(event.serverTimeDiff());
 
-                options.storeLayout().updateAuthKey(authData.dc(), event.authKey())
+                mtProtoOptions.storeLayout().updateAuthKey(authData.dc(), event.authKey())
                         .subscribe(null, ctx::fireExceptionCaught);
 
                 ctx.pipeline().remove(HANDSHAKE);
@@ -258,14 +259,9 @@ public class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, new MTProtoEncryption(MTProtoClientImpl.this, transportCodec));
 
             if (type == DcId.Type.MAIN) {
-                options.storeLayout().updateDataCenter(authData.dc())
+                mtProtoOptions.storeLayout().updateDataCenter(authData.dc())
                         .subscribe(null, ctx::fireExceptionCaught);
             }
-
-            Duration period = switch (authData.dc().getType()) {
-                case MEDIA, CDN -> PING_QUERY_PERIOD_MEDIA;
-                case REGULAR -> PING_QUERY_PERIOD;
-            };
 
             pingEmitter = Trigger.create(() -> {
                 if (!inflightPing) {
@@ -279,7 +275,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 logStateChange(ChannelState.DISCONNECTED);
                 channelState = ChannelState.DISCONNECTED_STATE;
                 ctx.close();
-            }, ctx.executor(), period);
+            }, ctx.executor(), options.pingInterval());
 
             if (authData.oldSessionId() != 0) {
                 send(ctx, ImmutableDestroySession.of(authData.oldSessionId()))
@@ -287,7 +283,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             send(ctx, options.initConnection())
-                    .subscribe(notify -> {
+                    .subscribe(freshConfig -> {
                         logStateChange(ChannelState.CONNECTED);
                         channelState = new ChannelState(ctx.channel(), ChannelState.CONNECTED);
 
@@ -296,15 +292,16 @@ public class MTProtoClientImpl implements MTProtoClient {
 
                         // Send all pending requests on next tick
                         ctx.executor().execute(() -> {
+                            if (pendingRequests.isEmpty()) {
+                                return;
+                            }
+
                             if (log.isDebugEnabled()) {
                                 log.debug("[C:0x{}] Sending pending requests: {}", id, pendingRequests.size());
                             }
 
-                            boolean wasAny = !pendingRequests.isEmpty();
                             pendingRequests.drain(ctx.channel()::write);
-                            if (wasAny) {
-                                ctx.channel().flush();
-                            }
+                            ctx.channel().flush();
                         });
 
                         if (sink != null) {
@@ -326,11 +323,11 @@ public class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addFirst(TRANSPORT, new TransportCodec(tr));
 
             if (authData.authKey() == null) {
-                options.storeLayout().getAuthKey(authData.dc())
+                mtProtoOptions.storeLayout().getAuthKey(authData.dc())
                         .switchIfEmpty(Mono.fromRunnable(() -> ctx.executor().execute(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
 
-                            var handshakeCtx = new HandshakeContext(options.dhPrimeChecker(), options.publicRsaKeyRegister());
+                            var handshakeCtx = new HandshakeContext(mtProtoOptions.dhPrimeChecker(), mtProtoOptions.publicRsaKeyRegister());
                             ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
                         })))
                         .subscribe(loaded -> ctx.executor().execute(() -> {
@@ -506,7 +503,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (req instanceof RpcQuery q) {
                 var resultPublisher = q.sink.isPublishOnEventLoop()
                         ? eventLoop
-                        : options.resultPublisher();
+                        : mtProtoOptions.resultPublisher();
 
                 q.sink.emitError(resultPublisher, exc);
             }
@@ -516,7 +513,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             if (request instanceof RpcQuery q) {
                 var resultPublisher = q.sink.isPublishOnEventLoop()
                         ? eventLoop
-                        : options.resultPublisher();
+                        : mtProtoOptions.resultPublisher();
 
                 q.sink.emitError(resultPublisher, exc);
             }
@@ -526,7 +523,7 @@ public class MTProtoClientImpl implements MTProtoClient {
         while ((q = delayedUntilAuth.poll()) != null) {
             var resultPublisher = q.sink.isPublishOnEventLoop()
                     ? eventLoop
-                    : options.resultPublisher();
+                    : mtProtoOptions.resultPublisher();
 
             q.sink.emitError(resultPublisher, exc);
         }

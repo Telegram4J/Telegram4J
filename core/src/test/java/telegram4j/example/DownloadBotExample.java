@@ -21,6 +21,7 @@ import telegram4j.mtproto.store.StoreLayoutImpl;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.function.Function;
 
 public class DownloadBotExample {
@@ -49,6 +50,8 @@ public class DownloadBotExample {
                         Path.of("core/src/test/resources/t4j-bot.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
                         MTProtoRetrySpec.max(d -> d.getSeconds() < 30, 2)))
+                .setReconnectionInterval(Duration.ofSeconds(30))
+                .setPingInterval(Duration.ofSeconds(30))
                 .withConnection(client -> {
 
                     return client.on(SendMessageEvent.class)

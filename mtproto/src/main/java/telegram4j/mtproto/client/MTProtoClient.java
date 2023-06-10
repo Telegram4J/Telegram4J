@@ -3,10 +3,20 @@ package telegram4j.mtproto.client;
 import reactor.core.publisher.Mono;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcId;
+import telegram4j.mtproto.ResponseTransformer;
+import telegram4j.mtproto.transport.TransportFactory;
+import telegram4j.tl.Config;
 import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.request.InitConnection;
+import telegram4j.tl.request.InvokeWithLayer;
+import telegram4j.tl.request.help.GetConfig;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Interface for MTProto client implementations with minimal method set.
@@ -80,6 +90,20 @@ public interface MTProtoClient {
          */
         default Stats copy() {
             return new ImmutableStats(lastQueryTimestamp().orElse(null), queriesCount());
+        }
+    }
+
+    record Options(TransportFactory transportFactory,
+                   InvokeWithLayer<Config, InitConnection<Config, GetConfig>> initConnection,
+                   Duration pingInterval, Duration reconnectionInterval,
+                   int gzipCompressionSizeThreshold, List<ResponseTransformer> responseTransformers) {
+
+        public Options {
+            requireNonNull(transportFactory);
+            requireNonNull(initConnection);
+            requireNonNull(pingInterval);
+            requireNonNull(reconnectionInterval);
+            requireNonNull(responseTransformers);
         }
     }
 }
