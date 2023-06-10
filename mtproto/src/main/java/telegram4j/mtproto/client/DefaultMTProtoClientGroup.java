@@ -82,6 +82,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         return Mono.whenDelayError(Stream.concat(dcs.values().stream()
                 .flatMap(dc -> Stream.concat(Arrays.stream(dc.downloadClients),
                         Arrays.stream(dc.uploadClients))), Stream.of(main))
+                .filter(c -> c != null)
                 .map(MTProtoClient::close)
                 .collect(Collectors.toList()))
                 .then(Mono.fromRunnable(() -> {
