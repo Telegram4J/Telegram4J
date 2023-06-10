@@ -3,6 +3,8 @@ package telegram4j.mtproto;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 import telegram4j.tl.mtproto.RpcError;
 
@@ -16,11 +18,13 @@ import java.util.function.Predicate;
  */
 public class MTProtoRetrySpec extends Retry {
 
+    private final Scheduler delayScheduler;
     private final Predicate<Duration> predicate;
     private final long maxAttempts;
     private final boolean inRow;
 
-    private MTProtoRetrySpec(Predicate<Duration> predicate, long maxAttempts, boolean inRow) {
+    private MTProtoRetrySpec(Scheduler delayScheduler, Predicate<Duration> predicate, long maxAttempts, boolean inRow) {
+        this.delayScheduler = Objects.requireNonNull(delayScheduler);
         this.predicate = Objects.requireNonNull(predicate);
         this.maxAttempts = maxAttempts;
         this.inRow = inRow;
@@ -35,32 +39,25 @@ public class MTProtoRetrySpec extends Retry {
      * @param inRow The maximum number of retry attempts to allow in a row, reset by successful onNext().
      * @return A new {@code MTProtoRetrySpec}.
      */
-    public static MTProtoRetrySpec create(Predicate<Duration> canRetry,
+    public static MTProtoRetrySpec create(Scheduler delayScheduler, Predicate<Duration> canRetry,
                                           long maxAttempts, boolean inRow) {
-        return new MTProtoRetrySpec(canRetry, maxAttempts, inRow);
+        return new MTProtoRetrySpec(delayScheduler, canRetry, maxAttempts, inRow);
     }
 
     public static MTProtoRetrySpec max(Predicate<Duration> canRetry, long maxAttempts) {
-        return create(canRetry, maxAttempts, false);
+        return max(Schedulers.single(), canRetry, maxAttempts);
+    }
+
+    public static MTProtoRetrySpec max(Scheduler delayScheduler, Predicate<Duration> canRetry, long maxAttempts) {
+        return create(delayScheduler, canRetry, maxAttempts, false);
     }
 
     public static MTProtoRetrySpec maxInRow(Predicate<Duration> canRetry, long maxAttempts) {
-        return create(canRetry, maxAttempts, true);
+        return maxInRow(Schedulers.single(), canRetry, maxAttempts);
     }
 
-    public MTProtoRetrySpec withPredicate(Predicate<Duration> predicate) {
-        if (predicate == this.predicate) return this;
-        return new MTProtoRetrySpec(predicate, maxAttempts, inRow);
-    }
-
-    public MTProtoRetrySpec withMaxAttempts(long maxAttempts) {
-        if (maxAttempts == this.maxAttempts) return this;
-        return new MTProtoRetrySpec(predicate, maxAttempts, inRow);
-    }
-
-    public MTProtoRetrySpec withInRow(boolean inRow) {
-        if (inRow == this.inRow) return this;
-        return new MTProtoRetrySpec(predicate, maxAttempts, inRow);
+    public static MTProtoRetrySpec maxInRow(Scheduler delayScheduler, Predicate<Duration> canRetry, long maxAttempts) {
+        return create(delayScheduler, canRetry, maxAttempts, true);
     }
 
     @Override
@@ -86,7 +83,7 @@ public class MTProtoRetrySpec extends Retry {
                     exc.getError().errorMessage().startsWith("FLOOD_WAIT_")) {
                     Duration delay = parse(exc.getError());
                     if (predicate.test(delay)) {
-                        return Mono.delay(delay);
+                        return Mono.delay(delay, delayScheduler);
                     }
                 }
             }
