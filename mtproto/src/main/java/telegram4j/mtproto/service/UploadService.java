@@ -25,6 +25,7 @@ import telegram4j.tl.storage.FileType;
 import telegram4j.tl.upload.BaseFile;
 import telegram4j.tl.upload.WebFile;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -87,7 +88,11 @@ public class UploadService extends RpcService {
                 fileRefId.asLocation().orElseThrow(), baseOffset, limit);
 
         return Flux.range(0, MAX_INFLIGHT_REQUESTS)
-                .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
+                .flatMapSequential(i -> {
+                    var requiredDelay = Mono.delay(Duration.ofMillis(20));
+                    return client.sendAwait(request.withOffset(offset.getAndAdd(limit)))
+                            .flatMap(requiredDelay::thenReturn);
+                })
                 .repeat(() -> !complete.get())
                 .cast(BaseFile.class)
                 .mapNotNull(part -> {
