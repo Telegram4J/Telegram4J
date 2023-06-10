@@ -4,7 +4,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryStickerSet;
@@ -222,7 +221,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public Mono<InputFile> uploadFile(Path path, String filename, int partSize) {
         return Mono.fromCallable(() -> Files.size(path))
-                .publishOn(Schedulers.boundedElastic())
                 .flatMap(size -> {
                     int ps = UploadService.suggestPartSize(size, partSize);
                     return serviceHolder.getUploadService()
