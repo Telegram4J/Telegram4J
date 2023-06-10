@@ -18,13 +18,15 @@ import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.tl.ImmutableBaseInputFile;
 import telegram4j.tl.ImmutableInputFileBig;
 import telegram4j.tl.InputFile;
+import telegram4j.tl.api.TlMethod;
+import telegram4j.tl.request.upload.ImmutableSaveBigFilePart;
 import telegram4j.tl.request.upload.ImmutableSaveFilePart;
-import telegram4j.tl.request.upload.SaveFilePart;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static telegram4j.mtproto.service.UploadService.log;
 
@@ -47,13 +49,10 @@ class UploadMono extends Mono<InputFile> {
         // It's necessary to avoid connection reset by server
         static final Duration UPLOAD_INTERVAL = Duration.ofMillis(300);
 
-        static final int CANCELLED = 1 << 0;
-        static final int TERMINATED = 1 << 1;
-
-        int readParts;
+        final AtomicInteger readParts = new AtomicInteger();
         CompositeByteBuf buffer;
         MessageDigest md5;
-        int roundRobin;
+        final AtomicInteger roundRobin = new AtomicInteger();
 
         final CoreSubscriber<? super InputFile> actual;
         final MTProtoClientGroup clientGroup;
@@ -61,8 +60,7 @@ class UploadMono extends Mono<InputFile> {
         final AtomicInteger received = new AtomicInteger();
         final AtomicInteger requested = new AtomicInteger();
 
-        Subscription subscription;
-        int state;
+        final AtomicReference<Subscription> subscription = new AtomicReference<>();
 
         public UploadSubscriber(CoreSubscriber<? super InputFile> actual,
                                 MTProtoClientGroup clientGroup,
@@ -78,25 +76,27 @@ class UploadMono extends Mono<InputFile> {
             if (md5 != null)
                 md5.update(buf.nioBuffer());
 
-            SaveFilePart part;
+            int partId = readParts.getAndIncrement();
+            TlMethod<Boolean> part;
             try {
-                part = ImmutableSaveFilePart.of(options.getFileId(), readParts++, buf);
+                if (options.isBigFile()) {
+                    part = ImmutableSaveBigFilePart.of(options.getFileId(), partId, options.getPartsCount(), buf);
+                } else {
+                    part = ImmutableSaveFilePart.of(options.getFileId(), partId, buf);
+                }
             } finally {
                 ReferenceCountUtil.safeRelease(buf);
             }
 
-            int idx = roundRobin++;
-            if (roundRobin == options.getParallelism()) {
-                roundRobin = 0;
-            }
+            int idx = Math.abs(roundRobin.getAndIncrement() % options.getParallelism());
 
             DcId dcId = DcId.upload(clientGroup.main().dc().getId(), idx);
             if (log.isDebugEnabled()) {
                 log.debug("[DC:{}, F:{}] Preparing to send {}/{}", dcId, options.getFileId(),
-                        part.filePart() + 1, options.getPartsCount());
+                        partId + 1, options.getPartsCount());
             }
 
-            Mono.delay(UPLOAD_INTERVAL)
+            Mono.delay(UPLOAD_INTERVAL, Schedulers.single())
                     .then(clientGroup.send(dcId, part))
                     .subscribe(res -> {
                         if (!res) throw new IllegalStateException("Unexpected result state");
@@ -104,23 +104,31 @@ class UploadMono extends Mono<InputFile> {
                         int cnt = received.incrementAndGet();
                         if (log.isDebugEnabled()) {
                             log.debug("[DC:{}, F:{}] Uploaded part {}, {}/{}", dcId, options.getFileId(),
-                                    part.filePart() + 1, cnt, options.getPartsCount());
+                                    partId + 1, cnt, options.getPartsCount());
                         }
 
                         int d = requested.decrementAndGet();
                         if (cnt == options.getPartsCount()) {
                             completeInner();
                         } else if (d == 0) {
-                            int remain = options.getPartsCount() - readParts;
+                            int remain = options.getPartsCount() - readParts.get();
                             int r = Math.min(options.getParallelism(), remain);
-                            requested.set(r);
-                            subscription.request(r);
+                            if (requested.compareAndSet(0, r)) {
+                                subscription.get().request(r);
+                            }
                         }
-                    }, this::onError);
+                    }, t -> {
+                        if (log.isDebugEnabled()) {
+                            log.debug("[DC:{}, F:{}] Failed to upload file part: {}",
+                                    dcId, options.getFileId(), partId);
+                        }
+                        onError(t);
+                    });
         }
 
         void completeInner() {
-            if ((state & CANCELLED) != 0) {
+            var sub = subscription.getAndSet(Operators.cancelledSubscription());
+            if (sub == Operators.cancelledSubscription()) {
                 return;
             }
 
@@ -135,15 +143,15 @@ class UploadMono extends Mono<InputFile> {
 
         @Override
         public void onSubscribe(Subscription s) {
-            if (Operators.validate(this.subscription, s)) {
-                this.subscription = s;
+            if (subscription.compareAndSet(null, s)) {
                 actual.onSubscribe(this);
             }
         }
 
         @Override
         public void onNext(ByteBuf buf) {
-            if ((state & TERMINATED) != 0) {
+            var current = subscription.get();
+            if (current == Operators.cancelledSubscription()) {
                 Operators.onNextDropped(buf, currentContext());
                 return;
             }
@@ -166,28 +174,25 @@ class UploadMono extends Mono<InputFile> {
                 send(buffer.readRetainedSlice(options.getPartSize()));
             }
 
-            if (readParts == options.getPartsCount() - 1 && buffer.isReadable()) {
+            if (readParts.get() == options.getPartsCount() - 1 && buffer.isReadable()) {
                 send(buffer);
             }
         }
 
         @Override
         public void onError(Throwable t) {
-            if ((state & TERMINATED) != 0) {
+            var current = subscription.getAndSet(Operators.cancelledSubscription());
+            if (current == Operators.cancelledSubscription()) {
                 Operators.onErrorDropped(t, currentContext());
                 return;
             }
 
-            state |= TERMINATED;
             actual.onError(t);
         }
 
         @Override
         public void onComplete() {
-            if ((state & TERMINATED) != 0) {
-                return;
-            }
-            state |= TERMINATED;
+            subscription.set(Operators.cancelledSubscription());
         }
 
         @Override
@@ -209,10 +214,9 @@ class UploadMono extends Mono<InputFile> {
                     DcId dcId = DcId.upload(clientGroup.main().dc().getId(), i);
 
                     clientGroup.getOrCreateClient(dcId)
-                            .subscribeOn(Schedulers.boundedElastic())
                             .subscribe(client -> {
                                 if (pending.decrementAndGet() == 0) {
-                                    subscription.request(Math.min(options.getParallelism(), options.getPartsCount()));
+                                    subscription.get().request(Math.min(options.getParallelism(), options.getPartsCount()));
                                 }
                             }, this::onError);
                 }
@@ -221,20 +225,20 @@ class UploadMono extends Mono<InputFile> {
 
         @Override
         public void cancel() {
-            if ((state & CANCELLED) != 0) {
+            var current = subscription.getAndSet(Operators.cancelledSubscription());
+            if (current == Operators.cancelledSubscription()) {
                 return;
             }
-            state |= CANCELLED;
-            subscription.cancel();
+
+            current.cancel();
         }
 
         @Nullable
         @Override
         public Object scanUnsafe(Scannable.Attr key) {
-            if (key == Attr.TERMINATED) return (state & TERMINATED) != 0;
-            if (key == Attr.PARENT) return subscription;
+            if (key == Attr.TERMINATED) return subscription.get() == Operators.cancelledSubscription();
+            if (key == Attr.PARENT) return subscription.get();
             if (key == Attr.RUN_STYLE) return Attr.RunStyle.ASYNC;
-            if (key == Attr.CANCELLED) return (state & CANCELLED) != 0;
             if (key == Attr.REQUESTED_FROM_DOWNSTREAM) return options.getPartsCount();
             if (key == Attr.ACTUAL) return actual;
             return null;
