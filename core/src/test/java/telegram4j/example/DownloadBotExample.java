@@ -18,7 +18,9 @@ import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 
+import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
@@ -29,7 +31,7 @@ public class DownloadBotExample {
 
     private static final Logger log = Loggers.getLogger(DownloadBotExample.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
         // only for testing, do not copy it to your production code!!!
         Hooks.onOperatorDebug();
@@ -40,6 +42,9 @@ public class DownloadBotExample {
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
         String apiHash = System.getenv("T4J_API_HASH");
         String botAuthToken = System.getenv("T4J_TOKEN");
+
+        Path dir = Path.of("core/src/test/resources/stash");
+        Files.createDirectories(dir);
 
         MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 // prefer retrieving full data about peer entities
@@ -68,7 +73,7 @@ public class DownloadBotExample {
                             .flatMap(doc -> Mono.justOrEmpty(doc.getDocument()))
                             .flatMap(doc -> {
                                 long t = System.currentTimeMillis();
-                                Path filePath = Path.of("core/src/test/resources/stash", t + ".file");
+                                Path filePath = dir.resolve(t + ".file");
                                 log.info("| Downloading file {}", filePath);
 
                                 return Mono.usingWhen(Mono.fromCallable(() -> FileChannel.open(filePath, StandardOpenOption.WRITE, StandardOpenOption.CREATE)),
