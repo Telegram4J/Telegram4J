@@ -37,6 +37,7 @@ import telegram4j.tl.request.mtproto.*;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
@@ -158,35 +159,6 @@ public class MTProtoClientImpl implements MTProtoClient {
                     .addListener(notify -> initializeChannel(ctx, tr));
         }
 
-        void reconnect(ChannelHandlerContext oldCtx) {
-            var currentState = channelState;
-            if (currentState == ChannelState.CLOSED_STATE) {
-                closeClient(oldCtx.executor());
-                return;
-            }
-
-            var future = bootstrap.connect();
-            future.addListener(notify -> {
-                Throwable t = notify.cause();
-                if (t != null) {
-                    if (t instanceof TransportException te) {
-                        log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
-                    } else if (t instanceof AuthorizationException) {
-                        log.error("[C:0x" + id + "] Exception during auth key generation", t);
-                    } else if (t instanceof MTProtoException) {
-                        log.error("[C:0x" + id + "] Validation exception", t);
-                    } else {
-                        log.error("[C:0x" + id + "] Unexpected client exception", t);
-                    }
-
-                    var sink = future.channel().attr(NOTIFY).get();
-                    if (sink != null) {
-                        sink.error(t);
-                    }
-                }
-            });
-        }
-
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
             var oldState = channelState;
@@ -213,6 +185,45 @@ public class MTProtoClientImpl implements MTProtoClient {
 
                 ctx.executor().schedule(() -> reconnect(ctx), options.reconnectionInterval().toNanos(), TimeUnit.NANOSECONDS);
             }
+        }
+
+        void reconnect(ChannelHandlerContext oldCtx) {
+            var currentState = channelState;
+            if (currentState == ChannelState.CLOSED_STATE) {
+                closeClient(oldCtx.executor());
+                return;
+            }
+
+            var future = bootstrap.connect();
+            future.addListener(notify -> {
+                Throwable t = notify.cause();
+                if (t != null) {
+                    if (t instanceof TransportException te) {
+                        log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
+                    } else if (t instanceof AuthorizationException) {
+                        log.error("[C:0x" + id + "] Exception during auth key generation", t);
+                    } else if (t instanceof MTProtoException) {
+                        log.error("[C:0x" + id + "] Validation exception", t);
+                    } else if (t instanceof ConnectException) {
+                        if (t instanceof ConnectTimeoutException) {
+                            log.error("[C:0x" + id + "] Connection timed out");
+                        } else {
+                            log.error("[C:0x" + id + "] Connect exception", t);
+                        }
+
+                        oldCtx.executor().schedule(() -> reconnect(oldCtx),
+                                options.reconnectionInterval().toNanos(), TimeUnit.NANOSECONDS);
+                        return;
+                    } else {
+                        log.error("[C:0x" + id + "] Unexpected client exception", t);
+                    }
+
+                    var sink = future.channel().attr(NOTIFY).get();
+                    if (sink != null) {
+                        sink.error(t);
+                    }
+                }
+            });
         }
 
         void closeClient(EventExecutor executor) {
@@ -352,23 +363,38 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
 
             bootstrap.attr(NOTIFY, sink);
-            bootstrap.connect()
-                    .addListener(notify -> {
-                        Throwable t = notify.cause();
-                        if (t != null) {
-                            if (t instanceof TransportException te) {
-                                log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
-                            } else if (t instanceof AuthorizationException) {
-                                log.error("[C:0x" + id + "] Exception during auth key generation", t);
-                            } else if (t instanceof MTProtoException) {
-                                log.error("[C:0x" + id + "] Validation exception", t);
-                            } else {
-                                log.error("[C:0x" + id + "] Unexpected client exception", t);
-                            }
+            connect0(sink);
+        });
+    }
 
-                            sink.error(t);
-                        }
-                    });
+    private void connect0(MonoSink<Void> sink) {
+        var future = bootstrap.connect();
+
+        future.addListener(notify -> {
+            Throwable t = notify.cause();
+            if (t != null) {
+                if (t instanceof TransportException te) {
+                    log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
+                } else if (t instanceof AuthorizationException) {
+                    log.error("[C:0x" + id + "] Exception during auth key generation", t);
+                } else if (t instanceof MTProtoException) {
+                    log.error("[C:0x" + id + "] Validation exception", t);
+                } else if (t instanceof ConnectException) {
+                    if (t instanceof ConnectTimeoutException) {
+                        log.error("[C:0x" + id + "] Connection timed out");
+                    } else {
+                        log.error("[C:0x" + id + "] Connect exception", t);
+                    }
+
+                    future.channel().eventLoop().schedule(() -> connect0(sink),
+                            options.reconnectionInterval().toNanos(), TimeUnit.NANOSECONDS);
+                    return;
+                } else {
+                    log.error("[C:0x" + id + "] Unexpected client exception", t);
+                }
+
+                sink.error(t);
+            }
         });
     }
 
