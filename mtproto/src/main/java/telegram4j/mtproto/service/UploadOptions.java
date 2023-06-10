@@ -206,8 +206,13 @@ public class UploadOptions {
                 throw new IllegalArgumentException("Invalid size and part size parameters, parts count is too big." +
                         "size: " + size + ", part size: " + partSize);
             }
-            if (parallelism == -1)
+            if (parallelism == -1) {
                 parallelism = UploadService.suggestParallelism(size);
+            }
+            if (size <= BIG_FILE_THRESHOLD && parallelism > 1) {
+                throw new IllegalArgumentException("Parallelism option is disabled for small files");
+            }
+
             if ((optBits & OPT_BIT_FILE_ID) != 0)
                 fileId = CryptoUtil.random.nextLong();
 
