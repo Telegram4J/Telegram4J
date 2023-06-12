@@ -247,14 +247,14 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Request to download file by their reference from Telegram Media DC or
      * if file {@link Document#isWeb()} and haven't telegram-proxying try to directly download file by url.
      *
-     * @see #downloadFile(FileReferenceId, int, int, boolean)
+     * @see #downloadFile(FileReferenceId, long, int, boolean)
      * @param fileRefId The serialized {@link FileReferenceId} of file.
      * @param offset The number of bytes to be skipped.
      * @param limit The number of bytes to be returned.
      * @param precise Disable some checks on limit and offset values, useful for example to stream videos by keyframes.
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
-    public Flux<FilePart> downloadFile(String fileRefId, int offset, int limit, boolean precise) {
+    public Flux<FilePart> downloadFile(String fileRefId, long offset, int limit, boolean precise) {
         return Mono.fromCallable(() -> FileReferenceId.deserialize(fileRefId))
                 .flatMapMany(deser -> downloadFile(deser, offset, limit, precise));
     }
@@ -313,7 +313,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Ignored if downloading file is web.
      * @return A {@link Flux} emitting full or parts of downloading file.
      */
-    public Flux<FilePart> downloadFile(FileReferenceId fileRefId, int offset, int limit, boolean precise) {
+    public Flux<FilePart> downloadFile(FileReferenceId fileRefId, long offset, int limit, boolean precise) {
         return Flux.defer(() -> {
             if (fileRefId.getFileType() == FileReferenceId.Type.WEB_DOCUMENT) {
                 if (authResources.isBot()) {
@@ -323,7 +323,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                     return Flux.error(new IllegalArgumentException("Web document without access hash"));
                 }
                 return serviceHolder.getUploadService()
-                        .getWebFile(fileRefId.asWebLocation().orElseThrow(), offset, limit)
+                        .getWebFile(fileRefId.asWebLocation().orElseThrow(), Math.toIntExact(offset), limit)
                         .map(FilePart::ofWebFile);
             }
 

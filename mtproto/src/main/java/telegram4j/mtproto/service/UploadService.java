@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class UploadService extends RpcService {
     static final Logger log = Loggers.getLogger(UploadService.class);
@@ -81,8 +82,8 @@ public class UploadService extends RpcService {
     // =========================
 
     private Flux<BaseFile> getFile0(MTProtoClient client, FileReferenceId fileRefId,
-                                    int baseOffset, int limit, boolean precise) {
-        AtomicInteger offset = new AtomicInteger(baseOffset);
+                                    long baseOffset, int limit, boolean precise) {
+        AtomicLong offset = new AtomicLong(baseOffset);
         AtomicBoolean complete = new AtomicBoolean();
         ImmutableGetFile request = ImmutableGetFile.of(precise ? ImmutableGetFile.PRECISE_MASK : 0,
                 fileRefId.asLocation().orElseThrow(), baseOffset, limit);
@@ -106,7 +107,7 @@ public class UploadService extends RpcService {
 
     @Compatible(Type.BOTH)
     public Flux<BaseFile> getFile(FileReferenceId location,
-                                  int offset, int limit, boolean precise) {
+                                  long offset, int limit, boolean precise) {
         if (offset < 0) return Flux.error(new IllegalArgumentException("offset is negative"));
         if (limit <= 0) return Flux.error(new IllegalArgumentException("limit is not positive"));
 
