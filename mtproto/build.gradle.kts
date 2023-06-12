@@ -4,10 +4,10 @@ dependencies {
     api(libs.reactor.addons.extra)
     api(libs.netty.handler)
 
-    compileOnlyApi(libs.netty.native.epoll) {
+    compileOnly(libs.netty.native.epoll) {
         artifact { classifier = "linux-x86_64" }
     }
-    compileOnlyApi(libs.netty.native.kqueue) {
+    compileOnly(libs.netty.native.kqueue) {
         artifact { classifier = "osx-x86_64" }
     }
 
