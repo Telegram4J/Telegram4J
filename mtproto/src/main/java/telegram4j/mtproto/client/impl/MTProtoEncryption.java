@@ -30,7 +30,8 @@ import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.client.impl.MTProtoClientImpl.*;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
-import static telegram4j.mtproto.util.CryptoUtil.*;
+import static telegram4j.mtproto.util.CryptoUtil.random;
+import static telegram4j.mtproto.util.CryptoUtil.sha256Digest;
 import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 
 class MTProtoEncryption extends ChannelDuplexHandler {
@@ -43,6 +44,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
     final MTProtoClientImpl client;
     final TransportCodec transportCodec;
     final ArrayList<Long> acknowledgments = new ArrayList<>(32);
+    final AES256IGECipher cipher = AES256IGECipher.create();
 
     MTProtoEncryption(MTProtoClientImpl client, TransportCodec transportCodec) {
         this.client = client;
@@ -222,7 +224,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         }
 
         ByteBuf messageKey = messageKeyHash.slice(8, 16);
-        AES256IGECipher cipher = createAesCipher(messageKey, authKey, false);
+        initCipher(messageKey, authKey, false);
 
         ByteBuf encrypted = cipher.encrypt(message);
         ByteBuf packet = Unpooled.wrappedBuffer(authKeyId, messageKey, encrypted);
@@ -264,7 +266,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         ByteBuf messageKey = data.readRetainedSlice(16);
 
         ByteBuf authKey = currentAuthKey.value();
-        AES256IGECipher cipher = createAesCipher(messageKey, authKey, true);
+        initCipher(messageKey, authKey, true);
 
         ByteBuf decrypted = cipher.decrypt(data.slice());
 
@@ -636,5 +638,26 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         var ack = ImmutableMsgsAck.of(batch);
         batch.clear();
         return ack;
+    }
+
+    void initCipher(ByteBuf messageKey, ByteBuf authKey, boolean inbound) {
+        int x = inbound ? 8 : 0;
+
+        ByteBuf sha256a = sha256Digest(messageKey, authKey.slice(x, 36));
+        ByteBuf sha256b = sha256Digest(authKey.slice(x + 40, 36), messageKey);
+
+        ByteBuf aesKey = Unpooled.wrappedBuffer(
+                sha256a.retainedSlice(0, 8),
+                sha256b.retainedSlice(8, 16),
+                sha256a.retainedSlice(24, 8));
+
+        ByteBuf aesIV = Unpooled.wrappedBuffer(
+                sha256b.retainedSlice(0, 8),
+                sha256a.retainedSlice(8, 16),
+                sha256b.retainedSlice(24, 8));
+        sha256a.release();
+        sha256b.release();
+
+        cipher.init(!inbound, aesKey, aesIV);
     }
 }

@@ -195,27 +195,6 @@ public final class CryptoUtil {
         return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(paddingb));
     }
 
-    public static AES256IGECipher createAesCipher(ByteBuf messageKey, ByteBuf authKey, boolean inbound) {
-        int x = inbound ? 8 : 0;
-
-        ByteBuf sha256a = sha256Digest(messageKey, authKey.slice(x, 36));
-        ByteBuf sha256b = sha256Digest(authKey.slice(x + 40, 36), messageKey);
-
-        ByteBuf aesKey = Unpooled.wrappedBuffer(
-                sha256a.retainedSlice(0, 8),
-                sha256b.retainedSlice(8, 16),
-                sha256a.retainedSlice(24, 8));
-
-        ByteBuf aesIV = Unpooled.wrappedBuffer(
-                sha256b.retainedSlice(0, 8),
-                sha256a.retainedSlice(8, 16),
-                sha256b.retainedSlice(24, 8));
-        sha256a.release();
-        sha256b.release();
-
-        return new AES256IGECipher(!inbound, toByteArray(aesKey), aesIV);
-    }
-
     // TODO: can be done with System.arraycopy()
     public static ByteBuf reverse(ByteBuf buf) {
         ByteBuf result = buf.alloc().buffer(buf.readableBytes());
