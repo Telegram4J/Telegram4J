@@ -36,12 +36,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * QR-code user authorization implementation that displays a qrcode of unicode chars to stdout.
+ * I use it for testing code and my bot.
+ *
  * <p>
  * This implementation can work only on linux with installed <b>qrencode</b> lib.
  */
-public class QrCodeAuthorization {
+public class QrEncodeCodeAuthorization {
 
-    private static final Logger log = Loggers.getLogger(QrCodeAuthorization.class);
+    private static final Logger log = Loggers.getLogger(QrEncodeCodeAuthorization.class);
 
     public static Mono<BaseAuthorization> authorize(MTProtoClientGroup clientGroup, StoreLayout storeLayout,
                                                     AuthorizationResources authResources) {
@@ -50,11 +52,11 @@ public class QrCodeAuthorization {
 
             int apiId = authResources.getApiId();
             String apiHash = authResources.getApiHash();
-            ResettableInterval inter = new ResettableInterval(Schedulers.boundedElastic());
+            var regenerateInterval = new ResettableInterval(Schedulers.single());
 
             var listenTokens = clientGroup.updates().on(UpdateShort.class)
                     .takeUntil(u -> complete.get())
-                    .filter(u -> u.update().identifier() == UpdateLoginToken.ID)
+                    .filter(u -> u.update() == UpdateLoginToken.instance())
                     .flatMap(l -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
                     .flatMap(token -> switch (token.identifier()) {
                         case LoginTokenSuccess.ID -> {
@@ -65,7 +67,7 @@ public class QrCodeAuthorization {
                             var migrate = (LoginTokenMigrateTo) token;
                             log.info("Redirecting to the DC {}", migrate.dcId());
                             yield storeLayout.getDcOptions()
-                                    // TODO: request help.GetConfig if DC not found
+                                    // TODO: request help.getConfig if DC not found
                                     .map(dcOpts -> dcOpts.find(DataCenter.Type.REGULAR, migrate.dcId())
                                             .orElseThrow(() -> new IllegalStateException("Could not find DC " + migrate.dcId()
                                                     + " for redirecting main client")))
@@ -76,29 +78,29 @@ public class QrCodeAuthorization {
                         default -> Flux.error(new IllegalStateException("Unexpected type of LoginToken: " + token));
                     })
                     .onErrorResume(RpcException.isErrorMessage("SESSION_PASSWORD_NEEDED"), e -> {
-                        inter.dispose();
-                        TwoFactorAuthHandler tfa = new TwoFactorAuthHandler(clientGroup, sink);
+                        regenerateInterval.dispose();
+                        var tfa = new TwoFactorAuthHandler(clientGroup, sink);
                         return tfa.begin2FA()
                                 .retryWhen(Retry.indefinitely()
                                         .filter(RpcException.isErrorMessage("PASSWORD_HASH_INVALID")));
                     })
                     .cast(BaseAuthorization.class)
                     .doOnNext(l -> {
-                        BaseUser b = (BaseUser) l.user();
+                        var baseUser = (BaseUser) l.user();
                         StringJoiner j = new StringJoiner(" ");
-                        Optional.ofNullable(b.firstName()).ifPresent(j::add);
-                        Optional.ofNullable(b.lastName()).ifPresent(j::add);
+                        Optional.ofNullable(baseUser.firstName()).ifPresent(j::add);
+                        Optional.ofNullable(baseUser.lastName()).ifPresent(j::add);
                         String name = (name = j.toString()).isEmpty() ? "unknown" : name;
                         log.info("Successfully login as {}", name);
                         complete.set(true);
-                        inter.dispose();
+                        regenerateInterval.dispose();
                         sink.success(l);
                     })
                     .subscribe();
 
-            inter.start(Duration.ofMinutes(1)); // stub period
+            regenerateInterval.start(Duration.ofMinutes(1)); // stub period
 
-            var qrDisplay = inter.ticks()
+            var qrDisplay = regenerateInterval.ticks()
                     .flatMap(tick -> clientGroup.send(DcId.main(), ImmutableExportLoginToken.of(apiId, apiHash, List.of())))
                     .cast(BaseLoginToken.class)
                     .doOnNext(b -> {
@@ -112,7 +114,7 @@ public class QrCodeAuthorization {
                             System.out.println();
                         }
 
-                        inter.start(dur, dur);
+                        regenerateInterval.start(dur, dur);
                     })
                     .subscribe();
 

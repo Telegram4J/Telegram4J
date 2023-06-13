@@ -15,7 +15,7 @@ import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever;
 import telegram4j.example.auth.CodeAuthorization;
-import telegram4j.example.auth.QrCodeAuthorization;
+import telegram4j.example.auth.QrEncodeCodeAuthorization;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
@@ -48,7 +48,7 @@ public class UserBotExample {
 
         MTProtoTelegramClient.create(apiId, apiHash,
                         Boolean.getBoolean("useQrAuth")
-                                ? QrCodeAuthorization::authorize
+                                ? QrEncodeCodeAuthorization::authorize
                                 : CodeAuthorization::authorize)
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
                         EntityRetrievalStrategy.STORE_FALLBACK_RPC, PreferredEntityRetriever.Setting.FULL,

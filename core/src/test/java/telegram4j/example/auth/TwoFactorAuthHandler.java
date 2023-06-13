@@ -51,7 +51,7 @@ class TwoFactorAuthHandler {
             }
 
             var currentAlgo = pswrd.currentAlgo();
-            if (!(currentAlgo instanceof PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow)) {
+            if (!(currentAlgo instanceof PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo)) {
                 return Mono.error(new IllegalStateException("Unexpected type of current algorithm: " + currentAlgo));
             }
 
@@ -72,7 +72,6 @@ class TwoFactorAuthHandler {
             }
 
             var password = sc.nextLine();
-            var algo = (PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow) currentAlgo;
 
             var g = BigInteger.valueOf(algo.g());
             var gBytes = toBytesPadded(g);
@@ -129,6 +128,7 @@ class TwoFactorAuthHandler {
     }
 
     // > the numbers must be used in big-endian form, padded to 2048 bits
+    // Copied and adapted from https://github.com/DrKLO/Telegram/blob/dfd74f809e97d1ecad9672fc7388cb0223a95dfc/TMessagesProj/src/main/java/org/telegram/messenger/SRPHelper.java#L9
     public static ByteBuf toBytesPadded(BigInteger value) {
         var bytes = value.toByteArray();
         if (bytes.length > 256) {
