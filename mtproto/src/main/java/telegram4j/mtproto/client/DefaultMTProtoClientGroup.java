@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 
 public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
+    private static final int FORK_THRESHOLD = 20; // TODO
     private static final VarHandle CA;
     private static final VarHandle MAIN;
 
@@ -139,9 +140,10 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             case MAIN -> Mono.just(main);
             case UPLOAD, DOWNLOAD -> {
                 int dcId = id.getId().orElseThrow();
+                int maxCnt = id.getType() == DcId.Type.UPLOAD ? options.maxUploadClientsCount : options.maxDownloadClientsCount;
+                Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
+                var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
                 if (id.isAutoShift()) {
-                    Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
-                    var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
                     MTProtoClient lessLoaded = null;
                     for (int i = 0; i < arr.length; i++) {
                         MTProtoClient v = (MTProtoClient) CA.getVolatile(arr, i);
@@ -154,8 +156,9 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                         }
                     }
 
-                    if (lessLoaded == null || lessLoaded.stats().queriesCount() != 0 &&
-                            dcInfo.activeDownloadClientsCount.get() < arr.length) {
+                    var activeCount = id.getType() == DcId.Type.UPLOAD ? dcInfo.activeUploadClientsCount : dcInfo.activeDownloadClientsCount;
+                    if ((lessLoaded == null || lessLoaded.stats().queriesCount() >= FORK_THRESHOLD) && activeCount.get() < maxCnt) {
+
                         yield options.mtProtoOptions.storeLayout().getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
                                         .orElseThrow(() -> new IllegalArgumentException(
@@ -170,15 +173,12 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                 }
 
                 int index = id.getShift().orElseThrow();
-                int max = id.getType() == DcId.Type.UPLOAD ? options.maxUploadClientsCount : options.maxDownloadClientsCount;
-                if (index >= max) {
+                if (index >= maxCnt) {
                     yield Mono.error(new IllegalArgumentException("Too big " + id.getType().name()
                             .toLowerCase(Locale.US) + " client shift: " + id.getShift() +
-                            " >= " + max));
+                            " >= " + maxCnt));
                 }
 
-                Dc dcInfo = dcs.computeIfAbsent(dcId, k -> new Dc(options));
-                var arr = id.getType() == DcId.Type.UPLOAD ? dcInfo.uploadClients : dcInfo.downloadClients;
                 yield Mono.justOrEmpty((MTProtoClient) CA.getVolatile(arr, index))
                         .switchIfEmpty(Mono.defer(() -> options.mtProtoOptions.storeLayout().getDcOptions()
                                 .map(dcOpts -> dcOpts.find(id.getType(), dcId)
@@ -201,8 +201,8 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             implements MTProtoClientGroup.Options {
 
         static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
-        static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(2);
-        static final Duration INACTIVE_DOWNLOAD_DURATION = Duration.ofMinutes(1);
+        static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(3);
+        static final Duration INACTIVE_DOWNLOAD_DURATION = Duration.ofMinutes(3);
         static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
         static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
 
