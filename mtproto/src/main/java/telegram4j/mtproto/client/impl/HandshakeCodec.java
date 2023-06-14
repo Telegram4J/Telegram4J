@@ -20,11 +20,11 @@ public final class HandshakeCodec extends ChannelDuplexHandler {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-        if (msg instanceof MTProtoObject o) {
-            ctx.write(encode(ctx, o), promise);
-        } else {
-            ctx.write(msg, promise);
+        if (!(msg instanceof MTProtoObject o)) {
+            throw new IllegalStateException("Unexpected type of outbound");
         }
+
+        ctx.write(encode(ctx, o), promise);
     }
 
     private ByteBuf encode(ChannelHandlerContext ctx, MTProtoObject msg) {
@@ -39,28 +39,27 @@ public final class HandshakeCodec extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof ByteBuf b) {
-            if (b.readableBytes() == 4) {
-                int code = b.readIntLE();
-                b.release();
-
-                throw new TransportException(code);
-            }
-
-            MTProtoObject decoded;
-            try {
-                decoded = decode(ctx, b);
-            } finally {
-                b.release();
-            }
-
-            ctx.fireChannelRead(decoded);
-        } else {
-            ctx.fireChannelRead(msg);
+        if (!(msg instanceof ByteBuf b)) {
+            throw new IllegalStateException("Unexpected type of inbound: " + msg.getClass());
         }
+        if (b.readableBytes() == 4) {
+            int code = b.readIntLE();
+            b.release();
+
+            throw new TransportException(code);
+        }
+
+        MTProtoObject decoded;
+        try {
+            decoded = decode(b);
+        } finally {
+            b.release();
+        }
+
+        ctx.fireChannelRead(decoded);
     }
 
-    private MTProtoObject decode(ChannelHandlerContext ctx, ByteBuf buf) {
+    private MTProtoObject decode(ByteBuf buf) {
         long authKeyId = buf.readLongLE();
         if (authKeyId != 0) {
             throw new MTProtoException("Received message with non-zero authKeyId");

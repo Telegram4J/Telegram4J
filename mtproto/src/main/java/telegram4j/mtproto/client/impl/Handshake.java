@@ -53,17 +53,17 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (msg instanceof MTProtoObject obj) {
-            switch (obj.identifier()) {
-                case ResPQ.ID -> handleResPQ(ctx, (ResPQ) obj);
-                case ServerDHParams.ID -> handleServerDHParams(ctx, (ServerDHParams) obj);
-                case DhGenOk.ID -> handleDhGenOk(ctx, (DhGenOk) obj);
-                case DhGenRetry.ID -> handleDhGenRetry(ctx, (DhGenRetry) obj);
-                case DhGenFail.ID -> handleDhGenFail(ctx, (DhGenFail) obj);
-                default -> throw new AuthorizationException("Unexpected MTProto object: " + obj);
-            }
-        } else {
-            ctx.fireChannelRead(msg);
+        if (!(msg instanceof MTProtoObject obj)) {
+            throw new IllegalStateException("Unexpected type of inbound: " + msg.getClass());
+        }
+
+        switch (obj.identifier()) {
+            case ResPQ.ID -> handleResPQ(ctx, (ResPQ) obj);
+            case ServerDHParams.ID -> handleServerDHParams(ctx, (ServerDHParams) obj);
+            case DhGenOk.ID -> handleDhGenOk(ctx, (DhGenOk) obj);
+            case DhGenRetry.ID -> handleDhGenRetry(ctx, (DhGenRetry) obj);
+            case DhGenFail.ID -> handleDhGenFail(ctx, (DhGenFail) obj);
+            default -> throw new AuthorizationException("Unexpected MTProto object: " + obj);
         }
     }
 
@@ -198,11 +198,10 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
                 sha1Digest(context.newNonce(), context.newNonce()),
                 context.newNonce().retainedSlice(0, 4));
 
-        byte[] aesKey = toByteArray(tmpAesKey);
+        var cipher = AES256IGECipher.create();
+        cipher.init(false, tmpAesKey.retain(), tmpAesIv.retain());
 
-        AES256IGECipher decrypter = new AES256IGECipher(false, aesKey, tmpAesIv.retain());
-
-        ByteBuf decrypted = decrypter.decrypt(encryptedAnswer);
+        ByteBuf decrypted = cipher.decrypt(encryptedAnswer);
         int answerSize = decrypted.readableBytes();
         ByteBuf hash = decrypted.readSlice(20);
         ServerDHInnerData serverDHInnerData = TlDeserializer.deserialize(decrypted);
@@ -325,8 +324,8 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         ByteBuf innerData = TlSerializer.serialize(ctx.alloc(), clientDHInnerData);
         ByteBuf innerDataWithHash = align(Unpooled.wrappedBuffer(sha1Digest(innerData), innerData), 16);
 
-        AES256IGECipher encrypter = new AES256IGECipher(true, aesKey, tmpAesIv);
-        ByteBuf dataWithHashEnc = encrypter.encrypt(innerDataWithHash);
+        cipher.init(true, tmpAesKey, tmpAesIv);
+        ByteBuf dataWithHashEnc = cipher.encrypt(innerDataWithHash);
 
         var req = ImmutableSetClientDHParams.of(context.nonce(), context.serverNonce(), dataWithHashEnc);
 
