@@ -81,11 +81,6 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             throw new IllegalArgumentException("Unexpected type of message to encrypt: " + msg);
         }
 
-        if (!isPingPacket(req.method)) {
-            client.stats.incrementQueriesCount();
-            client.stats.lastQueryTimestamp = Instant.now();
-        }
-
         if (log.isTraceEnabled() && !client.requests.isEmpty()) {
             log.trace("[C:0x{}] {}", client.id, client.requests.entrySet().stream()
                     .map(e -> "0x" + Long.toHexString(e.getKey()) + ": " + e.getValue())
@@ -247,8 +242,13 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             }
         }
 
+        if (!isPingPacket(req.method)) {
+            client.stats.incrementQueriesCount();
+            client.stats.lastQueryTimestamp = Instant.now();
+        }
+
         transportCodec.setQuickAck(quickAck);
-        ctx.writeAndFlush(packet, ctx.voidPromise());
+        ctx.write(packet, promise);
     }
 
     void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws IOException {
