@@ -37,7 +37,7 @@ public final class TcpClientResources implements Disposable {
     public static TcpClientResources create(boolean preferNative, int ioWorkerCount) {
         EventLoopResources eventLoopResources = EventLoopResources.create(preferNative);
 
-        var threadFactory = new DefaultThreadFactory("t4j-" + eventLoopResources.getGroupPrefix());
+        var threadFactory = new DefaultThreadFactory("t4j-" + eventLoopResources.getGroupPrefix(), true);
         var eventLoopGroup = eventLoopResources.createEventLoopGroup(ioWorkerCount, threadFactory);
 
         return new TcpClientResources(threadFactory, eventLoopResources, eventLoopGroup);
