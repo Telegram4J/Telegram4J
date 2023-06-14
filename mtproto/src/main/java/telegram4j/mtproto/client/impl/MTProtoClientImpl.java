@@ -327,7 +327,9 @@ public class MTProtoClientImpl implements MTProtoClient {
                         .switchIfEmpty(Mono.fromRunnable(() -> ctx.executor().execute(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
 
-                            var handshakeCtx = new HandshakeContext(mtProtoOptions.dhPrimeChecker(), mtProtoOptions.publicRsaKeyRegister());
+                            int expiresIn = 0;//type == DcId.Type.MAIN ? 0 : Math.toIntExact(options.authKeyLifetime().getSeconds());
+                            var handshakeCtx = new HandshakeContext(expiresIn,
+                                    mtProtoOptions.dhPrimeChecker(), mtProtoOptions.publicRsaKeyRegister());
                             ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
                         })))
                         .subscribe(loaded -> ctx.executor().execute(() -> {

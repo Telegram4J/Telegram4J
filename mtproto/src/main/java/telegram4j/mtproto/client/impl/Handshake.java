@@ -20,6 +20,7 @@ import telegram4j.tl.request.mtproto.ImmutableSetClientDHParams;
 import telegram4j.tl.request.mtproto.ReqDHParams;
 
 import java.math.BigInteger;
+import java.time.Instant;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
@@ -104,15 +105,30 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         context.newNonce(newNonce);
         context.serverNonce(resPQ.serverNonce());
 
-        PQInnerData pqInnerData = PQInnerDataDc.builder()
-                .pq(resPQ.pq())
-                .p(pb)
-                .q(qb)
-                .nonce(nonce)
-                .serverNonce(resPQ.serverNonce())
-                .newNonce(newNonce)
-                .dc(authData.dc().getInternalId())
-                .build();
+        PQInnerData pqInnerData;
+        if (context.expiresIn() != 0) {
+            pqInnerData = PQInnerDataTempDc.builder()
+                    .pq(resPQ.pq())
+                    .p(pb)
+                    .q(qb)
+                    .nonce(nonce)
+                    .serverNonce(resPQ.serverNonce())
+                    .newNonce(newNonce)
+                    .dc(authData.dc().getInternalId())
+                    .expiresIn(context.expiresIn())
+                    .build();
+            context.expiresAt(System.currentTimeMillis() + context.expiresIn()*1000L);
+        } else {
+            pqInnerData = PQInnerDataDc.builder()
+                    .pq(resPQ.pq())
+                    .p(pb)
+                    .q(qb)
+                    .nonce(nonce)
+                    .serverNonce(resPQ.serverNonce())
+                    .newNonce(newNonce)
+                    .dc(authData.dc().getInternalId())
+                    .build();
+        }
 
         ByteBuf pqInnerDataBuf = TlSerializer.serialize(ctx.alloc(), pqInnerData);
         ByteBuf encryptedData = rsa(pqInnerDataBuf, foundKey.key());
@@ -345,8 +361,9 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         if (!dhGenOk.serverNonce().equals(context.serverNonce())) throw new AuthorizationException("serverNonce mismatch");
         if (!dhGenOk.newNonceHash1().equals(newNonceHash)) throw new AuthorizationException("newNonceHash1 mismatch");
 
+        Instant expiresAtTimestamp = context.expiresAt() != 0 ? Instant.ofEpochSecond(context.expiresAt()) : null;
         ctx.fireUserEventTriggered(new HandshakeCompleteEvent(
-                new AuthKey(context.authKey()),
+                new AuthKey(context.authKey(), expiresAtTimestamp),
                 context.serverSalt(), context.serverTimeDiff()));
     }
 

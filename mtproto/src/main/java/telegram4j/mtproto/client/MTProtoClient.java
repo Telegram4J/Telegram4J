@@ -96,7 +96,8 @@ public interface MTProtoClient {
     record Options(TransportFactory transportFactory,
                    InvokeWithLayer<Config, InitConnection<Config, GetConfig>> initConnection,
                    Duration pingInterval, Duration reconnectionInterval,
-                   int gzipCompressionSizeThreshold, List<ResponseTransformer> responseTransformers) {
+                   int gzipCompressionSizeThreshold, List<ResponseTransformer> responseTransformers,
+                   Duration authKeyLifetime) {
 
         public Options {
             requireNonNull(transportFactory);
@@ -104,6 +105,7 @@ public interface MTProtoClient {
             requireNonNull(pingInterval);
             requireNonNull(reconnectionInterval);
             requireNonNull(responseTransformers);
+            requireNonNull(authKeyLifetime);
         }
     }
 }

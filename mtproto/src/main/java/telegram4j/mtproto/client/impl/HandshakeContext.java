@@ -9,6 +9,7 @@ import java.util.Objects;
 
 public final class HandshakeContext {
 
+    private final int expiresIn;
     private final DhPrimeChecker dhPrimeChecker;
     private final PublicRsaKeyRegister publicRsaKeyRegister;
 
@@ -21,10 +22,24 @@ public final class HandshakeContext {
     private ServerDHParams serverDHParams;
     private int serverTimeDiff;
     private int retry;
+    private long expiresAt;
 
-    public HandshakeContext(DhPrimeChecker dhPrimeChecker, PublicRsaKeyRegister publicRsaKeyRegister) {
+    public HandshakeContext(int expiresIn, DhPrimeChecker dhPrimeChecker, PublicRsaKeyRegister publicRsaKeyRegister) {
+        this.expiresIn = expiresIn;
         this.dhPrimeChecker = dhPrimeChecker;
         this.publicRsaKeyRegister = publicRsaKeyRegister;
+    }
+
+    public int expiresIn() {
+        return expiresIn;
+    }
+
+    public void expiresAt(long expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
+    public long expiresAt() {
+        return expiresAt;
     }
 
     public DhPrimeChecker dhPrimeChecker() {
