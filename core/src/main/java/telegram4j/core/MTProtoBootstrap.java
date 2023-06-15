@@ -86,6 +86,7 @@ public final class MTProtoBootstrap {
     private UpdateDispatcher updateDispatcher;
     private Duration pingInterval = Duration.ofSeconds(10);
     private Duration reconnectionInterval = Duration.ofSeconds(3);
+    private Duration authKeyLifetime = Duration.ofDays(1);
 
     private ExecutorService resultPublisher;
     private Scheduler updatesPublisher;
@@ -186,6 +187,11 @@ public final class MTProtoBootstrap {
 
     public MTProtoBootstrap setReconnectionInterval(Duration reconnectionInterval) {
         this.reconnectionInterval = Objects.requireNonNull(reconnectionInterval);
+        return this;
+    }
+
+    public MTProtoBootstrap setAuthKeyLifetime(Duration authKeyLifetime) {
+        this.authKeyLifetime = Objects.requireNonNull(authKeyLifetime);
         return this;
     }
 
@@ -388,7 +394,7 @@ public final class MTProtoBootstrap {
                         var clientOptions = new MTProtoClient.Options(
                                 transportFactory, initConnectionRequest,
                                 pingInterval, reconnectionInterval,
-                                gzipCompressionSizeThreshold, responseTransformers);
+                                gzipCompressionSizeThreshold, responseTransformers, authKeyLifetime);
                         var mtProtoOptions = new MTProtoOptions(
                                 tcpClientResources, initPublicRsaKeyRegister(),
                                 initDhPrimeChecker(), storeLayout,
