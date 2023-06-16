@@ -2,6 +2,7 @@ package telegram4j.mtproto.service;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -90,7 +91,7 @@ public class UploadService extends RpcService {
 
         return Flux.range(0, MAX_INFLIGHT_REQUESTS)
                 .flatMapSequential(i -> {
-                    var requiredDelay = Mono.delay(Duration.ofMillis(20));
+                    var requiredDelay = Mono.delay(Duration.ofMillis(20), Schedulers.single());
                     return client.sendAwait(request.withOffset(offset.getAndAdd(limit)))
                             .flatMap(requiredDelay::thenReturn);
                 })
