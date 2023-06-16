@@ -1,5 +1,6 @@
 package telegram4j.core.event;
 
+import org.reactivestreams.Publisher;
 import reactor.bool.BooleanUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -9,7 +10,6 @@ import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
-import reactor.util.concurrent.Queues;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.event.dispatcher.UpdateContext;
@@ -25,6 +25,7 @@ import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.Variant2;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.*;
@@ -35,6 +36,8 @@ import telegram4j.tl.request.updates.ImmutableGetChannelDifference;
 import telegram4j.tl.request.updates.ImmutableGetDifference;
 import telegram4j.tl.updates.*;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -48,21 +51,32 @@ import static telegram4j.mtproto.util.TlEntityUtil.getRawPeerId;
 
 /** Manager for correct and complete work with general and channel updates. */
 public class DefaultUpdatesManager implements UpdatesManager {
-    // TODO:
-    //  - delay getChannelDifference and getDifference for preventing updates duplicating
-
     protected static final Logger log = Loggers.getLogger(DefaultUpdatesManager.class);
+
+    protected static final VarHandle REQUESTING_DIFFERENCE;
+
+    static {
+        var lookup = MethodHandles.lookup();
+        try {
+            REQUESTING_DIFFERENCE = lookup.findVarHandle(DefaultUpdatesManager.class, "requestingDifference", boolean.class);
+        } catch (ReflectiveOperationException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
 
     protected final MTProtoTelegramClient client;
     protected final Options options;
-    protected final ResettableInterval stateInterval = new ResettableInterval(Schedulers.single(),
-            Sinks.many().unicast().onBackpressureBuffer(Queues.<Long>get(Queues.XS_BUFFER_SIZE).get()));
+    protected final ResettableInterval stateInterval =
+            new ResettableInterval(Schedulers.single(),
+                    Sinks.many().unicast().onBackpressureError());
 
     protected volatile int pts = -1;
     protected volatile int qts = -1;
     protected volatile int date = -1;
     protected volatile int seq = -1;
     protected volatile boolean initialized;
+
+    protected volatile boolean requestingDifference;
 
     public DefaultUpdatesManager(MTProtoTelegramClient client, Options options) {
         this.client = Objects.requireNonNull(client);
@@ -80,8 +94,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Override
     public Mono<Void> fillGap() {
-        return client.getServiceHolder()
-        .getUpdatesService().getState()
+        return client.getMtProtoClientGroup()
+        .send(DcId.main(), GetState.instance())
         .flatMap(state -> {
             if (!initialized) {
                 return client.getMtProtoResources().getStoreLayout()
@@ -102,6 +116,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Override
     public Flux<Event> handle(Updates updates) {
+        stateInterval.start(options.checkin, options.checkin);
+
         return switch (updates.identifier()) {
             case UpdatesTooLong.ID -> getDifference();
             case UpdateShort.ID -> {
@@ -118,8 +134,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
             case BaseUpdates.ID -> {
                 var data = (BaseUpdates) updates;
 
-                int seqEnd = data.seq();
                 StringJoiner j = new StringJoiner(", ");
+                int seqEnd = data.seq();
                 if (seqEnd != 0) {
                     int seq = this.seq;
 
@@ -141,7 +157,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                yield handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
+                yield handleUpdates(List.of(), data.updates(), data.chats(), data.users(), true);
             }
             case UpdatesCombined.ID -> {
                 var data = (UpdatesCombined) updates;
@@ -170,7 +186,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 }
                 date = data.date();
 
-                yield handleUpdates0(List.of(), data.updates(), data.chats(), data.users(), true);
+                yield handleUpdates(List.of(), data.updates(), data.chats(), data.users(), true);
             }
             case UpdateShortChatMessage.ID -> {
                 var data = (UpdateShortChatMessage) updates;
@@ -301,11 +317,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     j.add("date: " + Instant.ofEpochSecond(date) + "->" + Instant.ofEpochSecond(state.date()));
                 }
 
-                String str = j.toString();
-                if (str.isEmpty()) {
-                    return Mono.empty();
-                }
-
+                j.add("unread count: " + state.unreadCount());
                 log.debug("Updating state" + (intermediate ? " to intermediate" : "") + ", " + j);
             }
 
@@ -328,82 +340,88 @@ public class DefaultUpdatesManager implements UpdatesManager {
             return Flux.empty();
         }
 
-        if (log.isDebugEnabled()) {
-            log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+        if (!requestingDifference && (boolean)REQUESTING_DIFFERENCE.compareAndSet(this, false, true)) {
+            if (log.isDebugEnabled()) {
+                log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
+            }
+
+            stateInterval.start(options.checkin, options.checkin);
+            return client.getMtProtoClientGroup()
+                    .send(DcId.main(), ImmutableGetDifference.of(pts, date, qts))
+                    .flatMapMany(this::handleDifference)
+                    .doOnTerminate(() -> requestingDifference = false);
+        }
+        return Flux.empty();
+    }
+
+    private Publisher<Event> handleDifference(Difference difference) {
+        if (log.isTraceEnabled()) {
+            log.trace("difference: {}", difference);
         }
 
-        stateInterval.start(options.checkin, options.checkin);
-        return client.getServiceHolder()
-                .getUpdatesService()
-                .getDifference(ImmutableGetDifference.of(pts, date, qts))
-                .flatMapMany(difference -> {
-                    if (log.isTraceEnabled()) {
-                        log.trace("difference: {}", difference);
+        return switch (difference.identifier()) {
+            case DifferenceEmpty.ID -> {
+                var diff = (DifferenceEmpty) difference;
+
+                boolean updated = false;
+                if (log.isDebugEnabled()) {
+                    StringJoiner j = new StringJoiner(", ");
+                    int seq = this.seq;
+                    if (seq != diff.seq()) {
+                        j.add("seq: " + seq + "->" + diff.seq());
+                        this.seq = diff.seq();
+                    }
+                    int currDate = this.date;
+                    if (currDate != diff.date()) {
+                        j.add("date: " + Instant.ofEpochSecond(currDate) + "->" + Instant.ofEpochSecond(diff.date()));
+                        this.date = diff.date();
                     }
 
-                    return switch (difference.identifier()) {
-                        case DifferenceEmpty.ID -> {
-                            var diff = (DifferenceEmpty) difference;
+                    String str = j.toString();
+                    if (str.isEmpty()) {
+                        yield Flux.empty();
+                    }
 
-                            boolean updated = false;
-                            if (log.isDebugEnabled()) {
-                                StringJoiner j = new StringJoiner(", ");
-                                int seq = this.seq;
-                                if (seq != diff.seq()) {
-                                    j.add("seq: " + seq + "->" + diff.seq());
-                                    this.seq = diff.seq();
-                                }
-                                int currDate = this.date;
-                                if (currDate != diff.date()) {
-                                    j.add("date: " + Instant.ofEpochSecond(currDate) + "->" + Instant.ofEpochSecond(diff.date()));
-                                    this.date = diff.date();
-                                }
+                    updated = true;
+                    log.debug("Updating state, " + j);
+                } else {
+                    int seq = this.seq;
+                    if (seq != diff.seq()) {
+                        this.seq = diff.seq();
+                        updated = true;
+                    }
+                    int currDate = this.date;
+                    if (currDate != diff.date()) {
+                        this.date = diff.date();
+                        updated = true;
+                    }
 
-                                String str = j.toString();
-                                if (str.isEmpty()) {
-                                    yield Mono.empty();
-                                }
+                    this.seq = diff.seq();
+                    this.date = diff.date();
+                }
 
-                                updated = true;
-                                log.debug("Updating state, " + j);
-                            } else {
-                                int seq = this.seq;
-                                if (seq != diff.seq()) {
-                                    this.seq = diff.seq();
-                                    updated = true;
-                                }
-                                int currDate = this.date;
-                                if (currDate != diff.date()) {
-                                    this.date = diff.date();
-                                    updated = true;
-                                }
+                yield saveStateIf(updated)
+                        .then(Mono.empty());
+            }
+            case BaseDifference.ID -> {
+                var diff = (BaseDifference) difference;
 
-                                this.seq = diff.seq();
-                                this.date = diff.date();
-                            }
+                yield applyState(diff.state(), false)
+                        .thenMany(handleUpdates(diff.newMessages(), diff.otherUpdates(),
+                                diff.chats(), diff.users(), false));
+            }
+            case DifferenceSlice.ID -> {
+                var diff = (DifferenceSlice) difference;
+                State state = diff.intermediateState();
 
-                            yield saveStateIf(updated)
-                                    .then(Mono.empty());
-                        }
-                        case BaseDifference.ID -> {
-                            var diff = (BaseDifference) difference;
-
-                            yield applyState(diff.state(), false)
-                                    .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
-                                            diff.chats(), diff.users(), false));
-                        }
-                        case DifferenceSlice.ID -> {
-                            var diff = (DifferenceSlice) difference;
-                            State state = diff.intermediateState();
-
-                            yield applyState(state, true)
-                                    .thenMany(handleUpdates0(diff.newMessages(), diff.otherUpdates(),
-                                            diff.chats(), diff.users(), false))
-                                    .concatWith(getDifference(state.pts(), state.qts(), state.date()));
-                        }
-                        default -> Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
-                    };
-                });
+                yield applyState(state, true)
+                        .thenMany(handleUpdates(diff.newMessages(), diff.otherUpdates(),
+                                diff.chats(), diff.users(), false))
+                        .concatWith(getDifference(state.pts(), state.qts(), state.date()));
+            }
+            // TODO DifferenceTooLong ?
+            default -> Mono.error(new IllegalArgumentException("Unknown difference type: " + difference));
+        };
     }
 
     @Nullable
@@ -417,9 +435,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
-    protected Flux<Event> handleUpdates0(List<telegram4j.tl.Message> newMessages, List<Update> otherUpdates,
-                                         List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
-                                         boolean notFromDiff) {
+    protected Flux<Event> handleUpdates(List<telegram4j.tl.Message> newMessages, List<Update> otherUpdates,
+                                        List<telegram4j.tl.Chat> chats, List<telegram4j.tl.User> users,
+                                        boolean notFromDiff) {
         var usersMap = users.stream()
                 .flatMap(u -> Stream.ofNullable(EntityFactory.createUser(client, u)))
                 .collect(Collectors.toMap(User::getId, Function.identity()));
@@ -430,7 +448,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .flatMap(u -> Stream.ofNullable(EntityFactory.createChat(client, u, null)))
                 .collect(Collectors.toMap(Chat::getId, Function.identity()));
 
-        Flux<SendMessageEvent> messageCreateEvents = Flux.fromIterable(newMessages)
+        var messageCreateEvents = Flux.fromIterable(newMessages)
                 .mapNotNull(DefaultUpdatesManager::filterMessage)
                 .filterWhen(message -> BooleanUtils.not(client.getMtProtoResources()
                         .getStoreLayout().existMessage(message.map(BaseMessage::peerId, MessageService::peerId),
@@ -450,7 +468,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             .map(m -> new SendMessageEvent(client, m, chat, author));
                 });
 
-        Flux<Event> applyChannelDifference = Flux.fromIterable(otherUpdates)
+        var applyChannelDifference = Flux.fromIterable(otherUpdates)
                 .ofType(UpdateChannelTooLong.class)
                 .flatMap(u -> client.getMtProtoResources().getStoreLayout()
                         .getChannelFullById(u.channelId())
@@ -458,10 +476,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                                 .resolveChannel(u.channelId())
                                 .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
                                 .then(Mono.empty())) // no channel pts; can't request channel updates
-                        .map(ChatFull::fullChat)
-                        .cast(ChannelFull.class)
-                        .map(ChannelFull::pts)
-                        .map(i -> Tuples.of(u, i)))
+                        .map(chatFull -> (ChannelFull) chatFull.fullChat())
+                        .map(i -> Tuples.of(u, i.pts())))
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
                 .flatMap(TupleUtils.function((u, cpts) -> {
                     var id = Optional.ofNullable(chatsMap.get(Id.ofChannel(u.channelId())))
@@ -484,13 +500,12 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             .limit(limit)
                             .build();
 
-                    return client.getServiceHolder()
-                            .getUpdatesService()
-                            .getChannelDifference(request)
+                    return client.getMtProtoClientGroup()
+                            .send(DcId.main(), request)
                             .flatMapMany(diff -> handleChannelDifference(request, diff));
                 }));
 
-        Flux<Event> concatedUpdates = Flux.fromIterable(otherUpdates)
+        var concatedUpdates = Flux.fromIterable(otherUpdates)
                 .map(u -> UpdateContext.create(client, chatsMap, usersMap, u))
                 .flatMap(u -> applyUpdate(u, notFromDiff))
                 .concatWith(messageCreateEvents)
@@ -544,9 +559,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
             var updRequest = ImmutableGetChannelDifference.copyOf(request)
                     .withPts(newPts);
 
-            return client.getServiceHolder()
-                    .getUpdatesService()
-                    .getChannelDifference(updRequest)
+            return client.getMtProtoClientGroup()
+                    .send(DcId.main(), updRequest)
                     .flatMapMany(d -> handleChannelDifference(updRequest, d));
         });
 
@@ -931,9 +945,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 .limit(limit)
                 .build();
 
-        return client.getServiceHolder()
-                .getUpdatesService()
-                .getChannelDifference(request)
+        return client.getMtProtoClientGroup()
+                .send(DcId.main(), request)
                 .flatMapMany(diff -> handleChannelDifference(request, diff))
                 .onErrorResume(RpcException.isErrorMessage("CHANNEL_PRIVATE"), e -> Mono.empty());
     }
@@ -959,7 +972,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
     public record Options(Duration checkin, int channelDifferenceLimit, boolean discardMinimalMessageUpdates) {
         public static final int MAX_USER_CHANNEL_DIFFERENCE = 100;
         public static final int MAX_BOT_CHANNEL_DIFFERENCE  = 100000;
-        public static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(3);
+        public static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
         public static final boolean DEFAULT_DISCARD_MINIMAL_MESSAGE_UPDATES = false;
 
         public Options(MTProtoTelegramClient client) {
