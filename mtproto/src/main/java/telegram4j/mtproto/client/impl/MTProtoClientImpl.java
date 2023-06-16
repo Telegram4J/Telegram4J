@@ -4,6 +4,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.AttributeKey;
+import io.netty.util.NetUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import org.reactivestreams.Subscription;
@@ -152,7 +153,8 @@ public class MTProtoClientImpl implements MTProtoClient {
         @Override
         public void channelActive(ChannelHandlerContext ctx) {
             if (log.isDebugEnabled()) {
-                log.debug("[C:0x{}] Sending transport identifier to the datacenter {}", id, authData.dc());
+                log.debug("[C:0x{}] Sending transport identifier to DC {} ({})",
+                        id, authData.dc().getId(), NetUtil.toSocketAddressString(authData.dc().getAddress(), authData.dc().getPort()));
             }
 
             Transport tr = options.transportFactory().create(authData.dc());
@@ -185,9 +187,7 @@ public class MTProtoClientImpl implements MTProtoClient {
             } else {
                 channelState = ChannelState.DISCONNECTED_STATE;
 
-                if (log.isDebugEnabled()) {
-                    log.debug("[C:0x{}] Reconnecting to the datacenter {}", id, authData.dc());
-                }
+                log.info("[C:0x{}] Reconnecting to DC {}", id, authData.dc().getId());
 
                 authData.resetSessionId();
 
@@ -235,9 +235,8 @@ public class MTProtoClientImpl implements MTProtoClient {
         }
 
         void closeClient(EventExecutor executor) {
-            if (log.isDebugEnabled()) {
-                log.debug("[C:0x{}] Disconnected from the datacenter {}", id, authData.dc());
-            }
+            log.info("[C:0x{}] Disconnected from DC {}", id, authData.dc().getId());
+
             cancelRequests(executor);
             onClose.emitEmpty(FAIL_FAST);
         }

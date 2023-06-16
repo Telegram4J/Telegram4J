@@ -48,6 +48,11 @@ public interface MTProtoClient {
      */
     DataCenter dc();
 
+    /**
+     * Gets the type of destination of client.
+     *
+     * @return The type of destination of client.
+     */
     DcId.Type type();
 
     /**
@@ -59,11 +64,17 @@ public interface MTProtoClient {
 
     /**
      * Gets a {@link Mono} which closes client and emitting empty signals.
+     * After this operation, the client can't be used to send queries.
      *
      * @return A {@link Mono} emitting empty signals on successful completion.
      */
     Mono<Void> close();
 
+    /**
+     * Gets a {@link Mono} which emits signals on client close.
+     *
+     * @return A {@link Mono} emitting empty signals on successful client close.
+     */
     Mono<Void> onClose();
 
     /** Interface for client statistic. */
