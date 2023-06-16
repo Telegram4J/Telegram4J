@@ -32,7 +32,7 @@ public interface MTProtoClientGroup {
      * @param <R> The return type of method.
      * @param id The id of client.
      * @param method The method to send.
-     * @see MTProtoClient#sendAwait(TlMethod)
+     * @see MTProtoClient#send(TlMethod)
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
     <R> Mono<R> send(DcId id, TlMethod<? extends R> method);

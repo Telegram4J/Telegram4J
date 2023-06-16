@@ -68,7 +68,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     @Override
     public <R> Mono<R> send(DcId id, TlMethod<? extends R> method) {
         return getOrCreateClient(id)
-                .flatMap(client -> client.sendAwait(method));
+                .flatMap(client -> client.send(method));
     }
 
     @Override

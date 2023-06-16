@@ -39,7 +39,7 @@ public interface MTProtoClient {
      * @param method An api request.
      * @return A {@link Mono} emitting signals with result on successful completion.
      */
-    <R> Mono<R> sendAwait(TlMethod<? extends R> method);
+    <R> Mono<R> send(TlMethod<? extends R> method);
 
     /**
      * Gets the client datacenter.
@@ -81,7 +81,7 @@ public interface MTProtoClient {
     interface Stats {
 
         /**
-         * Gets timestamp of last {@link #sendAwait(TlMethod)} call, if present.
+         * Gets timestamp of last {@link #send(TlMethod)} call, if present.
          *
          * @return The timestamp of last send query call, if present.
          */

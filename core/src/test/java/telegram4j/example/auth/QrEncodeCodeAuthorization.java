@@ -73,7 +73,7 @@ public class QrEncodeCodeAuthorization {
                                             .orElseThrow(() -> new IllegalStateException("Could not find DC " + migrate.dcId()
                                                     + " for redirecting main client")))
                                     .flatMap(clientGroup::setMain)
-                                    .flatMap(client -> client.sendAwait(ImmutableImportLoginToken.of(migrate.token())))
+                                    .flatMap(client -> client.send(ImmutableImportLoginToken.of(migrate.token())))
                                     .cast(LoginTokenSuccess.class);
                         }
                         default -> Flux.error(new IllegalStateException("Unexpected type of LoginToken: " + token));

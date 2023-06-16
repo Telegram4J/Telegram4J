@@ -405,7 +405,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <R> Mono<R> sendAwait(TlMethod<? extends R> method) {
+    public <R> Mono<R> send(TlMethod<? extends R> method) {
         return Mono.defer(() -> {
             if (!isResultAwait(method)) {
                 return Mono.error(new MTProtoException("Illegal method was sent: " + method));

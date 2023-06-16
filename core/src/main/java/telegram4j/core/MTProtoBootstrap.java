@@ -426,7 +426,7 @@ public final class MTProtoBootstrap {
                     .then(Mono.defer(() -> {
                         if (authHandler != null) {
                             // to trigger user auth
-                            return mainClient.sendAwait(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
+                            return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
                                     .doOnNext(ign -> sink.success(extractSelfId(ign.get(0))))
                                     .onErrorResume(RpcException.isErrorCode(401), t ->
                                             authHandler.process(clientGroup, storeLayout, authResources)
@@ -437,7 +437,7 @@ public final class MTProtoBootstrap {
                                                     .doOnSuccess(ign -> sink.success(extractSelfId(auth.user()))))
                                             .then(Mono.empty()));
                         }
-                        return mainClient.sendAwait(ImmutableImportBotAuthorization.of(0,
+                        return mainClient.send(ImmutableImportBotAuthorization.of(0,
                                         authResources.getApiId(), authResources.getApiHash(),
                                         authResources.getBotAuthToken().orElseThrow()))
                                 .onErrorResume(RpcException.isErrorCode(303),
@@ -522,14 +522,14 @@ public final class MTProtoBootstrap {
             return Mono.justOrEmpty(dcOptions.find(DataCenter.Type.REGULAR, dcId))
                     // We used default DcOptions which may be outdated.
                     // Well, let's request dc config and store it
-                    .switchIfEmpty(tmpClient.sendAwait(GetConfig.instance())
+                    .switchIfEmpty(tmpClient.send(GetConfig.instance())
                             .flatMap(cfg -> storeLayout.onUpdateConfig(cfg)
                                     .then(storeLayout.getDcOptions()))
                             .flatMap(newOpts -> Mono.justOrEmpty(newOpts.find(DataCenter.Type.REGULAR, dcId))
                                     .switchIfEmpty(Mono.error(() -> new IllegalStateException(
                                             "Could not find DC " + dcId + " for redirecting main client in received options: " + newOpts)))))
                     .flatMap(clientGroup::setMain)
-                    .flatMap(client -> client.sendAwait(ImmutableImportBotAuthorization.of(0,
+                    .flatMap(client -> client.send(ImmutableImportBotAuthorization.of(0,
                             authResources.getApiId(), authResources.getApiHash(),
                             authResources.getBotAuthToken().orElseThrow())));
         });

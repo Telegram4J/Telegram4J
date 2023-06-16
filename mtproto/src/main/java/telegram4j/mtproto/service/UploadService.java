@@ -92,7 +92,7 @@ public class UploadService extends RpcService {
         return Flux.range(0, MAX_INFLIGHT_REQUESTS)
                 .flatMapSequential(i -> {
                     var requiredDelay = Mono.delay(Duration.ofMillis(20), Schedulers.single());
-                    return client.sendAwait(request.withOffset(offset.getAndAdd(limit)))
+                    return client.send(request.withOffset(offset.getAndAdd(limit)))
                             .flatMap(requiredDelay::thenReturn);
                 })
                 .repeat(() -> !complete.get())
@@ -135,7 +135,7 @@ public class UploadService extends RpcService {
         if (location.getDcId() != clientGroup.main().dc().getId()) {
             return sendMain(ImmutableExportAuthorization.of(location.getDcId()))
                     .zipWith(clientGroup.getOrCreateClient(dcId))
-                    .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
+                    .flatMap(TupleUtils.function((auth, client) -> client.send(
                                     ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
                             .thenReturn(client)))
                     .flatMapMany(client -> getFile0(client, location, offset, limit, precise));
@@ -153,7 +153,7 @@ public class UploadService extends RpcService {
             ImmutableGetWebFile request = ImmutableGetWebFile.of(location, baseOffset, limit);
 
             return Flux.range(0, MAX_INFLIGHT_REQUESTS)
-                    .flatMapSequential(i -> client.sendAwait(request.withOffset(offset.getAndAdd(limit))))
+                    .flatMapSequential(i -> client.send(request.withOffset(offset.getAndAdd(limit))))
                     .repeat(() -> !complete.get())
                     .mapNotNull(part -> {
                         offset.addAndGet(limit);
@@ -178,7 +178,7 @@ public class UploadService extends RpcService {
                     return sendMain(ImmutableExportAuthorization.of(cfg.webfileDcId()))
                             .zipWith(clientGroup.getOrCreateClient(dc));
                 })
-                .flatMap(TupleUtils.function((auth, client) -> client.sendAwait(
+                .flatMap(TupleUtils.function((auth, client) -> client.send(
                         ImmutableImportAuthorization.of(auth.id(), auth.bytes()))
                         .thenReturn(client)))
                 .flatMapMany(client -> getWebFile0(client, location, offset, limit));
