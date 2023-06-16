@@ -124,6 +124,6 @@ public final class ChatParticipantUpdateEvent extends ChatEvent {
                 ", joinRequest=" + joinRequest +
                 ", chat=" + chat +
                 ", actor=" + actor +
-                "} " + super.toString();
+                '}';
     }
 }
