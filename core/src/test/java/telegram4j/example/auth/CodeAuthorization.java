@@ -8,6 +8,7 @@ import reactor.core.publisher.Sinks;
 import reactor.util.retry.Retry;
 import telegram4j.core.AuthorizationResources;
 import telegram4j.mtproto.DataCenter;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.store.StoreLayout;
@@ -74,8 +75,7 @@ public class CodeAuthorization {
                                 phoneNumber = readPhoneNumber(sc);
                             }
 
-                            return clientGroup.main()
-                                    .sendAwait(ImmutableSendCode.of(phoneNumber, authResources.getApiId(),
+                            return clientGroup.send(DcId.main(), ImmutableSendCode.of(phoneNumber, authResources.getApiId(),
                                             authResources.getApiHash(), ImmutableCodeSettings.of()))
                                     .onErrorResume(RpcException.isErrorMessage("PHONE_NUMBER_INVALID"), e ->
                                             Mono.fromRunnable(() -> state.emitNext(State.SEND_CODE, FAIL_FAST)))
@@ -104,8 +104,7 @@ public class CodeAuthorization {
                                     .cast(BaseSentCode.class)
                                     .flatMapMany(this::applyCode);
                         case RESEND_CODE:
-                            return clientGroup.main()
-                                    .sendAwait(ImmutableResendCode.of(phoneNumber, currentCode.phoneCodeHash()))
+                            return clientGroup.send(DcId.main(), ImmutableResendCode.of(phoneNumber, currentCode.phoneCodeHash()))
                                     .cast(BaseSentCode.class)
                                     .flatMapMany(this::applyCode);
                         case AWAIT_CODE:
@@ -192,7 +191,7 @@ public class CodeAuthorization {
         }
 
         if (code.equalsIgnoreCase("cancel")) {
-            return clientGroup.main().sendAwait(ImmutableCancelCode.of(phoneNumber, scode.phoneCodeHash()))
+            return clientGroup.send(DcId.main(), ImmutableCancelCode.of(phoneNumber, scode.phoneCodeHash()))
                     .doOnNext(b -> {
                         synchronized (System.out) {
                             System.out.println(delimiter);
@@ -207,8 +206,7 @@ public class CodeAuthorization {
                     });
         }
 
-        return clientGroup.main()
-                .sendAwait(SignIn.builder()
+        return clientGroup.send(DcId.main(), SignIn.builder()
                         .phoneNumber(phoneNumber)
                         .phoneCode(code)
                         .phoneCodeHash(scode.phoneCodeHash())

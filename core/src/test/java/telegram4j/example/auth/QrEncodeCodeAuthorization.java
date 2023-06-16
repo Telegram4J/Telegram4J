@@ -4,6 +4,7 @@ import reactor.core.Disposables;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -52,7 +53,7 @@ public class QrEncodeCodeAuthorization {
 
             int apiId = authResources.getApiId();
             String apiHash = authResources.getApiHash();
-            var regenerateInterval = new ResettableInterval(Schedulers.single());
+            var regenerateInterval = new ResettableInterval(Schedulers.single(), Sinks.many().unicast().onBackpressureError());
 
             var listenTokens = clientGroup.updates().on(UpdateShort.class)
                     .takeUntil(u -> complete.get())
