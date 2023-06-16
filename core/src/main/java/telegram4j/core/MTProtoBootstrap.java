@@ -587,7 +587,7 @@ public final class MTProtoBootstrap {
         // By default, all events will be published on the same thread pool as updates
         return new DefaultEventDispatcher(Schedulers.immediate(),
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                Sinks.EmitFailureHandler.FAIL_FAST);
+                Sinks.EmitFailureHandler.busyLooping(Duration.ofNanos(50)));
     }
 
     private UpdateDispatcher initUpdateDispatcher(Scheduler updatesPublisher) {
@@ -596,7 +596,7 @@ public final class MTProtoBootstrap {
         }
         return new SinksUpdateDispatcher(updatesPublisher,
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                Sinks.EmitFailureHandler.FAIL_FAST);
+                Sinks.EmitFailureHandler.busyLooping(Duration.ofNanos(50)));
     }
 
     private DhPrimeChecker initDhPrimeChecker() {
