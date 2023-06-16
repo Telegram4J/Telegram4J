@@ -157,7 +157,14 @@ public class MTProtoClientImpl implements MTProtoClient {
 
             Transport tr = options.transportFactory().create(authData.dc());
             ctx.writeAndFlush(tr.identifier(ctx.alloc()))
-                    .addListener(notify -> initializeChannel(ctx, tr));
+                    .addListener(notify -> {
+                        Throwable cause = notify.cause();
+                        if (cause != null) {
+                            ctx.fireExceptionCaught(cause);
+                        } else if (notify.isSuccess()) {
+                            initializeChannel(ctx, tr);
+                        }
+                    });
         }
 
         @Override
