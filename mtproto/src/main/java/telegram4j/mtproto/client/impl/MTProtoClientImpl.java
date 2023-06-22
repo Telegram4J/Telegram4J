@@ -82,9 +82,9 @@ public class MTProtoClientImpl implements MTProtoClient {
     final MTProtoClientGroup group;
     final DcId.Type type;
     final AuthData authData;
-    final MpscArrayQueue<RpcRequest> pendingRequests = new MpscArrayQueue<>(Queues.SMALL_BUFFER_SIZE);
+    final MpscArrayQueue<RpcQuery> pendingRequests = new MpscArrayQueue<>(Queues.SMALL_BUFFER_SIZE);
     final HashMap<Long, Request> requests = new HashMap<>();
-    final ArrayDeque<MTProtoClientImpl.RpcQuery> delayedUntilAuth = new ArrayDeque<>(16);
+    final ArrayDeque<RpcQuery> delayedUntilAuth = new ArrayDeque<>(16);
     final String id = Integer.toHexString(hashCode());
     final InnerStats stats = new InnerStats();
     final Sinks.Empty<Void> onClose = Sinks.empty();
@@ -474,7 +474,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 sink.success();
             } else if (oldCs == ChannelState.DISCONNECTED_STATE) {
                 onClose.emitEmpty(FAIL_FAST);
-                // TODO cancel pending requests
+                cancelRequests(mtProtoOptions.resultPublisher());
                 sink.success();
             } else {
                 EventLoop eventLoop = oldCs.channel.eventLoop();
@@ -506,8 +506,7 @@ public class MTProtoClientImpl implements MTProtoClient {
 
     void cancelRequests(ExecutorService eventLoop) {
         RuntimeException exc = Exceptions.failWithCancel();
-        for (var e : requests.entrySet()) {
-            var req = e.getValue();
+        for (var req : requests.values()) {
             if (req instanceof RpcQuery q) {
                 var resultPublisher = q.sink.isPublishOnEventLoop()
                         ? eventLoop
@@ -517,14 +516,12 @@ public class MTProtoClientImpl implements MTProtoClient {
             }
         }
 
-        pendingRequests.drain(request -> {
-            if (request instanceof RpcQuery q) {
-                var resultPublisher = q.sink.isPublishOnEventLoop()
-                        ? eventLoop
-                        : mtProtoOptions.resultPublisher();
+        pendingRequests.drain(rpcQuery -> {
+            var resultPublisher = rpcQuery.sink.isPublishOnEventLoop()
+                    ? eventLoop
+                    : mtProtoOptions.resultPublisher();
 
-                q.sink.emitError(resultPublisher, exc);
-            }
+            rpcQuery.sink.emitError(resultPublisher, exc);
         });
 
         RpcQuery q;
