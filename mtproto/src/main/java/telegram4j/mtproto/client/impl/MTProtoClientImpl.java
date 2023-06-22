@@ -427,7 +427,7 @@ public class MTProtoClientImpl implements MTProtoClient {
                 return (Mono<R>) sink;
             } else { // CONNECTED
                 RequestMono sink = new RequestMono(false);
-                channelState.channel.writeAndFlush(new RpcQuery(method, sink), channelState.channel.voidPromise());
+                currentState.channel.writeAndFlush(new RpcQuery(method, sink), currentState.channel.voidPromise());
                 return (Mono<R>) sink;
             }
         })
