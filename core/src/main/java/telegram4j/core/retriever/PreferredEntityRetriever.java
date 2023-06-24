@@ -12,6 +12,8 @@ import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
 import telegram4j.tl.InputMessage;
 
+import java.util.Objects;
+
 /**
  * Additional wrapping for {@code EntityRetriever} which have settings to control
  * behavior of {@link #getUserById(Id)} and {@link #getChatById(Id)} methods.
@@ -22,7 +24,7 @@ public class PreferredEntityRetriever implements EntityRetriever {
     private final Setting userPreference;
 
     PreferredEntityRetriever(EntityRetriever delegate, Setting chatPreference, Setting userPreference) {
-        this.delegate = delegate;
+        this.delegate = Objects.requireNonNull(delegate);
         this.chatPreference = chatPreference;
         this.userPreference = userPreference;
     }

@@ -18,6 +18,7 @@ import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.InputMessage;
 import telegram4j.tl.PeerChannel;
 import telegram4j.tl.PeerUser;
+import telegram4j.tl.messages.MessagesNotModified;
 
 /** Implementation of {@code EntityRetriever} which uses {@link StoreLayout storage}. */
 public class StoreEntityRetriever implements EntityRetriever {
@@ -99,22 +100,20 @@ public class StoreEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<Chat> getChatById(Id chatId) {
-        return Mono.defer(() -> {
-            return switch (chatId.getType()) {
-                case CHAT -> storeLayout.getChatById(chatId.asLong())
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case CHANNEL -> storeLayout.getChannelById(chatId.asLong())
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case USER -> storeLayout.getUserById(chatId.asLong())
-                        .flatMap(p -> {
-                            var retrieveSelf = retrieveSelfUserForDMs
-                                    ? getUserById(client.getSelfId())
-                                    : Mono.<User>empty();
-                            return retrieveSelf
-                                    .map(u -> EntityFactory.createChat(client, p, u))
-                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
-                        });
-            };
+        return Mono.defer(() -> switch (chatId.getType()) {
+            case CHAT -> storeLayout.getChatById(chatId.asLong())
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case CHANNEL -> storeLayout.getChannelById(chatId.asLong())
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case USER -> storeLayout.getUserById(chatId.asLong())
+                    .flatMap(p -> {
+                        var retrieveSelf = retrieveSelfUserForDMs
+                                ? getUserById(client.getSelfId())
+                                : Mono.<User>empty();
+                        return retrieveSelf
+                                .map(u -> EntityFactory.createChat(client, p, u))
+                                .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                    });
         });
     }
 
@@ -158,17 +157,16 @@ public class StoreEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
+        if (chatId.getType() == Id.Type.CHAT && peerId.getType() != Id.Type.USER) {
+            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
+                    "but given: " + chatId.getType()));
+        }
+
         return Mono.defer(() -> switch (chatId.getType()) {
-            case CHAT -> {
-                if (peerId.getType() != Id.Type.USER) {
-                    yield Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
-                            "but given: " + chatId.getType()));
-                }
-                yield storeLayout.getChatParticipantById(chatId.asLong(), peerId.asLong())
-                        .map(r -> new ChatParticipant(client, r.getUser()
-                                .map(u -> EntityFactory.createUser(client, u))
-                                .orElse(null), r.getParticipant(), chatId));
-            }
+            case CHAT -> storeLayout.getChatParticipantById(chatId.asLong(), peerId.asLong())
+                    .map(r -> new ChatParticipant(client, r.getUser()
+                            .map(u -> EntityFactory.createUser(client, u))
+                            .orElse(null), r.getParticipant(), chatId));
             case CHANNEL -> storeLayout.getChannelParticipantById(chatId.asLong(), peerId.asPeer())
                     .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
             default -> Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
@@ -199,6 +197,7 @@ public class StoreEntityRetriever implements EntityRetriever {
             }
             return storeLayout.getMessages(chatId.asLong(), messageIds);
         })
+        .filter(m -> m.identifier() != MessagesNotModified.ID)
         .map(d -> AuxiliaryEntityFactory.createMessages(client, d));
     }
 }

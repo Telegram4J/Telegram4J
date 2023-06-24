@@ -66,8 +66,7 @@ public class RpcEntityRetriever implements EntityRetriever {
         return Mono.justOrEmpty(peerId.asUsername())
                 .flatMap(serviceHolder.getUserService()::resolveUsername)
                 .flatMap(p -> switch (p.peer().identifier()) {
-                    case PeerChannel.ID ->
-                            Mono.justOrEmpty(EntityFactory.createChat(client, p.chats().get(0), null));
+                    case PeerChannel.ID -> Mono.justOrEmpty(EntityFactory.createChat(client, p.chats().get(0), null));
                     case PeerUser.ID -> Mono.justOrEmpty(EntityFactory.createUser(client, p.users().get(0)));
                     default -> Mono.error(new IllegalStateException("Unknown Peer type: " + p.peer()));
                 })
@@ -100,105 +99,94 @@ public class RpcEntityRetriever implements EntityRetriever {
 
     @Override
     public Mono<Chat> getChatMinById(Id chatId) {
-        return Mono.defer(() -> {
-            return switch (chatId.getType()) {
-                case CHAT -> serviceHolder.getChatService().getChat(chatId.asLong())
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case CHANNEL -> client.asInputChannel(chatId)
-                        .flatMap(serviceHolder.getChatService()::getChannel)
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case USER -> client.asInputUser(chatId)
-                        .flatMap(serviceHolder.getUserService()::getUser)
-                        .flatMap(p -> {
-                            var retrieveSelf = retrieveSelfUserForDMs
-                                    ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
-                                    .getUserById(client.getSelfId())
-                                    : Mono.<User>empty();
-                            return retrieveSelf
-                                    .mapNotNull(u -> EntityFactory.createChat(client, p, u))
-                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
-                        });
-            };
+        return Mono.defer(() -> switch (chatId.getType()) {
+            case CHAT -> serviceHolder.getChatService().getChat(chatId.asLong())
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case CHANNEL -> client.asInputChannel(chatId)
+                    .flatMap(serviceHolder.getChatService()::getChannel)
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case USER -> client.asInputUser(chatId)
+                    .flatMap(serviceHolder.getUserService()::getUser)
+                    .flatMap(p -> {
+                        var retrieveSelf = retrieveSelfUserForDMs
+                                ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
+                                .getUserById(client.getSelfId())
+                                : Mono.<User>empty();
+                        return retrieveSelf
+                                .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                    });
         });
     }
 
     @Override
     public Mono<Chat> getChatFullById(Id chatId) {
-        return Mono.defer(() -> {
-            return switch (chatId.getType()) {
-                case CHAT -> serviceHolder.getChatService().getFullChat(chatId.asLong())
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case CHANNEL -> client.asInputChannel(chatId)
-                        .flatMap(serviceHolder.getChatService()::getFullChannel)
-                        .mapNotNull(c -> EntityFactory.createChat(client, c, null));
-                case USER -> client.asInputUser(chatId)
-                        .flatMap(serviceHolder.getUserService()::getFullUser)
-                        .flatMap(p -> {
-                            var retrieveSelf = retrieveSelfUserForDMs
-                                    ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
-                                    .getUserById(client.getSelfId())
-                                    : Mono.<User>empty();
-                            return retrieveSelf
-                                    .mapNotNull(u -> EntityFactory.createChat(client, p, u))
-                                    .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
-                        });
-            };
+        return Mono.defer(() -> switch (chatId.getType()) {
+            case CHAT -> serviceHolder.getChatService().getFullChat(chatId.asLong())
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case CHANNEL -> client.asInputChannel(chatId)
+                    .flatMap(serviceHolder.getChatService()::getFullChannel)
+                    .mapNotNull(c -> EntityFactory.createChat(client, c, null));
+            case USER -> client.asInputUser(chatId)
+                    .flatMap(serviceHolder.getUserService()::getFullUser)
+                    .flatMap(p -> {
+                        var retrieveSelf = retrieveSelfUserForDMs
+                                ? client.withRetrievalStrategy(EntityRetrievalStrategy.STORE)
+                                .getUserById(client.getSelfId())
+                                : Mono.<User>empty();
+                        return retrieveSelf
+                                .mapNotNull(u -> EntityFactory.createChat(client, p, u))
+                                .switchIfEmpty(Mono.fromSupplier(() -> EntityFactory.createChat(client, p, null)));
+                    });
         });
     }
 
     @Override
     public Mono<ChatParticipant> getParticipantById(Id chatId, Id peerId) {
-        return Mono.defer(() -> {
-            switch (chatId.getType()) {
-                // telegram api doest provide normal way to retrieve specified chat participant,
-                // and therefore we retrieve full chat info and looking up participant
-                case CHAT -> {
-                    if (peerId.getType() != Id.Type.USER) {
-                        return Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
-                                "but given: " + chatId.getType()));
-                    }
-                    return serviceHolder.getChatService().getFullChat(chatId.asLong())
-                            .mapNotNull(c -> {
-                                var chatFull = (BaseChatFull) c.fullChat();
-                                telegram4j.tl.ChatParticipant member;
-                                if (chatFull.participants() instanceof BaseChatParticipants base) {
-                                    member = base.participants().stream()
-                                            .filter(p -> p.userId() == peerId.asLong())
-                                            .findFirst()
-                                            .orElse(null);
+        if (chatId.getType() == Id.Type.CHAT && peerId.getType() != Id.Type.USER) {
+            return Mono.error(new IllegalArgumentException("Incorrect id type, expected: USER, " +
+                    "but given: " + chatId.getType()));
+        }
 
-                                } else if (chatFull.participants() instanceof ChatParticipantsForbidden forbidden) {
-                                    member = Optional.ofNullable(forbidden.selfParticipant())
-                                            .filter(p -> p.userId() == peerId.asLong())
-                                            .orElse(null);
-                                } else {
-                                    throw new IllegalStateException();
-                                }
+        return Mono.defer(() -> switch (chatId.getType()) {
+            // telegram api doest provide normal way to retrieve specified chat participant,
+            // and therefore we retrieve full chat info and looking up participant
+            case CHAT -> serviceHolder.getChatService().getFullChat(chatId.asLong())
+                    .mapNotNull(c -> {
+                        var chatFull = (BaseChatFull) c.fullChat();
+                        telegram4j.tl.ChatParticipant member;
+                        if (chatFull.participants() instanceof BaseChatParticipants base) {
+                            member = base.participants().stream()
+                                    .filter(p -> p.userId() == peerId.asLong())
+                                    .findFirst()
+                                    .orElse(null);
 
-                                if (member == null) {
-                                    return null;
-                                }
-                                var user = c.users().stream()
-                                        .filter(u -> u.id() == peerId.asLong())
-                                        .findFirst()
-                                        .map(u -> EntityFactory.createUser(client, u))
-                                        .orElse(null);
-                                return new ChatParticipant(client, user, member, chatId);
-                            });
-                }
-                case CHANNEL -> {
-                    return client.asInputChannel(chatId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
-                            .zipWith(client.asInputPeer(peerId)
-                                    .switchIfEmpty(MappingUtil.unresolvedPeer(peerId)))
-                            .flatMap(TupleUtils.function(serviceHolder.getChatService()::getParticipant))
-                            .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
-                }
-                default -> {
-                    return Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
-                            "CHAT, but given: " + chatId.getType()));
-                }
-            }
+                        } else if (chatFull.participants() instanceof ChatParticipantsForbidden forbidden) {
+                            member = Optional.ofNullable(forbidden.selfParticipant())
+                                    .filter(p -> p.userId() == peerId.asLong())
+                                    .orElse(null);
+                        } else {
+                            throw new IllegalStateException();
+                        }
+
+                        if (member == null) {
+                            return null;
+                        }
+                        var user = c.users().stream()
+                                .filter(u -> u.id() == peerId.asLong())
+                                .findFirst()
+                                .map(u -> EntityFactory.createUser(client, u))
+                                .orElse(null);
+                        return new ChatParticipant(client, user, member, chatId);
+                    });
+            case CHANNEL -> client.asInputChannel(chatId)
+                    .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                    .zipWith(client.asInputPeer(peerId)
+                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId)))
+                    .flatMap(TupleUtils.function(serviceHolder.getChatService()::getParticipant))
+                    .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
+            default -> Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
+                    "CHAT, but given: " + chatId.getType()));
         });
     }
 
