@@ -1,7 +1,10 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     `java-library`
     `maven-publish`
     signing
+    idea
     alias(libs.plugins.versions)
 }
 
@@ -12,12 +15,19 @@ subprojects {
     apply(plugin = "java-library")
     apply(plugin = "maven-publish")
     apply(plugin = "com.github.ben-manes.versions")
+    apply(plugin = "idea")
 
     if (!isJitpack && !isSnapshot) {
         apply(plugin = "signing")
     }
 
     val archiveBaseName = "telegram4j-$name"
+
+    idea {
+        module {
+            isDownloadSources = true
+        }
+    }
 
     dependencies {
         api(platform(rootProject.libs.reactor.bom))
@@ -50,6 +60,10 @@ subprojects {
 
     tasks.test {
         useJUnitPlatform()
+
+        testLogging {
+            exceptionFormat = TestExceptionFormat.FULL
+        }
     }
 
     tasks.withType<Javadoc> {
