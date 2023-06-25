@@ -9,9 +9,9 @@ import java.util.concurrent.ThreadFactory;
 public sealed interface EventLoopResources
         permits EpollEventLoopResources, KQueueEventLoopResources, NioEventLoopResources {
 
-    int DEFAULT_IO_WORKER_COUNT = Integer.parseInt(System.getProperty(
+    int DEFAULT_IO_WORKER_COUNT = Integer.getInteger(
             "telegram4j.netty.ioWorkerCount",
-            "" + Math.max(Runtime.getRuntime().availableProcessors(), 4)));
+            Math.min(Runtime.getRuntime().availableProcessors(), 4));
 
     static EventLoopResources nio() {
         return NioEventLoopResources.instance;
