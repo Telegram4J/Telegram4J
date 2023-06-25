@@ -24,6 +24,7 @@ import telegram4j.mtproto.client.ImmutableStats;
 import telegram4j.mtproto.client.MTProtoClient;
 import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.client.MTProtoOptions;
+import telegram4j.mtproto.resource.impl.BaseProxyResources;
 import telegram4j.mtproto.transport.Transport;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.api.TlMethod;
@@ -46,11 +47,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static io.netty.channel.ChannelHandler.Sharable;
 import static reactor.core.publisher.Sinks.EmitFailureHandler.FAIL_FAST;
 import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 
 public class MTProtoClientImpl implements MTProtoClient {
+    static final String PROXY           = "proxy";
+
     static final String HANDSHAKE_CODEC = "mtproto.handshake.codec";
     static final String HANDSHAKE       = "mtproto.handshake";
     static final String TRANSPORT       = "mtproto.transport";
@@ -104,18 +106,23 @@ public class MTProtoClientImpl implements MTProtoClient {
 
         var tcpClientRes = mtProtoOptions.tcpClientResources();
         this.bootstrap = new Bootstrap()
-                .channelFactory(tcpClientRes.getEventLoopResources().getChannelFactory())
-                .group(tcpClientRes.getEventLoopGroup())
+                .channelFactory(tcpClientRes.eventLoopResources().getChannelFactory())
+                .group(tcpClientRes.eventLoopGroup())
                 .remoteAddress(InetSocketAddress.createUnresolved(dc.getAddress(), dc.getPort()))
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
+                        var impl = (BaseProxyResources) tcpClientRes.proxyProvider().orElse(null);
+                        if (impl != null) {
+                            ch.pipeline().addFirst(PROXY, impl.createProxyHandler(impl.address));
+                        }
+
                         ch.pipeline().addLast(CORE, new MTProtoClientHandler());
                     }
+
                 });
     }
 
-    @Sharable
     class MTProtoClientHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable t) {

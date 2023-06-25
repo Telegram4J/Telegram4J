@@ -1,46 +1,50 @@
 package telegram4j.mtproto.resource;
 
 import io.netty.channel.EventLoopGroup;
-import io.netty.util.concurrent.DefaultThreadFactory;
 import reactor.core.Disposable;
+import reactor.util.annotation.Nullable;
 
-import java.util.concurrent.ThreadFactory;
+import java.util.Objects;
+import java.util.Optional;
 
 public final class TcpClientResources implements Disposable {
-    private final ThreadFactory threadFactory;
+    @Nullable
+    private final ProxyResources proxyResources;
     private final EventLoopResources eventLoopResources;
     private final EventLoopGroup eventLoopGroup;
 
-    private TcpClientResources(ThreadFactory threadFactory, EventLoopResources eventLoopResources,
+    private TcpClientResources(@Nullable ProxyResources proxyResources,
+                               EventLoopResources eventLoopResources,
                                EventLoopGroup eventLoopGroup) {
-        this.threadFactory = threadFactory;
+        this.proxyResources = proxyResources;
         this.eventLoopResources = eventLoopResources;
         this.eventLoopGroup = eventLoopGroup;
     }
 
-    public ThreadFactory getThreadFactory() {
-        return threadFactory;
+    public Optional<ProxyResources> proxyProvider() {
+        return Optional.ofNullable(proxyResources);
     }
 
-    public EventLoopResources getEventLoopResources() {
+    public EventLoopResources eventLoopResources() {
         return eventLoopResources;
     }
 
-    public EventLoopGroup getEventLoopGroup() {
+    public EventLoopGroup eventLoopGroup() {
         return eventLoopGroup;
     }
 
     public static TcpClientResources create() {
-        return create(Transports.preferNative, EventLoopResources.DEFAULT_IO_WORKER_COUNT);
+        return create(Transports.preferNative);
     }
 
-    public static TcpClientResources create(boolean preferNative, int ioWorkerCount) {
-        EventLoopResources eventLoopResources = EventLoopResources.create(preferNative);
+    public static TcpClientResources create(boolean preferNative) {
+        return builder()
+                .eventLoopResources(EventLoopResources.create(preferNative))
+                .build();
+    }
 
-        var threadFactory = new DefaultThreadFactory("t4j-" + eventLoopResources.getGroupPrefix(), true);
-        var eventLoopGroup = eventLoopResources.createEventLoopGroup(ioWorkerCount, threadFactory);
-
-        return new TcpClientResources(threadFactory, eventLoopResources, eventLoopGroup);
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Override
@@ -51,5 +55,33 @@ public final class TcpClientResources implements Disposable {
     @Override
     public boolean isDisposed() {
         return eventLoopGroup.isShutdown();
+    }
+
+    public static class Builder {
+        @Nullable
+        ProxyResources proxyResources;
+        @Nullable
+        EventLoopResources eventLoopResources;
+
+        private Builder() {}
+
+        public Builder proxyResources(ProxyResources proxyResources) {
+            this.proxyResources = Objects.requireNonNull(proxyResources);
+            return this;
+        }
+
+        public Builder eventLoopResources(EventLoopResources eventLoopResources) {
+            this.eventLoopResources = Objects.requireNonNull(eventLoopResources);
+            return this;
+        }
+
+        public TcpClientResources build() {
+            if (eventLoopResources == null) {
+                eventLoopResources = EventLoopResources.create();
+            }
+
+            var eventLoopGroup = eventLoopResources.createEventLoopGroup();
+            return new TcpClientResources(proxyResources, eventLoopResources, eventLoopGroup);
+        }
     }
 }

@@ -1,28 +1,19 @@
 package telegram4j.mtproto.resource;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
-import java.util.concurrent.ThreadFactory;
-
-final class NioEventLoopResources implements EventLoopResources {
-    static final EventLoopResources instance = new NioEventLoopResources();
-
+public non-sealed class NioEventLoopResources implements EventLoopResources {
     @Override
-    public EventLoopGroup createEventLoopGroup(int nThreads, ThreadFactory threadFactory) {
-        return new NioEventLoopGroup(nThreads, threadFactory);
+    public NioEventLoopGroup createEventLoopGroup() {
+        var threadFactory = new DefaultThreadFactory("t4j-nio", true);
+        return new NioEventLoopGroup(DEFAULT_IO_WORKER_COUNT, threadFactory);
     }
 
     @Override
-    public ChannelFactory<? extends Channel> getChannelFactory() {
+    public ChannelFactory<? extends NioSocketChannel> getChannelFactory() {
         return NioSocketChannel::new;
-    }
-
-    @Override
-    public String getGroupPrefix() {
-        return "nio";
     }
 }

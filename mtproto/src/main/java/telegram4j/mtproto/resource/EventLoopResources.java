@@ -4,8 +4,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
 
-import java.util.concurrent.ThreadFactory;
-
 public sealed interface EventLoopResources
         permits EpollEventLoopResources, KQueueEventLoopResources, NioEventLoopResources {
 
@@ -14,7 +12,7 @@ public sealed interface EventLoopResources
             Math.min(Runtime.getRuntime().availableProcessors(), 4));
 
     static EventLoopResources nio() {
-        return NioEventLoopResources.instance;
+        return new NioEventLoopResources();
     }
 
     static EventLoopResources create() {
@@ -24,17 +22,15 @@ public sealed interface EventLoopResources
     static EventLoopResources create(boolean preferNative) {
         if (preferNative) {
             if (Transports.Epoll.available) {
-                return EpollEventLoopResources.instance;
+                return new EpollEventLoopResources();
             } else if (Transports.KQueue.available) {
-                return KQueueEventLoopResources.instance;
+                return new KQueueEventLoopResources();
             }
         }
-        return NioEventLoopResources.instance;
+        return new NioEventLoopResources();
     }
 
-    EventLoopGroup createEventLoopGroup(int nThreads, ThreadFactory threadFactory);
+    EventLoopGroup createEventLoopGroup();
 
     ChannelFactory<? extends Channel> getChannelFactory();
-
-    String getGroupPrefix();
 }

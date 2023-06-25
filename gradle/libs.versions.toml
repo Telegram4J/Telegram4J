@@ -20,6 +20,7 @@ jsr305 = "com.google.code.findbugs:jsr305:3.0.2"
 
 netty-bom = { module = "io.netty:netty-bom", version.ref = "netty-bom" }
 netty-handler = { module = "io.netty:netty-handler" }
+netty-handler-proxy = { module = "io.netty:netty-handler-proxy" }
 netty-native-epoll = { module = "io.netty:netty-transport-native-epoll" }
 netty-native-kqueue = { module = "io.netty:netty-transport-native-kqueue" }
 

@@ -1,28 +1,19 @@
 package telegram4j.mtproto.resource;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
-import java.util.concurrent.ThreadFactory;
-
-final class EpollEventLoopResources implements EventLoopResources {
-    static final EventLoopResources instance = new EpollEventLoopResources();
-
+public non-sealed class EpollEventLoopResources implements EventLoopResources {
     @Override
-    public EventLoopGroup createEventLoopGroup(int nThreads, ThreadFactory threadFactory) {
-        return new EpollEventLoopGroup(nThreads, threadFactory);
+    public EpollEventLoopGroup createEventLoopGroup() {
+        var threadFactory = new DefaultThreadFactory("t4j-epoll", true);
+        return new EpollEventLoopGroup(DEFAULT_IO_WORKER_COUNT, threadFactory);
     }
 
     @Override
-    public ChannelFactory<? extends Channel> getChannelFactory() {
+    public ChannelFactory<? extends EpollSocketChannel> getChannelFactory() {
         return EpollSocketChannel::new;
-    }
-
-    @Override
-    public String getGroupPrefix() {
-        return "epoll";
     }
 }

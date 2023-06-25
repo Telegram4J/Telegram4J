@@ -3,6 +3,7 @@ dependencies {
     api(libs.reactor.core)
     api(libs.reactor.addons.extra)
     api(libs.netty.handler)
+    api(libs.netty.handler.proxy)
 
     compileOnly(libs.netty.native.epoll) {
         artifact { classifier = "linux-x86_64" }

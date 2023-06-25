@@ -4,9 +4,11 @@ module telegram4j.mtproto {
     requires org.reactivestreams;
     requires io.netty.buffer;
     requires io.netty.handler;
+    requires io.netty.handler.proxy;
     requires io.netty.codec;
     requires io.netty.common;
     requires io.netty.transport;
+    requires io.netty.codec.http;
     requires com.github.benmanes.caffeine;
     requires com.fasterxml.jackson.databind;
 
