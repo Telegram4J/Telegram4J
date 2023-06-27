@@ -400,13 +400,14 @@ public final class MTProtoBootstrap {
                                 initDhPrimeChecker(), storeLayout,
                                 initResultPublisher());
 
+                        var updatesScheduler = initUpdatesPublisher();
                         ClientFactory clientFactory = this.clientFactory.apply(mtProtoOptions, clientOptions);
                         MTProtoClientGroup clientGroup = clientGroupFactory.apply(
                                 MTProtoClientGroup.Options.of(mainDc, clientFactory,
-                                        initUpdateDispatcher(initUpdatesPublisher()), mtProtoOptions));
+                                        initUpdateDispatcher(updatesScheduler), mtProtoOptions));
 
                         return authorizeClient(clientGroup, storeLayout, dcOptions)
-                                .flatMap(selfId -> initializeClient(selfId, clientGroup, mtProtoOptions));
+                                .flatMap(selfId -> initializeClient(selfId, clientGroup, mtProtoOptions, updatesScheduler));
                     }))
                     .subscribe(sink::success, sink::error));
 
@@ -461,9 +462,9 @@ public final class MTProtoBootstrap {
     }
 
     private Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientGroup clientGroup,
-                                                         MTProtoOptions options) {
+                                                         MTProtoOptions options, Scheduler updatesScheduler) {
         return Mono.create(sink -> {
-            EventDispatcher eventDispatcher = initEventDispatcher();
+            EventDispatcher eventDispatcher = initEventDispatcher(updatesScheduler);
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
             MTProtoResources mtProtoResources = new MTProtoResources(options.storeLayout(), eventDispatcher,
@@ -580,12 +581,11 @@ public final class MTProtoBootstrap {
         return Schedulers.newParallel("t4j-events", 4, true);
     }
 
-    private EventDispatcher initEventDispatcher() {
+    private EventDispatcher initEventDispatcher(Scheduler updatesPublisher) {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        // By default, all events will be published on the same thread pool as updates
-        return new DefaultEventDispatcher(Schedulers.immediate(),
+        return new DefaultEventDispatcher(updatesPublisher,
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 Sinks.EmitFailureHandler.busyLooping(Duration.ofNanos(50)));
     }
