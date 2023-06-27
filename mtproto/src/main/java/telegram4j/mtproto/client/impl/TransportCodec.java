@@ -80,19 +80,19 @@ public final class TransportCodec extends ChannelDuplexHandler {
     class Encoder extends ChannelOutboundHandlerAdapter {
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
-            if (msg instanceof ByteBuf b) {
-                ByteBuf encoded;
-                try {
-                    encoded = transport.encode(b, quickAck);
-                } finally {
-                    // b.release();
-                    // b may already be released in Transport.encode(...)
-                    // ReferenceCountUtil.safeRelease(b);
-                }
-                ctx.write(encoded, promise);
-            } else {
-                ctx.write(msg, promise);
+            if (!(msg instanceof ByteBuf b)) {
+                throw new IllegalStateException("Unexpected type of message: " + msg);
             }
+
+            ByteBuf encoded;
+            try {
+                encoded = transport.encode(b, quickAck);
+            } finally {
+                // b.release();
+                // b may already be released in Transport.encode(...)
+                // ReferenceCountUtil.safeRelease(b);
+            }
+            ctx.write(encoded, promise);
         }
     }
 }
