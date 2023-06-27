@@ -147,6 +147,21 @@ public final class CryptoUtil {
         }
     }
 
+    public static ByteBuf sha256Digest(ByteBuf first) {
+        MessageDigest sha256 = SHA256.get();
+        sha256.reset();
+        sha256.update(first.nioBuffer());
+        return Unpooled.wrappedBuffer(sha256.digest());
+    }
+
+    public static ByteBuf sha256Digest(ByteBuf first, ByteBuf second) {
+        MessageDigest sha256 = SHA256.get();
+        sha256.reset();
+        sha256.update(first.nioBuffer());
+        sha256.update(second.nioBuffer());
+        return Unpooled.wrappedBuffer(sha256.digest());
+    }
+
     public static ByteBuf sha256Digest(ByteBuf... bufs) {
         MessageDigest sha256 = SHA256.get();
         sha256.reset();

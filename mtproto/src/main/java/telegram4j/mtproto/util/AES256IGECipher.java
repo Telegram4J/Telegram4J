@@ -50,7 +50,7 @@ public final class AES256IGECipher {
     public ByteBuf encrypt(ByteBuf data) {
         int size = data.readableBytes();
         int blockSize = baseCipher.getBlockSize();
-        ByteBuf encrypted = data.alloc().buffer(size);
+        ByteBuf encrypted = data.alloc().ioBuffer(size);
         // first 16 - input, second - output
         byte[] buffer = new byte[blockSize + blockSize];
 

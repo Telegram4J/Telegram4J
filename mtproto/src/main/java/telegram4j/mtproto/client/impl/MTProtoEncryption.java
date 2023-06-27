@@ -81,12 +81,6 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             throw new IllegalArgumentException("Unexpected type of message to encrypt: " + msg);
         }
 
-        if (log.isTraceEnabled() && !client.requests.isEmpty()) {
-            log.trace("[C:0x{}] {}", client.id, client.requests.entrySet().stream()
-                    .map(e -> "0x" + Long.toHexString(e.getKey()) + ": " + e.getValue())
-                    .collect(Collectors.joining(", ", "{", "}")));
-        }
-
         if (client.authData.unauthorized() && msg instanceof RpcQuery query
                 && query.method.identifier() != GetUsers.ID // TODO: It's dirty hack to check is auth needed
                 && !isAuthMethod(query.method)) {
@@ -158,7 +152,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             int unpadded = (messageSize + 12) % 16;
             padding = 12 + (unpadded != 0 ? 16 - unpadded : 0);
 
-            message = ctx.alloc().buffer(messageSize + padding);
+            message = ctx.alloc().ioBuffer(messageSize + padding);
             message.writeLongLE(client.authData.serverSalt());
             message.writeLongLE(client.authData.sessionId());
             message.writeLongLE(containerMsgId);
@@ -193,7 +187,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             int unpadded = (messageSize + 12) % 16;
             padding = 12 + (unpadded != 0 ? 16 - unpadded : 0);
 
-            message = ctx.alloc().buffer(messageSize + padding)
+            message = ctx.alloc().ioBuffer(messageSize + padding)
                     .writeLongLE(client.authData.serverSalt())
                     .writeLongLE(client.authData.sessionId())
                     .writeLongLE(requestMessageId)
