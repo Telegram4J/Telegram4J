@@ -18,15 +18,10 @@ public sealed interface HttpProxyResources extends ProxyResources permits HttpPr
     /** {@return The initial HTTP headers} if present. */
     Optional<HttpHeaders> httpHeaders();
 
-    /** {@return The username for proxy} if present then and {@link #password()} will be present too. */
-    @Override
-    Optional<String> username();
-
-    /** {@return The password for proxy} if present then and {@link #username()} will be present too. */
-    @Override
-    Optional<String> password();
-
     sealed interface AddressSpec extends ProxyResources.AddressSpec permits HttpProxyResourcesImpl.Spec {
+        @Override
+        AddressSpec from(ProxyResources proxyResources);
+
         @Override
         ProxySpec address(InetSocketAddress address);
     }
@@ -42,12 +37,6 @@ public sealed interface HttpProxyResources extends ProxyResources permits HttpPr
 
         @Override
         ProxySpec connectTimeout(@Nullable Duration connectTimeout);
-
-        @Override
-        ProxySpec username(@Nullable String username);
-
-        @Override
-        ProxySpec password(@Nullable String password);
 
         /**
          * Builds {@code HttpProxyResources} from this spec.

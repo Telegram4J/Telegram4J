@@ -15,7 +15,7 @@ import java.util.Optional;
  * @implNote Implementation of this resource is immutable and thread-safe.
  */
 public sealed interface ProxyResources
-        permits HttpProxyResources, BaseProxyResources {
+        permits HttpProxyResources, SocksProxyResources, BaseProxyResources {
 
     /**
      * Creates new spec builder of Socks 5 proxy.
@@ -23,12 +23,12 @@ public sealed interface ProxyResources
      * @apiNote Returning spec is not thread safe must be used locally or with synchronization.
      * @return A new spec of Socks 5 proxy.
      */
-    static AddressSpec ofSocks5() {
+    static SocksProxyResources.AddressSpec ofSocks5() {
         return new Sock5ProxyResourcesImpl.Spec();
     }
 
     /**
-     * Creates new spec builder of HTTP proxy.
+     * Creates new spec builder of HTTP/HTTPS proxy.
      *
      * @apiNote Returning spec is not thread safe must be used locally or with synchronization.
      * @return A new spec builder of HTTP proxy.
@@ -47,14 +47,20 @@ public sealed interface ProxyResources
      */
     Optional<Duration> connectTimeout();
 
-    /** {@return The username for proxy} if present. */
-    Optional<String> username();
-
-    /** {@return The password for proxy} if present. */
-    Optional<String> password();
-
     /** A helper builder of mandatory {@code address} attribute. */
-    sealed interface AddressSpec permits HttpProxyResources.AddressSpec, BaseProxyResources.Spec {
+    sealed interface AddressSpec permits HttpProxyResources.AddressSpec, SocksProxyResources.AddressSpec, BaseProxyResources.Spec {
+
+        /**
+         * Configures this spec with values from specified.
+         * <p>
+         * If type of specified {@code proxyResources} is different
+         * from type of the constructing resources, then
+         * extra properties will be ignored
+         *
+         * @param proxyResources The base resources for modifying.
+         * @return The spec, for chaining.
+         */
+        AddressSpec from(ProxyResources proxyResources);
 
         /**
          * Configures proxy address.
@@ -66,7 +72,7 @@ public sealed interface ProxyResources
     }
 
     /** A helper builder of optional attributes. */
-    sealed interface ProxySpec permits HttpProxyResources.ProxySpec, BaseProxyResources.Spec {
+    sealed interface ProxySpec permits HttpProxyResources.ProxySpec, SocksProxyResources.ProxySpec, BaseProxyResources.Spec {
         /**
          * Configures initial HTTP headers for proxy.
          *
@@ -74,22 +80,6 @@ public sealed interface ProxyResources
          * @return This spec.
          */
         ProxySpec connectTimeout(@Nullable Duration connectTimeout);
-
-        /**
-         * Configures username for proxy.
-         *
-         * @param username The username for proxy.
-         * @return This spec.
-         */
-        ProxySpec username(@Nullable String username);
-
-        /**
-         * Configures password for proxy.
-         *
-         * @param password The password for proxy.
-         * @return This spec.
-         */
-        ProxySpec password(@Nullable String password);
 
         /**
          * Builds {@code ProxyResources} from this spec.

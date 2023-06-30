@@ -13,19 +13,11 @@ import java.util.Optional;
 public abstract sealed class BaseProxyResources
         implements ProxyResources
         permits HttpProxyResourcesImpl, Sock5ProxyResourcesImpl {
-
-    @Nullable
-    public final String username;
-    @Nullable
-    public final String password;
     @Nullable
     public final Duration connectTimeout;
     public final InetSocketAddress address;
 
-    protected BaseProxyResources(String username, String password,
-                                 Duration connectTimeout, InetSocketAddress address) {
-        this.username = username;
-        this.password = password;
+    protected BaseProxyResources(@Nullable Duration connectTimeout, InetSocketAddress address) {
         this.connectTimeout = connectTimeout;
         this.address = address;
     }
@@ -40,16 +32,6 @@ public abstract sealed class BaseProxyResources
         return Optional.ofNullable(connectTimeout);
     }
 
-    @Override
-    public Optional<String> username() {
-        return Optional.ofNullable(username);
-    }
-
-    @Override
-    public Optional<String> password() {
-        return Optional.ofNullable(password);
-    }
-
     public abstract ProxyHandler createProxyHandler(SocketAddress resolvedAddress);
 
     public static abstract sealed class Spec implements AddressSpec, ProxySpec
@@ -57,11 +39,16 @@ public abstract sealed class BaseProxyResources
 
         public InetSocketAddress address;
         @Nullable
-        public String username;
-        @Nullable
-        public String password;
-        @Nullable
         public Duration connectTimeout;
+
+        @Override
+        public AddressSpec from(ProxyResources proxyResources) {
+            if (proxyResources instanceof BaseProxyResources b) {
+                connectTimeout = b.connectTimeout;
+                address = b.address;
+            }
+            return this;
+        }
 
         @Override
         public ProxySpec address(InetSocketAddress address) {
@@ -72,18 +59,6 @@ public abstract sealed class BaseProxyResources
         @Override
         public ProxySpec connectTimeout(@Nullable Duration connectTimeout) {
             this.connectTimeout = connectTimeout;
-            return this;
-        }
-
-        @Override
-        public ProxySpec username(@Nullable String username) {
-            this.username = username;
-            return this;
-        }
-
-        @Override
-        public ProxySpec password(@Nullable String password) {
-            this.password = password;
             return this;
         }
 

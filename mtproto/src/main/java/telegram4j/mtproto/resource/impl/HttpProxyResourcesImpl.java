@@ -5,6 +5,7 @@ import io.netty.handler.proxy.HttpProxyHandler;
 import io.netty.handler.proxy.ProxyHandler;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.resource.HttpProxyResources;
+import telegram4j.mtproto.resource.ProxyResources;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -14,13 +15,12 @@ import java.util.Optional;
 public final class HttpProxyResourcesImpl
         extends BaseProxyResources
         implements HttpProxyResources {
-
+    @Nullable
     public final HttpHeaders httpHeaders;
 
-    private HttpProxyResourcesImpl(String username, String password,
-                                   Duration connectTimeout, InetSocketAddress address,
-                                   HttpHeaders httpHeaders) {
-        super(username, password, connectTimeout, address);
+    private HttpProxyResourcesImpl(@Nullable Duration connectTimeout, InetSocketAddress address,
+                                   @Nullable HttpHeaders httpHeaders) {
+        super(connectTimeout, address);
         this.httpHeaders = httpHeaders;
     }
 
@@ -32,9 +32,7 @@ public final class HttpProxyResourcesImpl
     @Override
     public ProxyHandler createProxyHandler(SocketAddress resolvedAddress) {
 
-        var handler = username != null && password != null
-                ? new HttpProxyHandler(resolvedAddress, username, password, httpHeaders)
-                : new HttpProxyHandler(resolvedAddress, httpHeaders);
+        var handler = new HttpProxyHandler(resolvedAddress, httpHeaders);
 
         if (connectTimeout != null) {
             handler.setConnectTimeoutMillis(connectTimeout.toMillis());
@@ -47,7 +45,17 @@ public final class HttpProxyResourcesImpl
             extends BaseProxyResources.Spec
             implements HttpProxyResources.AddressSpec, HttpProxyResources.ProxySpec {
 
+        @Nullable
         public HttpHeaders httpHeaders;
+
+        @Override
+        public Spec from(ProxyResources proxyResources) {
+            if (proxyResources instanceof HttpProxyResourcesImpl h) {
+                httpHeaders = h.httpHeaders;
+            }
+
+            return (Spec) super.from(proxyResources);
+        }
 
         @Override
         public Spec address(InetSocketAddress address) {
@@ -60,27 +68,14 @@ public final class HttpProxyResourcesImpl
         }
 
         @Override
-        public Spec username(@Nullable String username) {
-            return (Spec) super.username(username);
-        }
-
-        @Override
-        public Spec password(@Nullable String password) {
-            return (Spec) super.password(password);
-        }
-
-        @Override
-        public Spec httpHeaders(HttpHeaders httpHeaders) {
+        public Spec httpHeaders(@Nullable HttpHeaders httpHeaders) {
             this.httpHeaders = httpHeaders;
             return this;
         }
 
         @Override
         public HttpProxyResourcesImpl build() {
-            if (username == null ^ password == null) {
-                throw new IllegalArgumentException("The password and username must be specified, or none");
-            }
-            return new HttpProxyResourcesImpl(username, password, connectTimeout, address, httpHeaders);
+            return new HttpProxyResourcesImpl(connectTimeout, address, httpHeaders);
         }
     }
 }
