@@ -98,7 +98,7 @@ public final class ChatParticipantUpdateEvent extends ChatEvent {
     /**
      * Gets chat where participant was updated.
      *
-     * @return The {@link GroupChat} or {@link Channel} where participant was updated.
+     * @return The {@link GroupChatPeer} or {@link ChannelPeer} where participant was updated.
      */
     @Override
     public Chat getChat() {

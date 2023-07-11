@@ -470,12 +470,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
         var applyChannelDifference = Flux.fromIterable(otherUpdates)
                 .ofType(UpdateChannelTooLong.class)
+                // TODO use UpdateChannelTooLong#pts()
                 .flatMap(u -> client.getMtProtoResources().getStoreLayout()
                         .getChannelFullById(u.channelId())
                         .switchIfEmpty(client.getMtProtoResources().getStoreLayout()
                                 .resolveChannel(u.channelId())
                                 .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
                                 .then(Mono.empty())) // no channel pts; can't request channel updates
+                        .onErrorResume(RpcException.isErrorMessage("CHANNEL_PRIVATE"), e -> Mono.empty())
                         .map(chatFull -> (ChannelFull) chatFull.fullChat())
                         .map(i -> Tuples.of(u, i.pts())))
                 .filter(TupleUtils.predicate((u, c) -> Optional.ofNullable(u.pts()).map(i -> i > c).orElse(true)))
@@ -827,28 +829,31 @@ public class DefaultUpdatesManager implements UpdatesManager {
             }
             // endregion
 
-            // If local channel pts is -1 just apply update
-            AtomicBoolean justApplied = new AtomicBoolean();
             return client.getMtProtoResources()
                     .getStoreLayout().getChannelFullById(channelId)
-                    .switchIfEmpty(client.getMtProtoResources()
+                    .switchIfEmpty(Mono.defer(() -> client.getMtProtoResources()
                             .getStoreLayout().resolveChannel(channelId)
                             .flatMap(client.getServiceHolder().getChatService()::getFullChannel)
-                            .doOnNext(c -> justApplied.set(true)))
-                    .map(ChatFull::fullChat)
-                    .cast(ChannelFull.class)
-                    .map(ChannelFull::pts)
-                    .flatMapMany(localPts -> {
-                        Mono<Void> updatePts = client.getMtProtoResources()
-                                .getStoreLayout().updateChannelPts(channelId, pts);
-
-                        if (justApplied.get()) {
+                            .onErrorResume(RpcException.isErrorMessage("CHANNEL_PRIVATE"), e -> Mono.empty())))
+                    .map(Optional::of)
+                    .defaultIfEmpty(Optional.empty())
+                    .flatMapMany(chatFullOpt -> {
+                        var chatFull = chatFullOpt.orElse(null);
+                        if (chatFull == null) {
                             if (log.isDebugEnabled() && notFromDiff) {
                                 log.debug("Updating state for channel: {}, pts: unknown->{}", channelId, pts);
                             }
-                            return updatePts.thenMany(mapUpdate);
+                            return mapUpdate;
                         }
 
+                        if (!(chatFull.fullChat() instanceof ChannelFull f)) {
+                            return Mono.error(new IllegalStateException("Unexpected type of ChatFull from storage"));
+                        }
+
+                        var updatePts = client.getMtProtoResources()
+                                .getStoreLayout().updateChannelPts(channelId, pts);
+
+                        int localPts = f.pts();
                         if (localPts + ptsCount < pts) {
                             log.debug("Updates gap found for channel {}. Received pts: {}-{}, local pts: {}",
                                     channelId, pts - ptsCount, pts, localPts);

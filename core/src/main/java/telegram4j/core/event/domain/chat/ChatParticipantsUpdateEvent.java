@@ -4,6 +4,7 @@ import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.GroupChat;
+import telegram4j.core.object.chat.GroupChatPeer;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +12,7 @@ import java.util.Optional;
 /** Event of batch modification of group chat participants. */
 public final class ChatParticipantsUpdateEvent extends ChatEvent {
 
-    private final GroupChat chat;
+    private final GroupChatPeer chat;
     @Nullable
     private final ChatParticipant selfParticipant;
     @Nullable
@@ -19,7 +20,7 @@ public final class ChatParticipantsUpdateEvent extends ChatEvent {
     @Nullable
     private final List<ChatParticipant> participants;
 
-    public ChatParticipantsUpdateEvent(MTProtoTelegramClient client, GroupChat chat,
+    public ChatParticipantsUpdateEvent(MTProtoTelegramClient client, GroupChatPeer chat,
                                        @Nullable ChatParticipant selfParticipant, @Nullable Integer version,
                                        @Nullable List<ChatParticipant> participants) {
         super(client);
@@ -41,10 +42,10 @@ public final class ChatParticipantsUpdateEvent extends ChatEvent {
     /**
      * Gets group chat where participants were updated.
      *
-     * @return The {@link GroupChat} where participants were updated.
+     * @return The {@link GroupChatPeer} where participants were updated.
      */
     @Override
-    public GroupChat getChat() {
+    public GroupChatPeer getChat() {
         return chat;
     }
 

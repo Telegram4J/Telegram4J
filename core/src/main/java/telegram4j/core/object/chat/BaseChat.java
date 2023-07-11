@@ -31,7 +31,7 @@ import static telegram4j.mtproto.util.TlEntityUtil.unmapEmpty;
 
 /** This class provides default implementation of {@link Chat} methods. */
 sealed abstract class BaseChat implements Chat
-        permits GroupChat, PrivateChat, BaseChannel {
+        permits BaseChannel, BaseUnavailableChat, GroupChat, PrivateChat {
 
     protected final MTProtoTelegramClient client;
 

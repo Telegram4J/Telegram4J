@@ -13,7 +13,7 @@ import java.util.List;
  *
  * @see <a href="https://core.telegram.org/api/channel#channels">Broadcasting Channels</a>
  */
-public final class BroadcastChannel extends BaseChannel {
+public final class BroadcastChannel extends BaseChannel implements Channel, ChannelPeer {
 
     public BroadcastChannel(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
         super(client, minData);

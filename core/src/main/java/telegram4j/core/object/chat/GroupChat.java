@@ -29,7 +29,7 @@ import static telegram4j.tl.BaseChat.*;
 import static telegram4j.tl.BaseChatFull.*;
 
 /** Represents a basic group of 0-200 users. */
-public final class GroupChat extends BaseChat {
+public final class GroupChat extends BaseChat implements GroupChatPeer {
 
     private final telegram4j.tl.BaseChat minData;
     @Nullable

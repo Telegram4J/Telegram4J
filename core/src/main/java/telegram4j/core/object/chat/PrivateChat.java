@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Represents a direct message chat. */
-public final class PrivateChat extends BaseChat {
+public final class PrivateChat extends BaseChat implements Chat {
 
     private final User user;
     private final User selfUser;

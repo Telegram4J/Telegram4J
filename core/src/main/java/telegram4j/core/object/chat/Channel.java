@@ -28,7 +28,8 @@ import static telegram4j.tl.ChannelFull.*;
  *
  * @see <a href="https://core.telegram.org/api/channel">Telegram Channels</a>
  */
-public sealed interface Channel extends Chat, MentionablePeer permits BaseChannel {
+public sealed interface Channel extends MentionablePeer, ChannelPeer
+        permits BaseChannel, SupergroupChat, BroadcastChannel {
 
     /**
      * Gets enum set of enabled channel flags.

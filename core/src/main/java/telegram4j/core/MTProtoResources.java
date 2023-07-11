@@ -2,7 +2,6 @@ package telegram4j.core;
 
 import reactor.util.annotation.Nullable;
 import telegram4j.core.event.EventDispatcher;
-import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.store.StoreLayout;
 
@@ -15,15 +14,12 @@ public final class MTProtoResources {
     private final EventDispatcher eventDispatcher;
     @Nullable
     private final EntityParserFactory defaultEntityParser;
-    private final UnavailableChatPolicy unavailableChatPolicy;
 
     MTProtoResources(StoreLayout storeLayout, EventDispatcher eventDispatcher,
-                     @Nullable EntityParserFactory defaultEntityParser,
-                     UnavailableChatPolicy unavailableChatPolicy) {
+                     @Nullable EntityParserFactory defaultEntityParser) {
         this.storeLayout = Objects.requireNonNull(storeLayout);
         this.eventDispatcher = Objects.requireNonNull(eventDispatcher);
         this.defaultEntityParser = defaultEntityParser;
-        this.unavailableChatPolicy = Objects.requireNonNull(unavailableChatPolicy);
     }
 
     /**
@@ -52,14 +48,5 @@ public final class MTProtoResources {
      */
     public Optional<EntityParserFactory> getDefaultEntityParser() {
         return Optional.ofNullable(defaultEntityParser);
-    }
-
-    /**
-     * Gets handle policy for processing unavailable chats/channels.
-     *
-     * @return The handle policy {@link UnavailableChatPolicy}.
-     */
-    public UnavailableChatPolicy getUnavailableChatPolicy() {
-        return unavailableChatPolicy;
     }
 }

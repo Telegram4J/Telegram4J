@@ -23,7 +23,7 @@ import java.util.Optional;
  *
  * @see <a href="https://core.telegram.org/api/channel#supergroups">Supegroups</a>
  */
-public final class SupergroupChat extends BaseChannel {
+public final class SupergroupChat extends BaseChannel implements Channel, ChannelPeer {
 
     public SupergroupChat(MTProtoTelegramClient client, telegram4j.tl.Channel minData) {
         super(client, minData);

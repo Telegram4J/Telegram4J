@@ -160,14 +160,14 @@ public class EntityFactory {
                                   @Nullable User selfUser) {
         return switch (possibleChat.identifier()) {
             case UserEmpty.ID, ChatEmpty.ID -> null;
-            case ChatForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                case THROWING -> throw UnavailableChatException.from((ChatForbidden) possibleChat);
-                case NULL_MAPPING -> null;
-            };
-            case ChannelForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                case THROWING -> throw UnavailableChatException.from((ChannelForbidden) possibleChat);
-                case NULL_MAPPING -> null;
-            };
+            case ChatForbidden.ID -> {
+                var data = (ChatForbidden) possibleChat;
+                yield new UnavailableGroupChat(client, data);
+            }
+            case ChannelForbidden.ID -> {
+                var data = (ChannelForbidden) possibleChat;
+                yield new UnavailableChannel(client, data);
+            }
             case UserFull.ID -> {
                 var userFull = (UserFull) possibleChat;
 
@@ -206,28 +206,15 @@ public class EntityFactory {
                 var minData = chatFull.chats().stream()
                         .filter(c -> c.id() == chatFull.fullChat().id())
                         .findFirst()
-                        .map(c -> switch (c.identifier()) {
-                            case ChatEmpty.ID -> null;
-                            case ChatForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                                case THROWING -> throw UnavailableChatException.from((ChatForbidden) possibleChat);
-                                case NULL_MAPPING -> null;
-                            };
-                            case ChannelForbidden.ID -> switch (client.getMtProtoResources().getUnavailableChatPolicy()) {
-                                case THROWING -> throw UnavailableChatException.from((ChannelForbidden) possibleChat);
-                                case NULL_MAPPING -> null;
-                            };
-                            case BaseChat.ID, Channel.ID -> c;
-                            default -> throw new IllegalArgumentException("Unknown Chat type: " + c);
-                        })
-                        .orElse(null);
-                if (minData == null) {
-                    yield null;
-                }
+                        .orElseThrow();
                 var usersMap = chatFull.users().stream()
                         .map(d -> createUser(client, d))
                         .filter(Objects::nonNull)
                         .collect(Collectors.toMap(u -> u.getId().asLong(), Function.identity()));
                 if (chatFull.fullChat() instanceof ChannelFull channelFull) {
+                    // Telegram is not consistent.
+                    // If the channel is unavailable, telegram will return the CHANNEL_PRIVATE error,
+                    // but not in case of group chats
                     var channelMin = (Channel) minData;
 
                     Long acc = channelMin.min() ? null : channelMin.accessHash();
@@ -235,7 +222,7 @@ public class EntityFactory {
                     var botInfo = channelFull.botInfo().stream()
                             .map(d -> new BotInfo(client, d, channelId,
                                     usersMap.get(Objects.requireNonNull(d.userId()))))
-                            .collect(Collectors.toUnmodifiableList());
+                            .toList();
 
                     yield channelMin.megagroup()
                             ? new SupergroupChat(client, channelFull, channelMin, botInfo)
@@ -247,7 +234,7 @@ public class EntityFactory {
                         .map(list -> list.stream()
                                 .map(d -> new BotInfo(client, d, chatId,
                                         usersMap.get(Objects.requireNonNull(d.userId()))))
-                                .collect(Collectors.toUnmodifiableList()))
+                                .toList())
                         .orElse(null);
                 List<ChatParticipant> chatParticipants;
                 switch (chat.participants().identifier()) {
@@ -255,7 +242,7 @@ public class EntityFactory {
                         var d = (BaseChatParticipants) chat.participants();
                         chatParticipants = d.participants().stream()
                                 .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
-                                .collect(Collectors.toUnmodifiableList());
+                                .toList();
                     }
                     case ChatParticipantsForbidden.ID -> {
                         var d = (ChatParticipantsForbidden) chat.participants();
@@ -264,6 +251,9 @@ public class EntityFactory {
                                 .orElse(null);
                     }
                     default -> throw new IllegalStateException("Unknown ChatParticipants type: " + chat.participants());
+                }
+                if (minData instanceof ChatForbidden f) {
+                    yield new UnavailableGroupChat(client, f);
                 }
                 yield new GroupChat(client, chat, (BaseChat) minData, chatParticipants, botInfo);
             }

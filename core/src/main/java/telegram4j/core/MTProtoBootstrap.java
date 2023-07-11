@@ -18,11 +18,11 @@ import telegram4j.core.event.EventDispatcher;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.internal.ParkEmitFailureHandler;
 import telegram4j.core.internal.Preconditions;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
-import telegram4j.core.util.UnavailableChatPolicy;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.DhPrimeChecker;
@@ -73,7 +73,6 @@ public final class MTProtoBootstrap {
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options(c));
     private Function<MTProtoClientGroup.Options, MTProtoClientGroup> clientGroupFactory = options ->
             new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
-    private UnavailableChatPolicy unavailableChatPolicy = UnavailableChatPolicy.NULL_MAPPING;
     private DhPrimeChecker dhPrimeChecker;
     private PublicRsaKeyRegister publicRsaKeyRegister;
     private DcOptions dcOptions;
@@ -239,19 +238,6 @@ public final class MTProtoBootstrap {
      */
     public MTProtoBootstrap setEntityRetrieverStrategy(EntityRetrievalStrategy strategy) {
         this.entityRetrievalStrategy = Objects.requireNonNull(strategy);
-        return this;
-    }
-
-    /**
-     * Sets handle policy for unavailable chats and channels.
-     * <p>
-     * By default, {@link UnavailableChatPolicy#NULL_MAPPING} will be used.
-     *
-     * @param policy A new policy for unavailable chats and channels.
-     * @return This builder.
-     */
-    public MTProtoBootstrap setUnavailableChatPolicy(UnavailableChatPolicy policy) {
-        this.unavailableChatPolicy = Objects.requireNonNull(policy);
         return this;
     }
 
@@ -467,8 +453,8 @@ public final class MTProtoBootstrap {
             EventDispatcher eventDispatcher = initEventDispatcher(updatesScheduler);
             Sinks.Empty<Void> onDisconnect = Sinks.empty();
 
-            MTProtoResources mtProtoResources = new MTProtoResources(options.storeLayout(), eventDispatcher,
-                    defaultEntityParserFactory, unavailableChatPolicy);
+            MTProtoResources mtProtoResources = new MTProtoResources(
+                    options.storeLayout(), eventDispatcher, defaultEntityParserFactory);
             ServiceHolder serviceHolder = new ServiceHolder(clientGroup, options.storeLayout());
 
             MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
@@ -587,7 +573,7 @@ public final class MTProtoBootstrap {
         }
         return new DefaultEventDispatcher(updatesPublisher,
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                Sinks.EmitFailureHandler.busyLooping(Duration.ofNanos(50)));
+                new ParkEmitFailureHandler(100));
     }
 
     private UpdateDispatcher initUpdateDispatcher(Scheduler updatesPublisher) {
@@ -596,7 +582,7 @@ public final class MTProtoBootstrap {
         }
         return new SinksUpdateDispatcher(updatesPublisher,
                 Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
-                Sinks.EmitFailureHandler.busyLooping(Duration.ofNanos(50)));
+                new ParkEmitFailureHandler(100));
     }
 
     private DhPrimeChecker initDhPrimeChecker() {

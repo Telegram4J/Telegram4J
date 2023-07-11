@@ -16,7 +16,8 @@ import java.time.Duration;
 import java.util.Optional;
 
 /** The Telegram <a href="https://core.telegram.org/api/channel">chat</a> representation. */
-public sealed interface Chat extends PeerEntity permits BaseChat, Channel {
+public sealed interface Chat extends PeerEntity
+        permits ChannelPeer, GroupChatPeer, PrivateChat, BaseChat, UnavailableChat {
 
     /**
      * Gets the type of chat.
@@ -154,13 +155,13 @@ public sealed interface Chat extends PeerEntity permits BaseChat, Channel {
         /** Represents a {@link PrivateChat}. */
         PRIVATE,
 
-        /** Represents a {@link GroupChat}. */
+        /** Represents a {@link GroupChat} or {@link UnavailableGroupChat}. */
         GROUP,
 
-        /** Represents a {@link SupergroupChat}. */
+        /** Represents a {@link SupergroupChat} or {@link UnavailableChannel}. */
         SUPERGROUP,
 
-        /** Represents a {@link BroadcastChannel}. */
+        /** Represents a {@link BroadcastChannel} or {@link UnavailableChannel}. */
         CHANNEL
     }
 }

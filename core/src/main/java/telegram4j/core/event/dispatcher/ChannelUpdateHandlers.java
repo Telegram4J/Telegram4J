@@ -5,6 +5,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.chat.ChatParticipantUpdateEvent;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;
+import telegram4j.core.object.chat.ChannelPeer;
 import telegram4j.core.object.chat.ChatParticipant;
 import telegram4j.core.object.chat.ExportedChatInvite;
 import telegram4j.core.util.Id;
@@ -35,11 +36,8 @@ class ChannelUpdateHandlers {
         UpdateChannelParticipant upd = context.getUpdate();
 
         Id channelId = Id.ofChannel(upd.channelId());
-        if (!context.getChats().containsKey(channelId)) {
-            return Flux.empty();
-        }
 
-        Channel channel = (Channel) Objects.requireNonNull(context.getChats().get(channelId));
+        var channel = (ChannelPeer) Objects.requireNonNull(context.getChats().get(channelId));
         // I can't be sure that ChatParticipant have user information attached because that field named as userId :/
         User peer = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
         User actor = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.actorId())));

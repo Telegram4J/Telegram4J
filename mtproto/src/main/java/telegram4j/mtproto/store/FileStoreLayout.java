@@ -490,12 +490,12 @@ public class FileStoreLayout implements StoreLayout {
     //////
 
     @Override
-    public Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId) {
+    public Mono<ChatData<Chat, BaseChatFull>> getChatById(long chatId) {
         return entityDelegate.getChatById(chatId);
     }
 
     @Override
-    public Mono<ChatData<Channel, ChannelFull>> getChannelById(long channelId) {
+    public Mono<ChatData<Chat, ChannelFull>> getChannelById(long channelId) {
         return entityDelegate.getChannelById(channelId);
     }
 
@@ -535,7 +535,7 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<BaseChat> getChatMinById(long chatId) {
+    public Mono<Chat> getChatMinById(long chatId) {
         return entityDelegate.getChatMinById(chatId);
     }
 
@@ -545,7 +545,7 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     @Override
-    public Mono<Channel> getChannelMinById(long channelId) {
+    public Mono<Chat> getChannelMinById(long channelId) {
         return entityDelegate.getChannelMinById(channelId);
     }
 

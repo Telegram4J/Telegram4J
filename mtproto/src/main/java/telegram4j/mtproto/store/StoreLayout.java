@@ -157,9 +157,9 @@ public interface StoreLayout extends UpdatesStore, ResultsStore {
      *
      * @param chatId The id of chat.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link BaseChat} object.
+     * the {@link BaseChat} or {@link ChatForbidden} object.
      */
-    Mono<BaseChat> getChatMinById(long chatId);
+    Mono<Chat> getChatMinById(long chatId);
 
     /**
      * Retrieve detailed chat information by specified id.
@@ -183,16 +183,16 @@ public interface StoreLayout extends UpdatesStore, ResultsStore {
      * @return A {@link Mono} emitting on successful completion
      * the {@link ChatData} with available chat information.
      */
-    Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId);
+    Mono<ChatData<Chat, BaseChatFull>> getChatById(long chatId);
 
     /**
      * Retrieve minimal channel information by specified id.
      *
      * @param channelId The id of chat.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link Channel} object.
+     * the {@link Channel} or {@link ChannelForbidden} object.
      */
-    Mono<Channel> getChannelMinById(long channelId);
+    Mono<Chat> getChannelMinById(long channelId);
 
     /**
      * Retrieve detailed channel information by specified id.
@@ -213,9 +213,9 @@ public interface StoreLayout extends UpdatesStore, ResultsStore {
      *
      * @param channelId The id of channel.
      * @return A {@link Mono} emitting on successful completion
-     * the {@link ChatData} with available channel information.
+     * the {@link ChatData} or {@link ChannelForbidden} with available channel information.
      */
-    Mono<ChatData<Channel, telegram4j.tl.ChannelFull>> getChannelById(long channelId);
+    Mono<ChatData<Chat, telegram4j.tl.ChannelFull>> getChannelById(long channelId);
 
     /**
      * Retrieve minimal user information by specified id.

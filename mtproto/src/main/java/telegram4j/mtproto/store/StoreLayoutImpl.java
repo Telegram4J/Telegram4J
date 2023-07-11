@@ -183,7 +183,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<BaseChat> getChatMinById(long chatId) {
+    public Mono<Chat> getChatMinById(long chatId) {
         return Mono.fromSupplier(() -> chats.get(chatId)).map(c -> c.min);
     }
 
@@ -223,7 +223,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<ChatData<BaseChat, BaseChatFull>> getChatById(long chatId) {
+    public Mono<ChatData<Chat, BaseChatFull>> getChatById(long chatId) {
         return Mono.fromSupplier(() -> chats.get(chatId))
                 .map(chatInfo -> {
                     List<BaseUser> users = new ArrayList<>();
@@ -250,7 +250,7 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<Channel> getChannelMinById(long channelId) {
+    public Mono<Chat> getChannelMinById(long channelId) {
         return Mono.fromSupplier(() -> channels.get(channelId)).map(c -> c.min);
     }
 
@@ -278,10 +278,10 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     @Override
-    public Mono<ChatData<Channel, ChannelFull>> getChannelById(long channelId) {
+    public Mono<ChatData<Chat, ChannelFull>> getChannelById(long channelId) {
         return Mono.fromSupplier(() -> channels.get(channelId))
                 .map(channelInfo -> {
-                    List<BaseUser> users = new ArrayList<>();
+                    var users = new ArrayList<BaseUser>();
                     if (channelInfo.full != null) {
                         for (BotInfo info : channelInfo.full.botInfo()) {
                             var u = this.users.get(Objects.requireNonNull(info.userId()));
@@ -776,14 +776,60 @@ public class StoreLayoutImpl implements StoreLayout {
     protected void saveChat(@Nullable ChatFull anyChatFull, Chat anyChat) {
         switch (anyChat.identifier()) {
             case ChannelForbidden.ID -> {
-                ChannelForbidden channelForbidden = (ChannelForbidden) anyChat;
-                var inputPeer = ImmutableInputPeerChannel.of(channelForbidden.id(), channelForbidden.accessHash());
-                peers.put(ImmutablePeerChannel.of(channelForbidden.id()), inputPeer);
-                channels.remove(channelForbidden.id());
+                var copy = ImmutableChannelForbidden.copyOf((ChannelForbidden) anyChat);
+                var inputPeer = ImmutableInputPeerChannel.of(copy.id(), copy.accessHash());
+                peers.put(ImmutablePeerChannel.of(copy.id()), inputPeer);
+                channels.compute(copy.id(), (k, v) -> {
+                    var channelFull = Optional.ofNullable(anyChatFull)
+                            .map(c -> ImmutableChannelFull.copyOf((ChannelFull) c))
+                            .or(() -> Optional.ofNullable(v).map(c -> c.full))
+                            .orElse(null);
+
+                    return v == null
+                            ? new ChannelInfo(copy, channelFull)
+                            : v.withData(copy, channelFull);
+                });
             }
             case ChatForbidden.ID -> {
-                peers.putIfAbsent(ImmutablePeerChat.of(anyChat.id()), ImmutableInputPeerChat.of(anyChat.id()));
-                chats.remove(anyChat.id());
+                var copy = ImmutableChatForbidden.copyOf((ChatForbidden) anyChat);
+                peers.putIfAbsent(ImmutablePeerChat.of(copy.id()), ImmutableInputPeerChat.of(copy.id()));
+                chats.compute(copy.id(), (k, v) -> {
+                    var chatFull = Optional.ofNullable(anyChatFull)
+                            .map(c -> ImmutableBaseChatFull.copyOf((BaseChatFull) c))
+                            .or(() -> Optional.ofNullable(v).map(c -> c.full))
+                            .orElse(null);
+
+                    ChatInfo updated = v == null
+                            ? new ChatInfo(copy, chatFull)
+                            : v.withData(copy, chatFull);
+
+                    if (anyChatFull != null) { // was updated
+                        if (chatFull.participants() instanceof BaseChatParticipants base) {
+
+                            var map = updated.participants();
+                            map.clear();
+                            for (var p : base.participants()) {
+                                var copyp = copyChatParticipant(p);
+                                map.put(copyp.userId(), copyp);
+                            }
+
+                            updated = updated.withParticipants(map);
+                        } else {
+                            ChatParticipant selfParticipant;
+                            if (chatFull.participants() instanceof ChatParticipantsForbidden f &&
+                                    (selfParticipant = f.selfParticipant()) != null) {
+                                var copyp = copyChatParticipant(selfParticipant);
+                                var map = updated.participants();
+                                map.put(copyp.userId(), copyp);
+                                updated = updated.withParticipants(map);
+                            } else {
+                                updated = updated.withParticipants(null);
+                            }
+                        }
+                    }
+
+                    return updated;
+                });
             }
             case BaseChat.ID -> {
                 var chat = ImmutableBaseChat.copyOf((BaseChat) anyChat);
@@ -827,15 +873,17 @@ public class StoreLayoutImpl implements StoreLayout {
                 });
             }
             case Channel.ID -> {
-                var channel = (Channel) anyChat;
-                var channelInfo = channels.get(channel.id());
-                saveUsernamePeer(channel);
+                var receivedChannel = (Channel) anyChat;
+                var channelInfo = channels.get(receivedChannel.id());
+                saveUsernamePeer(receivedChannel);
 
                 // received channel is min, and we have non-min channel, just ignore received.
-                if (channel.min() && channelInfo != null && !channelInfo.min.min() && channelInfo.min.accessHash() != null) {
+                if (receivedChannel.min() && channelInfo != null &&
+                        (channelInfo.min instanceof ImmutableChannel c &&
+                                !c.min() && c.accessHash() != null)) {
                     return;
                 }
-                var channelCopy = ImmutableChannel.copyOf(channel);
+                var channelCopy = ImmutableChannel.copyOf(receivedChannel);
                 channels.compute(channelCopy.id(), (k, v) -> {
                     var channelFull = Optional.ofNullable(anyChatFull)
                             .map(c -> ImmutableChannelFull.copyOf((ChannelFull) c))
@@ -944,7 +992,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 var chp = ImmutablePeerChannel.copyOf((PeerChannel) p);
                 var channelInfo = channels.get(chp.channelId());
 
-                if ((channelInfo == null || channelInfo.min.min()) && !isBot()) {
+                if ((channelInfo == null || channelInfo.min instanceof ImmutableChannel c && c.min()) && !isBot()) {
                     var chatPeer = peers.get(peerId);
                     if (chatPeer == null) {
                         break;
@@ -1054,17 +1102,17 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     protected static class ChannelInfo {
-        protected final ImmutableChannel min;
+        protected final Chat min; // ImmutableChannel or ImmutableChannelForbidden
         @Nullable
         protected final ImmutableChannelFull full;
         @Nullable // initializes on demand
         protected final ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants;
 
-        protected ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
+        protected ChannelInfo(Chat min, @Nullable ImmutableChannelFull full) {
             this(min, full, null);
         }
 
-        protected ChannelInfo(ImmutableChannel min, @Nullable ImmutableChannelFull full,
+        protected ChannelInfo(Chat min, @Nullable ImmutableChannelFull full,
                     @Nullable ConcurrentMap<Peer, telegram4j.tl.ChannelParticipant> participants) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
@@ -1087,7 +1135,7 @@ public class StoreLayoutImpl implements StoreLayout {
             return new ChannelInfo(min, full, participants);
         }
 
-        protected ChannelInfo withData(ImmutableChannel min, @Nullable ImmutableChannelFull full) {
+        protected ChannelInfo withData(Chat min, @Nullable ImmutableChannelFull full) {
             if (this.min == min && this.full == full) return this;
             return new ChannelInfo(min, full, participants);
         }
@@ -1103,17 +1151,17 @@ public class StoreLayoutImpl implements StoreLayout {
     }
 
     protected static class ChatInfo {
-        protected final ImmutableBaseChat min;
+        protected final Chat min; // ImmutableBaseChat or ImmutableChatForbidden
         @Nullable
         protected final ImmutableBaseChatFull full;
         @Nullable // initializes on demand
         protected final ConcurrentMap<Long, ChatParticipant> participants;
 
-        protected ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
+        protected ChatInfo(Chat min, @Nullable ImmutableBaseChatFull full) {
             this(min, full, null);
         }
 
-        protected ChatInfo(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full,
+        protected ChatInfo(Chat min, @Nullable ImmutableBaseChatFull full,
                  @Nullable ConcurrentMap<Long, ChatParticipant> participants) {
             this.min = Objects.requireNonNull(min);
             this.full = full;
@@ -1136,7 +1184,7 @@ public class StoreLayoutImpl implements StoreLayout {
             return participants != null ? participants : new ConcurrentHashMap<>();
         }
 
-        public ChatInfo withData(ImmutableBaseChat min, @Nullable ImmutableBaseChatFull full) {
+        public ChatInfo withData(Chat min, @Nullable ImmutableBaseChatFull full) {
             if (this.min == min && this.full == full) return this;
             return new ChatInfo(min, full, participants);
         }
