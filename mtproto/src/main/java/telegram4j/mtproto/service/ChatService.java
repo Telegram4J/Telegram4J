@@ -1307,6 +1307,8 @@ public class ChatService extends RpcService {
                                     m = e.message();
                                 } else if (u instanceof UpdateNewChannelMessage e) {
                                     m = e.message();
+                                } else if (u instanceof UpdateNewScheduledMessage e) {
+                                    m = e.message();
                                 } else {
                                     continue;
                                 }
@@ -1319,7 +1321,7 @@ public class ChatService extends RpcService {
                                 }
                             }
 
-                            throw new IllegalStateException();
+                            throw new IllegalStateException("No message updates in " + casted);
                         }
                         default -> throw new IllegalArgumentException("Unknown Updates type: " + updates);
                     }
