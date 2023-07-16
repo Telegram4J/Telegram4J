@@ -4,8 +4,10 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.util.concurrent.ScheduledFuture;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import telegram4j.mtproto.MTProtoException;
 import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.auth.AuthorizationException;
@@ -21,6 +23,7 @@ import telegram4j.tl.request.mtproto.ReqDHParams;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
@@ -29,9 +32,13 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
 
     private static final Logger log = Loggers.getLogger("telegram4j.mtproto.Handshake");
 
+    private static final long RESPONSE_TIMEOUT = 3000;
+
     private final String clientId;
     private final AuthData authData;
     private final HandshakeContext context;
+
+    private ScheduledFuture<?> timeoutSchedule;
 
     public Handshake(String clientId, AuthData authData, HandshakeContext context) {
         this.clientId = clientId;
@@ -49,13 +56,28 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         context.nonce(nonce);
 
         log.debug("[C:0x{}] Sending ReqPqMulti", clientId);
-        ctx.writeAndFlush(ImmutableReqPqMulti.of(nonce), ctx.voidPromise());
+        write(ctx, ImmutableReqPqMulti.of(nonce));
+    }
+
+    private void write(ChannelHandlerContext ctx, MTProtoObject object) {
+        ctx.writeAndFlush(object)
+                .addListener(future -> {
+                    if (future.isSuccess()) {
+                        timeoutSchedule = ctx.executor().schedule(() -> {
+                            ctx.pipeline().fireExceptionCaught(new MTProtoException("Response read timeout"));
+                        }, RESPONSE_TIMEOUT, TimeUnit.MILLISECONDS);
+                    }
+                });
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
         if (!(msg instanceof MTProtoObject obj)) {
             throw new IllegalStateException("Unexpected type of inbound: " + msg.getClass());
+        }
+
+        if (timeoutSchedule != null) {
+            timeoutSchedule.cancel(true);
         }
 
         switch (obj.identifier()) {
@@ -134,14 +156,14 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         ByteBuf encryptedData = rsa(pqInnerDataBuf, foundKey.key());
 
         log.debug("[C:0x{}] Sending ReqDHParams", clientId);
-        ctx.writeAndFlush(ReqDHParams.builder()
+        write(ctx, ReqDHParams.builder()
                 .nonce(nonce)
                 .serverNonce(resPQ.serverNonce())
                 .encryptedData(encryptedData)
                 .p(pb)
                 .q(qb)
                 .publicKeyFingerprint(foundKey.fingerprint())
-                .build(), ctx.voidPromise());
+                .build());
     }
 
     private static ByteBuf rsa(ByteBuf data, PublicRsaKey key) {
@@ -348,7 +370,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         dataWithHashEnc.release();
 
         log.debug("[C:0x{}] Sending SetClientDHParam", clientId);
-        ctx.writeAndFlush(req, ctx.voidPromise());
+        write(ctx, req);
     }
 
     private void handleDhGenOk(ChannelHandlerContext ctx, DhGenOk dhGenOk) {
@@ -380,6 +402,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         ServerDHParams serverDHParams = context.serverDHParams();
         log.debug("Retrying dh params extending, attempt: {}", context.retry());
 
+        // TODO ?
         handleServerDHParams(ctx, serverDHParams);
     }
 
