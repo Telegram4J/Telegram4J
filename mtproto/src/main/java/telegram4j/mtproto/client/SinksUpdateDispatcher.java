@@ -32,7 +32,8 @@ public class SinksUpdateDispatcher implements UpdateDispatcher {
 
     @Override
     public void shutdown() {
-        sink.emitComplete(emitFailureHandler);
+        // TODO how?
+//        sink.emitComplete(emitFailureHandler);
         scheduler.dispose();
     }
 }

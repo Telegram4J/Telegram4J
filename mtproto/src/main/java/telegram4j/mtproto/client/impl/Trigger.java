@@ -6,7 +6,7 @@ import io.netty.util.concurrent.ScheduledFuture;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-public final class Trigger {
+final class Trigger {
     private final Runnable action;
     private final EventExecutor eventExecutor;
     private final long nanos;

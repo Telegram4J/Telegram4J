@@ -7,7 +7,7 @@ import telegram4j.tl.mtproto.ServerDHParams;
 
 import java.util.Objects;
 
-public final class HandshakeContext {
+final class HandshakeContext {
 
     private final int expiresIn;
     private final DhPrimeChecker dhPrimeChecker;

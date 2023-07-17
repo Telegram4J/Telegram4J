@@ -27,4 +27,6 @@ module telegram4j.mtproto {
     exports telegram4j.mtproto.store.object;
     exports telegram4j.mtproto.client;
     exports telegram4j.mtproto.resource;
+
+    exports telegram4j.mtproto.internal to telegram4j.core;
 }

@@ -7,7 +7,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.concurrent.ScheduledFuture;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.mtproto.MTProtoException;
 import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.auth.AuthorizationException;
@@ -28,7 +27,7 @@ import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
-public final class Handshake extends ChannelInboundHandlerAdapter {
+final class Handshake extends ChannelInboundHandlerAdapter {
 
     private static final Logger log = Loggers.getLogger("telegram4j.mtproto.Handshake");
 
@@ -64,7 +63,7 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
                 .addListener(future -> {
                     if (future.isSuccess()) {
                         timeoutSchedule = ctx.executor().schedule(() -> {
-                            ctx.pipeline().fireExceptionCaught(new MTProtoException("Response read timeout"));
+                            ctx.pipeline().fireExceptionCaught(new TimeoutException());
                         }, RESPONSE_TIMEOUT, TimeUnit.MILLISECONDS);
                     }
                 });
@@ -417,5 +416,12 @@ public final class Handshake extends ChannelInboundHandlerAdapter {
         if (!dhGenFail.newNonceHash3().equals(newNonceHash)) throw new AuthorizationException("newNonceHash3 mismatch");
 
         throw new AuthorizationException("Failed to create an authorization key");
+    }
+
+    static class TimeoutException extends Exception {
+
+        public TimeoutException() {
+            super(null, null, false, false);
+        }
     }
 }

@@ -1,4 +1,4 @@
-package telegram4j.core.internal;
+package telegram4j.mtproto.internal;
 
 import java.util.function.Supplier;
 

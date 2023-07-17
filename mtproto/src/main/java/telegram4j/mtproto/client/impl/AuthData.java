@@ -18,8 +18,10 @@ import java.util.StringJoiner;
 
 import static telegram4j.mtproto.util.CryptoUtil.random;
 
-public final class AuthData {
+final class AuthData {
     private static final int DEFAULT_IMSG_ID_REGISTER_SIZE = 128;
+
+    private final String clientId;
 
     @Nullable
     private AuthKey authKey;
@@ -34,7 +36,8 @@ public final class AuthData {
     private final DataCenter dc;
     private final InboundMessageIdRegister messageIdRegister = new InboundMessageIdRegister(DEFAULT_IMSG_ID_REGISTER_SIZE);
 
-    public AuthData(DataCenter dc) {
+    public AuthData(String clientId, DataCenter dc) {
+        this.clientId = clientId;
         this.dc = Objects.requireNonNull(dc);
     }
 
@@ -166,7 +169,7 @@ public final class AuthData {
         };
     }
 
-    static class InboundMessageIdRegister {
+    class InboundMessageIdRegister {
 
         private static final Logger log = Loggers.getLogger("telegram4j.mtproto.InboundMessageIdRegister");
 
@@ -229,7 +232,8 @@ public final class AuthData {
                         dump.add("0x" + Long.toHexString(msgId));
                     }
 
-                    log.debug("Received non-incremental messageId. Current set: " + dump);
+                    log.debug("[C:0x{}] Received non-incremental messageId 0x{}. Current set: {}",
+                            clientId, Long.toHexString(messageId), dump);
                 }
                 return true;
             }

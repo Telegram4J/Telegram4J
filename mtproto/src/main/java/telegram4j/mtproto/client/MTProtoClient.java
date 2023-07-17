@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
+import static telegram4j.mtproto.internal.Preconditions.requireArgument;
 
 /**
  * Interface for MTProto client implementations with minimal method set.
@@ -106,7 +107,7 @@ public interface MTProtoClient {
 
     record Options(TransportFactory transportFactory,
                    InvokeWithLayer<Config, InitConnection<Config, GetConfig>> initConnection,
-                   Duration pingInterval, Duration reconnectionInterval,
+                   Duration pingInterval, ReconnectionStrategy reconnectionStrategy,
                    int gzipCompressionSizeThreshold, List<ResponseTransformer> responseTransformers,
                    Duration authKeyLifetime) {
 
@@ -114,9 +115,9 @@ public interface MTProtoClient {
             requireNonNull(transportFactory);
             requireNonNull(initConnection);
             requireNonNull(pingInterval);
-            requireNonNull(reconnectionInterval);
+            requireNonNull(reconnectionStrategy);
             requireNonNull(responseTransformers);
-            requireNonNull(authKeyLifetime);
+            requireArgument(!authKeyLifetime.isNegative(), "authKeyLifetime must be positive or zero");
         }
     }
 }

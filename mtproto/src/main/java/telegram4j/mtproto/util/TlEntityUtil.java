@@ -213,8 +213,10 @@ public class TlEntityUtil {
             name = name.substring(9);
 
         String namespace = method.getClass().getPackageName();
-        if (namespace.startsWith("telegram4j.tl."))
-            namespace = namespace.substring(14);
+        if (namespace.startsWith("telegram4j.tl"))
+            namespace = namespace.substring(13);
+        if (namespace.startsWith("."))
+            namespace = namespace.substring(1);
         if (namespace.startsWith("request"))
             namespace = namespace.substring(7);
         if (namespace.startsWith("."))

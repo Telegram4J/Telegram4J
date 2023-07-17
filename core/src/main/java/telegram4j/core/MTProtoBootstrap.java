@@ -19,7 +19,6 @@ import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.internal.ParkEmitFailureHandler;
-import telegram4j.core.internal.Preconditions;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.util.Id;
@@ -28,6 +27,9 @@ import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.DhPrimeChecker;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
 import telegram4j.mtproto.client.*;
+import telegram4j.mtproto.client.ReconnectionStrategy;
+import telegram4j.mtproto.client.DefaultReconnectionStrategy;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.mtproto.resource.TcpClientResources;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.FileStoreLayout;
@@ -84,8 +86,9 @@ public final class MTProtoBootstrap {
     private TcpClientResources tcpClientResources;
     private UpdateDispatcher updateDispatcher;
     private Duration pingInterval = Duration.ofSeconds(10);
-    private Duration reconnectionInterval = Duration.ofSeconds(3);
     private Duration authKeyLifetime = Duration.ofDays(1);
+    // Max backoff is 16 seconds
+    private ReconnectionStrategy reconnectionStrategy = DefaultReconnectionStrategy.create(3, 5, Duration.ofSeconds(1));
 
     private ExecutorService resultPublisher;
     private Scheduler updatesPublisher;
@@ -184,18 +187,27 @@ public final class MTProtoBootstrap {
         return this;
     }
 
+    public MTProtoBootstrap setReconnectionStrategy(ReconnectionStrategy reconnectionStrategy) {
+        this.reconnectionStrategy = Objects.requireNonNull(reconnectionStrategy);
+        return this;
+    }
+
+    /** @deprecated use {@link #setReconnectionStrategy(ReconnectionStrategy)} with {@link ReconnectionStrategy#fixedInterval(Duration)} */
+    @Deprecated(forRemoval = true)
     public MTProtoBootstrap setReconnectionInterval(Duration reconnectionInterval) {
-        this.reconnectionInterval = Objects.requireNonNull(reconnectionInterval);
+        this.reconnectionStrategy = ReconnectionStrategy.fixedInterval(reconnectionInterval);
         return this;
     }
 
     public MTProtoBootstrap setAuthKeyLifetime(Duration authKeyLifetime) {
-        this.authKeyLifetime = Objects.requireNonNull(authKeyLifetime);
+        Preconditions.requireArgument(!authKeyLifetime.isNegative());
+        this.authKeyLifetime = authKeyLifetime;
         return this;
     }
 
     public MTProtoBootstrap setPingInterval(Duration pingInterval) {
-        this.pingInterval = Objects.requireNonNull(pingInterval);
+        Preconditions.requireArgument(!pingInterval.isNegative());
+        this.pingInterval = pingInterval;
         return this;
     }
 
@@ -379,7 +391,7 @@ public final class MTProtoBootstrap {
                         var responseTransformers = List.copyOf(this.responseTransformers);
                         var clientOptions = new MTProtoClient.Options(
                                 transportFactory, initConnectionRequest,
-                                pingInterval, reconnectionInterval,
+                                pingInterval, reconnectionStrategy,
                                 gzipCompressionSizeThreshold, responseTransformers, authKeyLifetime);
                         var mtProtoOptions = new MTProtoOptions(
                                 tcpClientResources, initPublicRsaKeyRegister(),

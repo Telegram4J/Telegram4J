@@ -5,6 +5,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.util.concurrent.ScheduledFuture;
 import telegram4j.mtproto.MTProtoException;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.TransportException;
@@ -17,15 +18,16 @@ import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.api.TlObject;
 import telegram4j.tl.auth.Authorization;
 import telegram4j.tl.auth.LoginTokenSuccess;
+import telegram4j.tl.auth.SentCodeSuccess;
 import telegram4j.tl.mtproto.*;
 import telegram4j.tl.request.InvokeWithLayer;
-import telegram4j.tl.request.users.GetUsers;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.StringJoiner;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static telegram4j.mtproto.client.impl.MTProtoClientImpl.*;
@@ -34,7 +36,12 @@ import static telegram4j.mtproto.util.CryptoUtil.random;
 import static telegram4j.mtproto.util.CryptoUtil.sha256Digest;
 import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 
-class MTProtoEncryption extends ChannelDuplexHandler {
+final class MTProtoEncryption extends ChannelDuplexHandler {
+    static final int RESEND_TIMEOUT = 20; // in millis
+    // Threshold at which acks will be sent along with queries
+    static final int ACKS_FORCE_SEND_THRESHOLD = Integer.getInteger("telegram4j.mtproto.client.acksForceThreshold", 16);
+    // Let delay state requests
+    static final int STATE_ASK_DELAY = 300;
 
     // limit for service container like a MsgsAck, MsgsStateReq
     static final int MAX_IDS_SIZE = 8192;
@@ -46,13 +53,23 @@ class MTProtoEncryption extends ChannelDuplexHandler {
     final ArrayList<Long> acknowledgments = new ArrayList<>(32);
     final AES256IGECipher cipher = AES256IGECipher.create();
 
+    ScheduledFuture<?> resendFuture;
+    boolean authTested;
+
+    ChannelHandlerContext ctx;
+
     MTProtoEncryption(MTProtoClientImpl client, TransportCodec transportCodec) {
         this.client = client;
         this.transportCodec = transportCodec;
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws IOException {
+    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+        this.ctx = ctx;
+    }
+
+    @Override
+    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (!(msg instanceof ByteBuf payload)) {
             throw new IllegalArgumentException("Unexpected type of message to decrypt: " + msg);
         }
@@ -81,9 +98,17 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             throw new IllegalArgumentException("Unexpected type of message to encrypt: " + msg);
         }
 
-        if (client.authData.unauthorized() && msg instanceof RpcQuery query
-                && query.method.identifier() != GetUsers.ID // TODO: It's dirty hack to check is auth needed
+        if (log.isTraceEnabled() && !client.requests.isEmpty()) {
+            log.trace("[C:0x{}] {}", client.id, client.requests.entrySet().stream()
+                    .map(e -> "0x" + Long.toHexString(e.getKey()) + ": " + e.getValue())
+                    .collect(Collectors.joining(", ", "{", "}")));
+        }
+
+        if (client.authData.unauthorized()
+                && authTested
+                && msg instanceof RpcQuery query
                 && !isAuthMethod(query.method)) {
+            authTested = true;
 
             client.delayedUntilAuth.addLast(query);
             return;
@@ -94,36 +119,49 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             throw new MTProtoException("No auth key");
         }
 
-        TlObject method = req.method;
+        long now = System.currentTimeMillis();
+
+        TlObject actualMethod = req.method;
         int size = TlSerializer.sizeOf(req.method);
         if (size >= client.options.gzipCompressionSizeThreshold()) {
             ByteBuf serialized = ctx.alloc().ioBuffer(size);
-            TlSerializer.serialize(serialized, method);
+            TlSerializer.serialize(serialized, req.method);
             ByteBuf gzipped = TlSerialUtil.compressGzip(ctx.alloc(), 9, serialized);
 
-            method = ImmutableGzipPacked.of(gzipped);
+            actualMethod = ImmutableGzipPacked.of(gzipped);
             gzipped.release();
 
-            size = TlSerializer.sizeOf(method);
+            size = TlSerializer.sizeOf(actualMethod);
         }
 
-        long containerMsgId = -1;
-        // server returns -404 transport error when this packet placed in container
-        boolean canContainerize = req.method.identifier() != InvokeWithLayer.ID && size < MAX_CONTAINER_LENGTH;
+        boolean canContainerize = canContainerize(req) && size < MAX_CONTAINER_LENGTH;
 
-        Request containerOrRequest = req;
+        long containerMsgId = -1;
         long requestMessageId = client.authData.nextMessageId();
         int requestSeqNo = client.authData.nextSeqNo(req.method);
 
-        ByteBuf message;
-        int padding;
-        var statesIds = new ArrayList<Long>();
-        var messages = new ArrayList<ContainerMessage>();
+        record ContainerMessage(long messageId, int seqNo, int size, TlMethod<?> method,
+                                // possibly gzipped request
+                                TlObject actualMethod) {
+
+            ContainerMessage(long messageId, int seqNo, TlMethod<?> method) {
+                this(messageId, seqNo, TlSerializer.sizeOf(method), method, method);
+            }
+        }
+
+        ArrayList<ContainerMessage> messages = null;
         if (canContainerize) {
+            messages = new ArrayList<>(2);
+
+            var statesIds = new ArrayList<Long>();
             for (var e : client.requests.entrySet()) {
                 long key = e.getKey();
-                var inf = e.getValue();
-                if (inf instanceof ContainerRequest) {
+                var requestInfo = e.getValue();
+                if (!(requestInfo instanceof RpcRequest r)) {
+                    continue;
+                }
+
+                if (r.creationTimestamp + STATE_ASK_DELAY > now) {
                     continue;
                 }
 
@@ -132,21 +170,34 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                     break;
                 }
             }
+
+            // TODO length checks and if applicable use gzip
+            if (!statesIds.isEmpty()) {
+                messages.add(new ContainerMessage(client.authData.nextMessageId(),
+                        client.authData.nextSeqNo(false), ImmutableMsgsStateReq.of(statesIds)));
+            }
+
+            if (!acknowledgments.isEmpty() &&
+                    (acknowledgments.size() > ACKS_FORCE_SEND_THRESHOLD ||
+                            // Ping is fine reason to send service messages
+                            isPingPacket(req.method))) {
+                messages.add(new ContainerMessage(client.authData.nextMessageId(),
+                        client.authData.nextSeqNo(false), collectAcks()));
+            }
+
+            canContainerize = !messages.isEmpty();
         }
 
-        if (canContainerize && !statesIds.isEmpty())
-            messages.add(new ContainerMessage(client.authData.nextMessageId(),
-                    client.authData.nextSeqNo(false), ImmutableMsgsStateReq.of(statesIds)));
-        if (canContainerize && !acknowledgments.isEmpty())
-            messages.add(new ContainerMessage(client.authData.nextMessageId(),
-                    client.authData.nextSeqNo(false), collectAcks()));
+        int padding;
+        ByteBuf message;
 
-        boolean containerize = canContainerize && !messages.isEmpty();
-        if (containerize) {
-            messages.add(new ContainerMessage(requestMessageId, requestSeqNo, size, method));
+        ContainerRequest container = null;
+        if (canContainerize) {
+            messages.add(new ContainerMessage(requestMessageId, requestSeqNo, size, req.method, actualMethod));
 
             containerMsgId = client.authData.nextMessageId();
             int containerSeqNo = client.authData.nextSeqNo(false);
+
             int payloadSize = messages.stream().mapToInt(c -> c.size() + 16).sum();
             int messageSize = 40 + payloadSize;
             int unpadded = (messageSize + 12) % 16;
@@ -161,28 +212,29 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             message.writeIntLE(MessageContainer.ID);
             message.writeIntLE(messages.size());
 
-            var rpcInCont = req instanceof RpcQuery r
-                    ? new QueryContainerRequest(r, containerMsgId)
-                    : new RpcContainerRequest(req, containerMsgId);
-            client.requests.put(requestMessageId, rpcInCont);
             var msgIds = new long[messages.size()];
             for (int i = 0; i < messages.size(); i++) {
                 var c = messages.get(i);
-                msgIds[i] = c.messageId();
-                if (c.messageId() != requestMessageId) {
-                    client.requests.put(c.messageId(), new RpcContainerRequest((TlMethod<?>) c.method(), containerMsgId));
-                }
+                msgIds[i] = c.messageId;
 
-                message.writeLongLE(c.messageId());
-                message.writeIntLE(c.seqNo());
-                message.writeIntLE(c.size());
-                TlSerializer.serialize(message, c.method());
+                var wrapped = c.messageId == requestMessageId
+                        ? req.wrap(containerMsgId)
+                        : new RpcContainerRequest(c.method, containerMsgId);
+                wrapped.setCreationTimestamp(now);
+                client.requests.put(c.messageId, wrapped);
+
+                message.writeLongLE(c.messageId);
+                message.writeIntLE(c.seqNo);
+                message.writeIntLE(c.size);
+                TlSerializer.serialize(message, c.actualMethod);
             }
 
-            containerOrRequest = new ContainerRequest(msgIds);
-            client.requests.put(containerMsgId, containerOrRequest);
+            container = new ContainerRequest(msgIds);
+            client.requests.put(containerMsgId, container);
         } else {
+            req.creationTimestamp = now;
             client.requests.put(requestMessageId, req);
+
             int messageSize = 32 + size;
             int unpadded = (messageSize + 12) % 16;
             padding = 12 + (unpadded != 0 ? 16 - unpadded : 0);
@@ -193,7 +245,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                     .writeLongLE(requestMessageId)
                     .writeIntLE(requestSeqNo)
                     .writeIntLE(size);
-            TlSerializer.serialize(message, method);
+            TlSerializer.serialize(message, actualMethod);
         }
 
         byte[] paddingb = new byte[padding];
@@ -207,7 +259,8 @@ class MTProtoEncryption extends ChannelDuplexHandler {
 
         boolean quickAck = false;
         int quickAckToken = -1;
-        if (!containerize && AuthData.isContentRelated(req.method) && transportCodec.delegate().supportsQuickAck()) {
+        if (transportCodec.delegate().supportsQuickAck() && !canContainerize &&
+                AuthData.isContentRelated(req.method)) {
             quickAckToken = messageKeyHash.getIntLE(0) | QUICK_ACK_MASK;
             quickAck = true;
         }
@@ -219,7 +272,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         ByteBuf packet = Unpooled.wrappedBuffer(authKeyId, messageKey, encrypted);
 
         if (rpcLog.isDebugEnabled()) {
-            if (containerOrRequest instanceof ContainerRequest) {
+            if (container != null) {
                 rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", client.id,
                         Long.toHexString(containerMsgId), messages.stream()
                                 .map(m -> "0x" + Long.toHexString(m.messageId()) + ": " + schemaTypeName(m.method()))
@@ -238,14 +291,14 @@ class MTProtoEncryption extends ChannelDuplexHandler {
 
         if (!isPingPacket(req.method)) {
             client.stats.incrementQueriesCount();
-            client.stats.lastQueryTimestamp = Instant.now();
+            client.stats.lastQueryTimestamp = Instant.ofEpochMilli(now);
         }
 
         transportCodec.setQuickAck(quickAck);
         ctx.write(packet, promise);
     }
 
-    void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws IOException {
+    void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws Exception {
         long authKeyId = data.readLongLE();
 
         var currentAuthKey = client.authData.authKey();
@@ -325,19 +378,6 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         return new RpcException(format, error, request.method);
     }
 
-    boolean handleMsgsAck(Object obj, long messageId) {
-        if (obj instanceof MsgsAck msgsAck) {
-            if (rpcLog.isDebugEnabled()) {
-                rpcLog.debug("[C:0x{}, M:0x{}] Received acknowledge for message(s): [{}]",
-                        client.id, Long.toHexString(messageId), msgsAck.msgIds().stream()
-                                .map(l -> String.format("0x%x", l))
-                                .collect(Collectors.joining(", ")));
-            }
-            return true;
-        }
-        return false;
-    }
-
     void decContainer(RpcRequest req) {
         if (req instanceof ContainerizedRequest aux) {
             var cnt = (ContainerRequest) client.requests.get(aux.containerMsgId());
@@ -347,13 +387,17 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         }
     }
 
-    void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) throws IOException {
+    void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) throws Exception {
         if (obj instanceof RpcResult rpcResult) {
             messageId = rpcResult.reqMsgId();
             obj = decompressIfApplicable(rpcResult.result());
 
             var query = (RpcQuery) client.requests.remove(messageId);
             if (query == null) {
+                if (rpcLog.isDebugEnabled()) {
+                    rpcLog.debug("[C:0x{}, M:0x{}] Receiving rpc result for unknown request",
+                            client.id, Long.toHexString(messageId));
+                }
                 return;
             }
 
@@ -389,15 +433,17 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                     query.sink.emitValue(client.mtProtoOptions.resultPublisher(), obj);
                 }
 
-                if (client.authData.unauthorized() && (obj instanceof Authorization || obj instanceof LoginTokenSuccess)) {
+                if (client.authData.unauthorized() &&
+                        (obj instanceof Authorization ||
+                        obj instanceof LoginTokenSuccess ||
+                        obj instanceof SentCodeSuccess)) {
                     client.authData.unauthorized(false);
 
                     if (!client.delayedUntilAuth.isEmpty()) {
-                        RpcQuery pendingQuery;
-                        while ((pendingQuery = client.delayedUntilAuth.pollFirst()) != null) {
-                            ctx.channel().write(pendingQuery);
-                        }
-                        ctx.channel().flush();
+                        client.resend.addAll(client.delayedUntilAuth);
+                        client.delayedUntilAuth.clear();
+
+                        resend();
                     }
                 }
             }
@@ -478,7 +524,13 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         }
 
         // from MessageContainer
-        if (handleMsgsAck(obj, messageId)) {
+        if (obj instanceof MsgsAck msgsAck) {
+            if (rpcLog.isDebugEnabled()) {
+                rpcLog.debug("[C:0x{}, M:0x{}] Received acknowledge for message(s): [{}]",
+                        client.id, Long.toHexString(messageId), msgsAck.msgIds().stream()
+                                .map(l -> String.format("0x%x", l))
+                                .collect(Collectors.joining(", ")));
+            }
             return;
         }
 
@@ -498,7 +550,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
             }
 
             client.authData.updateTimeOffset((int) (messageId >> 32));
-            emitUnwrapped(ctx, badMsgNotification.badMsgId());
+            resendUnwrapped(ctx, badMsgNotification.badMsgId());
             return;
         }
 
@@ -533,14 +585,20 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                     int state = c.getByte(i) & 7;
                     switch (state) {
                         // not received, resend
-                        case 1, 2, 3 -> emitUnwrapped(ctx, msgId);
+                        case 1, 2, 3 -> resendUnwrapped(ctx, msgId);
                         case 4 -> { // acknowledged
                             var sub = (RpcRequest) client.requests.get(msgId);
                             if (sub == null) {
+                                if (rpcLog.isDebugEnabled()) {
+                                    rpcLog.debug("[C:0x{}, M:0x{}] Receiving state for unknown request",
+                                            client.id, Long.toHexString(msgId));
+                                }
                                 continue;
                             }
+
                             if (!isResultAwait(sub.method)) {
                                 client.requests.remove(msgId);
+                                client.stats.decrementQueriesCount();
                                 decContainer(sub);
                             }
                         }
@@ -584,7 +642,7 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         log.warn("[C:0x{}] Unhandled payload: {}", client.id, obj);
     }
 
-    void emitUnwrappedContainer(ChannelHandlerContext ctx, ContainerRequest container) {
+    void resendUnwrappedContainer(ContainerRequest container) {
         for (long msgId : container.msgIds) {
             var inner = (RpcRequest) client.requests.remove(msgId);
             // If inner is null this mean response for mean was received
@@ -598,32 +656,42 @@ class MTProtoEncryption extends ChannelDuplexHandler {
                 } else if (inner.method.identifier() == MsgsStateReq.ID) {
                     continue;
                 } else {
-                    RpcRequest single = inner instanceof QueryContainerRequest query
+                    var single = inner instanceof QueryContainerRequest query
                             ? new RpcQuery(query.method, query.sink)
                             : new RpcRequest(inner.method);
 
-                    ctx.channel().writeAndFlush(single, ctx.voidPromise());
+                    client.resend.add(single);
                 }
             }
         }
     }
 
-    void emitUnwrapped(ChannelHandlerContext ctx, long possibleCntMsgId) {
-        Request request = client.requests.get(possibleCntMsgId);
-        if (request instanceof ContainerRequest container) {
-            client.requests.remove(possibleCntMsgId);
+    void resendUnwrapped(ChannelHandlerContext ctx, long possibleCntMsgId) throws Exception {
+        var request = client.requests.remove(possibleCntMsgId);
+        if (request == null) {
+            return;
+        }
 
-            emitUnwrappedContainer(ctx, container);
+        if (rpcLog.isDebugEnabled()) {
+            rpcLog.debug("[C:0x{}, M:0x{}] Queued for resending", client.id, Long.toHexString(possibleCntMsgId));
+        }
+
+        if (request instanceof ContainerRequest container) {
+            resendUnwrappedContainer(container);
         } else if (request instanceof ContainerizedRequest cntMessage) {
+            client.resend.add((RpcRequest) cntMessage); // TODO
+
             var cnt = (ContainerRequest) client.requests.remove(cntMessage.containerMsgId());
             if (cnt != null) {
-                emitUnwrappedContainer(ctx, cnt);
+                resendUnwrappedContainer(cnt);
             }
         } else if (request instanceof RpcRequest rpcRequest) {
-            client.requests.remove(possibleCntMsgId);
-
-            ctx.channel().writeAndFlush(rpcRequest, ctx.voidPromise());
+            client.resend.add(rpcRequest);
+        } else {
+            throw new IllegalStateException("Unexpected request type: " + request);
         }
+
+        delayResend();
     }
 
     MsgsAck collectAcks() {
@@ -653,5 +721,200 @@ class MTProtoEncryption extends ChannelDuplexHandler {
         sha256b.release();
 
         cipher.init(!inbound, aesKey, aesIV);
+    }
+
+    void delayResend() throws Exception {
+        // Force resend
+        if (resendFuture != null) {
+            resendFuture.cancel(false);
+            resend();
+            return;
+        }
+
+        resendFuture = ctx.executor().schedule(() -> {
+            resendFuture = null;
+
+            try {
+                resend();
+            } catch (Exception e) {
+                ctx.fireExceptionCaught(e);
+            }
+        }, RESEND_TIMEOUT, TimeUnit.MILLISECONDS);
+    }
+
+    void resend() throws Exception {
+        // Use default query path.
+        if (client.resend.size() == 1) {
+            ctx.channel().writeAndFlush(client.resend.pollFirst(), ctx.voidPromise());
+            return;
+        }
+
+        // Sending requests that cannot be sent in a container
+        boolean any = false;
+        for (var it = client.resend.iterator(); it.hasNext(); ) {
+            var rpcRequest = it.next();
+            if (!canContainerize(rpcRequest)) {
+                it.remove();
+
+                any = true;
+                ctx.channel().write(rpcRequest, ctx.voidPromise());
+            }
+        }
+
+        if (any) {
+            ctx.channel().flush();
+        }
+
+        writeContainer();
+
+        // Couldn't resend all requests
+        if (!client.resend.isEmpty()) {
+            delayResend();
+        }
+    }
+
+    void writeContainer() throws Exception {
+
+        long now = System.currentTimeMillis();
+
+        record ContainerMessage(long messageId, int seqNo, int size, RpcRequest request, TlObject actualMethod) {}
+
+        int totalSize = 0;
+        var messages = new ArrayList<ContainerMessage>(Math.min(client.resend.size(), 16));
+        for (var it = client.resend.iterator(); it.hasNext(); ) {
+            var rpcRequest = it.next();
+
+            TlObject actualMethod = rpcRequest.method;
+            int requestSize = TlSerializer.sizeOf(rpcRequest.method);
+            // TODO
+            if (requestSize >= client.options.gzipCompressionSizeThreshold()) {
+                ByteBuf serialized = ctx.alloc().ioBuffer(requestSize);
+                TlSerializer.serialize(serialized, rpcRequest.method);
+                ByteBuf gzipped = TlSerialUtil.compressGzip(ctx.alloc(), 9, serialized);
+
+                actualMethod = ImmutableGzipPacked.of(gzipped);
+                gzipped.release();
+
+                requestSize = TlSerializer.sizeOf(actualMethod);
+            }
+
+            // overflow? Not sure about bound
+            // Perhaps the header should also be taken into message size
+            if (totalSize + requestSize >= MAX_CONTAINER_LENGTH) {
+                continue;
+            }
+
+            totalSize += requestSize;
+
+            it.remove();
+            messages.add(new ContainerMessage(client.authData.nextMessageId(),
+                    client.authData.nextSeqNo(rpcRequest.method),
+                    requestSize, rpcRequest, actualMethod));
+
+            // Not sure about real max size. Perhaps off-by-one error
+            if (messages.size() == MAX_CONTAINER_SIZE) {
+                break;
+            }
+        }
+
+        var currentAuthKey = client.authData.authKey();
+        if (currentAuthKey == null) {
+            throw new MTProtoException("No auth key");
+        }
+
+        // TODO optionally gzip
+//        var statesIds = new ArrayList<Long>();
+//        for (var e : client.requests.entrySet()) {
+//            long key = e.getKey();
+//            var requestInfo = e.getValue();
+//            if (requestInfo instanceof ContainerRequest) {
+//                continue;
+//            }
+//
+//            statesIds.add(key);
+//            if (statesIds.size() == MAX_IDS_SIZE) {
+//                break;
+//            }
+//        }
+//
+//        if (!statesIds.isEmpty())
+//            messages.add(new ContainerMessage(client.authData.nextMessageId(),
+//                    client.authData.nextSeqNo(false), ImmutableMsgsStateReq.of(statesIds)));
+//        if (!acknowledgments.isEmpty())
+//            messages.add(new ContainerMessage(client.authData.nextMessageId(),
+//                    client.authData.nextSeqNo(false), collectAcks()));
+
+        long containerMsgId = client.authData.nextMessageId();
+        int containerSeqNo = client.authData.nextSeqNo(false);
+
+        int payloadSize = totalSize + messages.size() * 16;
+        int messageSize = 40 + payloadSize;
+        int unpadded = (messageSize + 12) % 16;
+        int padding = 12 + (unpadded != 0 ? 16 - unpadded : 0);
+
+        ByteBuf message = ctx.alloc().ioBuffer(messageSize + padding);
+        message.writeLongLE(client.authData.serverSalt());
+        message.writeLongLE(client.authData.sessionId());
+        message.writeLongLE(containerMsgId);
+        message.writeIntLE(containerSeqNo);
+
+        message.writeIntLE(payloadSize + 8);
+        message.writeIntLE(MessageContainer.ID);
+        message.writeIntLE(messages.size());
+
+        var msgIds = new long[messages.size()];
+        for (int i = 0; i < messages.size(); i++) {
+            var c = messages.get(i);
+            msgIds[i] = c.messageId();
+
+            var wrapped = c.request.wrap(containerMsgId);
+            wrapped.setCreationTimestamp(now);
+
+            client.requests.put(c.messageId(), wrapped);
+
+            message.writeLongLE(c.messageId());
+            message.writeIntLE(c.seqNo());
+            message.writeIntLE(c.size());
+            TlSerializer.serialize(message, c.actualMethod);
+        }
+
+        client.requests.put(containerMsgId, new ContainerRequest(msgIds));
+
+        client.stats.addQueriesCount(msgIds.length);
+        client.stats.lastQueryTimestamp = Instant.ofEpochMilli(now);
+
+        byte[] paddingb = new byte[padding];
+        random.nextBytes(paddingb);
+        message.writeBytes(paddingb);
+
+        ByteBuf authKey = currentAuthKey.value();
+        ByteBuf authKeyId = Unpooled.copyLong(Long.reverseBytes(currentAuthKey.id()));
+
+        ByteBuf messageKeyHash = sha256Digest(authKey.slice(88, 32), message);
+
+        ByteBuf messageKey = messageKeyHash.slice(8, 16);
+        initCipher(messageKey, authKey, false);
+
+        ByteBuf encrypted = cipher.encrypt(message);
+        ByteBuf packet = Unpooled.wrappedBuffer(authKeyId, messageKey, encrypted);
+
+        if (rpcLog.isDebugEnabled()) {
+            rpcLog.debug("[C:0x{}, M:0x{}] Sending container: {{}}", client.id,
+                    Long.toHexString(containerMsgId), messages.stream()
+                            .map(m -> "0x" + Long.toHexString(m.messageId()) + ": " + schemaTypeName(m.request.method))
+                            .collect(Collectors.joining(", ")));
+        }
+
+        transportCodec.setQuickAck(false);
+
+        ctx.writeAndFlush(packet, ctx.voidPromise());
+    }
+
+    static boolean canContainerize(RpcRequest request) {
+        return switch (request.method.identifier()) {
+            // server returns -404 transport error when this packet placed to container
+            case InvokeWithLayer.ID -> false;
+            default -> true;
+        };
     }
 }

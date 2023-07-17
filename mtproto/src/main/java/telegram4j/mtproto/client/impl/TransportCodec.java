@@ -10,7 +10,7 @@ import telegram4j.mtproto.transport.Transport;
 
 import java.util.List;
 
-public final class TransportCodec extends ChannelDuplexHandler {
+final class TransportCodec extends ChannelDuplexHandler {
     private final Transport transport;
     private final Decoder decoder = new Decoder();
     private final Encoder encoder = new Encoder();

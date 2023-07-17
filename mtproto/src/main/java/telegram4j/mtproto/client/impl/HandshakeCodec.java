@@ -10,7 +10,7 @@ import telegram4j.tl.TlDeserializer;
 import telegram4j.tl.TlSerializer;
 import telegram4j.tl.api.MTProtoObject;
 
-public final class HandshakeCodec extends ChannelDuplexHandler {
+final class HandshakeCodec extends ChannelDuplexHandler {
 
     private final AuthData authData;
 
