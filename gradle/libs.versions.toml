@@ -27,6 +27,7 @@ netty-native-kqueue = { module = "io.netty:netty-transport-native-kqueue" }
 reactor-bom = { module = "io.projectreactor:reactor-bom", version.ref = "reactor-bom" }
 reactor-core = { module = "io.projectreactor:reactor-core" }
 reactor-addons-extra = { module = "io.projectreactor.addons:reactor-extra" }
+reactor-test = { module = "io.projectreactor:reactor-test" }
 
 [plugins]
 versions = { id = "com.github.ben-manes.versions", version = "0.47.0" }

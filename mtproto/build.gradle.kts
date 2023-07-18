@@ -2,6 +2,7 @@ dependencies {
     api(libs.tl.parser) { isChanging = true }
     api(libs.reactor.core)
     api(libs.reactor.addons.extra)
+    api(libs.reactor.test)
     api(libs.netty.handler)
     api(libs.netty.handler.proxy)
 

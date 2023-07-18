@@ -536,6 +536,9 @@ public final class MTProtoClientImpl implements MTProtoClient {
                 notifyAttr.set(sink);
 
                 current.channel.close();
+            } else { // client was not connected
+                sink.success();
+                onClose.emitEmpty(FAIL_FAST);
             }
         });
     }
