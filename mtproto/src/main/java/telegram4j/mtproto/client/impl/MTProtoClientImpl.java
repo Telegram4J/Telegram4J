@@ -108,7 +108,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
                              Options options) {
         this.group = group;
         this.type = type;
-        this.authData = new AuthData(id, dc);
+        this.authData = new AuthData(dc);
         this.mtProtoOptions = mtProtoOptions;
         this.options = options;
 

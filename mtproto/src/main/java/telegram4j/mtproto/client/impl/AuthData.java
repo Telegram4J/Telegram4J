@@ -13,15 +13,15 @@ import telegram4j.tl.mtproto.MsgsStateReq;
 import telegram4j.tl.request.mtproto.Ping;
 import telegram4j.tl.request.mtproto.PingDelayDisconnect;
 
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.StringJoiner;
 
 import static telegram4j.mtproto.util.CryptoUtil.random;
 
 final class AuthData {
-    private static final int DEFAULT_IMSG_ID_REGISTER_SIZE = 128;
-
-    private final String clientId;
+    private static final int IMSG_ID_REGISTER_SIZE =
+            Integer.getInteger("telegram4j.mtproto.imsgIdRegisterSize", 128);
 
     @Nullable
     private AuthKey authKey;
@@ -34,10 +34,9 @@ final class AuthData {
     private boolean unauthorized;
 
     private final DataCenter dc;
-    private final InboundMessageIdRegister messageIdRegister = new InboundMessageIdRegister(DEFAULT_IMSG_ID_REGISTER_SIZE);
+    final InboundMessageIdRegister messageIdRegister = new InboundMessageIdRegister(IMSG_ID_REGISTER_SIZE);
 
-    public AuthData(String clientId, DataCenter dc) {
-        this.clientId = clientId;
+    public AuthData(DataCenter dc) {
         this.dc = Objects.requireNonNull(dc);
     }
 
@@ -95,6 +94,8 @@ final class AuthData {
         do {
             sessionId = random.nextLong();
         } while (sessionId == oldSessionId);
+
+        messageIdRegister.clear();
     }
 
     public boolean unauthorized() {
@@ -205,7 +206,8 @@ final class AuthData {
                 return true;
             }
 
-            long d = messageId - buffer[max];
+            long newest = buffer[max];
+            long d = messageId - newest;
             if (d > 0) { // messageId is greater than maxId - enqueue (return true)
                 if (p == buffer.length) {
                     overflow = true;
@@ -221,22 +223,22 @@ final class AuthData {
                 // 1. messageId already received (return false)
                 // 2. Received non-incremental inconsistent identifier. For now I consider it as protocol error
 
+                // After some research, I concluded that is not erroneous behavior.
+                // see https://github.com/telegramdesktop/tdesktop/blob/23778bec9f854d41b29220291f5e5fa24ba5d894/Telegram/SourceFiles/mtproto/details/mtproto_received_ids_manager.cpp#L12-L25
+
                 for (long l : buffer) {
                     if (l == messageId) {
                         return false;
                     }
                 }
-                if (log.isDebugEnabled()) {
-                    StringJoiner dump = new StringJoiner(", ", "{", "}");
-                    for (long msgId : buffer) {
-                        dump.add("0x" + Long.toHexString(msgId));
-                    }
-
-                    log.debug("[C:0x{}] Received non-incremental messageId 0x{}. Current set: {}",
-                            clientId, Long.toHexString(messageId), dump);
-                }
                 return true;
             }
+        }
+
+        public void clear() {
+            overflow = false;
+            pos = 0;
+            Arrays.fill(buffer, 0);
         }
     }
 }
