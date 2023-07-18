@@ -37,8 +37,6 @@ public class DownloadBotExample {
         Hooks.onOperatorDebug();
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
 
-
-
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
         String apiHash = System.getenv("T4J_API_HASH");
         String botAuthToken = System.getenv("T4J_TOKEN");
@@ -55,8 +53,6 @@ public class DownloadBotExample {
                         Path.of("core/src/test/resources/t4j-bot.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
                         MTProtoRetrySpec.max(d -> d.getSeconds() < 30, 2)))
-                .setReconnectionInterval(Duration.ofSeconds(30))
-                .setPingInterval(Duration.ofSeconds(30))
                 .withConnection(client -> {
 
                     return client.on(SendMessageEvent.class)

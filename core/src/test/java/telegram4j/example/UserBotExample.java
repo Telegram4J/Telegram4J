@@ -24,7 +24,6 @@ import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
 
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -34,11 +33,9 @@ public class UserBotExample {
     private static final Logger log = Loggers.getLogger(UserBotExample.class);
 
     public static void main(String[] args) {
-
         // only for testing
         Hooks.onOperatorDebug();
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-        //
 
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new TlModule());
@@ -61,9 +58,6 @@ public class UserBotExample {
                         new Options(Options.DEFAULT_CHECKIN,
                                 Options.MAX_USER_CHANNEL_DIFFERENCE,
                                 true)))
-                .setReconnectionInterval(Duration.ofSeconds(30))
-                // Large delay for reconnection is needed for me
-                // Because that's how I can test intermediate state when client is disconnected
                 .withConnection(client -> {
 
                     Mono<Void> eventLog = client.getMtProtoClientGroup().updates().all()

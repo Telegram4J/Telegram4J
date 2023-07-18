@@ -35,6 +35,7 @@ import java.time.Duration;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,33 +46,32 @@ public class BotButtonExample {
             .collect(Collectors.toUnmodifiableMap(c -> c.getInfo().command(), Function.identity()));
 
     public static void main(String[] args) {
-
         // only for testing, do not copy it to your production code!!!
         Hooks.onOperatorDebug();
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
-
-
 
         int apiId = Integer.parseInt(System.getenv("T4J_API_ID"));
         String apiHash = System.getenv("T4J_API_HASH");
         String botAuthToken = System.getenv("T4J_TOKEN");
 
-        MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
+        var client = MTProtoTelegramClient.create(apiId, apiHash, botAuthToken)
                 .setDefaultEntityParserFactory(EntityParserFactory.MARKDOWN_V2)
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
                         Path.of("core/src/test/resources/t4j-bot.bin")))
-                .withConnection(client -> {
-                    var updateCommands = client.setCommands(
-                                    BotCommandScopeSpec.of(BotCommandScopeSpec.Type.DEFAULT),
-                                    "en", commands.stream()
-                                            .map(Command::getInfo)
-                                            .collect(Collectors.toUnmodifiableList()));
-
-                    var listenEvents = client.on(new BotEventAdapter());
-
-                    return Mono.when(updateCommands, listenEvents);
-                })
+                .connect()
                 .block();
+
+        Objects.requireNonNull(client);
+
+        client.setCommands(BotCommandScopeSpec.of(BotCommandScopeSpec.Type.DEFAULT), "en", commands.stream()
+                        .map(Command::getInfo)
+                        .toList())
+                .subscribe();
+
+        client.on(new BotEventAdapter())
+                .subscribe();
+
+        client.onDisconnect().block();
     }
 
     @TelegramCommand(command = "begin_inline", description = "Begin inline button demonstration")
