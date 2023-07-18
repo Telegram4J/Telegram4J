@@ -13,7 +13,7 @@ import telegram4j.core.event.domain.Event;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.Document;
 import telegram4j.core.object.Message;
@@ -29,6 +29,7 @@ import telegram4j.core.retriever.EntityRetriever;
 import telegram4j.core.spec.BotCommandScopeSpec;
 import telegram4j.core.util.Id;
 import telegram4j.core.util.PeerId;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.client.MTProtoClientGroup;
 import telegram4j.mtproto.file.*;
 import telegram4j.mtproto.service.ServiceHolder;
@@ -37,6 +38,8 @@ import telegram4j.mtproto.service.UploadService;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedMessages;
+import telegram4j.tl.request.bots.*;
+import telegram4j.tl.request.messages.ImmutableDeleteMessages;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -192,9 +195,10 @@ public final class MTProtoTelegramClient implements EntityRetriever {
 
         return Mono.defer(() -> {
             var chatAdminRights = ImmutableChatAdminRights.of(MappingUtil.getMaskValue(adminRights));
-            if (type == Chat.Type.CHANNEL)
-                return serviceHolder.getBotService().setBotBroadcastDefaultAdminRights(chatAdminRights);
-            return serviceHolder.getBotService().setBotGroupDefaultAdminRights(chatAdminRights);
+            var request = type == Chat.Type.CHANNEL
+                    ? ImmutableSetBotBroadcastDefaultAdminRights.of(chatAdminRights)
+                    : ImmutableSetBotGroupDefaultAdminRights.of(chatAdminRights);
+            return mtProtoClientGroup.send(DcId.main(), request);
         });
     }
 
@@ -340,7 +344,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>common</b> events.
      */
     public Mono<AffectedMessages> deleteMessages(boolean revoke, Iterable<Integer> ids) {
-        return serviceHolder.getChatService().deleteMessages(revoke, ids);
+        var request = ImmutableDeleteMessages.of(revoke ? ImmutableDeleteMessages.REVOKE_MASK : 0, ids);
+        return mtProtoClientGroup.send(DcId.main(), request);
     }
 
     /**
@@ -353,8 +358,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     public Mono<AffectedMessages> deleteChannelMessages(Id channelId, Iterable<Integer> ids) {
         return asInputChannel(channelId) // contains check of id type
                 .switchIfEmpty(MappingUtil.unresolvedPeer(channelId))
-                .flatMap(p -> serviceHolder.getChatService()
-                        .deleteMessages(p, ids));
+                .flatMap(p -> mtProtoClientGroup.send(DcId.main(),
+                                telegram4j.tl.request.channels.ImmutableDeleteMessages.of(p, ids)));
     }
 
     /**
@@ -366,8 +371,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public Mono<List<BotCommand>> getCommands(BotCommandScopeSpec spec, String langCode) {
         return spec.asData(this)
-                .flatMap(scope -> serviceHolder.getBotService()
-                        .getBotCommands(scope, langCode));
+                .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
+                        ImmutableGetBotCommands.of(scope, langCode)));
     }
 
     /**
@@ -379,8 +384,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public Mono<Boolean> resetCommands(BotCommandScopeSpec spec, String langCode) {
         return spec.asData(this)
-                .flatMap(scope -> serviceHolder.getBotService()
-                        .resetBotCommands(scope, langCode));
+                .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
+                        ImmutableResetBotCommands.of(scope, langCode)));
     }
 
     /**
@@ -393,8 +398,8 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public Mono<Boolean> setCommands(BotCommandScopeSpec spec, String langCode, Iterable<? extends BotCommand> commands) {
         return spec.asData(this)
-                .flatMap(scope -> serviceHolder.getBotService()
-                        .setBotCommands(scope, langCode, commands));
+                .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
+                        ImmutableSetBotCommands.of(scope, langCode, commands)));
     }
 
     /**

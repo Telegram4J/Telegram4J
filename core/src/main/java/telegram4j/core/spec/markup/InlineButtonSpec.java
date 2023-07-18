@@ -3,7 +3,7 @@ package telegram4j.core.spec.markup;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import reactor.util.annotation.Nullable;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.markup.KeyboardButton;
 import telegram4j.core.util.Id;
 import telegram4j.tl.api.TlEncodingUtil;

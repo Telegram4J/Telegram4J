@@ -5,7 +5,6 @@ import telegram4j.tl.api.TlEncodingUtil;
 import java.util.*;
 import java.util.function.IntBinaryOperator;
 import java.util.function.Predicate;
-import java.util.stream.StreamSupport;
 
 /**
  * Immutable version of {@link EnumSet} which backed as {@code int}.
@@ -23,14 +22,16 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
     }
 
     public static <E extends Enum<E> & BitFlag> ImmutableEnumSet<E> of(Class<E> type, Iterable<E> values) {
-        if (values instanceof ImmutableEnumSet) {
-            return (ImmutableEnumSet<E>) values;
+        if (values instanceof ImmutableEnumSet<E> e) {
+            return e;
         }
-
         Objects.requireNonNull(type);
-        return new ImmutableEnumSet<>(type, StreamSupport.stream(values.spliterator(), false)
-                .map(E::mask)
-                .reduce(0, (l, r) -> l | r));
+
+        int mask = 0;
+        for (E e : values) {
+            mask |= e.mask();
+        }
+        return new ImmutableEnumSet<>(type, mask);
     }
 
     public static <E extends Enum<E> & BitFlag> ImmutableEnumSet<E> of(Class<E> type, int value) {
@@ -39,13 +40,16 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
     }
 
     @SuppressWarnings("unchecked")
-    public static <E extends Enum<E> & BitFlag> ImmutableEnumSet<E> of(E... value) {
-        Class<?> ctype = value.getClass().getComponentType();
+    public static <E extends Enum<E> & BitFlag> ImmutableEnumSet<E> of(E... values) {
+        Class<?> ctype = values.getClass().getComponentType();
         Class<?> etype = (etype = ctype.getSuperclass()) == Enum.class ? ctype : etype;
-        Objects.requireNonNull(etype);
-        return new ImmutableEnumSet<>((Class<E>) etype, Arrays.stream(value)
-                .map(E::mask)
-                .reduce(0, (l, r) -> l | r));
+
+        int mask = 0;
+        for (E e : values) {
+            mask |= e.mask();
+        }
+
+        return new ImmutableEnumSet<>((Class<E>) etype, mask);
     }
 
     public Class<E> getElementType() {
@@ -57,7 +61,7 @@ public final class ImmutableEnumSet<E extends Enum<E> & BitFlag> extends Abstrac
     }
 
     public EnumSet<E> asEnumSet() {
-        EnumSet<E> e = EnumSet.allOf(elementType);
+        var e = EnumSet.allOf(elementType);
         e.removeIf(v -> !contains(v));
         return e;
     }

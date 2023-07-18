@@ -4,7 +4,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.markup.ReplyMarkup;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.tl.*;

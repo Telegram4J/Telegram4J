@@ -1,7 +1,7 @@
 package telegram4j.core.spec.markup;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.markup.KeyboardButton;
 
 import java.util.Objects;

@@ -1,7 +1,7 @@
 package telegram4j.core.util;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Channel;

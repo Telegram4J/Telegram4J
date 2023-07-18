@@ -5,7 +5,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
@@ -64,32 +64,32 @@ public final class BotCommandScopeSpec {
     }
 
     public Mono<BotCommandScope> asData(MTProtoTelegramClient client) {
-        return Mono.defer(() -> {
-            switch (type) {
-                case CHAT_ADMINS: return Mono.just(BotCommandScopeChatAdmins.instance());
-                case CHATS: return Mono.just(BotCommandScopeChats.instance());
-                case DEFAULT: return Mono.just(BotCommandScopeDefault.instance());
-                case PEER:
-                    Objects.requireNonNull(peerId);
-                    return client.asInputPeer(peerId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
-                            .map(ImmutableBotCommandScopePeer::of);
-                case PEER_ADMINS:
-                    Objects.requireNonNull(peerId);
-                    return client.asInputPeer(peerId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
-                            .map(ImmutableBotCommandScopePeerAdmins::of);
-                case PEER_USER:
-                    Objects.requireNonNull(peerId);
-                    Objects.requireNonNull(userId);
-                    return client.asInputPeer(peerId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
-                            .zipWith(client.asInputUser(userId)
-                                    .switchIfEmpty(MappingUtil.unresolvedPeer(userId)))
-                            .map(TupleUtils.function(ImmutableBotCommandScopePeerUser::of));
-                case USERS: return Mono.just(BotCommandScopeUsers.instance());
-                default: throw new IllegalStateException("Unexpected value: " + type);
+        return Mono.defer(() -> switch (type) {
+            case CHAT_ADMINS -> Mono.just(BotCommandScopeChatAdmins.instance());
+            case CHATS -> Mono.just(BotCommandScopeChats.instance());
+            case DEFAULT -> Mono.just(BotCommandScopeDefault.instance());
+            case PEER -> {
+                Objects.requireNonNull(peerId);
+                yield client.asInputPeer(peerId)
+                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                        .map(ImmutableBotCommandScopePeer::of);
             }
+            case PEER_ADMINS -> {
+                Objects.requireNonNull(peerId);
+                yield client.asInputPeer(peerId)
+                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                        .map(ImmutableBotCommandScopePeerAdmins::of);
+            }
+            case PEER_USER -> {
+                Objects.requireNonNull(peerId);
+                Objects.requireNonNull(userId);
+                yield client.asInputPeer(peerId)
+                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                        .zipWith(client.asInputUser(userId)
+                                .switchIfEmpty(MappingUtil.unresolvedPeer(userId)))
+                        .map(TupleUtils.function(ImmutableBotCommandScopePeerUser::of));
+            }
+            case USERS -> Mono.just(BotCommandScopeUsers.instance());
         });
     }
 

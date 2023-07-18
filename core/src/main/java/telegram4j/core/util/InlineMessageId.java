@@ -32,12 +32,12 @@ public final class InlineMessageId {
     public static InlineMessageId from(InputBotInlineMessageID id) {
         return switch (id.identifier()) {
             case InputBotInlineMessageID64.ID -> {
-                InputBotInlineMessageID64 d = (InputBotInlineMessageID64) id;
+                var d = (InputBotInlineMessageID64) id;
 
                 yield new InlineMessageId(d.dcId(), d.ownerId(), d.id(), d.accessHash());
             }
             case BaseInputBotInlineMessageID.ID -> {
-                BaseInputBotInlineMessageID d = (BaseInputBotInlineMessageID) id;
+                var d = (BaseInputBotInlineMessageID) id;
 
                 long ownerId = d.id() >> 32;
                 int msgId = (int) d.id();

@@ -7,7 +7,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.BotInfo;
 import telegram4j.core.object.PeerNotifySettings;
 import telegram4j.core.object.Photo;

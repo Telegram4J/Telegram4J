@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Simplified version of the {@link telegram4j.tl.UserStatus user status}. */
-public class UserStatus {
+public final class UserStatus {
 
     private final Type type;
     @Nullable

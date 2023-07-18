@@ -1,7 +1,7 @@
 package telegram4j.core.spec.inline;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.spec.markup.ReplyMarkupSpec;
 import telegram4j.core.spec.media.InputMediaVenueSpec;
 import telegram4j.core.util.parser.EntityParserFactory;

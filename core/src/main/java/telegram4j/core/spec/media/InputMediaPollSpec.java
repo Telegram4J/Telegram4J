@@ -7,7 +7,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import reactor.util.function.Tuples;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.internal.Preconditions;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.core.util.parser.EntityParserFactory;
@@ -50,8 +50,7 @@ public final class InputMediaPollSpec implements InputMediaSpec {
         this.closePeriod = builder.closePeriod;
         this.closeTimestamp = builder.closeTimestamp;
         this.answers = List.copyOf(builder.answers);
-        if (builder instanceof QuizBuilder) {
-            QuizBuilder quizBuilder = (QuizBuilder) builder;
+        if (builder instanceof QuizBuilder quizBuilder) {
             this.solution = quizBuilder.solution;
             this.parser = quizBuilder.parser;
             this.correctAnswer = quizBuilder.correctAnswer;
