@@ -24,9 +24,9 @@ import java.util.stream.Stream;
 
 public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
-    private static final int FORK_THRESHOLD = 20; // TODO
-    private static final VarHandle CA;
-    private static final VarHandle MAIN;
+    protected static final int FORK_THRESHOLD = 20; // TODO
+    protected static final VarHandle CA;
+    protected static final VarHandle MAIN;
 
     static {
         var lookup = MethodHandles.lookup();
@@ -39,11 +39,11 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         CA = MethodHandles.arrayElementVarHandle(MTProtoClient[].class);
     }
 
-    private final Options options;
-    private final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.single(),
+    protected final Options options;
+    protected final ResettableInterval activityMonitoring = new ResettableInterval(Schedulers.single(),
             Sinks.many().unicast().onBackpressureError());
-    private final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
-    private volatile MTProtoClient main;
+    protected final ConcurrentMap<Integer, Dc> dcs = new ConcurrentHashMap<>();
+    protected volatile MTProtoClient main;
 
     public DefaultMTProtoClientGroup(Options options) {
         this.options = options;
@@ -200,11 +200,11 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
                           int maxUploadClientsCount)
             implements MTProtoClientGroup.Options {
 
-        static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
-        static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(3);
-        static final Duration INACTIVE_DOWNLOAD_DURATION = Duration.ofMinutes(3);
-        static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
-        static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
+        public static final Duration DEFAULT_CHECKIN = Duration.ofMinutes(1);
+        public static final Duration INACTIVE_UPLOAD_DURATION = Duration.ofMinutes(3);
+        public static final Duration INACTIVE_DOWNLOAD_DURATION = Duration.ofMinutes(3);
+        public static final int DEFAULT_MAX_DOWNLOAD_CLIENTS_COUNT = 4;
+        public static final int DEFAULT_MAX_UPLOAD_CLIENTS_COUNT = 4;
 
         public Options(MTProtoClientGroup.Options options) {
             this(options.mainDc(), options.clientFactory(), options.updateDispatcher(), options.mtProtoOptions());
@@ -226,18 +226,18 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
         }
     }
 
-    static class Dc {
-        final MTProtoClient[] downloadClients;
-        final MTProtoClient[] uploadClients;
-        final AtomicInteger activeDownloadClientsCount = new AtomicInteger();
-        final AtomicInteger activeUploadClientsCount = new AtomicInteger();
+    protected static class Dc {
+        protected final MTProtoClient[] downloadClients;
+        protected final MTProtoClient[] uploadClients;
+        protected final AtomicInteger activeDownloadClientsCount = new AtomicInteger();
+        protected final AtomicInteger activeUploadClientsCount = new AtomicInteger();
 
-        Dc(Options options) {
+        protected Dc(Options options) {
             this.downloadClients = new MTProtoClient[options.maxDownloadClientsCount];
             this.uploadClients = new MTProtoClient[options.maxUploadClientsCount];
         }
 
-        MTProtoClient setClient(DcId.Type type, MTProtoClient client) {
+        protected MTProtoClient setClient(DcId.Type type, MTProtoClient client) {
             var arr = type == DcId.Type.UPLOAD ? uploadClients : downloadClients;
             MTProtoClient latest = client;
             for (int i = 0; i < arr.length; i++) {
@@ -255,7 +255,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
             return latest;
         }
 
-        MTProtoClient setClient(DcId.Type type, int index, MTProtoClient client) {
+        protected MTProtoClient setClient(DcId.Type type, int index, MTProtoClient client) {
             var arr = type == DcId.Type.UPLOAD ? uploadClients : downloadClients;
             MTProtoClient res = (MTProtoClient)CA.compareAndExchange(arr, index, null, client);
             if (res == null) {

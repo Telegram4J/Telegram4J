@@ -11,7 +11,9 @@ final class ReconnectionContextImpl implements ReconnectionContext {
     @Nullable
     private Duration lastBackoff;
     private Throwable exception;
-    private boolean resume = true;
+
+    // volatile for multi-thread access in MTProtoClient.close()
+    private volatile boolean resume = true;
 
     public void resetAfterConnect() {
         iteration = 0;
@@ -66,7 +68,7 @@ final class ReconnectionContextImpl implements ReconnectionContext {
 
     @Override
     public String toString() {
-        return "IterationContext{" +
+        return "ReconnectionContext{" +
                 "iteration=" + iteration +
                 ", lastBackoff=" + lastBackoff +
                 ", exception=" + exception +

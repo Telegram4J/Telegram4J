@@ -534,6 +534,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
             if (current.channel != null) {
                 var notifyAttr = current.channel.attr(NOTIFY);
                 notifyAttr.set(sink);
+                reconnectCtx.setResume(false);
 
                 current.channel.close();
             } else { // client was not connected
