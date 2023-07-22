@@ -10,8 +10,10 @@ import telegram4j.core.object.StickerSet;
 import telegram4j.core.object.media.GeoPoint;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.util.Id;
+import telegram4j.mtproto.DcId;
 import telegram4j.tl.*;
 import telegram4j.tl.messages.AffectedHistory;
+import telegram4j.tl.request.channels.ImmutableSetStickers;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -178,10 +180,8 @@ public final class SupergroupChat extends BaseChannel implements Channel, Channe
      */
     public Mono<Boolean> setStickerSet(InputStickerSet stickerSetId) {
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
-                .flatMap(channel -> client.getServiceHolder().getChatService()
-                        .setStickers(channel, stickerSetId));
+        return client.asInputChannelExact(id)
+                .flatMap(channel -> client.getMtProtoClientGroup().send(DcId.main(), ImmutableSetStickers.of(channel, stickerSetId)));
     }
 
     /**

@@ -10,6 +10,7 @@ import telegram4j.core.object.Document;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.MessageAction;
 import telegram4j.core.object.MessageMedia;
+import telegram4j.core.object.MessageReplyHeader;
 import telegram4j.core.object.Photo;
 import telegram4j.core.object.Reaction;
 import telegram4j.core.object.User;
@@ -96,7 +97,7 @@ public class EntityFactory {
                         .map(list -> list.stream()
                                 .map(d -> new BotInfo(client, d, chatId,
                                         usersMap.get(Objects.requireNonNull(d.userId()))))
-                                .collect(Collectors.toUnmodifiableList()))
+                                .toList())
                         .orElse(null);
 
                 List<ChatParticipant> chatParticipants;
@@ -105,7 +106,7 @@ public class EntityFactory {
                         var d = (BaseChatParticipants) chatData.fullData.participants();
                         chatParticipants = d.participants().stream()
                                 .map(c -> new ChatParticipant(client, usersMap.get(c.userId()), c, chatId))
-                                .collect(Collectors.toUnmodifiableList());
+                                .toList();
                     }
                     case ChatParticipantsForbidden.ID -> {
                         var d = (ChatParticipantsForbidden) chatData.fullData.participants();
@@ -140,7 +141,7 @@ public class EntityFactory {
                 var botInfo = channelData.fullData.botInfo().stream()
                         .map(d -> new BotInfo(client, d, channelId,
                                 usersMap.get(Objects.requireNonNull(d.userId()))))
-                        .collect(Collectors.toUnmodifiableList());
+                        .toList();
 
                 return channelData.minData.broadcast()
                         ? new BroadcastChannel(client, channelData.fullData, channelData.minData, botInfo)
@@ -344,7 +345,20 @@ public class EntityFactory {
             case MessageMediaGeoLive.ID -> new MessageMedia.GeoLive(client, (MessageMediaGeoLive) data);
             case MessageMediaPoll.ID -> new MessageMedia.Poll(client, (MessageMediaPoll) data, peer);
             case MessageMediaDice.ID -> new MessageMedia.Dice(client, (MessageMediaDice) data);
+            case MessageMediaStory.ID -> new MessageMedia.Story(client, (MessageMediaStory) data);
             default -> throw new IllegalArgumentException("Unknown MessageMedia type: " + data);
+        };
+    }
+
+    static <T> IllegalArgumentException unknown(Class<? super T> supertype, T data) {
+        return new IllegalArgumentException("Unknown " + supertype.getSimpleName() + " type: " + data);
+    }
+
+    public static MessageReplyHeader createMessageReplyHeader(MTProtoTelegramClient client, telegram4j.tl.MessageReplyHeader data, Id chatId) {
+        return switch (data.identifier()) {
+            case BaseMessageReplyHeader.ID -> new MessageReplyToMessageHeader(client, (BaseMessageReplyHeader) data, chatId);
+            case MessageReplyStoryHeader.ID -> new MessageReplyToStoryHeader(client, (MessageReplyStoryHeader) data);
+            default -> throw unknown(telegram4j.tl.MessageReplyHeader.class, data);
         };
     }
 
@@ -610,7 +624,7 @@ public class EntityFactory {
                 var some = (ChatReactionsSome) data;
                 yield new ChatReactions(some.reactions().stream()
                         .map(EntityFactory::createReaction)
-                        .collect(Collectors.toUnmodifiableList()));
+                        .toList());
             }
             case ChatReactionsNone.ID -> null;
             default -> throw new IllegalStateException("Unknown ChatReactions type: " + data);

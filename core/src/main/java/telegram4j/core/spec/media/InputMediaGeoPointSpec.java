@@ -4,7 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.tl.BaseInputGeoPoint;
-import telegram4j.tl.InputMedia;
+import telegram4j.tl.ImmutableInputMediaGeoPoint;
 import telegram4j.tl.InputMediaGeoPoint;
 
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ public final class InputMediaGeoPointSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaGeoPoint> resolve(MTProtoTelegramClient client) {
         return Mono.just(InputMediaGeoPoint.builder()
                 .geoPoint(BaseInputGeoPoint.builder()
                         .lat(latitude())
@@ -74,8 +74,7 @@ public final class InputMediaGeoPointSpec implements InputMediaSpec {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof InputMediaGeoPointSpec)) return false;
-        InputMediaGeoPointSpec that = (InputMediaGeoPointSpec) o;
+        if (!(o instanceof InputMediaGeoPointSpec that)) return false;
         return Double.doubleToLongBits(latitude) == Double.doubleToLongBits(that.latitude)
                 && Double.doubleToLongBits(longitude) == Double.doubleToLongBits(that.longitude)
                 && Objects.equals(accuracyRadius, that.accuracyRadius);

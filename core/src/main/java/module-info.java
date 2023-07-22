@@ -14,6 +14,7 @@ module telegram4j.core {
 
     exports telegram4j.core;
     exports telegram4j.core.auxiliary;
+    exports telegram4j.core.handle;
     exports telegram4j.core.event;
     exports telegram4j.core.event.domain;
     exports telegram4j.core.event.domain.chat;

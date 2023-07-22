@@ -29,6 +29,27 @@ public interface EntityRetriever {
      */
     Mono<PeerEntity> resolvePeer(PeerId peerId);
 
+    default Mono<PeerEntity> getPeerById(Id id) {
+        return Mono.defer(() -> switch (id.getType()) {
+            case CHANNEL, CHAT -> getChatById(id);
+            case USER -> getUserById(id);
+        });
+    }
+
+    default Mono<PeerEntity> getPeerMinById(Id id) {
+        return Mono.defer(() -> switch (id.getType()) {
+            case CHANNEL, CHAT -> getChatMinById(id);
+            case USER -> getUserMinById(id);
+        });
+    }
+
+    default Mono<PeerEntity> getPeerFullById(Id id) {
+        return Mono.defer(() -> switch (id.getType()) {
+            case CHANNEL, CHAT -> getChatFullById(id);
+            case USER -> getUserFullById(id);
+        });
+    }
+
     /**
      * Retrieve user with retriever strategy by the specified id.
      * By default, this method will retrieve minimal information about user,

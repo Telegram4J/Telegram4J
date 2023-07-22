@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auxiliary.AuxiliaryStickerSet;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.media.MaskCoordinates;
 import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.file.Context;
@@ -91,7 +92,7 @@ public final class Sticker extends Document {
      * @return The duration of video sticker, if {@link #getType()} is {@link Sticker.Type#VIDEO}
      */
     public Optional<Duration> getDuration() {
-        return optData.getT2().map(d -> Duration.ofSeconds(d.duration()));
+        return optData.getT2().map(d -> MappingUtil.durationFromSeconds(d.duration()));
     }
 
     /**

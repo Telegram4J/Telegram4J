@@ -10,6 +10,8 @@ import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.event.EventAdapter;
 import telegram4j.core.event.UpdatesManager;
 import telegram4j.core.event.domain.Event;
+import telegram4j.core.handle.MTProtoPeerHandle;
+import telegram4j.core.handle.PeerHandle;
 import telegram4j.core.internal.AuxiliaryEntityFactory;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.internal.MappingUtil;
@@ -59,6 +61,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     private final Id selfId;
     private final ServiceHolder serviceHolder;
     private final EntityRetriever entityRetriever;
+    private final PeerHandle peerHandle;
     private final Mono<Void> onDisconnect;
 
     MTProtoTelegramClient(AuthorizationResources authResources,
@@ -74,6 +77,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
         this.selfId = selfId;
         this.entityRetriever = entityRetriever.apply(this);
         this.updatesManager = updatesManager.apply(this);
+        this.peerHandle = new PeerHandle(this, new MTProtoPeerHandle(this));
         this.onDisconnect = onDisconnect;
     }
 
@@ -106,6 +110,19 @@ public final class MTProtoTelegramClient implements EntityRetriever {
     }
 
     /**
+     * Gets id of <i>current</i> user.
+     *
+     * @return The id of <i>current</i> user.
+     */
+    public Id getSelfId() {
+        return selfId;
+    }
+
+    public PeerHandle getPeerHandle() {
+        return peerHandle;
+    }
+
+    /**
      * Gets {@link UpdatesManager} resource to handle incoming {@link Updates} from MTProto
      * client and controlling updates gaps.
      *
@@ -113,15 +130,6 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      */
     public UpdatesManager getUpdatesManager() {
         return updatesManager;
-    }
-
-    /**
-     * Gets id of <i>current</i> user.
-     *
-     * @return The id of <i>current</i> user.
-     */
-    public Id getSelfId() {
-        return selfId;
     }
 
     /**
@@ -356,8 +364,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion {@link AffectedMessages} with range of affected <b>channel</b> events.
      */
     public Mono<AffectedMessages> deleteChannelMessages(Id channelId, Iterable<Integer> ids) {
-        return asInputChannel(channelId) // contains check of id type
-                .switchIfEmpty(MappingUtil.unresolvedPeer(channelId))
+        return asInputChannelExact(channelId)
                 .flatMap(p -> mtProtoClientGroup.send(DcId.main(),
                                 telegram4j.tl.request.channels.ImmutableDeleteMessages.of(p, ids)));
     }
@@ -370,7 +377,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion immutable list of bot commands.
      */
     public Mono<List<BotCommand>> getCommands(BotCommandScopeSpec spec, String langCode) {
-        return spec.asData(this)
+        return spec.resolve(this)
                 .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
                         ImmutableGetBotCommands.of(scope, langCode)));
     }
@@ -383,7 +390,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion boolean result state.
      */
     public Mono<Boolean> resetCommands(BotCommandScopeSpec spec, String langCode) {
-        return spec.asData(this)
+        return spec.resolve(this)
                 .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
                         ImmutableResetBotCommands.of(scope, langCode)));
     }
@@ -397,7 +404,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @return A {@link Mono} emitting on successful completion boolean result state.
      */
     public Mono<Boolean> setCommands(BotCommandScopeSpec spec, String langCode, Iterable<? extends BotCommand> commands) {
-        return spec.asData(this)
+        return spec.resolve(this)
                 .flatMap(scope -> mtProtoClientGroup.send(DcId.main(),
                         ImmutableSetBotCommands.of(scope, langCode, commands)));
     }
@@ -472,8 +479,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                         // received from min users which have a special access hash
                         // which valid only for downloading
                         .withAccessHash(null);
-                yield asInputPeer(peerId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                yield asInputPeerExact(peerId)
                         .flatMap(peer -> switch (peerId.getType()) {
                             case USER -> serviceHolder.getUserService()
                                     .getUserPhotos(TlEntityUtil.toInputUser(peer),
@@ -586,15 +592,20 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * Converts specified {@link Id} into the low-leveled {@link InputPeer} object and
      * assigns access hash from cache if present and applicable.
      *
-     * @param chatId The id of user/chat/channel to converting.
+     * @param peerId The id of user/chat/channel to converting.
      * @return A {@link Mono}, emitting on successful completion resolved {@link InputPeer} object.
      */
-    public Mono<InputPeer> asInputPeer(Id chatId) {
-        return switch (chatId.getType()) {
-            case USER -> asInputUser(chatId).map(TlEntityUtil::toInputPeer);
-            case CHAT -> Mono.just(ImmutableInputPeerChat.of(chatId.asLong()));
-            case CHANNEL -> asInputChannel(chatId).map(TlEntityUtil::toInputPeer);
+    public Mono<InputPeer> asInputPeer(Id peerId) {
+        return switch (peerId.getType()) {
+            case USER -> asInputUser(peerId).map(TlEntityUtil::toInputPeer);
+            case CHAT -> Mono.just(ImmutableInputPeerChat.of(peerId.asLong()));
+            case CHANNEL -> asInputChannel(peerId).map(TlEntityUtil::toInputPeer);
         };
+    }
+
+    public Mono<InputPeer> asInputPeerExact(Id peerId) {
+        return asInputPeer(peerId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(peerId));
     }
 
     /**
@@ -617,14 +628,18 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 return Mono.error(new IllegalArgumentException("Min ids can not be used for bots"));
             }
 
-            return asInputPeer(min.getPeerId())
-                    .switchIfEmpty(MappingUtil.unresolvedPeer(min.getPeerId()))
+            return asInputPeerExact(min.getPeerId())
                     .map(p -> ImmutableInputChannelFromMessage.of(p, min.getMessageId(), channelId.asLong()));
         }
 
         return Mono.justOrEmpty(channelId.getAccessHash())
                 .<InputChannel>map(acc -> ImmutableBaseInputChannel.of(channelId.asLong(), acc))
                 .switchIfEmpty(mtProtoResources.getStoreLayout().resolveChannel(channelId.asLong()));
+    }
+
+    public Mono<InputChannel> asInputChannelExact(Id channelId) {
+        return asInputChannel(channelId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(channelId));
     }
 
     /**
@@ -651,14 +666,18 @@ public final class MTProtoTelegramClient implements EntityRetriever {
                 return Mono.error(new IllegalArgumentException("Min ids can not be used for bots"));
             }
 
-            return asInputPeer(min.getPeerId())
-                    .switchIfEmpty(MappingUtil.unresolvedPeer(min.getPeerId()))
+            return asInputPeerExact(min.getPeerId())
                     .map(p -> ImmutableInputUserFromMessage.of(p, min.getMessageId(), userId.asLong()));
         }
 
         return Mono.justOrEmpty(userId.getAccessHash())
                 .<InputUser>map(acc -> ImmutableBaseInputUser.of(userId.asLong(), acc))
                 .switchIfEmpty(mtProtoResources.getStoreLayout().resolveUser(userId.asLong()));
+    }
+
+    public Mono<InputUser> asInputUserExact(Id userId) {
+        return asInputUser(userId)
+                .switchIfEmpty(MappingUtil.unresolvedPeer(userId));
     }
 
     /**

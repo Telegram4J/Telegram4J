@@ -158,8 +158,8 @@ public sealed class MessageAction implements TelegramObject {
             this.data = Objects.requireNonNull(data);
         }
 
-        public String getDomain() {
-            return data.domain();
+        public Optional<String> getDomain() {
+            return Optional.ofNullable(data.domain());
         }
 
         @Override
@@ -949,17 +949,17 @@ public sealed class MessageAction implements TelegramObject {
     /** Service messages representing creation of new channel topic. */
     public static final class TopicCreate extends MessageAction {
         // from https://github.com/telegramdesktop/tdesktop/blob/55fd9c50912b127bf782765f23a1b31569e53cbe/Telegram/SourceFiles/data/data_forum_topic.cpp#L47
-        /** Topic icon color in RGB format looking like this: <span style="color: #6FB9F0">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #6FB9F0">■</span>. */
         public static final int BLUE = 0x6FB9F0;
-        /** Topic icon color in RGB format looking like this: <span style="color: #FFD67E">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #FFD67E">■</span>. */
         public static final int YELLOW = 0xFFD67E;
-        /** Topic icon color in RGB format looking like this: <span style="color: #CB86DB">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #CB86DB">■</span>. */
         public static final int VIOLET = 0xCB86DB;
-        /** Topic icon color in RGB format looking like this: <span style="color: #8EEE98">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #8EEE98">■</span>. */
         public static final int GREEN = 0x8EEE98;
-        /** Topic icon color in RGB format looking like this: <span style="color: #FF93B2">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #FF93B2">■</span>. */
         public static final int ROSE = 0xFF93B2;
-        /** Topic icon color in RGB format looking like this: <span style="color: #FB6F5F">\u25A0</span>. */
+        /** Topic icon color in RGB format looking like this: <span style="color: #FB6F5F">■</span>. */
         public static final int RED = 0xFB6F5F;
 
         private final MessageActionTopicCreate data;

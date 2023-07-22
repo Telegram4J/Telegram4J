@@ -15,7 +15,9 @@ import java.util.List;
 
 import static reactor.function.TupleUtils.function;
 
-/** Event of ordinary inline button triggered from the inline query. */
+/**
+ * Event of ordinary inline button triggered from the inline query.
+ */
 public final class InlineCallbackQueryEvent extends CallbackEvent {
 
     private final InlineMessageId messageId;
@@ -54,18 +56,22 @@ public final class InlineCallbackQueryEvent extends CallbackEvent {
                     .flatMap(r -> r.asData(client));
 
             var media = Mono.justOrEmpty(spec.media())
-                    .flatMap(r -> r.asData(client));
+                    .flatMap(r -> r.resolve(client));
 
-            return parsed.map(function((txt, ent) -> EditInlineBotMessage.builder()
-                            .message(txt.isEmpty() ? null : txt)
-                            .entities(ent.isEmpty() ? null : ent)
+            return Mono.fromSupplier(() -> EditInlineBotMessage.builder()
                             .noWebpage(spec.noWebpage())
-                            .id(messageId.asData())))
-                    .flatMap(builder -> replyMarkup.doOnNext(builder::replyMarkup)
-                            .then(media.doOnNext(builder::media))
-                            .then(Mono.fromSupplier(builder::build)))
-                    .flatMap(editMessage -> client.getServiceHolder()
-                            .getChatService().editInlineBotMessage(editMessage));
+                            .id(messageId.asData()))
+                    .flatMap(builder -> parsed.map(function((txt, ent) -> builder
+                                    .message(txt.isEmpty() ? null : txt)
+                                    .entities(ent.isEmpty() ? null : ent))))
+                    .flatMap(builder -> replyMarkup
+                            .map(builder::replyMarkup)
+                            .defaultIfEmpty(builder))
+                    .flatMap(builder -> media
+                            .map(builder::media)
+                            .defaultIfEmpty(builder))
+                    .flatMap(builder -> client.getServiceHolder()
+                            .getChatService().editInlineBotMessage(builder.build()));
         });
     }
 

@@ -174,8 +174,7 @@ public final class Poll implements TelegramObject {
             return Mono.error(new IllegalStateException("No context information for this poll known"));
         }
 
-        return client.asInputPeer(peer)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(peer))
+        return client.asInputPeerExact(peer)
                 .flatMap(p -> Mono.just(EditMessage.builder()
                                 .peer(p)
                                 .id(data.getMessageId())

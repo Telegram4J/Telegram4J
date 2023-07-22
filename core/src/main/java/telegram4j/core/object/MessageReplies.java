@@ -96,12 +96,10 @@ public class MessageReplies implements TelegramObject {
         var retriever = client.withRetrievalStrategy(strategy);
         return Flux.fromIterable(recentRepliers)
                 .map(Id::of)
-                .flatMap(id -> {
-                    switch (id.getType()) {
-                        case USER: return retriever.getUserById(id);
-                        case CHANNEL: return retriever.getChatById(id);
-                        default: return Flux.error(new IllegalStateException());
-                    }
+                .flatMap(id -> switch (id.getType()) {
+                    case USER -> retriever.getUserById(id);
+                    case CHANNEL -> retriever.getChatById(id);
+                    default -> Flux.error(new IllegalStateException());
                 })
                 .cast(MentionablePeer.class);
     }

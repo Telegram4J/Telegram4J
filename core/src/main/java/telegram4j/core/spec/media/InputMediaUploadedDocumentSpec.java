@@ -6,10 +6,7 @@ import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.util.BitFlag;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.mtproto.file.FileReferenceId;
-import telegram4j.tl.DocumentAttribute;
-import telegram4j.tl.InputFile;
-import telegram4j.tl.InputMedia;
-import telegram4j.tl.InputMediaUploadedDocument;
+import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
 
 import java.time.Duration;
@@ -89,7 +86,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaUploadedDocument> resolve(MTProtoTelegramClient client) {
         return Mono.fromSupplier(() -> InputMediaUploadedDocument.builder()
                 .flags(flags.getValue())
                 .file(file)
@@ -172,8 +169,7 @@ public final class InputMediaUploadedDocumentSpec implements InputMediaSpec {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof InputMediaUploadedDocumentSpec)) return false;
-        InputMediaUploadedDocumentSpec that = (InputMediaUploadedDocumentSpec) o;
+        if (!(o instanceof InputMediaUploadedDocumentSpec that)) return false;
         return flags.equals(that.flags)
                 && file.equals(that.file)
                 && Objects.equals(thumb, that.thumb)

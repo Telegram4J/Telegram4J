@@ -364,8 +364,7 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
 
         private Builder from(Object object) {
             Objects.requireNonNull(object);
-            if (object instanceof InlineResultDocumentSpec) {
-                InlineResultDocumentSpec instance = (InlineResultDocumentSpec) object;
+            if (object instanceof InlineResultDocumentSpec instance) {
                 duration(instance.duration);
                 documentFri = instance.documentFri;
                 documentUrl = instance.documentUrl;
@@ -379,8 +378,7 @@ public final class InlineResultDocumentSpec implements InlineResultSpec {
                 title(instance.title);
                 performer(instance.performer);
                 message(instance.message);
-            } else if (object instanceof InlineResultSpec) {
-                InlineResultSpec instance = (InlineResultSpec) object;
+            } else if (object instanceof InlineResultSpec instance) {
                 message(instance.message());
                 id(instance.id());
             }

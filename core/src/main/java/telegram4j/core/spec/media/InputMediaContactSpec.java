@@ -3,6 +3,7 @@ package telegram4j.core.spec.media;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.tl.ImmutableInputMediaContact;
 import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaContact;
 
@@ -40,7 +41,7 @@ public final class InputMediaContactSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaContact> resolve(MTProtoTelegramClient client) {
         return Mono.just(InputMediaContact.builder()
                 .phoneNumber(phoneNumber())
                 .firstName(firstName())

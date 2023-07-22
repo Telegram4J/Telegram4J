@@ -1,11 +1,12 @@
 package telegram4j.core.event.dispatcher;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
-import telegram4j.tl.Update;
+import telegram4j.tl.*;
 
 import java.util.Map;
 import java.util.Objects;
@@ -47,15 +48,18 @@ public class UpdateContext<U extends Update> {
     }
 
     public Optional<Chat> getChatEntity(Id peer) {
-        switch (peer.getType()) {
-            case CHAT:
-            case CHANNEL:
-                return Optional.ofNullable(chats.get(peer));
-            case USER:
-                return Optional.ofNullable(users.get(peer))
-                        .map(u -> new PrivateChat(client, u, users.get(client.getSelfId())));
-            default: throw new IllegalStateException();
-        }
+        return switch (peer.getType()) {
+            case CHAT, CHANNEL -> Optional.ofNullable(chats.get(peer));
+            case USER -> Optional.ofNullable(users.get(peer))
+                    .map(u -> new PrivateChat(client, u, users.get(client.getSelfId())));
+        };
+    }
+
+    public Optional<PeerEntity> getPeer(Id peer) {
+        return switch (peer.getType()) {
+            case CHAT, CHANNEL -> Optional.ofNullable(chats.get(peer));
+            case USER -> Optional.ofNullable(users.get(peer));
+        };
     }
 
     public U getUpdate() {

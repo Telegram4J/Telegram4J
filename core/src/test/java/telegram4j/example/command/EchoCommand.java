@@ -3,6 +3,7 @@ package telegram4j.example.command;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 import telegram4j.core.event.domain.message.SendMessageEvent;
+import telegram4j.core.spec.ReplyToMessageSpec;
 import telegram4j.core.spec.SendMessageSpec;
 
 @TelegramCommand(command = "echo", description = "Repeat text.")
@@ -16,7 +17,7 @@ public class EchoCommand implements Command {
                     int spc = text.indexOf(' ');
                     return c.sendMessage(SendMessageSpec.builder()
                             .message(spc == -1 ? "Missing echo text." : text.substring(spc + 1))
-                            .replyToMessageId(event.getMessage().getId())
+                            .replyTo(ReplyToMessageSpec.of(event.getMessage()))
                             .build());
                 });
     }

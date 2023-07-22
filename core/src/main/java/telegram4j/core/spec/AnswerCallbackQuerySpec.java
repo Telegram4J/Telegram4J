@@ -83,8 +83,7 @@ public final class AnswerCallbackQuerySpec {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof AnswerCallbackQuerySpec)) return false;
-        AnswerCallbackQuerySpec that = (AnswerCallbackQuerySpec) o;
+        if (!(o instanceof AnswerCallbackQuerySpec that)) return false;
         return alert == that.alert
                 && Objects.equals(message, that.message)
                 && Objects.equals(url, that.url)

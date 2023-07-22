@@ -15,10 +15,7 @@ import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageEntity;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.markup.ReplyMarkup;
-import telegram4j.core.spec.AnswerInlineCallbackQuerySpec;
-import telegram4j.core.spec.BotCommandScopeSpec;
-import telegram4j.core.spec.EditMessageSpec;
-import telegram4j.core.spec.SendMessageSpec;
+import telegram4j.core.spec.*;
 import telegram4j.core.spec.inline.InlineMessageSpec;
 import telegram4j.core.spec.inline.InlineResultArticleSpec;
 import telegram4j.core.spec.markup.InlineButtonSpec;
@@ -81,7 +78,7 @@ public class BotButtonExample {
             return Mono.justOrEmpty(event.getChat())
                     .switchIfEmpty(event.getMessage().getChat())
                     .flatMap(chat -> chat.sendMessage(SendMessageSpec.of("Please select an inline button!")
-                            .withReplyTo(event.getMessage())
+                            .withReplyTo(ReplyToMessageSpec.of(event.getMessage()))
                             .withReplyMarkup(ReplyMarkupSpec.inlineKeyboard(List.of(
                                     List.of(InlineButtonSpec.callback("Callback button", false,
                                                     Unpooled.copyInt(ThreadLocalRandom.current().nextInt())),
@@ -113,7 +110,7 @@ public class BotButtonExample {
                     .flatMap(chat -> chat.sendMessage(SendMessageSpec.of("Please select a reply button! " +
                                     "_Note: I have different keyboards in groups and private chats_")
                             .withReplyMarkup(chat.getType() == Chat.Type.PRIVATE ? dmMarkup : groupsMarkup)
-                            .withReplyTo(event.getMessage())));
+                            .withReplyTo(ReplyToMessageSpec.of(event.getMessage()))));
         }
     }
 

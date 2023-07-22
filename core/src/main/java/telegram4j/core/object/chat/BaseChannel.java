@@ -312,8 +312,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     @Override
     public Mono<Void> editTitle(String newTitle) {
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputChannelExact(id)
                 .flatMap(channel -> client.getServiceHolder().getChatService()
                         .editTitle(channel, newTitle));
     }
@@ -321,10 +320,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     @Override
     public Mono<Channel> editAdmin(Id userId, Iterable<AdminRight> rights, String rank) {
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
-                .zipWith(client.asInputUser(userId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(userId)))
+        return Mono.zip(client.asInputChannelExact(id), client.asInputUserExact(userId))
                 .flatMap(TupleUtils.function((channel, peer) -> client.getServiceHolder().getChatService()
                         .editAdmin(channel, peer, ImmutableChatAdminRights.of(
                                 MappingUtil.getMaskValue(rights)), rank)))
@@ -336,10 +332,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     public Mono<Channel> editBanned(Id peerId, Iterable<ChatRestrictions.Right> rights, @Nullable Instant untilTimestamp) {
         int untilDate = untilTimestamp != null ? Math.toIntExact(untilTimestamp.getEpochSecond()) : 0;
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
-                .zipWith(client.asInputPeer(peerId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId)))
+        return Mono.zip(client.asInputChannelExact(id), client.asInputPeerExact(peerId))
                 .flatMap(TupleUtils.function((channel, peer) -> client.getServiceHolder().getChatService()
                         .editBanned(channel, peer, ImmutableChatBannedRights.of(
                                 MappingUtil.getMaskValue(rights), untilDate))))
@@ -351,8 +344,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     public Mono<Void> editPhoto(@Nullable BaseInputPhoto spec) {
         var photo = spec != null ? ImmutableBaseInputChatPhoto.of(spec) : InputChatPhotoEmpty.instance();
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputChannelExact(id)
                 .flatMap(channel -> client.getServiceHolder().getChatService()
                         .editPhoto(channel, photo));
     }
@@ -361,8 +353,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     public Mono<Void> editPhoto(@Nullable InputChatUploadedPhoto spec) {
         var photo = spec != null ? spec : InputChatPhotoEmpty.instance();
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputChannelExact(id)
                 .flatMap(channel -> client.getServiceHolder().getChatService()
                         .editPhoto(channel, photo));
     }
@@ -370,21 +361,20 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     @Override
     public Mono<Void> leave() {
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputChannelExact(id)
                 .flatMap(client.getServiceHolder().getChatService()::leaveChannel);
     }
 
     @Override
     public Mono<ChatParticipant> getParticipantById(EntityRetrievalStrategy strategy, Id peerId) {
-        return client.withRetrievalStrategy(strategy).getParticipantById(getId(), peerId);
+        return client.withRetrievalStrategy(strategy)
+                .getParticipantById(getId(), peerId);
     }
 
     @Override
     public Flux<ChatParticipant> getParticipants(ChannelParticipantsFilter filter, int offset, int limit) {
         Id id = getId();
-        return client.asInputChannel(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputChannelExact(id)
                 .flatMapMany(channel -> PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
                                 .getParticipants(channel, filter, o, limit, 0), BaseChannelParticipants::count, offset, limit)
                         .flatMap(data -> {
@@ -398,7 +388,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
                             return Flux.fromIterable(data.participants())
                                     .map(c -> {
                                         Id peerId = Id.of(TlEntityUtil.getUserId(c));
-                                        MentionablePeer peer = switch (peerId.getType()) {
+                                        var peer = switch (peerId.getType()) {
                                             case USER -> users.get(peerId);
                                             case CHANNEL -> chats.get(peerId);
                                             case CHAT -> throw new IllegalStateException();
@@ -414,8 +404,7 @@ sealed abstract class BaseChannel extends BaseChat implements Channel
     @Override
     public Mono<Boolean> editAbout(String newAbout) {
         Id id = getId();
-        return client.asInputPeer(id)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(id))
+        return client.asInputPeerExact(id)
                 .flatMap(channel -> client.getServiceHolder().getChatService()
                         .editChatAbout(channel, newAbout));
     }

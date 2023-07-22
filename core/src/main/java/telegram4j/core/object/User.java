@@ -392,7 +392,7 @@ public final class User implements MentionablePeer {
      * @return A {@link Flux} emitting {@link Photo} objects.
      */
     public Flux<Photo> getPhotos(int offset, long maxId, int limit) {
-        return client.asInputUser(getId())
+        return client.asInputUserExact(getId())
                 .flatMapMany(u -> {
                     var inputPeer = TlEntityUtil.toInputPeer(u);
                     return PaginationSupport.paginate(o -> client.getServiceHolder().getUserService()

@@ -130,8 +130,7 @@ public final class EditMessageSpec {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof EditMessageSpec)) return false;
-        EditMessageSpec other = (EditMessageSpec) o;
+        if (!(o instanceof EditMessageSpec other)) return false;
         return equalsTo(other);
     }
 

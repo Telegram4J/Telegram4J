@@ -73,11 +73,11 @@ public class MessagePeerReaction implements TelegramObject {
             Id peerId = getPeerId();
             EntityRetriever retriever = client.withRetrievalStrategy(strategy);
 
-            switch (peerId.getType()) {
-                case USER: return retriever.getUserById(peerId);
-                case CHANNEL: return retriever.getChatById(peerId);
-                default: throw new IllegalStateException("Unexpected type of peer id");
-            }
+            return switch (peerId.getType()) {
+                case USER -> retriever.getUserById(peerId);
+                case CHANNEL -> retriever.getChatById(peerId);
+                default -> throw new IllegalStateException("Unexpected type of peer id");
+            };
         })
         .cast(MentionablePeer.class);
     }

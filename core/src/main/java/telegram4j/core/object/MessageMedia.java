@@ -71,7 +71,9 @@ public sealed class MessageMedia implements TelegramObject {
         POLL,
 
         /** Message dice. */
-        DICE
+        DICE,
+
+        STORY
     }
 
     public static final class Geo extends MessageMedia {
@@ -465,6 +467,15 @@ public sealed class MessageMedia implements TelegramObject {
             return "MessageMediaDice{" +
                     "data=" + data +
                     '}';
+        }
+    }
+
+    public static final class Story extends MessageMedia {
+        private final MessageMediaStory data;
+
+        public Story(MTProtoTelegramClient client, MessageMediaStory data) {
+            super(client, Type.STORY);
+            this.data = data;
         }
     }
 }

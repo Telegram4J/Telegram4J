@@ -3,7 +3,7 @@ package telegram4j.core.event.domain.message;
 import io.netty.buffer.ByteBuf;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
-import telegram4j.core.object.User;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.Poll.Flag;
 
@@ -15,13 +15,13 @@ import java.util.stream.Collectors;
 public final class MessagePollVoteEvent extends MessageEvent {
     @Nullable
     private final Poll poll;
-    private final User user;
+    private final PeerEntity peer;
     private final List<ByteBuf> options;
 
-    public MessagePollVoteEvent(MTProtoTelegramClient client, @Nullable Poll poll, User user, List<ByteBuf> options) {
+    public MessagePollVoteEvent(MTProtoTelegramClient client, @Nullable Poll poll, PeerEntity peer, List<ByteBuf> options) {
         super(client);
         this.poll = poll;
-        this.user = user;
+        this.peer = peer;
         this.options = options;
     }
 
@@ -35,12 +35,12 @@ public final class MessagePollVoteEvent extends MessageEvent {
     }
 
     /**
-     * Gets voted user.
+     * Gets voted peer.
      *
-     * @return The voted user.
+     * @return The voted peer.
      */
-    public User getUser() {
-        return user;
+    public PeerEntity getPeer() {
+        return peer;
     }
 
     /**
@@ -59,7 +59,7 @@ public final class MessagePollVoteEvent extends MessageEvent {
     public String toString() {
         return "MessagePollVoteEvent{" +
                 "poll=" + poll +
-                ", user=" + user +
+                ", peer=" + peer +
                 ", options=" + options +
                 '}';
     }

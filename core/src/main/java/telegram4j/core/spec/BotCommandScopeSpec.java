@@ -5,6 +5,7 @@ import reactor.function.TupleUtils;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
+import telegram4j.core.internal.MonoSpec;
 import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.core.object.chat.Channel;
 import telegram4j.core.object.chat.Chat;
@@ -16,7 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /** Represents a scope where the bot commands will be valid. */
-public final class BotCommandScopeSpec {
+public final class BotCommandScopeSpec implements MonoSpec<BotCommandScope> {
     private final Type type;
     @Nullable
     private final Id peerId;
@@ -63,31 +64,27 @@ public final class BotCommandScopeSpec {
         return Optional.ofNullable(userId);
     }
 
-    public Mono<BotCommandScope> asData(MTProtoTelegramClient client) {
+    @Override
+    public Mono<BotCommandScope> resolve(MTProtoTelegramClient client) {
         return Mono.defer(() -> switch (type) {
             case CHAT_ADMINS -> Mono.just(BotCommandScopeChatAdmins.instance());
             case CHATS -> Mono.just(BotCommandScopeChats.instance());
             case DEFAULT -> Mono.just(BotCommandScopeDefault.instance());
             case PEER -> {
                 Objects.requireNonNull(peerId);
-                yield client.asInputPeer(peerId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                yield client.asInputPeerExact(peerId)
                         .map(ImmutableBotCommandScopePeer::of);
             }
             case PEER_ADMINS -> {
                 Objects.requireNonNull(peerId);
-                yield client.asInputPeer(peerId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
+                yield client.asInputPeerExact(peerId)
                         .map(ImmutableBotCommandScopePeerAdmins::of);
             }
             case PEER_USER -> {
                 Objects.requireNonNull(peerId);
                 Objects.requireNonNull(userId);
-                yield client.asInputPeer(peerId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
-                        .zipWith(client.asInputUser(userId)
-                                .switchIfEmpty(MappingUtil.unresolvedPeer(userId)))
-                        .map(TupleUtils.function(ImmutableBotCommandScopePeerUser::of));
+                yield Mono.zip(client.asInputPeerExact(peerId), client.asInputUserExact(userId),
+                        ImmutableBotCommandScopePeerUser::of);
             }
             case USERS -> Mono.just(BotCommandScopeUsers.instance());
         });

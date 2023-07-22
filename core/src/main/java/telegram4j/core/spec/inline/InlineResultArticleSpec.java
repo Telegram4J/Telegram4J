@@ -171,16 +171,14 @@ public final class InlineResultArticleSpec implements InlineResultSpec {
 
         private Builder from(Object object) {
             Objects.requireNonNull(object);
-            if (object instanceof InlineResultArticleSpec) {
-                InlineResultArticleSpec instance = (InlineResultArticleSpec) object;
+            if (object instanceof InlineResultArticleSpec instance) {
                 description(instance.description);
                 id(instance.id);
                 title(instance.title);
                 message(instance.message);
                 thumb(instance.thumb);
                 url(instance.url);
-            } else if (object instanceof InlineResultSpec) {
-                InlineResultSpec instance = (InlineResultSpec) object;
+            } else if (object instanceof InlineResultSpec instance) {
                 message(instance.message());
                 id(instance.id());
             }

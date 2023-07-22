@@ -364,8 +364,7 @@ public final class GroupChat extends BaseChat implements GroupChatPeer {
      * @return A {@link Mono} emitting on successful completion nothing.
      */
     public Mono<Void> deleteChatParticipant(Id userId, boolean revokeHistory) {
-        return client.asInputUser(userId)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
+        return client.asInputUserExact(userId)
                 .flatMap(p -> client.getServiceHolder().getChatService()
                         .deleteChatUser(minData.id(), p, revokeHistory));
     }

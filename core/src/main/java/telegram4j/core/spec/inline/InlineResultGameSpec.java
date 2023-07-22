@@ -52,8 +52,7 @@ public final class InlineResultGameSpec implements InlineResultSpec {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof InlineResultGameSpec)) return false;
-        InlineResultGameSpec that = (InlineResultGameSpec) o;
+        if (!(o instanceof InlineResultGameSpec that)) return false;
         return shortName.equals(that.shortName) && id.equals(that.id) && message.equals(that.message);
     }
 
@@ -110,13 +109,11 @@ public final class InlineResultGameSpec implements InlineResultSpec {
 
         private Builder from(Object object) {
             Objects.requireNonNull(object);
-            if (object instanceof InlineResultGameSpec) {
-                InlineResultGameSpec instance = (InlineResultGameSpec) object;
+            if (object instanceof InlineResultGameSpec instance) {
                 shortName(instance.shortName);
                 message(instance.message);
                 id(instance.id);
-            } else if (object instanceof InlineResultSpec) {
-                InlineResultSpec instance = (InlineResultSpec) object;
+            } else if (object instanceof InlineResultSpec instance) {
                 message(instance.message());
                 id(instance.id());
             }

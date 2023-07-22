@@ -1,15 +1,12 @@
 package telegram4j.core.spec.media;
 
-import reactor.core.publisher.Mono;
-import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MonoSpec;
 import telegram4j.tl.InputMedia;
 
 // TODO: Implement spec for inputMediaGame
-public sealed interface InputMediaSpec
+public sealed interface InputMediaSpec extends MonoSpec<InputMedia>
         permits InputMediaContactSpec, InputMediaDiceSpec, InputMediaDocumentSpec,
                 InputMediaGeoLiveSpec, InputMediaGeoPointSpec, InputMediaPhotoSpec,
                 InputMediaPollSpec, InputMediaUploadedDocumentSpec, InputMediaUploadedPhotoSpec,
                 InputMediaVenueSpec {
-
-    Mono<InputMedia> asData(MTProtoTelegramClient client);
 }

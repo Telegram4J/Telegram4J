@@ -6,9 +6,10 @@ import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.object.MessageMedia;
-import telegram4j.core.object.MessageReplyHeader;
+import telegram4j.core.object.MessageReplyToMessageHeader;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever;
@@ -23,7 +24,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.Duration;
 import java.util.function.Function;
 
 public class DownloadBotExample {
@@ -60,7 +60,9 @@ public class DownloadBotExample {
                             .filter(e -> e.getChat().map(c -> c.getType() == Chat.Type.PRIVATE).orElse(false))
                             // Reply to message with media or send new one
                             .flatMap(e -> e.getMessage().getReplyTo()
-                                    .map(MessageReplyHeader::getMessage)
+                                    .map(header -> header instanceof MessageReplyToMessageHeader m
+                                            ? m.getMessage()
+                                            : Mono.<AuxiliaryMessages>empty())
                                     .orElse(Mono.empty())
                                     .map(msg -> msg.getMessages().get(0))
                                     .defaultIfEmpty(e.getMessage()))

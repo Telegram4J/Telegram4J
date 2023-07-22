@@ -179,10 +179,8 @@ public class RpcEntityRetriever implements EntityRetriever {
                                 .orElse(null);
                         return new ChatParticipant(client, user, member, chatId);
                     });
-            case CHANNEL -> client.asInputChannel(chatId)
-                    .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
-                    .zipWith(client.asInputPeer(peerId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId)))
+            case CHANNEL -> client.asInputChannelExact(chatId)
+                    .zipWith(client.asInputPeerExact(peerId))
                     .flatMap(TupleUtils.function(serviceHolder.getChatService()::getParticipant))
                     .map(p -> EntityFactory.createChannelParticipant(client, p, chatId, peerId));
             default -> Mono.error(new IllegalArgumentException("Incorrect id type, expected: CHANNEL or " +
@@ -209,8 +207,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                         return Flux.fromIterable(participants)
                                 .map(p -> new ChatParticipant(client, users.get(Id.ofUser(p.userId())), p, chatId));
                     });
-            case CHANNEL -> client.asInputChannel(chatId)
-                    .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+            case CHANNEL -> client.asInputChannelExact(chatId)
                     .flatMapMany(channel -> {
                         Id channelId = Id.of(channel, client.getSelfId());
                         return PaginationSupport.paginate(o -> client.getServiceHolder().getChatService()
@@ -250,8 +247,7 @@ public class RpcEntityRetriever implements EntityRetriever {
                     if (chatId == null || chatId.getType() != Id.Type.CHANNEL) {
                         return serviceHolder.getChatService().getMessages(messageIds);
                     }
-                    return client.asInputChannel(chatId)
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(chatId))
+                    return client.asInputChannelExact(chatId)
                             .flatMap(c -> serviceHolder.getChatService().getMessages(c, messageIds));
                 })
                 .filter(m -> m.identifier() != MessagesNotModified.ID) // just ignore

@@ -16,12 +16,14 @@ import telegram4j.core.retriever.EntityRetrievalStrategy;
 import telegram4j.core.retriever.PreferredEntityRetriever;
 import telegram4j.example.auth.CodeAuthorization;
 import telegram4j.example.auth.QrEncodeCodeAuthorization;
+import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
 import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
+import telegram4j.tl.request.help.GetConfig;
 
 import java.nio.file.Path;
 import java.util.concurrent.ThreadLocalRandom;

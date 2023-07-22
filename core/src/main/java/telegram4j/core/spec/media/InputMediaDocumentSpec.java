@@ -66,7 +66,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<InputMedia> resolve(MTProtoTelegramClient client) {
         return Mono.fromCallable(() -> {
             Integer ttlSeconds = autoDeleteDuration()
                     .map(Duration::getSeconds)
@@ -125,8 +125,7 @@ public final class InputMediaDocumentSpec implements InputMediaSpec {
     @Override
     public boolean equals(@Nullable Object o) {
         if (this == o) return true;
-        if (!(o instanceof InputMediaDocumentSpec)) return false;
-        InputMediaDocumentSpec that = (InputMediaDocumentSpec) o;
+        if (!(o instanceof InputMediaDocumentSpec that)) return false;
         return spoiler == that.spoiler &&
                 Objects.equals(documentFri, that.documentFri) &&
                 Objects.equals(documentUrl, that.documentUrl) &&

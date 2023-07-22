@@ -22,7 +22,7 @@ public final class InputMediaDiceSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaDice> resolve(MTProtoTelegramClient client) {
         return Mono.just(ImmutableInputMediaDice.of(emoticon()));
     }
 

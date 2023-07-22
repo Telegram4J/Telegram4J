@@ -1,6 +1,7 @@
 package telegram4j.core.object;
 
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.mtproto.file.Context;
 import telegram4j.tl.BaseDocument;
 import telegram4j.tl.DocumentAttributeVideo;
@@ -8,6 +9,8 @@ import telegram4j.tl.WebDocument;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /** Inferred from document attributes type of video and gif documents. */
 public final class Video extends Document {
@@ -67,7 +70,11 @@ public final class Video extends Document {
      * @return The duration of video document.
      */
     public Duration getDuration() {
-        return Duration.ofSeconds(videoData.duration());
+        return MappingUtil.durationFromSeconds(videoData.duration());
+    }
+
+    public Optional<Integer> getPreloadPrefixSize() {
+        return Optional.ofNullable(videoData.preloadPrefixSize());
     }
 
     /**

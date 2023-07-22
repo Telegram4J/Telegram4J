@@ -63,7 +63,7 @@ public class ExampleReplyBot {
                         // telegram api may not deliver chat info and in this situation it's necessary to retrieve chat
                         .switchIfEmpty(e.getMessage().getChat())
                         .flatMap(c -> c.sendMessage(SendMessageSpec.of("pong!")
-                                .withReplyTo(e.getMessage()))))
+                                .withReplyTo(ReplyToMessageSpec.of(e.getMessage())))))
                 .subscribe();
 
         // wait until the client is stopped through `client.disconnect()`

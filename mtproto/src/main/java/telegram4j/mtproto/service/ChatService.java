@@ -414,10 +414,6 @@ public class ChatService extends RpcService {
         return sendMain(ImmutableGetCommonChats.of(user, maxId, limit));
     }
 
-    public Mono<Chats> getAllChats(Iterable<Long> exceptIds) {
-        return sendMain(GetAllChats.builder().exceptIds(exceptIds).build());
-    }
-
     public Mono<WebPage> getWebPage(String url, int hash) {
         return sendMain(ImmutableGetWebPage.of(url, hash));
     }
@@ -461,10 +457,6 @@ public class ChatService extends RpcService {
     @Compatible(Type.BOT)
     public Mono<MessageMedia> uploadMedia(InputPeer peer, InputMedia media) {
         return sendMain(ImmutableUploadMedia.of(peer, media));
-    }
-
-    public Mono<Updates> sendScreenshotNotification(InputPeer peer, int replyToMsgId, long randomId) {
-        return sendMain(ImmutableSendScreenshotNotification.of(peer, replyToMsgId, randomId));
     }
 
     public Mono<FavedStickers> getFavedStickers(long hash) {
@@ -1071,12 +1063,12 @@ public class ChatService extends RpcService {
                     switch (updates.identifier()) {
                         case UpdateShortSentMessage.ID -> {
                             var casted = (UpdateShortSentMessage) updates;
-                            Integer replyToMsgId = request.replyToMsgId();
+                            var replyTo = request.replyTo();
                             var message = BaseMessage.builder()
                                     .flags(request.flags() | casted.flags())
                                     .peerId(chat)
                                     .fromId(author)
-                                    .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(0, replyToMsgId) : null)
+                                    .replyTo(replyTo != null ? toOutput(replyTo) : null)
                                     .message(request.message())
                                     .id(casted.id())
                                     .replyMarkup(request.replyMarkup())
@@ -1175,6 +1167,8 @@ public class ChatService extends RpcService {
                                     m = e.message();
                                 } else if (u instanceof UpdateNewChannelMessage e) {
                                     m = e.message();
+                                } else if (u instanceof UpdateNewScheduledMessage e) {
+                                    m = e.message();
                                 } else {
                                     continue;
                                 }
@@ -1194,6 +1188,24 @@ public class ChatService extends RpcService {
                 }));
     }
 
+    static MessageReplyHeader toOutput(InputReplyTo input) {
+        return switch (input.identifier()) {
+            case InputReplyToMessage.ID -> {
+                var replyTo = (InputReplyToMessage) input;
+                yield BaseMessageReplyHeader.builder()
+                        .replyToMsgId(replyTo.replyToMsgId())
+                        .replyToTopId(replyTo.topMsgId())
+                        .build();
+            }
+            case InputReplyToStory.ID -> {
+                var replyTo = (InputReplyToStory) input;
+
+                throw new UnsupportedOperationException("InputReplyToStory");
+            }
+            default -> throw new IllegalArgumentException("Unexpected InputReplyTo type: " + input);
+        };
+    }
+
     private Mono<Tuple2<Message, Updates>> transformMessageUpdate(SendMessage request, Updates updates) {
         return toPeer(request.peer())
                 .zipWith(Mono.justOrEmpty(request.sendAs())
@@ -1203,12 +1215,12 @@ public class ChatService extends RpcService {
                     switch (updates.identifier()) {
                         case UpdateShortSentMessage.ID -> {
                             var casted = (UpdateShortSentMessage) updates;
-                            Integer replyToMsgId = request.replyToMsgId();
+                            var replyTo = request.replyTo();
                             var message = BaseMessage.builder()
                                     .flags(request.flags() | casted.flags())
                                     .peerId(chat)
                                     .fromId(author)
-                                    .replyTo(replyToMsgId != null ? ImmutableMessageReplyHeader.of(0, replyToMsgId) : null)
+                                    .replyTo(replyTo != null ? toOutput(replyTo) : null)
                                     .message(request.message())
                                     .id(casted.id())
                                     .replyMarkup(request.replyMarkup())

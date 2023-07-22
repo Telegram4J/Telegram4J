@@ -12,10 +12,7 @@ import telegram4j.core.object.media.Poll;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.core.util.parser.EntityParserFactory;
 import telegram4j.core.util.parser.EntityParserSupport;
-import telegram4j.tl.ImmutablePollAnswer;
-import telegram4j.tl.InputMedia;
-import telegram4j.tl.InputMediaPoll;
-import telegram4j.tl.PollAnswer;
+import telegram4j.tl.*;
 import telegram4j.tl.api.TlEncodingUtil;
 
 import java.time.Duration;
@@ -107,7 +104,7 @@ public final class InputMediaPollSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaPoll> resolve(MTProtoTelegramClient client) {
         return Mono.defer(() -> parser()
                 .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                 .flatMap(parser -> solution().map(s -> EntityParserSupport.parse(client, parser.apply(s.trim()))))

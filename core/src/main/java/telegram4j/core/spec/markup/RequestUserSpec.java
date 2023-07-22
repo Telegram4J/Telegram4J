@@ -1,7 +1,7 @@
 package telegram4j.core.spec.markup;
 
 import reactor.util.annotation.Nullable;
-import telegram4j.tl.RequestPeerType;
+import telegram4j.tl.ImmutableRequestPeerTypeUser;
 import telegram4j.tl.RequestPeerTypeUser;
 
 import java.util.Objects;
@@ -48,7 +48,7 @@ public final class RequestUserSpec implements RequestPeerSpec {
     }
 
     @Override
-    public RequestPeerType asData() {
+    public ImmutableRequestPeerTypeUser resolve() {
         return RequestPeerTypeUser.builder()
                 .bot(isBot)
                 .premium(isPremium)

@@ -179,7 +179,7 @@ class MessageUpdateHandlers {
                 .map(r -> r.messages().stream()
                         .map(d -> EntityFactory.createMessage(context.getClient(), d,
                                 Objects.requireNonNull(chatId))) // must be present
-                        .collect(Collectors.toUnmodifiableList()))
+                        .toList())
                 .orElse(null);
 
         return Flux.just(new DeleteMessagesEvent(context.getClient(), chatId,
@@ -231,8 +231,9 @@ class MessageUpdateHandlers {
         Poll poll = Optional.ofNullable(context.getOld())
                 .map(d -> new Poll(context.getClient(), d))
                 .orElse(null);
-        User user = Objects.requireNonNull(context.getUsers().get(Id.ofUser(upd.userId())));
+        var peer = context.getPeer(Id.of(upd.peer()))
+                .orElseThrow();
 
-        return Flux.just(new MessagePollVoteEvent(context.getClient(), poll, user, upd.options()));
+        return Flux.just(new MessagePollVoteEvent(context.getClient(), poll, peer, upd.options()));
     }
 }

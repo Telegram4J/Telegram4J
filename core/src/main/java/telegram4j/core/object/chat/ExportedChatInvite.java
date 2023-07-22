@@ -2,6 +2,7 @@ package telegram4j.core.object.chat;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -73,7 +74,7 @@ public final class ExportedChatInvite implements TelegramObject {
      * @return A {@link Mono} emitting on successful completion the {@link User}.
      */
     public Mono<User> getAdmin() {
-        return client.getUserById(Id.ofUser(data.adminId()));
+        return getAdmin(MappingUtil.IDENTITY_RETRIEVER);
     }
 
     /**
@@ -84,7 +85,7 @@ public final class ExportedChatInvite implements TelegramObject {
      */
     public Mono<User> getAdmin(EntityRetrievalStrategy strategy) {
         return client.withRetrievalStrategy(strategy)
-                .getUserById(Id.ofUser(data.adminId()));
+                .getUserById(getAdminId());
     }
 
     /**

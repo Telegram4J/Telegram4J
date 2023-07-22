@@ -1,9 +1,10 @@
 package telegram4j.core.spec.markup;
 
 import telegram4j.core.object.markup.KeyboardButton;
+import telegram4j.core.spec.Spec;
 import telegram4j.tl.RequestPeerType;
 
-public sealed interface RequestPeerSpec
+public sealed interface RequestPeerSpec extends Spec<RequestPeerType>
         permits RequestUserSpec, RequestChatSpec, RequestChannelSpec {
 
     static RequestPeerSpec from(KeyboardButton.RequestPeer requestPeer) {
@@ -21,5 +22,6 @@ public sealed interface RequestPeerSpec
         }
     }
 
-    RequestPeerType asData();
+    @Override
+    RequestPeerType resolve();
 }

@@ -5,6 +5,7 @@ import reactor.core.publisher.Mono;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.MessageEntity;
+import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.TelegramObject;
 import telegram4j.core.object.User;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
@@ -70,7 +71,7 @@ public final class PollResults implements TelegramObject {
     public Set<Id> getRecentVotersIds() {
         return Optional.ofNullable(data.recentVoters())
                 .map(l -> l.stream()
-                        .map(Id::ofUser)
+                        .map(Id::of)
                         .collect(Collectors.toSet()))
                 .orElse(Set.of());
     }
@@ -78,9 +79,9 @@ public final class PollResults implements TelegramObject {
     /**
      * Requests to retrieve the recent poll voters.
      *
-     * @return A {@link Flux} which emits the {@link User voters}.
+     * @return A {@link Flux} which emits the {@link PeerEntity voters}.
      */
-    public Flux<User> getRecentVoters() {
+    public Flux<PeerEntity> getRecentVoters() {
         return getRecentVoters(MappingUtil.IDENTITY_RETRIEVER);
     }
 
@@ -88,13 +89,13 @@ public final class PollResults implements TelegramObject {
      * Requests to retrieve the recent poll voters using specified retrieval strategy.
      *
      * @param strategy The strategy to apply.
-     * @return A {@link Flux} which emits the {@link User voters}.
+     * @return A {@link Flux} which emits the {@link PeerEntity voters}.
      */
-    public Flux<User> getRecentVoters(EntityRetrievalStrategy strategy) {
+    public Flux<PeerEntity> getRecentVoters(EntityRetrievalStrategy strategy) {
         var retriever = client.withRetrievalStrategy(strategy);
         return Mono.justOrEmpty(data.recentVoters())
                 .flatMapIterable(Function.identity())
-                .flatMap(id -> retriever.getUserById(Id.ofUser(id)));
+                .flatMap(id -> retriever.getPeerById(Id.of(id)));
     }
 
     /**

@@ -120,8 +120,7 @@ public final class AnswerInlineCallbackQuerySpec {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof AnswerInlineCallbackQuerySpec)) return false;
-        AnswerInlineCallbackQuerySpec that = (AnswerInlineCallbackQuerySpec) o;
+        if (!(o instanceof AnswerInlineCallbackQuerySpec that)) return false;
         return flags.equals(that.flags)
                 && results.equals(that.results)
                 && cacheTime.equals(that.cacheTime)

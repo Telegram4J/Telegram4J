@@ -134,8 +134,7 @@ public final class ForwardMessagesSpec {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ForwardMessagesSpec)) return false;
-        ForwardMessagesSpec other = (ForwardMessagesSpec) o;
+        if (!(o instanceof ForwardMessagesSpec other)) return false;
         return flags.equals(other.flags)
                 && ids.equals(other.ids)
                 && Objects.equals(scheduleTimestamp, other.scheduleTimestamp)

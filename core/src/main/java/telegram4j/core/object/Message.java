@@ -160,7 +160,7 @@ public final class Message implements Restrictable {
      */
     public Optional<MessageReplyHeader> getReplyTo() {
         return Optional.ofNullable(data.map(BaseMessage::replyTo, MessageService::replyTo))
-                .map(d -> new MessageReplyHeader(client, d, resolvedChatId));
+                .map(d -> EntityFactory.createMessageReplyHeader(client, d, resolvedChatId));
     }
 
     /**
@@ -178,7 +178,8 @@ public final class Message implements Restrictable {
      * @return The {@link Duration} of the message Time-To-Live, if present.
      */
     public Optional<Duration> getAutoDeleteDuration() {
-        return Optional.ofNullable(data.map(BaseMessage::ttlPeriod, MessageService::ttlPeriod)).map(Duration::ofSeconds);
+        return Optional.ofNullable(data.map(BaseMessage::ttlPeriod, MessageService::ttlPeriod))
+                .map(Duration::ofSeconds);
     }
 
     /**
@@ -384,7 +385,7 @@ public final class Message implements Restrictable {
      * @return A {@link Mono} emitting on successful completion updated message.
      */
     public Mono<Message> edit(EditMessageSpec spec) {
-        return client.asInputPeer(resolvedChatId).switchIfEmpty(MappingUtil.unresolvedPeer(resolvedChatId)).flatMap(peer -> {
+        return client.asInputPeerExact(resolvedChatId).flatMap(peer -> {
             var parsed = spec.parser()
                     .or(() -> client.getMtProtoResources().getDefaultEntityParser())
                     .flatMap(parser -> spec.message().map(s -> EntityParserSupport.parse(client, parser.apply(s.trim()))))
@@ -394,7 +395,7 @@ public final class Message implements Restrictable {
                     .flatMap(r -> r.asData(client));
 
             var media = Mono.justOrEmpty(spec.media())
-                    .flatMap(r -> r.asData(client));
+                    .flatMap(r -> r.resolve(client));
 
             Id chatId = Id.of(peer, client.getSelfId());
 
@@ -443,8 +444,7 @@ public final class Message implements Restrictable {
      * @return A {@link Mono} emitting on successful completion nothing.
      */
     public Mono<Void> pin(Set<PinMessageFlags> flags) {
-        return client.asInputPeer(resolvedChatId)
-                .switchIfEmpty(MappingUtil.unresolvedPeer(resolvedChatId))
+        return client.asInputPeerExact(resolvedChatId)
                 .flatMap(peer -> client.getServiceHolder().getChatService()
                         .updatePinnedMessage(UpdatePinnedMessage.builder()
                                 .peer(peer)

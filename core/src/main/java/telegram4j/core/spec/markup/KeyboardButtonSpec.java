@@ -42,8 +42,7 @@ public sealed interface KeyboardButtonSpec permits InlineButtonSpec, ReplyButton
             case URL_AUTH -> {
                 var s = (InlineButtonSpec) this;
                 Id userId = s.userId().orElseThrow();
-                yield client.asInputUser(userId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
+                yield client.asInputUserExact(userId)
                         .map(id -> ImmutableInputKeyboardButtonUrlAuth.builder()
                                 .text(text())
                                 .fwdText(s.forwardText().orElse(null))
@@ -61,8 +60,7 @@ public sealed interface KeyboardButtonSpec permits InlineButtonSpec, ReplyButton
             case USER_PROFILE -> {
                 var s = (InlineButtonSpec) this;
                 Id userId = s.userId().orElseThrow();
-                yield client.asInputUser(userId)
-                        .switchIfEmpty(MappingUtil.unresolvedPeer(userId))
+                yield client.asInputUserExact(userId)
                         .map(id -> ImmutableInputKeyboardButtonUserProfile.of(text(), id));
             }
             case SWITCH_INLINE -> {
@@ -88,7 +86,9 @@ public sealed interface KeyboardButtonSpec permits InlineButtonSpec, ReplyButton
             case REQUEST_PEER -> {
                 var s = (ReplyButtonSpec) this;
                 yield Mono.just(ImmutableKeyboardButtonRequestPeer.of(text(),
-                        s.buttonId().orElseThrow(), s.requestPeer().map(RequestPeerSpec::asData).orElseThrow()));
+                        s.buttonId().orElseThrow(), s.requestPeer()
+                                .map(RequestPeerSpec::resolve)
+                                .orElseThrow()));
             }
             // unsupported
             case WEB_VIEW, SIMPLE_WEB_VIEW -> throw new UnsupportedOperationException("Web view not yet supported");

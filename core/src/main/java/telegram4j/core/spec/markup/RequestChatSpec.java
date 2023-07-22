@@ -5,7 +5,7 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.tl.ImmutableChatAdminRights;
-import telegram4j.tl.RequestPeerType;
+import telegram4j.tl.ImmutableRequestPeerTypeChat;
 import telegram4j.tl.RequestPeerTypeChat;
 
 import java.util.EnumSet;
@@ -122,7 +122,7 @@ public final class RequestChatSpec implements RequestPeerSpec {
     }
 
     @Override
-    public RequestPeerType asData() {
+    public ImmutableRequestPeerTypeChat resolve() {
         return RequestPeerTypeChat.builder()
                 .creator(ownedByUser)
                 .botParticipant(isBotParticipant)

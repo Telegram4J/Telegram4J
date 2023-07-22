@@ -4,6 +4,7 @@ import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.mtproto.file.FileReferenceId;
+import telegram4j.tl.ImmutableInputMediaUploadedPhoto;
 import telegram4j.tl.InputFile;
 import telegram4j.tl.InputMedia;
 import telegram4j.tl.InputMediaUploadedPhoto;
@@ -54,7 +55,7 @@ public final class InputMediaUploadedPhotoSpec implements InputMediaSpec {
     }
 
     @Override
-    public Mono<InputMedia> asData(MTProtoTelegramClient client) {
+    public Mono<ImmutableInputMediaUploadedPhoto> resolve(MTProtoTelegramClient client) {
         return Mono.fromSupplier(() -> InputMediaUploadedPhoto.builder()
                 .file(file)
                 .stickers(stickers()

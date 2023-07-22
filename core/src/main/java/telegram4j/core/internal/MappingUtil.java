@@ -17,9 +17,11 @@ import telegram4j.tl.BaseMessage;
 import telegram4j.tl.MessageService;
 import telegram4j.tl.Peer;
 
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 public class MappingUtil {
     private MappingUtil() {}
@@ -34,6 +36,12 @@ public class MappingUtil {
             mask |= value.mask();
         }
         return mask;
+    }
+
+    public static Duration durationFromSeconds(double seconds) {
+        long secs = (long) seconds;
+        long millis = (long) ((seconds - secs) * 1000);
+        return Duration.ofSeconds(secs, TimeUnit.MILLISECONDS.toNanos(millis));
     }
 
     public static <E extends Enum<E>> EnumSet<E> copyAsEnumSet(Class<E> type, Iterable<E> iterable) {

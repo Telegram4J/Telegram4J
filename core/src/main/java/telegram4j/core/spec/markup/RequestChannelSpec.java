@@ -5,6 +5,7 @@ import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.chat.AdminRight;
 import telegram4j.core.util.ImmutableEnumSet;
 import telegram4j.tl.ImmutableChatAdminRights;
+import telegram4j.tl.ImmutableRequestPeerTypeBroadcast;
 import telegram4j.tl.RequestPeerType;
 import telegram4j.tl.RequestPeerTypeBroadcast;
 
@@ -72,7 +73,7 @@ public final class RequestChannelSpec implements RequestPeerSpec {
     }
 
     @Override
-    public RequestPeerType asData() {
+    public ImmutableRequestPeerTypeBroadcast resolve() {
         return RequestPeerTypeBroadcast.builder()
                 .creator(ownedByUser)
                 .hasUsername(hasUsername)

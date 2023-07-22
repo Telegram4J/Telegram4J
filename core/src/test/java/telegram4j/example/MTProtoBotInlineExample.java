@@ -68,7 +68,7 @@ public class MTProtoBotInlineExample {
 
     private static Publisher<?> handleInlineQuery(InlineQueryEvent e) {
         switch (e.getQuery().toLowerCase()) {
-            case "article":
+            case "article" -> {
                 return e.answer(AnswerInlineCallbackQuerySpec.builder()
                         .cacheTime(CACHE_TIME)
                         .addResult(InlineResultArticleSpec.builder()
@@ -79,7 +79,8 @@ public class MTProtoBotInlineExample {
                                         .withParser(EntityParserFactory.MARKDOWN_V2))
                                 .build())
                         .build());
-            case "gif":
+            }
+            case "gif" -> {
                 return e.answer(AnswerInlineCallbackQuerySpec.builder()
                         .cacheTime(CACHE_TIME)
                         .addResult(InlineResultDocumentSpec.builder()
@@ -97,7 +98,8 @@ public class MTProtoBotInlineExample {
                                                 InlineButtonSpec.url("no!", "https://www.youtube.com/watch?v=dQw4w9WgXcQ"))))))
                                 .build())
                         .build());
-            case "photo":
+            }
+            case "photo" -> {
                 return e.answer(AnswerInlineCallbackQuerySpec.builder()
                         .cacheTime(CACHE_TIME)
                         .addResult(InlineResultDocumentSpec.builder()
@@ -108,7 +110,8 @@ public class MTProtoBotInlineExample {
                                 .message(InlineMessageSpec.mediaAuto("Icon of TDesktop"))
                                 .build())
                         .build());
-            case "lastphoto":
+            }
+            case "lastphoto" -> {
                 FileReferenceId photoId = lastPhotoId;
                 if (photoId == null) {
                     return Mono.empty();
@@ -122,7 +125,10 @@ public class MTProtoBotInlineExample {
                                         .withParser(EntityParserFactory.MARKDOWN_V2))
                                 .build())
                         .build());
-            default: return Mono.empty();
+            }
+            default -> {
+                return Mono.empty();
+            }
         }
     }
 }

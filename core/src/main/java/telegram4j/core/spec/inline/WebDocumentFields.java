@@ -53,8 +53,7 @@ public class WebDocumentFields {
         @Override
         public boolean equals(@Nullable Object o) {
             if (this == o) return true;
-            if (!(o instanceof Size)) return false;
-            Size size = (Size) o;
+            if (!(o instanceof Size size)) return false;
             return width == size.width && height == size.height;
         }
 
