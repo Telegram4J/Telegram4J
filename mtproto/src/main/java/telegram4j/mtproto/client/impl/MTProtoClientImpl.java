@@ -41,7 +41,6 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.net.InetSocketAddress;
-import java.net.SocketException;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayDeque;
@@ -127,42 +126,12 @@ public final class MTProtoClientImpl implements MTProtoClient {
 
                         ch.pipeline().addLast(CORE, new MTProtoClientHandler());
                     }
-
                 });
     }
 
     class MTProtoClientHandler extends ChannelInboundHandlerAdapter {
         private MTProtoEncryption encryption;
         private ScheduledFuture<?> reconnectHandle;
-
-        private boolean setException(Throwable t) {
-            boolean resume = false;
-
-            if (t instanceof IOException) {
-                log.error("[C:0x" + id + "] Socket exception: " + t);
-
-                resume = true;
-            } else if (t instanceof TransportException te) {
-                log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
-            } else if (t instanceof AuthorizationException) {
-                log.error("[C:0x" + id + "] Exception during auth key generation", t);
-            } else if (t instanceof MTProtoException) {
-                log.error("[C:0x" + id + "] Validation exception", t);
-
-                resume = true;
-            } else if (t instanceof Handshake.TimeoutException) {
-                log.error("[C:0x" + id + "] Handshake timeout");
-
-                resume = true;
-            } else {
-                log.error("[C:0x" + id + "] Unexpected client exception", t);
-            }
-
-            reconnectCtx.setException(t);
-            reconnectCtx.setResume(resume);
-
-            return resume;
-        }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable t) {
@@ -373,6 +342,35 @@ public final class MTProtoClientImpl implements MTProtoClient {
         }
     }
 
+    boolean setException(Throwable t) {
+        boolean resume = false;
+
+        if (t instanceof IOException) {
+            log.error("[C:0x" + id + "] Socket exception: " + t);
+
+            resume = true;
+        } else if (t instanceof TransportException te) {
+            log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
+        } else if (t instanceof AuthorizationException) {
+            log.error("[C:0x" + id + "] Exception during auth key generation", t);
+        } else if (t instanceof MTProtoException) {
+            log.error("[C:0x" + id + "] Validation exception", t);
+
+            resume = true;
+        } else if (t instanceof Handshake.TimeoutException) {
+            log.error("[C:0x" + id + "] Handshake timeout");
+
+            resume = true;
+        } else {
+            log.error("[C:0x" + id + "] Unexpected client exception", t);
+        }
+
+        reconnectCtx.setException(t);
+        reconnectCtx.setResume(resume);
+
+        return resume;
+    }
+
     void logStateChange(int newState) {
         int old = oldState;
         if (old == newState) {
@@ -408,26 +406,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
         future.addListener(notify -> {
             Throwable t = notify.cause();
             if (t != null) {
-                boolean reconnect = false;
-                if (t instanceof TransportException te) {
-                    log.error("[C:0x" + id + "] Transport exception, code: " + te.getCode());
-                } else if (t instanceof AuthorizationException) {
-                    log.error("[C:0x" + id + "] Exception during auth key generation", t);
-                } else if (t instanceof MTProtoException) {
-                    log.error("[C:0x" + id + "] Validation exception", t);
-
-                    reconnect = true;
-                } else if (t instanceof SocketException) {
-                    log.error("[C:0x" + id + "] Socket exception: " + t);
-
-                    reconnect = true;
-                } else if (t instanceof Handshake.TimeoutException) {
-                    log.error("[C:0x" + id + "] Handshake timeout");
-
-                    reconnect = true;
-                } else {
-                    log.error("[C:0x" + id + "] Unexpected client exception", t);
-                }
+                boolean reconnect = setException(t);
 
                 long backoff;
                 if (reconnect && (backoff = nextBackoff(t)) != -1) {
@@ -448,7 +427,8 @@ public final class MTProtoClientImpl implements MTProtoClient {
 
         var backoff = options.reconnectionStrategy().computeBackoff(reconnectCtx);
         if (backoff != null) {
-            Preconditions.requireArgument(!backoff.isNegative(), options.reconnectionStrategy() + " returned negative backoff");
+            Preconditions.requireArgument(!backoff.isNegative(), () ->
+                    options.reconnectionStrategy() + " returned negative backoff");
 
             reconnectCtx.setLastBackoff(backoff);
         }

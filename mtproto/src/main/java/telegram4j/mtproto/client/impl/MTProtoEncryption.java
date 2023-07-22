@@ -64,7 +64,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         this.ctx = ctx;
     }
 
@@ -89,7 +89,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
             throw new TransportException(val);
         }
 
-        decryptPayload(ctx, payload);
+        decryptPayload(payload);
     }
 
     @Override
@@ -298,7 +298,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
         ctx.write(packet, promise);
     }
 
-    void decryptPayload(ChannelHandlerContext ctx, ByteBuf data) throws Exception {
+    void decryptPayload(ByteBuf data) throws Exception {
         long authKeyId = data.readLongLE();
 
         var currentAuthKey = client.authData.authKey();
@@ -361,7 +361,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
             decrypted.release();
         }
 
-        handleServiceMessage(ctx, obj, messageId);
+        handleServiceMessage(obj, messageId);
     }
 
     Object decompressIfApplicable(Object obj) throws IOException {
@@ -387,7 +387,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
         }
     }
 
-    void handleServiceMessage(ChannelHandlerContext ctx, Object obj, long messageId) throws Exception {
+    void handleServiceMessage(Object obj, long messageId) throws Exception {
         if (obj instanceof RpcResult rpcResult) {
             messageId = rpcResult.reqMsgId();
             obj = decompressIfApplicable(rpcResult.result());
@@ -459,7 +459,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
             }
 
             for (Message message : messageContainer.messages()) {
-                handleServiceMessage(ctx, message.body(), message.msgId());
+                handleServiceMessage(message.body(), message.msgId());
             }
             return;
         }
@@ -550,7 +550,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
             }
 
             client.authData.updateTimeOffset((int) (messageId >> 32));
-            resendUnwrapped(ctx, badMsgNotification.badMsgId());
+            resendUnwrapped(badMsgNotification.badMsgId());
             return;
         }
 
@@ -585,7 +585,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
                     int state = c.getByte(i) & 7;
                     switch (state) {
                         // not received, resend
-                        case 1, 2, 3 -> resendUnwrapped(ctx, msgId);
+                        case 1, 2, 3 -> resendUnwrapped(msgId);
                         case 4 -> { // acknowledged
                             var sub = (RpcRequest) client.requests.get(msgId);
                             if (sub == null) {
@@ -666,7 +666,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
         }
     }
 
-    void resendUnwrapped(ChannelHandlerContext ctx, long possibleCntMsgId) throws Exception {
+    void resendUnwrapped(long possibleCntMsgId) throws Exception {
         var request = client.requests.remove(possibleCntMsgId);
         if (request == null) {
             return;
@@ -679,7 +679,7 @@ final class MTProtoEncryption extends ChannelDuplexHandler {
         if (request instanceof ContainerRequest container) {
             resendUnwrappedContainer(container);
         } else if (request instanceof ContainerizedRequest cntMessage) {
-            client.resend.add((RpcRequest) cntMessage); // TODO
+            client.resend.add((RpcRequest) cntMessage); // TODO must extend it
 
             var cnt = (ContainerRequest) client.requests.remove(cntMessage.containerMsgId());
             if (cnt != null) {

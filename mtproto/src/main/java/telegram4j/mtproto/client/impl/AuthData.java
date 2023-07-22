@@ -1,10 +1,9 @@
 package telegram4j.mtproto.client.impl;
 
-import reactor.util.Logger;
-import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.auth.AuthKey;
+import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.tl.api.TlMethod;
 import telegram4j.tl.mtproto.MessageContainer;
 import telegram4j.tl.mtproto.MsgResendReq;
@@ -15,7 +14,6 @@ import telegram4j.tl.request.mtproto.PingDelayDisconnect;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.StringJoiner;
 
 import static telegram4j.mtproto.util.CryptoUtil.random;
 
@@ -170,10 +168,7 @@ final class AuthData {
         };
     }
 
-    class InboundMessageIdRegister {
-
-        private static final Logger log = Loggers.getLogger("telegram4j.mtproto.InboundMessageIdRegister");
-
+    static class InboundMessageIdRegister {
         // The implementation of ordered set
         // with fixed size. If new messageId's are added
         // then the oldest id of set will be replaced by new value.
@@ -183,15 +178,12 @@ final class AuthData {
         private boolean overflow;
 
         public InboundMessageIdRegister(int size) {
-            // The buffer will not work correctly on very small sizes,
-            // so I use sizes greater than 16
-
-            assert size > 1 && (size & size - 1) == 0;
+            Preconditions.requireArgument(size >= 8, "size should not be smaller 8 for correct work");
             buffer = new long[size];
         }
 
         public boolean check(long messageId) {
-            assert messageId != 0;
+            // assert messageId != 0;
 
             int p = pos;
             int min = overflow ? p : 0;

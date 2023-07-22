@@ -7,8 +7,9 @@ import java.util.Optional;
 
 /** Immutable implementation of {@code MTProtoClient.Stats}. */
 public class ImmutableStats implements MTProtoClient.Stats {
-    private final Instant lastQueryTimestamp;
-    private final int queriesCount;
+    @Nullable
+    protected final Instant lastQueryTimestamp;
+    protected final int queriesCount;
 
     public ImmutableStats(@Nullable Instant lastQueryTimestamp, int queriesCount) {
         this.lastQueryTimestamp = lastQueryTimestamp;
