@@ -10,16 +10,17 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.core.AuthorizationHandler.Resources;
+import telegram4j.core.auth.AuthorizationHandler.Resources;
 import telegram4j.core.MTProtoTelegramClient;
 import telegram4j.core.auth.CodeAuthorizationHandler;
-import telegram4j.core.auth.CodeAuthorizationHandler.*;
+import telegram4j.core.auth.CodeAuthorizationHandler.CodeAction;
+import telegram4j.core.auth.CodeAuthorizationHandler.PhoneNumberAction;
 import telegram4j.core.auth.QRAuthorizationHandler;
 import telegram4j.core.auth.TwoFactorHandler;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.PreferredEntityRetriever.Setting;
+import telegram4j.core.retriever.PreferredEntityRetriever;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
@@ -55,16 +56,16 @@ public class UserBotExample {
                 if (hint != null) {
                     base += " (Hint: '" + hint + "')";
                 }
-                ctx.logInfo(base);
+                ctx.log(base);
 
                 return sc.nextLine();
             });
         }
     }
 
-    static class StdINCallback extends Base2FACallback implements Callback {
+    static class StdINCallback extends Base2FACallback implements CodeAuthorizationHandler.Callback {
 
-        private String cleanPhoneNumber(String phoneNumber) {
+        static String cleanPhoneNumber(String phoneNumber) {
             if (phoneNumber.startsWith("+"))
                 phoneNumber = phoneNumber.substring(1);
             phoneNumber = phoneNumber.replaceAll(" ", "");
@@ -72,9 +73,9 @@ public class UserBotExample {
         }
 
         @Override
-        public Mono<PhoneNumberAction> onPhoneNumber(Resources res, PhoneNumberContext ctx) {
+        public Mono<PhoneNumberAction> onPhoneNumber(Resources res, CodeAuthorizationHandler.PhoneNumberContext ctx) {
             return Mono.fromCallable(() -> {
-                ctx.logInfo("Please write your phone number");
+                ctx.log("Please write your phone number");
 
                 String phoneNumber = sc.nextLine();
                 if (phoneNumber.equalsIgnoreCase("cancel")) {
@@ -85,14 +86,14 @@ public class UserBotExample {
         }
 
         @Override
-        public Mono<CodeAction> onSentCode(Resources res, PhoneCodeContext ctx) {
+        public Mono<CodeAction> onSentCode(Resources res, CodeAuthorizationHandler.PhoneCodeContext ctx) {
             return Mono.fromCallable(() -> {
-                ctx.logInfo("Code has been sent, write it");
+                ctx.log("Code has been sent, write it");
 
                 String codeOrCommand = sc.nextLine();
                 return switch (codeOrCommand.toLowerCase(Locale.ROOT)) {
                     case "resend" -> {
-                        ctx.logInfo("Resending code...");
+                        ctx.log("Resending code...");
                         yield CodeAction.resend();
                     }
                     case "cancel" -> CodeAction.cancel();
@@ -104,11 +105,12 @@ public class UserBotExample {
 
     static class QRCallback extends Base2FACallback implements QRAuthorizationHandler.Callback {
         @Override
-        public Mono<Void> onLoginToken(Resources res, QRAuthorizationHandler.Context ctx) {
-            return Mono.fromRunnable(() -> {
-                ctx.logInfo("New QR code (you have " + ctx.expiresIn().toSeconds() + " seconds to scan it)");
+        public Mono<ActionType> onLoginToken(Resources res, QRAuthorizationHandler.Context ctx) {
+            return Mono.fromSupplier(() -> {
+                ctx.log("New QR code (you have " + ctx.expiresIn().toSeconds() + " seconds to scan it)");
 
                 System.out.println(generateQr(ctx.loginUrl()));
+                return ActionType.STOP;
             });
         }
 
@@ -144,8 +146,8 @@ public class UserBotExample {
                                 : new CodeAuthorizationHandler(new StdINCallback())
                 )
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
-                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL,
-                        Setting.FULL))
+                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, PreferredEntityRetriever.Setting.FULL,
+                        PreferredEntityRetriever.Setting.FULL))
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
                         Path.of("core/src/test/resources/t4j.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),

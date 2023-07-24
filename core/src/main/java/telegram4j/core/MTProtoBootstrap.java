@@ -12,6 +12,7 @@ import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import reactor.util.concurrent.Queues;
+import telegram4j.core.auth.AuthorizationHandler;
 import telegram4j.core.event.DefaultEventDispatcher;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.EventDispatcher;
@@ -421,7 +422,8 @@ public final class MTProtoBootstrap {
                         return authorizeClient(clientGroup, storeLayout, dcOptions)
                                 .flatMap(selfId -> initializeClient(selfId, clientGroup, mtProtoOptions, updatesScheduler));
                     }))
-                    .subscribe(sink::success, sink::error));
+                    .doOnSuccess(sink::success)
+                    .subscribe(null, sink::error));
 
             sink.onCancel(composite);
         });

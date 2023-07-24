@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBufAllocator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.annotation.Nullable;
+import telegram4j.core.auth.AuthorizationHandler;
 import telegram4j.core.auxiliary.AuxiliaryMessages;
 import telegram4j.core.auxiliary.AuxiliaryStickerSet;
 import telegram4j.core.event.EventAdapter;

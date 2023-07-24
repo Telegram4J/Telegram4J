@@ -6,7 +6,7 @@ import io.netty.buffer.Unpooled;
 import reactor.core.publisher.Mono;
 import reactor.util.Logger;
 import reactor.util.Loggers;
-import telegram4j.core.AuthorizationHandler.Resources;
+import telegram4j.core.auth.AuthorizationHandler.Resources;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.internal.Preconditions;
@@ -33,7 +33,11 @@ import static telegram4j.mtproto.util.CryptoUtil.*;
 
 // Ported version of https://gist.github.com/andrew-ld/524332536dbc8c525ed80d281855a0d4 and
 // https://github.com/DrKLO/Telegram/blob/abb896635f849a93968a2ba35a944c91b4978be4/TMessagesProj/src/main/java/org/telegram/messenger/SRPHelper.java#L29
-/** Base implementation of 2FA password handler. */
+/**
+ * Base implementation of 2FA password handler.
+ *
+ * @apiNote This class not intended to be shared, as it not thread-safe.
+ */
 public class TwoFactorHandler {
     protected static final Logger log = Loggers.getLogger(TwoFactorHandler.class);
 
@@ -68,12 +72,104 @@ public class TwoFactorHandler {
                                 }));
     }
 
+    /**
+     * Interface for controlling 2FA flow.
+     *
+     * @implSpec It's preferable to make the implementation ready for sharing.
+     */
+    public interface Callback {
+
+        /**
+         * Reads required 2FA password from input.
+         *
+         * @param res An auth flow resources.
+         * @param ctx Current context of 2FA. Do not cache this value.
+         * @return A {@link Mono} emitting on successful completion 2FA password.
+         * Any emitted errors or empty signals will terminate auth flow.
+         */
+        Mono<String> on2FAPassword(Resources res, Context ctx);
+
+        /**
+         * Handles errors for invalid 2FA password.
+         *
+         * @param res An auth flow resources.
+         * @param ctx Current context of 2FA. Do not cache this value.
+         * @return A {@link Mono} emitting on successful completion action to do.
+         * Any emitted errors or empty signals will terminate auth flow.
+         */
+        default Mono<ActionType> on2FAPasswordInvalid(Resources res, Context ctx) {
+            return Mono.fromSupplier(() -> {
+                ctx.log("Specified 2FA password is invalid, retrying...");
+                return ActionType.RETRY;
+            });
+        }
+
+        /** Enumeration that represents action for handling errors. */
+        enum ActionType {
+            /** Retry current auth step, like a resending of code or re-checking 2FA password. */
+            RETRY,
+
+            /** Cancel and stop current auth. */
+            STOP
+        }
+    }
+
+    /**
+     * Context available when entering a 2FA password.
+     *
+     * @apiNote Class not intended to be cached when passed to the callback methods, as it
+     * not thread-safe and mutable.
+     */
+    public static class Context extends AuthContext {
+
+        protected String password;
+        protected Password srp;
+        // Terrible class name.
+        protected PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo;
+
+        protected Context(String id) {
+            super(id);
+        }
+
+        protected void init(Password srp) {
+            if (!srp.hasPassword()) {
+                throw new UnsupportedOperationException("No 2FA password");
+            }
+
+            var currentAlgo = srp.currentAlgo();
+            if (!(currentAlgo instanceof PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo)) {
+                throw new IllegalStateException("Unexpected type of current algorithm: " + currentAlgo);
+            }
+
+            this.srp = srp;
+            this.algo = algo;
+        }
+
+        @Override
+        protected void log0(String message) {
+            log.info(message);
+        }
+
+        // Public API
+        // =============
+
+        /** {@return A current SRP parameters} */
+        public final Password srp() {
+            Password srp = this.srp;
+            Preconditions.requireState(srp != null, "srp has not initialized yet");
+            return srp;
+        }
+    }
+
+    // Implementation code
+    // ======================
+
     protected Mono<Password> getPassword() {
         return res.clientGroup().send(DcId.main(), GetPassword.instance());
     }
 
     protected <T> Mono<T> cancel() {
-        return Mono.error(new RuntimeException("[I:0x" + ctx.id + "] 2FA authorization cancelled"));
+        return Mono.empty();
     }
 
     protected BaseInputCheckPasswordSRP generateSRP(Context ctx) {
@@ -132,69 +228,8 @@ public class TwoFactorHandler {
         return res.clientGroup().send(DcId.main(), ImmutableCheckPassword.of(inputCheckPasswordSRP));
     }
 
-    public interface Callback {
-
-        Mono<String> on2FAPassword(Resources res, Context ctx);
-
-        default Mono<ActionType> on2FAPasswordInvalid(Resources res, Context ctx) {
-            return Mono.fromSupplier(() -> {
-                ctx.logInfo("Specified 2FA password is invalid, retrying...");
-                return ActionType.RETRY;
-            });
-        }
-
-        /** Enumeration that represents action for handling errors. */
-        enum ActionType {
-            /** Retry current auth step, like a resend code or re-check 2FA password. */
-            RETRY,
-
-            /** Cancel and stop current auth. */
-            STOP
-        }
-    }
-
-    public static class Context extends AuthContext {
-
-        protected String password;
-        protected Password srp;
-        // Terrible class name.
-        protected PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo;
-
-        protected Context(String id) {
-            super(id);
-        }
-
-        protected void init(Password srp) {
-            if (!srp.hasPassword()) {
-                throw new UnsupportedOperationException("No password 2FA");
-            }
-
-            var currentAlgo = srp.currentAlgo();
-            if (!(currentAlgo instanceof PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo)) {
-                throw new IllegalStateException("Unexpected type of current algorithm: " + currentAlgo);
-            }
-
-            this.srp = srp;
-            this.algo = algo;
-        }
-
-        @Override
-        protected void logInfo0(String message) {
-            log.info(message);
-        }
-
-        // Public API
-        // =============
-
-        public final Password srp() {
-            Password srp = this.srp;
-            Preconditions.requireState(srp != null, "srp has not initialized yet");
-            return srp;
-        }
-    }
-
     // Implementation details
-    // ======================
+    // =========================
 
     // > the numbers must be used in big-endian form, padded to 2048 bits
     // Copied and adapted from https://github.com/DrKLO/Telegram/blob/dfd74f809e97d1ecad9672fc7388cb0223a95dfc/TMessagesProj/src/main/java/org/telegram/messenger/SRPHelper.java#L9
