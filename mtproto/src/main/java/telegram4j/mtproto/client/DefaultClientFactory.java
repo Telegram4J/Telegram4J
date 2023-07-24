@@ -7,8 +7,8 @@ import telegram4j.mtproto.client.impl.MTProtoClientImpl;
 import java.util.Objects;
 
 public class DefaultClientFactory implements ClientFactory {
-    private final MTProtoOptions mtprotoOptions;
-    private final MTProtoClient.Options clientOptions;
+    protected final MTProtoOptions mtprotoOptions;
+    protected final MTProtoClient.Options clientOptions;
 
     public DefaultClientFactory(MTProtoOptions mtprotoOptions, MTProtoClient.Options clientOptions) {
         this.mtprotoOptions = Objects.requireNonNull(mtprotoOptions);

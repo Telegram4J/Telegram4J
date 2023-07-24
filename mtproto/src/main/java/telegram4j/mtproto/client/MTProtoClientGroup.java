@@ -37,6 +37,7 @@ public interface MTProtoClientGroup {
      */
     <R> Mono<R> send(DcId id, TlMethod<? extends R> method);
 
+    /** {@return A dispatcher for life updates} */
     UpdateDispatcher updates();
 
     /**

@@ -31,11 +31,17 @@ public final class ResettableInterval implements Disposable {
 
     public void start(Duration delay, Duration period) {
         swap.update(Flux.interval(delay, period, timerScheduler)
-                .subscribe(tick -> sink.emitNext(tick, Sinks.EmitFailureHandler.FAIL_FAST)));
+                .subscribe(tick -> sink.emitNext(tick, Sinks.EmitFailureHandler.FAIL_FAST),
+                        e -> sink.emitError(e, Sinks.EmitFailureHandler.FAIL_FAST)));
     }
 
     public Flux<Long> ticks() {
         return sink.asFlux();
+    }
+
+    public void close() {
+        swap.dispose();
+        sink.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST);
     }
 
     @Override
