@@ -11,6 +11,12 @@ public class Preconditions {
         }
     }
 
+    public static void requireState(boolean expression, String message) {
+        if (!expression) {
+            throw new IllegalStateException(message);
+        }
+    }
+
     public static void requireState(boolean expression, Supplier<String> message) {
         if (!expression) {
             throw new IllegalStateException(message.get());
