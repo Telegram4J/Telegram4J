@@ -110,7 +110,7 @@ public class UserBotExample {
                 ctx.log("New QR code (you have " + ctx.expiresIn().toSeconds() + " seconds to scan it)");
 
                 System.out.println(generateQr(ctx.loginUrl()));
-                return ActionType.STOP;
+                return ActionType.RETRY;
             });
         }
 
