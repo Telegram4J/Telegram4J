@@ -2,6 +2,7 @@ package telegram4j.example;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetector.Level;
 import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
@@ -9,13 +10,16 @@ import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.Logger;
 import reactor.util.Loggers;
+import telegram4j.core.AuthorizationHandler.Resources;
 import telegram4j.core.MTProtoTelegramClient;
+import telegram4j.core.auth.CodeAuthorizationHandler;
+import telegram4j.core.auth.CodeAuthorizationHandler.*;
+import telegram4j.core.auth.QRAuthorizationHandler;
+import telegram4j.core.auth.TwoFactorHandler;
 import telegram4j.core.event.DefaultUpdatesManager;
 import telegram4j.core.event.DefaultUpdatesManager.Options;
 import telegram4j.core.retriever.EntityRetrievalStrategy;
-import telegram4j.core.retriever.PreferredEntityRetriever;
-import telegram4j.example.auth.CodeAuthorization;
-import telegram4j.example.auth.QrEncodeCodeAuthorization;
+import telegram4j.core.retriever.PreferredEntityRetriever.Setting;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.MTProtoRetrySpec;
 import telegram4j.mtproto.MethodPredicate;
@@ -23,21 +27,109 @@ import telegram4j.mtproto.ResponseTransformer;
 import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
-import telegram4j.tl.request.help.GetConfig;
+import telegram4j.tl.request.account.ImmutableUpdateStatus;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.Scanner;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class UserBotExample {
 
     private static final Logger log = Loggers.getLogger(UserBotExample.class);
 
+    static class Base2FACallback implements TwoFactorHandler.Callback {
+        protected final Scanner sc = new Scanner(System.in);
+
+        @Override
+        public Mono<String> on2FAPassword(Resources res, TwoFactorHandler.Context ctx) {
+            return Mono.fromCallable(() -> {
+                String base = "The account is protected by 2FA, please write password";
+                String hint = ctx.srp().hint();
+                if (hint != null) {
+                    base += " (Hint: '" + hint + "')";
+                }
+                ctx.logInfo(base);
+
+                return sc.nextLine();
+            });
+        }
+    }
+
+    static class StdINCallback extends Base2FACallback implements Callback {
+
+        private String cleanPhoneNumber(String phoneNumber) {
+            if (phoneNumber.startsWith("+"))
+                phoneNumber = phoneNumber.substring(1);
+            phoneNumber = phoneNumber.replaceAll(" ", "");
+            return phoneNumber;
+        }
+
+        @Override
+        public Mono<PhoneNumberAction> onPhoneNumber(Resources res, PhoneNumberContext ctx) {
+            return Mono.fromCallable(() -> {
+                ctx.logInfo("Please write your phone number");
+
+                String phoneNumber = sc.nextLine();
+                if (phoneNumber.equalsIgnoreCase("cancel")) {
+                    return PhoneNumberAction.cancel();
+                }
+                return PhoneNumberAction.of(cleanPhoneNumber(phoneNumber));
+            });
+        }
+
+        @Override
+        public Mono<CodeAction> onSentCode(Resources res, PhoneCodeContext ctx) {
+            return Mono.fromCallable(() -> {
+                ctx.logInfo("Code has been sent, write it");
+
+                String codeOrCommand = sc.nextLine();
+                return switch (codeOrCommand.toLowerCase(Locale.ROOT)) {
+                    case "resend" -> {
+                        ctx.logInfo("Resending code...");
+                        yield CodeAction.resend();
+                    }
+                    case "cancel" -> CodeAction.cancel();
+                    default -> CodeAction.of(codeOrCommand);
+                };
+            });
+        }
+    }
+
+    static class QRCallback extends Base2FACallback implements QRAuthorizationHandler.Callback {
+        @Override
+        public Mono<Void> onLoginToken(Resources res, QRAuthorizationHandler.Context ctx) {
+            return Mono.fromRunnable(() -> {
+                ctx.logInfo("New QR code (you have " + ctx.expiresIn().toSeconds() + " seconds to scan it)");
+
+                System.out.println(generateQr(ctx.loginUrl()));
+            });
+        }
+
+        static String generateQr(String text) {
+            try {
+                Process v = new ProcessBuilder("qrencode", "-t", "UTF8", text)
+                        .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                        .start();
+
+                return v.inputReader(StandardCharsets.UTF_8).lines()
+                        .collect(Collectors.joining("\n"));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+    }
+
     public static void main(String[] args) {
         // only for testing
         Hooks.onOperatorDebug();
-        ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+        ResourceLeakDetector.setLevel(Level.PARANOID);
 
         ObjectMapper mapper = new ObjectMapper()
                 .registerModule(new TlModule());
@@ -46,12 +138,14 @@ public class UserBotExample {
         String apiHash = System.getenv("TEST_API_HASH");
 
         MTProtoTelegramClient.create(apiId, apiHash,
+                        // Linux way
                         Boolean.getBoolean("useQrAuth")
-                                ? QrEncodeCodeAuthorization::authorize
-                                : CodeAuthorization::authorize)
+                                ? new QRAuthorizationHandler(new QRCallback())
+                                : new CodeAuthorizationHandler(new StdINCallback())
+                )
                 .setEntityRetrieverStrategy(EntityRetrievalStrategy.preferred(
-                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, PreferredEntityRetriever.Setting.FULL,
-                        PreferredEntityRetriever.Setting.FULL))
+                        EntityRetrievalStrategy.STORE_FALLBACK_RPC, Setting.FULL,
+                        Setting.FULL))
                 .setStoreLayout(new FileStoreLayout(new StoreLayoutImpl(Function.identity()),
                         Path.of("core/src/test/resources/t4j.bin")))
                 .addResponseTransformer(ResponseTransformer.retryFloodWait(MethodPredicate.all(),
@@ -89,9 +183,7 @@ public class UserBotExample {
                             .flatMap(e -> {
                                 boolean state = online[0];
                                 online[0] = !state;
-                                return client.getServiceHolder()
-                                        .getAccountService()
-                                        .updateStatus(state);
+                                return client.getMtProtoClientGroup().send(DcId.main(), ImmutableUpdateStatus.of(state));
                             })
                             .then();
 

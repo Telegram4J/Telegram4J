@@ -1,4 +1,4 @@
 @NonNullApi
-package telegram4j.example.auth;
+package telegram4j.core.auth;
 
 import reactor.util.annotation.NonNullApi;

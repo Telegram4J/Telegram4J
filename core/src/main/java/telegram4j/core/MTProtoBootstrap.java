@@ -27,9 +27,6 @@ import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.DhPrimeChecker;
 import telegram4j.mtproto.auth.DhPrimeCheckerCache;
 import telegram4j.mtproto.client.*;
-import telegram4j.mtproto.client.ReconnectionStrategy;
-import telegram4j.mtproto.client.DefaultReconnectionStrategy;
-import telegram4j.mtproto.internal.Preconditions;
 import telegram4j.mtproto.resource.TcpClientResources;
 import telegram4j.mtproto.service.ServiceHolder;
 import telegram4j.mtproto.store.FileStoreLayout;
@@ -56,13 +53,15 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
+import static telegram4j.mtproto.internal.Preconditions.requireArgument;
+
 public final class MTProtoBootstrap {
 
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
 
     private final AuthorizationResources authResources;
     @Nullable
-    private final AuthorisationHandler authHandler;
+    private final AuthorizationHandler authHandler;
     private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
 
     private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
@@ -93,7 +92,7 @@ public final class MTProtoBootstrap {
     private ExecutorService resultPublisher;
     private Scheduler updatesPublisher;
 
-    MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorisationHandler authHandler) {
+    MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorizationHandler authHandler) {
         this.authResources = authResources;
         this.authHandler = authHandler;
     }
@@ -138,7 +137,14 @@ public final class MTProtoBootstrap {
         return this;
     }
 
-    // TODO docs
+    /**
+     * Sets TCP client resources for all MTProto clients.
+     * <p>
+     * If custom resources doesn't set, clients will use {@link TcpClientResources#create()}.
+     *
+     * @param tcpClientResources A new {@link TcpClientResources} for clients.
+     * @return This builder.
+     */
     public MTProtoBootstrap setTcpClientResources(TcpClientResources tcpClientResources) {
         this.tcpClientResources = Objects.requireNonNull(tcpClientResources);
         return this;
@@ -171,6 +177,14 @@ public final class MTProtoBootstrap {
         return this;
     }
 
+    /**
+     * Sets custom {@link ExecutorService} for requests callback handling.
+     * <p>
+     * If no custom {@code ExecutorService} specified, {@link ForkJoinPool#commonPool()} will be used.
+     *
+     * @param resultPublisher A new {@code ExecutorService} for handling RPC results.
+     * @return This builder.
+     */
     public MTProtoBootstrap setResultPublisher(ExecutorService resultPublisher) {
         this.resultPublisher = Objects.requireNonNull(resultPublisher);
         return this;
@@ -200,13 +214,13 @@ public final class MTProtoBootstrap {
     }
 
     public MTProtoBootstrap setAuthKeyLifetime(Duration authKeyLifetime) {
-        Preconditions.requireArgument(!authKeyLifetime.isNegative());
+        requireArgument(!authKeyLifetime.isNegative());
         this.authKeyLifetime = authKeyLifetime;
         return this;
     }
 
     public MTProtoBootstrap setPingInterval(Duration pingInterval) {
-        Preconditions.requireArgument(!pingInterval.isNegative());
+        requireArgument(!pingInterval.isNegative());
         this.pingInterval = pingInterval;
         return this;
     }
@@ -222,7 +236,7 @@ public final class MTProtoBootstrap {
      * @throws IllegalArgumentException if type of specified option is not {@link DataCenter.Type#REGULAR}.
      */
     public MTProtoBootstrap setDataCenter(DataCenter dataCenter) {
-        Preconditions.requireArgument(dataCenter.getType() == DataCenter.Type.REGULAR, "Invalid type for main DC");
+        requireArgument(dataCenter.getType() == DataCenter.Type.REGULAR, "Invalid type for main DC");
         this.dataCenter = dataCenter;
         return this;
     }
@@ -323,7 +337,7 @@ public final class MTProtoBootstrap {
      * @return This builder.
      */
     public MTProtoBootstrap setGzipCompressionSizeThreshold(int gzipCompressionSizeThreshold) {
-        Preconditions.requireArgument(gzipCompressionSizeThreshold > 0, "Invalid threshold value");
+        requireArgument(gzipCompressionSizeThreshold > 0, "gzipCompressionSizeThreshold must be positive");
         this.gzipCompressionSizeThreshold = gzipCompressionSizeThreshold;
         return this;
     }
@@ -428,7 +442,7 @@ public final class MTProtoBootstrap {
                             return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
                                     .doOnNext(ign -> sink.success(extractSelfId(ign.get(0))))
                                     .onErrorResume(RpcException.isErrorCode(401), t ->
-                                            authHandler.process(clientGroup, storeLayout, authResources)
+                                            authHandler.process(new AuthorizationHandler.Resources(clientGroup, storeLayout, authResources))
                                             // users can emit empty signals if they want to gracefully destroy the client
                                             .switchIfEmpty(Mono.defer(clientGroup::close)
                                                     .then(Mono.fromRunnable(sink::success)))

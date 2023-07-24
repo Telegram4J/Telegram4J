@@ -31,4 +31,5 @@ module telegram4j.core {
     exports telegram4j.core.spec.media;
     exports telegram4j.core.util;
     exports telegram4j.core.util.parser;
+    exports telegram4j.core.auth;
 }
