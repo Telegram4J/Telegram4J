@@ -105,7 +105,7 @@ public final class MTProtoTelegramClient implements EntityRetriever {
      * @param authHandler The user authorization implementation. QR or phone code handler.
      * @return The new {@link MTProtoBootstrap} client builder.
      */
-    public static MTProtoBootstrap create(int apiId, String apiHash, AuthorisationHandler authHandler) {
+    public static MTProtoBootstrap create(int apiId, String apiHash, AuthorizationHandler authHandler) {
         return new MTProtoBootstrap(new AuthorizationResources(apiId, apiHash), authHandler);
     }
 
