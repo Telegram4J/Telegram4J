@@ -4,6 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.util.concurrent.ScheduledFuture;
 import reactor.util.Logger;
 import reactor.util.Loggers;
@@ -25,6 +26,8 @@ import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import static telegram4j.mtproto.internal.Crypto.sha1Digest;
+import static telegram4j.mtproto.internal.Crypto.sha256Digest;
 import static telegram4j.mtproto.util.CryptoUtil.*;
 
 final class Handshake extends ChannelInboundHandlerAdapter {
@@ -63,7 +66,7 @@ final class Handshake extends ChannelInboundHandlerAdapter {
                 .addListener(future -> {
                     if (future.isSuccess()) {
                         timeoutSchedule = ctx.executor().schedule(() -> {
-                            ctx.pipeline().fireExceptionCaught(new TimeoutException());
+                            ctx.pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE);
                         }, RESPONSE_TIMEOUT, TimeUnit.MILLISECONDS);
                     }
                 });
@@ -223,8 +226,6 @@ final class Handshake extends ChannelInboundHandlerAdapter {
             throw new AuthorizationException("encryptedAnswer size mismatch");
         }
 
-        context.serverDHParams(serverDHParams); // for DhGenRetry
-
         ByteBuf serverNonceAndNewNonceSha1 = sha1Digest(context.serverNonce(), context.newNonce());
         ByteBuf tmpAesKey = Unpooled.wrappedBuffer(
                 sha1Digest(context.newNonce(), context.serverNonce()),
@@ -347,7 +348,7 @@ final class Handshake extends ChannelInboundHandlerAdapter {
         BigInteger authKey = ga.modPow(b, dhPrime);
 
         context.serverTimeDiff(serverDHInnerData.serverTime() - Math.toIntExact(System.currentTimeMillis()/1000));
-        context.authKey(alignKeyZero(toByteBuf(authKey), 256));
+        context.authKey(toByteBuf(authKey));
         context.authKeyHash(sha1Digest(context.authKey()).slice(0, 8));
         context.serverSalt(Long.reverseBytes(context.newNonce().getLong(0) ^ context.serverNonce().getLong(1)));
 
@@ -398,11 +399,9 @@ final class Handshake extends ChannelInboundHandlerAdapter {
         if (!dhGenRetry.serverNonce().equals(context.serverNonce())) throw new AuthorizationException("serverNonce mismatch");
         if (!dhGenRetry.newNonceHash2().equals(newNonceHash)) throw new AuthorizationException("newNonceHash2 mismatch");
 
-        ServerDHParams serverDHParams = context.serverDHParams();
-        log.debug("Retrying dh params extending, attempt: {}", context.retry());
+        // log.debug("Retrying dh params extending, attempt: {}", context.retry());
 
-        // TODO ?
-        handleServerDHParams(ctx, serverDHParams);
+        throw new AuthorizationException();
     }
 
     private void handleDhGenFail(ChannelHandlerContext ctx, DhGenFail dhGenFail) {
@@ -418,10 +417,89 @@ final class Handshake extends ChannelInboundHandlerAdapter {
         throw new AuthorizationException("Failed to create an authorization key");
     }
 
-    static class TimeoutException extends Exception {
-
-        public TimeoutException() {
-            super(null, null, false, false);
+    static ByteBuf align(ByteBuf src, int factor) {
+        if (src.readableBytes() % factor == 0) {
+            return src;
         }
+
+        int padding = factor - src.readableBytes() % factor;
+        byte[] paddingb = new byte[padding];
+        random.nextBytes(paddingb);
+        return Unpooled.wrappedBuffer(src, Unpooled.wrappedBuffer(paddingb));
+    }
+
+    // from https://github.com/tdlib/td/blob/64c718c0a1b02a28a6f628d98cd5fbde1d17c3fa/tdutils/td/utils/crypto.cpp
+    static long pqGcd(long a, long b) {
+        if (a == 0) return b;
+
+        while ((a & 1) == 0) {
+            a >>= 1;
+        }
+
+        // if ((b & 1) == 0)
+        //     throw new IllegalArgumentException("a: " + a + ", b: " + b);
+
+        while (true) {
+            if (a > b) {
+                a = a - b >> 1;
+                while ((a & 1) == 0) {
+                    a >>= 1;
+                }
+            } else if (b > a) {
+                b = b - a >> 1;
+                while ((b & 1) == 0) {
+                    b >>= 1;
+                }
+            } else {
+                return a;
+            }
+        }
+    }
+
+    // returns (c + a * b) % pq
+    static long pqAddMul(long c, long a, long b, long pq) {
+        while (b != 0) {
+            if ((b & 1) != 0) {
+                c += a;
+                if (c >= pq) {
+                    c -= pq;
+                }
+            }
+            a += a;
+            if (a >= pq) {
+                a -= pq;
+            }
+            b >>= 1;
+        }
+        return c;
+    }
+
+    static long pqFactorize(long pq) {
+        if (pq <= 2) return 1;
+        if ((pq & 1) == 0) return 2;
+
+        long g = 0;
+        for (int i = 0, iter = 0; i < 3 || iter < 1000; i++) {
+            long q = (17 + random.nextInt(32)) % (pq - 1);
+            long x = Math.abs(random.nextLong()) % (pq - 1) + 1;
+            long y = x;
+            int lim = 1 << Math.min(5, i) + 18;
+            for (int j = 1; j < lim; j++) {
+                iter++;
+                x = pqAddMul(q, x, x, pq);
+                long z = x < y ? pq + x - y : x - y;
+                g = pqGcd(z, pq);
+                if (g != 1) {
+                    break;
+                }
+                if ((j & j - 1) == 0) {
+                    y = x;
+                }
+            }
+            if (g > 1 && g < pq) {
+                break;
+            }
+        }
+        return g != 0 ? Math.min(pq / g, g) : g;
     }
 }

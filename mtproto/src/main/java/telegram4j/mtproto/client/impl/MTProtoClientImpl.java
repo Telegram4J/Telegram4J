@@ -6,9 +6,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.util.AttributeKey;
 import io.netty.util.NetUtil;
 import io.netty.util.concurrent.EventExecutor;
+import io.netty.util.concurrent.ScheduledFuture;
 import io.netty.util.internal.shaded.org.jctools.queues.MpscArrayQueue;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
@@ -48,7 +50,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -69,7 +70,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
 
     static final int PING_TIMEOUT = 60;
 
-    static final AttributeKey<MonoSink<Void>> NOTIFY = AttributeKey.valueOf("notify");
+    static final AttributeKey<MonoSink<Void>> NOTIFY = AttributeKey.valueOf("$notify");
 
     static final VarHandle CHANNEL_STATE;
     static {
@@ -84,7 +85,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
     volatile ChannelState channelState = ChannelState.disconnected(null);
     int oldState = ChannelState.DISCONNECTED;
     boolean inflightPing;
-    Trigger pingEmitter;
+    ScheduledFuture<?> pingTrigger;
 
     final MTProtoClientGroup group;
     final DcId.Type type;
@@ -161,8 +162,8 @@ public final class MTProtoClientImpl implements MTProtoClient {
 
         @Override
         public void channelInactive(ChannelHandlerContext ctx) {
-            if (pingEmitter != null) {
-                pingEmitter.cancel();
+            if (pingTrigger != null) {
+                pingTrigger.cancel(false);
             }
 
             long backoff;
@@ -241,6 +242,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
                 authData.serverSalt(event.serverSalt());
                 authData.timeOffset(event.serverTimeDiff());
 
+                // TODO: switch thread to publisher
                 mtProtoOptions.storeLayout().updateAuthKey(authData.dc(), event.authKey())
                         .subscribe(null, ctx::fireExceptionCaught);
 
@@ -260,21 +262,12 @@ public final class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addAfter(TRANSPORT, ENCRYPTION, encryption);
 
             if (type == DcId.Type.MAIN) {
+                // TODO: switch thread to publisher
                 mtProtoOptions.storeLayout().updateDataCenter(authData.dc())
                         .subscribe(null, ctx::fireExceptionCaught);
             }
 
-            pingEmitter = Trigger.create(() -> {
-                if (!inflightPing) {
-                    inflightPing = true;
-                    ctx.writeAndFlush(new RpcRequest(ImmutablePingDelayDisconnect.of(System.nanoTime(), PING_TIMEOUT)), ctx.voidPromise());
-                    return;
-                }
-
-                log.debug("[C:0x{}] Closing by ping timeout", id);
-
-                ctx.close();
-            }, ctx.executor(), options.pingInterval());
+            schedulePing(ctx);
 
             if (authData.oldSessionId() != 0) {
                 send(ctx, ImmutableDestroySession.of(authData.oldSessionId()))
@@ -296,6 +289,24 @@ public final class MTProtoClientImpl implements MTProtoClient {
 
                         sendPendingRequests(ctx);
                     }, ctx::fireExceptionCaught);
+        }
+
+        void schedulePing(ChannelHandlerContext ctx) {
+            long period = options.pingInterval().toNanos();
+            pingTrigger = ctx.executor().scheduleWithFixedDelay(() -> sendPing(ctx),
+                    period, period, TimeUnit.NANOSECONDS);
+
+        }
+
+        void sendPing(ChannelHandlerContext ctx) {
+            if (inflightPing) {
+                log.debug("[C:0x{}] Closing by ping timeout", id);
+
+                ctx.close();
+            } else {
+                inflightPing = true;
+                ctx.writeAndFlush(new RpcRequest(ImmutablePingDelayDisconnect.of(System.nanoTime(), PING_TIMEOUT)), ctx.voidPromise());
+            }
         }
 
         void sendPendingRequests(ChannelHandlerContext ctx) {
@@ -323,6 +334,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
             ctx.pipeline().addFirst(TRANSPORT, new TransportCodec(tr));
 
             if (authData.authKey() == null) {
+                // TODO: switch thread to publisher
                 mtProtoOptions.storeLayout().getAuthKey(authData.dc())
                         .switchIfEmpty(Mono.fromRunnable(() -> ctx.executor().execute(() -> {
                             ctx.pipeline().addAfter(TRANSPORT, HANDSHAKE_CODEC, new HandshakeCodec(authData));
@@ -332,8 +344,8 @@ public final class MTProtoClientImpl implements MTProtoClient {
                                     mtProtoOptions.dhPrimeChecker(), mtProtoOptions.publicRsaKeyRegister());
                             ctx.pipeline().addAfter(HANDSHAKE_CODEC, HANDSHAKE, new Handshake(id, authData, handshakeCtx));
                         })))
-                        .subscribe(loaded -> ctx.executor().execute(() -> {
-                            authData.authKey(loaded);
+                        .subscribe(loadedAuthKey -> ctx.executor().execute(() -> {
+                            authData.authKey(loadedAuthKey);
                             configure(ctx);
                         }), ctx::fireExceptionCaught);
             } else {
@@ -357,7 +369,7 @@ public final class MTProtoClientImpl implements MTProtoClient {
             log.error("[C:0x" + id + "] Validation exception", t);
 
             resume = true;
-        } else if (t instanceof Handshake.TimeoutException) {
+        } else if (t instanceof ReadTimeoutException) {
             log.error("[C:0x" + id + "] Handshake timeout");
 
             resume = true;

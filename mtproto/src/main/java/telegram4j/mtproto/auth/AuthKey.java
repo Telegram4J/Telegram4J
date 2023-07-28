@@ -1,14 +1,17 @@
 package telegram4j.mtproto.auth;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.internal.Crypto;
+import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.api.TlEncodingUtil;
 
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Optional;
 
-import static telegram4j.mtproto.util.CryptoUtil.sha1Digest;
-
+/** Value-based tuple of auth key and it's details. */
 public final class AuthKey {
     private final ByteBuf value;
     private final long id;
@@ -23,6 +26,23 @@ public final class AuthKey {
         this.expiresAtTimestamp = expiresAtTimestamp;
     }
 
+    // SHA1 rarely used and there is no reason to store it in global TL. Only for IO threads
+    static MessageDigest getSHA1() {
+        var localOrNew = Crypto.SHA1.getIfExists();
+        if (localOrNew == null) {
+            localOrNew = CryptoUtil.createDigest("SHA-1");
+        } else {
+            localOrNew.reset();
+        }
+        return localOrNew;
+    }
+
+    public static ByteBuf sha1Digest(ByteBuf buf) {
+        var sha1 = getSHA1();
+        sha1.update(buf.nioBuffer());
+        return Unpooled.wrappedBuffer(sha1.digest());
+    }
+
     public AuthKey(ByteBuf value) {
         this(value, null);
     }
@@ -31,10 +51,12 @@ public final class AuthKey {
         return value;
     }
 
+    /** {@return SHA-1 of last 8 bytes of the auth key} */
     public long id() {
         return id;
     }
 
+    /** {@return An timestamp of key expiration} If auth key is temporary */
     public Optional<Instant> expiresAtTimestamp() {
         return Optional.ofNullable(expiresAtTimestamp);
     }
@@ -49,5 +71,11 @@ public final class AuthKey {
     @Override
     public int hashCode() {
         return Long.hashCode(id);
+    }
+
+    @Override
+    public String toString() {
+        String expireTimestamp = expiresAtTimestamp != null ? (", expiresAtTimestamp=" + expiresAtTimestamp) : "";
+        return "AuthKey{id=0x" + Long.toHexString(id) + expireTimestamp + '}';
     }
 }

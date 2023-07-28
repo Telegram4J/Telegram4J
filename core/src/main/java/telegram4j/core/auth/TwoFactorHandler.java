@@ -10,6 +10,7 @@ import telegram4j.core.auth.AuthorizationHandler.Resources;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
 import telegram4j.mtproto.internal.Preconditions;
+import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.BaseInputCheckPasswordSRP;
 import telegram4j.tl.ImmutableBaseInputCheckPasswordSRP;
 import telegram4j.tl.PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow;
@@ -127,8 +128,24 @@ public class TwoFactorHandler {
         // Terrible class name.
         protected PasswordKdfAlgoSHA256SHA256PBKDF2HMACSHA512iter100000SHA256ModPow algo;
 
+        protected final MessageDigest sha256 = CryptoUtil.createDigest("SHA-256");
+
         protected Context(String id) {
             super(id);
+        }
+
+        protected ByteBuf sha256Digest(ByteBuf first) {
+            sha256.reset();
+            sha256.update(first.nioBuffer());
+            return Unpooled.wrappedBuffer(sha256.digest());
+        }
+
+        protected ByteBuf sha256Digest(ByteBuf... bufs) {
+            sha256.reset();
+            for (ByteBuf b : bufs) {
+                sha256.update(b.nioBuffer());
+            }
+            return Unpooled.wrappedBuffer(sha256.digest());
         }
 
         protected void init(Password srp) {
@@ -180,14 +197,14 @@ public class TwoFactorHandler {
         var salt1 = ctx.algo.salt1();
         var salt2 = ctx.algo.salt2();
 
-        var k = fromByteBuf(sha256Digest(pBytes, gBytes));
+        var k = fromByteBuf(ctx.sha256Digest(pBytes, gBytes));
         var p = fromByteBuf(pBytes.retain());
 
-        var hash1 = sha256Digest(salt1, Unpooled.wrappedBuffer(ctx.password.getBytes(StandardCharsets.UTF_8)), salt1);
-        var hash2 = sha256Digest(salt2, hash1, salt2);
+        var hash1 = ctx.sha256Digest(salt1, Unpooled.wrappedBuffer(ctx.password.getBytes(StandardCharsets.UTF_8)), salt1);
+        var hash2 = ctx.sha256Digest(salt2, hash1, salt2);
         var hash3 = pbkdf2HmacSha512Iter100000(hash2, salt1);
 
-        var x = fromByteBuf(sha256Digest(salt2, hash3, salt2));
+        var x = fromByteBuf(ctx.sha256Digest(salt2, hash3, salt2));
 
         random.setSeed(toByteArray(ctx.srp.secureRandom()));
 
@@ -200,7 +217,7 @@ public class TwoFactorHandler {
         var b = fromByteBuf(srpB);
         var bBytes = toBytesPadded(b);
 
-        var u = fromByteBuf(sha256Digest(gABytes, bBytes));
+        var u = fromByteBuf(ctx.sha256Digest(gABytes, bBytes));
 
         var bkgx = b.subtract(k.multiply(g.modPow(x, p)).mod(p));
         if (bkgx.compareTo(BigInteger.ZERO) < 0) {
@@ -209,14 +226,14 @@ public class TwoFactorHandler {
 
         var s = bkgx.modPow(a.add(u.multiply(x)), p);
         var sBytes = toBytesPadded(s);
-        var kBytes = sha256Digest(sBytes);
+        var kBytes = ctx.sha256Digest(sBytes);
 
         // TODO: checks
 
-        var m1 = sha256Digest(
-                xor(sha256Digest(pBytes), sha256Digest(gBytes)),
-                sha256Digest(salt1),
-                sha256Digest(salt2),
+        var m1 = ctx.sha256Digest(
+                xor(ctx.sha256Digest(pBytes), ctx.sha256Digest(gBytes)),
+                ctx.sha256Digest(salt1),
+                ctx.sha256Digest(salt2),
                 gABytes, bBytes, kBytes
         );
 

@@ -19,7 +19,6 @@ final class HandshakeContext {
     private ByteBuf authKey;
     private long serverSalt;
     private ByteBuf authKeyHash;
-    private ServerDHParams serverDHParams;
     private int serverTimeDiff;
     private int retry;
     private long expiresAt;
@@ -96,14 +95,6 @@ final class HandshakeContext {
 
     public ByteBuf authKeyHash() {
         return authKeyHash;
-    }
-
-    public ServerDHParams serverDHParams() {
-        return serverDHParams;
-    }
-
-    public void serverDHParams(ServerDHParams serverDHParams) {
-        this.serverDHParams = serverDHParams;
     }
 
     public void serverTimeDiff(int serverTimeDiff) {

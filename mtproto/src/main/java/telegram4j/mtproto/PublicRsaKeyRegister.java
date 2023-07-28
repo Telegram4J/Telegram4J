@@ -1,6 +1,7 @@
 package telegram4j.mtproto;
 
 import reactor.util.annotation.Nullable;
+import telegram4j.mtproto.util.CryptoUtil;
 
 import java.math.BigInteger;
 import java.util.HashMap;
@@ -180,14 +181,14 @@ public final class PublicRsaKeyRegister {
      * Creates new public RSA keys register with specified keys.
      * This method will compute map containing fingerprints of keys for indexing them.
      *
-     * @see PublicRsaKey#computeTail(PublicRsaKey)
      * @param keys An iterable with keys.
      * @return A new {@code PublicRsaKeyRegister} containing all specified public RSA keys associated with their fingerprints.
      */
     public static PublicRsaKeyRegister create(Iterable<PublicRsaKey> keys) {
         var map = new HashMap<Long, PublicRsaKey>();
+        var sha1 = CryptoUtil.createDigest("SHA-1");
         for (PublicRsaKey key : keys) {
-            long fingerprint = PublicRsaKey.computeTail(key);
+            long fingerprint = PublicRsaKey.computeTail(sha1, key);
             if (map.putIfAbsent(fingerprint, key) != null) {
                 throw new IllegalArgumentException("Duplicate public RSA key, fingerprint: 0x"
                         + Long.toHexString(fingerprint) + ", key: " + key);

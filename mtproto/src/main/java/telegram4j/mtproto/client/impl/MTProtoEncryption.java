@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 import static telegram4j.mtproto.client.impl.MTProtoClientImpl.*;
 import static telegram4j.mtproto.transport.Transport.QUICK_ACK_MASK;
 import static telegram4j.mtproto.util.CryptoUtil.random;
-import static telegram4j.mtproto.util.CryptoUtil.sha256Digest;
+import static telegram4j.mtproto.internal.Crypto.sha256Digest;
 import static telegram4j.mtproto.util.TlEntityUtil.schemaTypeName;
 
 final class MTProtoEncryption extends ChannelDuplexHandler {

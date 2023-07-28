@@ -493,8 +493,10 @@ public final class MTProtoBootstrap {
             var composite = Disposables.composite();
 
             composite.add(clientGroup.start()
-                    .doOnError(sink::error)
-                    .subscribe(null, t -> log.error("MTProto client group terminated with an error", t)));
+                    .subscribe(null, t -> {
+                        sink.error(t);
+                        log.error("MTProto client group terminated with an error", t);
+                    }));
 
             composite.add(clientGroup.updates().all()
                     .flatMap(telegramClient.getUpdatesManager()::handle)

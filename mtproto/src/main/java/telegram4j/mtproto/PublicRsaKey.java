@@ -8,9 +8,10 @@ import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlSerialUtil;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
 import java.util.Objects;
 
-/** RSA exponent and modulus number tuple. */
+/** Value-based tuple of RSA exponent and modulus. */
 public final class PublicRsaKey {
     private final BigInteger modulus;
     private final BigInteger exponent;
@@ -24,19 +25,26 @@ public final class PublicRsaKey {
      * Compute a reversed tail of last 64 big-endian bits from serialized key sha 1 hash,
      * which uses in DH gen.
      *
+     * @param sha1 The SHA-1 digest.
      * @param key The RSA key.
      * @return The reversed tail in {@literal long} number of key hash.
      */
-    public static long computeTail(PublicRsaKey key) {
+    static long computeTail(MessageDigest sha1, PublicRsaKey key) {
         var alloc = UnpooledByteBufAllocator.DEFAULT;
         ByteBuf modulusBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.modulus));
         ByteBuf exponentBytes = TlSerialUtil.serializeBytes(alloc, CryptoUtil.toByteBuf(key.exponent));
 
-        ByteBuf concat = Unpooled.wrappedBuffer(modulusBytes, exponentBytes);
-        ByteBuf sha1 = CryptoUtil.sha1Digest(concat);
-        concat.release();
+        sha1.reset();
+        try {
+            sha1.update(modulusBytes.nioBuffer());
+            sha1.update(exponentBytes.nioBuffer());
+        } finally {
+            modulusBytes.release();
+            exponentBytes.release();
+        }
+        ByteBuf hash = Unpooled.wrappedBuffer(sha1.digest());
 
-        return sha1.getLongLE(sha1.readableBytes() - 8);
+        return hash.getLongLE(hash.readableBytes() - 8);
     }
 
     /**
