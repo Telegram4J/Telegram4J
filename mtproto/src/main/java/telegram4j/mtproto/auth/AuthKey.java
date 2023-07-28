@@ -37,7 +37,7 @@ public final class AuthKey {
         return localOrNew;
     }
 
-    public static ByteBuf sha1Digest(ByteBuf buf) {
+    static ByteBuf sha1Digest(ByteBuf buf) {
         var sha1 = getSHA1();
         sha1.update(buf.nioBuffer());
         return Unpooled.wrappedBuffer(sha1.digest());

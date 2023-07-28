@@ -66,7 +66,7 @@ public class FileStoreLayout implements StoreLayout {
     public FileStoreLayout(StoreLayout entityDelegate, Path dataFile, ExecutorService persistExecutor) {
         this.dataFile = Objects.requireNonNull(dataFile);
         this.entityDelegate = Objects.requireNonNull(entityDelegate);
-        this.persistExecutor = persistExecutor;
+        this.persistExecutor = Objects.requireNonNull(persistExecutor);
     }
 
     public Path getDataFile() {
@@ -347,6 +347,7 @@ public class FileStoreLayout implements StoreLayout {
                 ByteBuf buf = Unpooled.wrappedBuffer(Files.readAllBytes(dataFile));
                 Version ver = Version.of(buf.readUnsignedShortLE());
                 Settings sett = ver.deser.deserialize(buf);
+
                 mainDcId = sett.mainDcId;
                 selfId = sett.selfId;
                 authKeys.putAll(sett.authKeys);

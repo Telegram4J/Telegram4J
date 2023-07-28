@@ -71,12 +71,12 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<DataCenter> getDataCenter() {
-        return Mono.justOrEmpty(dataCenter);
+        return Mono.fromSupplier(() -> dataCenter);
     }
 
     @Override
     public Mono<State> getCurrentState() {
-        return Mono.justOrEmpty(state);
+        return Mono.fromSupplier(() -> state);
     }
 
     @Override
@@ -377,17 +377,17 @@ public class StoreLayoutImpl implements StoreLayout {
 
     @Override
     public Mono<Config> getConfig() {
-        return Mono.justOrEmpty(config);
+        return Mono.fromSupplier(() -> config);
     }
 
     @Override
     public Mono<DcOptions> getDcOptions() {
-        return Mono.justOrEmpty(dcOptions);
+        return Mono.fromSupplier(() -> dcOptions);
     }
 
     @Override
     public Mono<PublicRsaKeyRegister> getPublicRsaKeyRegister() {
-        return Mono.justOrEmpty(publicRsaKeyRegister);
+        return Mono.fromSupplier(() -> publicRsaKeyRegister);
     }
 
     // Updates methods
