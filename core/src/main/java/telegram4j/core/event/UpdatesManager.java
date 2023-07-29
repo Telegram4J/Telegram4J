@@ -32,5 +32,5 @@ public interface UpdatesManager {
     Flux<Event> handle(Updates updates);
 
     /** Closes underling services/schedules. */
-    void shutdown();
+    Mono<Void> close();
 }

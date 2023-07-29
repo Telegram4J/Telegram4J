@@ -29,11 +29,13 @@ import telegram4j.mtproto.store.FileStoreLayout;
 import telegram4j.mtproto.store.StoreLayoutImpl;
 import telegram4j.tl.json.TlModule;
 import telegram4j.tl.request.account.ImmutableUpdateStatus;
+import telegram4j.tl.request.help.GetConfig;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Scanner;
 import java.util.concurrent.ThreadLocalRandom;
@@ -164,9 +166,10 @@ public class UserBotExample {
                             .then();
 
                     var online = new boolean[]{false};
+                    // *bad way* to make fake online
                     // update user status in fixed random interval
                     Mono<Void> status = Flux.<Integer>create(sink -> {
-                                var scheduler = Schedulers.newSingle("t4j-user-status");
+                                var scheduler = Schedulers.newSingle("t4j-user-status", true);
                                 var task = scheduler.schedule(() -> {
                                     while (!Thread.currentThread().isInterrupted()) {
                                         try {
@@ -182,6 +185,7 @@ public class UserBotExample {
                                 });
                                 sink.onCancel(Disposables.composite(scheduler, task));
                             })
+                            .takeUntilOther(client.onDisconnect())
                             .flatMap(e -> {
                                 boolean state = online[0];
                                 online[0] = !state;

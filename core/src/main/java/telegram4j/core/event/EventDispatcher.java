@@ -54,5 +54,5 @@ public interface EventDispatcher {
     void publish(Event event);
 
     /** Close dispatcher and stop event redistributing. */
-    void shutdown();
+    Mono<Void> close();
 }

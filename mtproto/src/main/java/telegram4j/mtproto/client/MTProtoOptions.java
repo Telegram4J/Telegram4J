@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 
 public record MTProtoOptions(TcpClientResources tcpClientResources, PublicRsaKeyRegister publicRsaKeyRegister,
                              DhPrimeChecker dhPrimeChecker, StoreLayout storeLayout,
-                             ExecutorService resultPublisher) {
+                             ExecutorService resultPublisher, boolean disposeResultPublisher) {
 
     public MTProtoOptions {
         requireNonNull(tcpClientResources);

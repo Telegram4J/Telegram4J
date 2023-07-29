@@ -2,7 +2,7 @@ package telegram4j.core.auth;
 
 import reactor.core.publisher.Mono;
 import telegram4j.core.AuthorizationResources;
-import telegram4j.mtproto.client.MTProtoClientGroup;
+import telegram4j.mtproto.client.MTProtoClientManager;
 import telegram4j.mtproto.store.StoreLayout;
 import telegram4j.tl.auth.BaseAuthorization;
 
@@ -30,7 +30,7 @@ public interface AuthorizationHandler {
      * @param storeLayout The initialized store layout for client.
      * @param authResources The {@code apiId} and {@code apiHash} parameters of application.
      */
-    record Resources(MTProtoClientGroup clientGroup, StoreLayout storeLayout,
+    record Resources(MTProtoClientManager clientGroup, StoreLayout storeLayout,
                      AuthorizationResources authResources) {
 
         public Resources {

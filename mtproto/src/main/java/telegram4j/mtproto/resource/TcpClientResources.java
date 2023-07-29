@@ -1,7 +1,6 @@
 package telegram4j.mtproto.resource;
 
 import io.netty.channel.EventLoopGroup;
-import reactor.core.Disposable;
 import reactor.util.annotation.Nullable;
 
 import java.util.Objects;
@@ -15,7 +14,7 @@ import java.util.Optional;
  *
  * @apiNote This class is immutable and thread-safe.
  */
-public final class TcpClientResources implements Disposable {
+public final class TcpClientResources {
     @Nullable
     private final ProxyResources proxyResources;
     private final EventLoopResources eventLoopResources;
@@ -78,18 +77,6 @@ public final class TcpClientResources implements Disposable {
      */
     public static Builder builder() {
         return new Builder();
-    }
-
-    /** Disposes underlying {@link EventLoopGroup}. After this operation, it becomes unavailable for use. */
-    @Override
-    public void dispose() {
-        eventLoopGroup.shutdownGracefully();
-    }
-
-    /** {@return Whether underlying {@link EventLoopGroup} was shutdown} */
-    @Override
-    public boolean isDisposed() {
-        return eventLoopGroup.isShutdown();
     }
 
     /**

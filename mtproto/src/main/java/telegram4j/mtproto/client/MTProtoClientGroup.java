@@ -19,14 +19,6 @@ public interface MTProtoClientGroup {
     MTProtoClient main();
 
     /**
-     * Configures a new main client for this group. Old client will be closed.
-     *
-     * @param dc The dc to which main client will associate.
-     * @return A {@link Mono} emitting on successful completion new main client.
-     */
-    Mono<MTProtoClient> setMain(DataCenter dc);
-
-    /**
      * Sends TL method to specified datacenter.
      *
      * @param <R> The return type of method.

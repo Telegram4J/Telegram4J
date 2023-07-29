@@ -44,7 +44,7 @@ public class ClientTest {
                 PublicRsaKeyRegister.createDefault(),
                 DhPrimeCheckerCache.instance(),
                 new StoreLayoutImpl(Function.identity()),
-                ForkJoinPool.commonPool()
+                ForkJoinPool.commonPool(), false
         );
 
         final var clientOptions = new MTProtoClient.Options(

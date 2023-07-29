@@ -7,7 +7,6 @@ import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
-import reactor.function.TupleUtils;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
@@ -52,10 +51,24 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static reactor.function.TupleUtils.function;
 import static telegram4j.mtproto.internal.Preconditions.requireArgument;
 
+/**
+ * A builder to create {@link MTProtoTelegramClient} instances.
+ *
+ * @apiNote This class is not thread-safe and must be used locally or synchronized externally.
+ * And note that any modifications of this builder after calling {@link #connect()}
+ * will have no effect at created instances of {@link MTProtoTelegramClient}.
+ *
+ * @see #withConnection(Function)
+ * @see #connect()
+ * @see MTProtoTelegramClient#create(int, String, String)
+ * @see MTProtoTelegramClient#create(int, String, AuthorizationHandler)
+ */
 public final class MTProtoBootstrap {
 
     private static final Logger log = Loggers.getLogger(MTProtoBootstrap.class);
@@ -63,7 +76,7 @@ public final class MTProtoBootstrap {
     private final AuthorizationResources authResources;
     @Nullable
     private final AuthorizationHandler authHandler;
-    private final List<ResponseTransformer> responseTransformers = new ArrayList<>();
+    private List<ResponseTransformer> responseTransformers;
 
     private TransportFactory transportFactory = dc -> new IntermediateTransport(true);
     private BiFunction<MTProtoOptions, MTProtoClient.Options, ClientFactory> clientFactory = DefaultClientFactory::new;
@@ -73,7 +86,7 @@ public final class MTProtoBootstrap {
     private EntityRetrievalStrategy entityRetrievalStrategy = EntityRetrievalStrategy.STORE_FALLBACK_RPC;
     private Function<MTProtoTelegramClient, UpdatesManager> updatesManagerFactory = c ->
             new DefaultUpdatesManager(c, new DefaultUpdatesManager.Options(c));
-    private Function<MTProtoClientGroup.Options, MTProtoClientGroup> clientGroupFactory = options ->
+    private Function<MTProtoClientGroup.Options, ? extends MTProtoClientManager> clientManagerFactory = options ->
             new DefaultMTProtoClientGroup(new DefaultMTProtoClientGroup.Options(options));
     private DhPrimeChecker dhPrimeChecker;
     private PublicRsaKeyRegister publicRsaKeyRegister;
@@ -90,12 +103,40 @@ public final class MTProtoBootstrap {
     // Max backoff is 16 seconds
     private ReconnectionStrategy reconnectionStrategy = DefaultReconnectionStrategy.create(3, 5, Duration.ofSeconds(1));
 
+    // By default it's ForkJoinPool.commonPool()
     private ExecutorService resultPublisher;
-    private Scheduler updatesPublisher;
+    private boolean disposeResultPublisher = false;
 
     MTProtoBootstrap(AuthorizationResources authResources, @Nullable AuthorizationHandler authHandler) {
         this.authResources = authResources;
         this.authHandler = authHandler;
+    }
+
+    MTProtoBootstrap(MTProtoBootstrap p) {
+        this.authResources = p.authResources;
+        this.authHandler = p.authHandler;
+        this.responseTransformers = p.responseTransformers;
+        this.transportFactory = p.transportFactory;
+        this.clientFactory = p.clientFactory;
+        this.defaultEntityParserFactory = p.defaultEntityParserFactory;
+        this.entityRetrievalStrategy = p.entityRetrievalStrategy;
+        this.updatesManagerFactory = p.updatesManagerFactory;
+        this.clientManagerFactory = p.clientManagerFactory;
+        this.dhPrimeChecker = p.dhPrimeChecker;
+        this.publicRsaKeyRegister = p.publicRsaKeyRegister;
+        this.dcOptions = p.dcOptions;
+        this.initConnectionParams = p.initConnectionParams;
+        this.storeLayout = p.storeLayout;
+        this.eventDispatcher = p.eventDispatcher;
+        this.dataCenter = p.dataCenter;
+        this.gzipCompressionSizeThreshold = p.gzipCompressionSizeThreshold;
+        this.tcpClientResources = p.tcpClientResources;
+        this.updateDispatcher = p.updateDispatcher;
+        this.pingInterval = p.pingInterval;
+        this.authKeyLifetime = p.authKeyLifetime;
+        this.reconnectionStrategy = p.reconnectionStrategy;
+        this.resultPublisher = p.resultPublisher;
+        this.disposeResultPublisher = p.disposeResultPublisher;
     }
 
     /**
@@ -103,18 +144,20 @@ public final class MTProtoBootstrap {
      * <p>
      * If custom implementation doesn't set, {@link DefaultMTProtoClientGroup} will be used.
      *
-     * @param clientGroupFactory A new factory for client group.
+     * @param clientManagerFactory A new factory for client group.
      * @return This builder.
      */
-    public MTProtoBootstrap setClientGroupManager(Function<MTProtoClientGroup.Options, MTProtoClientGroup> clientGroupFactory) {
-        this.clientGroupFactory = Objects.requireNonNull(clientGroupFactory);
+    public MTProtoBootstrap setClientGroupManager(Function<MTProtoClientGroup.Options, ? extends MTProtoClientManager> clientManagerFactory) {
+        this.clientManagerFactory = Objects.requireNonNull(clientManagerFactory);
         return this;
     }
 
     /**
      * Sets store layout for accessing and persisting incoming data from Telegram API.
      * <p>
-     * If custom implementation doesn't set, {@link StoreLayoutImpl} with message LRU cache bounded to {@literal 10000} will be used.
+     * If custom implementation doesn't set, {@link FileStoreLayout} will be used for saving
+     * user data with in-memory {@link StoreLayoutImpl} delegate for
+     * caching incoming data from Telegram API.
      *
      * @param storeLayout A new store layout implementation for client.
      * @return This builder.
@@ -191,12 +234,29 @@ public final class MTProtoBootstrap {
         return this;
     }
 
-    public MTProtoBootstrap setUpdatesPublisher(Scheduler updatesPublisher) {
-        this.updatesPublisher = updatesPublisher;
+    /**
+     * Sets custom {@link ExecutorService} for requests callback handling.
+     * <p>
+     * If no custom {@code ExecutorService} specified, {@link ForkJoinPool#commonPool()} will be used.
+     *
+     * @param resultPublisher A new {@code ExecutorService} for handling RPC results.
+     * @return This builder.
+     */
+    public MTProtoBootstrap setResultPublisher(ExecutorService resultPublisher, boolean automaticShutdown) {
+        this.resultPublisher = Objects.requireNonNull(resultPublisher);
+        this.disposeResultPublisher = automaticShutdown;
         return this;
     }
 
-    // TODO docs
+    /**
+     * Sets custom {@link UpdateDispatcher} for distributing raw {@link Updates}.
+     * <p>
+     * If no custom {@code ExecutorService} specified, {@link SinksUpdateDispatcher} will be used
+     * with small buffering strategy. Note,
+     *
+     * @param updateDispatcher A new {@code UpdateDispatcher} for distributing raw {@link Updates}.
+     * @return This builder.
+     */
     public MTProtoBootstrap setUpdateDispatcher(UpdateDispatcher updateDispatcher) {
         this.updateDispatcher = Objects.requireNonNull(updateDispatcher);
         return this;
@@ -214,6 +274,7 @@ public final class MTProtoBootstrap {
         return this;
     }
 
+    // Unused
     public MTProtoBootstrap setAuthKeyLifetime(Duration authKeyLifetime) {
         requireArgument(!authKeyLifetime.isNegative());
         this.authKeyLifetime = authKeyLifetime;
@@ -269,7 +330,7 @@ public final class MTProtoBootstrap {
     }
 
     /**
-     * Sets default global {@link EntityParserFactory} for text parsing, by default is {@code null}.
+     * Sets default global {@link EntityParserFactory} for text parsing, by default it is {@code null}.
      *
      * @param defaultEntityParserFactory A new default {@link EntityParserFactory} for text parsing.
      * @return This builder.
@@ -326,12 +387,18 @@ public final class MTProtoBootstrap {
      * @return This builder.
      */
     public MTProtoBootstrap addResponseTransformer(ResponseTransformer responseTransformer) {
-        responseTransformers.add(Objects.requireNonNull(responseTransformer));
+        Objects.requireNonNull(responseTransformer);
+        var r = responseTransformers;
+        if (r == null) {
+            r = responseTransformers = new ArrayList<>();
+        }
+
+        r.add(responseTransformer);
         return this;
     }
 
     /**
-     * Sets size threshold for gzip packing mtproto queries, by default equals to 16KB.
+     * Sets size threshold for gzip packing mtproto queries, by default equals to 16KiB.
      *
      * @throws IllegalArgumentException if {@code gzipCompressionSizeThreshold} is negative.
      * @param gzipCompressionSizeThreshold The new request's size threshold.
@@ -355,7 +422,7 @@ public final class MTProtoBootstrap {
     }
 
     /**
-     * Prepare and connect {@link MTProtoClient} to the specified Telegram DC and
+     * Prepare and connect {@link MTProtoClient} to the Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono} and terminate client with disconnecting.
      *
@@ -369,187 +436,214 @@ public final class MTProtoBootstrap {
     }
 
     /**
-     * Prepare and connect MTProto client to the specified Telegram DC and
+     * Prepare and connect MTProto client to the Telegram DC and
      * on successfully completion emit {@link MTProtoTelegramClient} to subscribers.
      * Any errors caused on connection time will be emitted to a {@link Mono}.
      *
      * @return A {@link Mono} that upon subscription and successfully completion emits a {@link MTProtoTelegramClient}.
      */
     public Mono<MTProtoTelegramClient> connect() {
-        return Mono.create(sink -> {
-            StoreLayout storeLayout = initStoreLayout();
+        return Mono.defer(() -> {
+            // Create shallow copy for preventing concurrent modification issues
+            var copy = new MTProtoBootstrap(this);
 
-            var composite = Disposables.composite();
-            composite.add(storeLayout.initialize()
-                    // Here the subscription order is important
-                    // and therefore need to make sure that initialization blocks
-                    .subscribeOn(Schedulers.immediate())
-                    .subscribe(null, t -> log.error("Store layout terminated with an error", t)));
-
-            var loadDcOptions = storeLayout.getDcOptions()
-                    .switchIfEmpty(Mono.defer(() -> { // no DcOptions present in store - use default
-                        var dcOptions = initDcOptions();
-                        return storeLayout.updateDcOptions(dcOptions)
-                                .thenReturn(dcOptions);
-                    }));
-            var loadMainDc = loadDcOptions
-                    .zipWhen(dcOptions -> storeLayout.getDataCenter()
-                            .switchIfEmpty(Mono.fromSupplier(() -> initDataCenter(dcOptions))));
-
-            composite.add(loadMainDc
-                    .flatMap(TupleUtils.function((dcOptions, mainDc) -> {
-                        var tcpClientResources = initTcpClientResources();
-                        var initConnectionRequest = InvokeWithLayer.<Config, InitConnection<Config, GetConfig>>builder()
-                                .layer(TlInfo.LAYER)
-                                .query(initConnection())
-                                .build();
-                        var responseTransformers = List.copyOf(this.responseTransformers);
-                        var clientOptions = new MTProtoClient.Options(
-                                transportFactory, initConnectionRequest,
-                                pingInterval, reconnectionStrategy,
-                                gzipCompressionSizeThreshold, responseTransformers, authKeyLifetime);
-                        var mtProtoOptions = new MTProtoOptions(
-                                tcpClientResources, initPublicRsaKeyRegister(),
-                                initDhPrimeChecker(), storeLayout,
-                                initResultPublisher());
-
-                        var updatesScheduler = initUpdatesPublisher();
-                        ClientFactory clientFactory = this.clientFactory.apply(mtProtoOptions, clientOptions);
-                        MTProtoClientGroup clientGroup = clientGroupFactory.apply(
-                                MTProtoClientGroup.Options.of(mainDc, clientFactory,
-                                        initUpdateDispatcher(updatesScheduler), mtProtoOptions));
-
-                        return authorizeClient(clientGroup, storeLayout, dcOptions)
-                                .flatMap(selfId -> initializeClient(selfId, clientGroup, mtProtoOptions, updatesScheduler));
-                    }))
-                    .doOnSuccess(sink::success)
-                    .subscribe(null, sink::error));
-
-            sink.onCancel(composite);
+            return connect(copy);
         });
     }
 
-    private Mono<Id> authorizeClient(MTProtoClientGroup clientGroup,
-                                     StoreLayout storeLayout, DcOptions dcOptions) {
-        return Mono.create(sink -> {
-            var mainClient = clientGroup.main();
+    // Static context is required to avoid usages of fields
+    private static Mono<MTProtoTelegramClient> connect(MTProtoBootstrap copy) {
+        var storeLayout = copy.initStoreLayout();
 
-            sink.onCancel(mainClient.connect()
-                    .onErrorResume(e -> clientGroup.close()
-                            .doOnSuccess(any -> sink.error(e))
-                            .then(Mono.never()))
-                    .then(Mono.defer(() -> {
-                        if (authHandler != null) {
-                            // to trigger user auth
-                            return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
-                                    .doOnNext(ign -> sink.success(extractSelfId(ign.get(0))))
-                                    .onErrorResume(RpcException.isErrorCode(401), t ->
-                                            authHandler.process(new AuthorizationHandler.Resources(clientGroup, storeLayout, authResources))
-                                            // users can emit empty signals if they want to gracefully destroy the client
-                                            .switchIfEmpty(Mono.defer(clientGroup::close)
-                                                    .then(Mono.fromRunnable(sink::success)))
-                                            .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                                    .doOnSuccess(ign -> sink.success(extractSelfId(auth.user()))))
-                                            .then(Mono.empty()));
-                        }
-                        return mainClient.send(ImmutableImportBotAuthorization.of(0,
-                                        authResources.getApiId(), authResources.getApiHash(),
-                                        authResources.getBotAuthToken().orElseThrow()))
-                                .onErrorResume(RpcException.isErrorCode(303),
-                                        e -> redirectToDc((RpcException) e, mainClient,
-                                                clientGroup, storeLayout, dcOptions))
-                                .cast(BaseAuthorization.class)
-                                .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                        .doOnSuccess(ign -> sink.success(extractSelfId(auth.user()))));
-                    }))
-                    .onErrorResume(e -> clientGroup.close()
-                            .doOnSuccess(any -> sink.error(e)))
-                    .subscribe());
-        });
+        // For first, load DC info if any
+        return storeLayout.initialize()
+                .then(storeLayout.getDcOptions()
+                        // If no DcOptions present in store - use default from bootstrap
+                        .switchIfEmpty(Mono.defer(() -> {
+                            var dcOptions = copy.initDcOptions();
+                            return storeLayout.updateDcOptions(dcOptions)
+                                    .thenReturn(dcOptions);
+                        })))
+                .zipWhen(dcOptions -> storeLayout.getDataCenter()
+                        .switchIfEmpty(Mono.fromSupplier(() -> copy.initDataCenter(dcOptions))))
+                .flatMap(function((dcOptions, mainDc) -> {
+                    var initConnectionRequest = InvokeWithLayer.<Config, InitConnection<Config, GetConfig>>builder()
+                            .layer(TlInfo.LAYER)
+                            .query(copy.initConnection())
+                            .build();
+                    var responseTransformers = copy.responseTransformers == null
+                            ? List.<ResponseTransformer>of()
+                            : List.copyOf(copy.responseTransformers);
+                    var clientOptions = new MTProtoClient.Options(
+                            copy.transportFactory, initConnectionRequest,
+                            copy.pingInterval, copy.reconnectionStrategy,
+                            copy.gzipCompressionSizeThreshold, responseTransformers, copy.authKeyLifetime);
+                    var mtProtoOptions = new MTProtoOptions(
+                            copy.initTcpClientResources(), copy.initPublicRsaKeyRegister(),
+                            copy.initDhPrimeChecker(), storeLayout,
+                            copy.initResultPublisher(), copy.disposeResultPublisher);
+
+                    var clientFactory = copy.clientFactory.apply(mtProtoOptions, clientOptions);
+
+                    Scheduler defaultUpdatesPublisher;
+                    // Conditionally nullable; If both eventDispatcher and updateDispatcher are not configured
+                    // then use new scheduler for them
+                    if (copy.eventDispatcher == null && copy.updateDispatcher == null) {
+                        defaultUpdatesPublisher = Schedulers.newParallel("t4j-events",
+                                Math.min(Runtime.getRuntime().availableProcessors(), 4), true);
+                    } else {
+                        defaultUpdatesPublisher = null;
+                    }
+
+                    var updateDispatcher = copy.initUpdateDispatcher(defaultUpdatesPublisher);
+                    var clientManager = copy.clientManagerFactory.apply(
+                            MTProtoClientGroup.Options.of(mainDc, clientFactory,
+                                    updateDispatcher, mtProtoOptions));
+
+                    return authorizeClient(clientManager, storeLayout, dcOptions, copy)
+                            .flatMap(selfId -> initializeClient(selfId, clientManager,
+                                    mtProtoOptions, defaultUpdatesPublisher, copy));
+                }));
     }
 
-    private static Id extractSelfId(User user) {
+    private static Mono<Id> authorizeClient(MTProtoClientManager clientManager,
+                                            StoreLayout storeLayout, DcOptions dcOptions,
+                                            MTProtoBootstrap copy) {
+        var mainClient = clientManager.main();
+
+        return mainClient.connect()
+                .then(Mono.defer(() -> {
+                    if (copy.authHandler != null) {
+                        // to trigger user auth
+                        return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
+                                .map(ign -> extractId(ign.get(0)))
+                                .onErrorResume(RpcException.isErrorCode(401), t ->
+                                        copy.authHandler.process(new AuthorizationHandler.Resources(
+                                                clientManager, storeLayout, copy.authResources))
+                                                // users can emit empty signals if they want to gracefully destroy the client
+                                                .switchIfEmpty(Mono.defer(clientManager::close)
+                                                        .then(Mono.empty()))
+                                                .flatMap(auth -> storeLayout.onAuthorization(auth)
+                                                        .then(Mono.fromSupplier(() -> extractId(auth.user())))));
+                    }
+                    return mainClient.send(ImmutableImportBotAuthorization.of(0,
+                                    copy.authResources.getApiId(), copy.authResources.getApiHash(),
+                                    copy.authResources.getBotAuthToken().orElseThrow()))
+                            .onErrorResume(RpcException.isErrorCode(303),
+                                    e -> redirectToDc((RpcException) e, mainClient,
+                                            clientManager, storeLayout, dcOptions, copy))
+                            .cast(BaseAuthorization.class)
+                            .flatMap(auth -> storeLayout.onAuthorization(auth)
+                                    .then(Mono.fromSupplier(() -> extractId(auth.user()))));
+                }))
+                .onErrorResume(e -> clientManager.close()
+                        .then(Mono.error(e)));
+    }
+
+    private static Id extractId(User user) {
         if (!(user instanceof BaseUser b)) {
             throw new IllegalStateException("Unexpected type of user from auth result");
         }
         return Id.ofUser(b.id(), b.accessHash());
     }
 
-    private Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientGroup clientGroup,
-                                                         MTProtoOptions options, Scheduler updatesScheduler) {
+    private static Mono<MTProtoTelegramClient> initializeClient(Id selfId, MTProtoClientManager clientManager,
+                                                                MTProtoOptions options, Scheduler updatesScheduler,
+                                                                MTProtoBootstrap copy) {
+        var eventDispatcher = copy.initEventDispatcher(updatesScheduler);
+
+        var mtProtoResources = new MTProtoResources(
+                options.storeLayout(), eventDispatcher, copy.defaultEntityParserFactory);
+        var serviceHolder = new ServiceHolder(clientManager, options.storeLayout());
+
+        var onDisconnect = Sinks.<Void>empty();
+        var telegramClient = new MTProtoTelegramClient(
+                copy.authResources, clientManager,
+                mtProtoResources, copy.updatesManagerFactory, selfId,
+                serviceHolder, copy.entityRetrievalStrategy, onDisconnect.asMono());
+
         return Mono.create(sink -> {
-            EventDispatcher eventDispatcher = initEventDispatcher(updatesScheduler);
-            Sinks.Empty<Void> onDisconnect = Sinks.empty();
+            boolean[] terminatedBootstrap = {false};
+            Consumer<Throwable> unhandledError = t -> {
+                if (!terminatedBootstrap[0]) {
+                    sink.error(t);
+                }
+                onDisconnect.emitError(t, Sinks.EmitFailureHandler.FAIL_FAST);
+            };
 
-            MTProtoResources mtProtoResources = new MTProtoResources(
-                    options.storeLayout(), eventDispatcher, defaultEntityParserFactory);
-            ServiceHolder serviceHolder = new ServiceHolder(clientGroup, options.storeLayout());
+            var withClient = Disposables.composite();
 
-            MTProtoTelegramClient telegramClient = new MTProtoTelegramClient(
-                    authResources, clientGroup,
-                    mtProtoResources, updatesManagerFactory, selfId,
-                    serviceHolder, entityRetrievalStrategy, onDisconnect.asMono());
-
-            var composite = Disposables.composite();
-
-            composite.add(clientGroup.start()
-                    .subscribe(null, t -> {
-                        sink.error(t);
-                        log.error("MTProto client group terminated with an error", t);
-                    }));
-
-            composite.add(clientGroup.updates().all()
+            withClient.add(clientManager.updates().all()
                     .flatMap(telegramClient.getUpdatesManager()::handle)
                     .doOnNext(eventDispatcher::publish)
-                    .subscribe(null, t -> log.error("Event dispatcher terminated with an error", t)));
+                    .subscribe(null, t -> {
+                        log.error("Event dispatcher terminated with an error", t);
+                        unhandledError.accept(t);
+                    }));
 
-            composite.add(telegramClient.getUpdatesManager().start()
-                    .subscribe(null, t -> log.error("Updates manager terminated with an error", t)));
+            withClient.add(clientManager.main().onClose()
+                    .then(Mono.defer(() -> Mono.whenDelayError(
+                            telegramClient.getUpdatesManager().close(),
+                            eventDispatcher.close(),
+                            options.storeLayout().close())))
+                    .subscribe(null, unhandledError,
+                            () -> {
+                                if (!terminatedBootstrap[0]) {
+                                    sink.success();
+                                }
+                                onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
+                            }));
 
-            composite.add(clientGroup.main().onClose()
-                    .doOnSuccess(any -> {
-                        eventDispatcher.shutdown();
-                        telegramClient.getUpdatesManager().shutdown();
-                        options.storeLayout().close().block();
-                        onDisconnect.emitEmpty(Sinks.EmitFailureHandler.FAIL_FAST);
-                    })
-                    .subscribe(null, t -> log.error("Exception while closing main client", t)));
+            withClient.add(clientManager.start()
+                    .takeUntilOther(onDisconnect.asMono())
+                    .subscribe(null, t -> {
+                        log.error(clientManager + " terminated with an exception", t);
+                        unhandledError.accept(t);
+                    }));
 
-            composite.add(Mono.defer(() -> {
-                        sink.success(telegramClient);
-                        return telegramClient.getUpdatesManager().fillGap();
-                    })
-                    .subscribe(null, t -> log.error("Exception while preparing client resources", t)));
+            withClient.add(telegramClient.getUpdatesManager().start()
+                    .takeUntilOther(onDisconnect.asMono())
+                    .subscribe(null, t -> {
+                        log.error(telegramClient.getUpdatesManager() + " terminated with an exception", t);
+                        unhandledError.accept(t);
+                    }));
 
-            sink.onCancel(composite);
+            withClient.add(telegramClient.getUpdatesManager().fillGap()
+                    .takeUntilOther(onDisconnect.asMono())
+                    .subscribe(null, t -> log.error("Exception while filling gap on bootstrapping", t)));
+
+            sink.onDispose(() -> terminatedBootstrap[0] = true);
+
+            sink.onCancel(withClient);
+
+            sink.onRequest(c -> sink.success(telegramClient));
         });
     }
 
-    private Mono<Authorization> redirectToDc(RpcException rpcExc,
-                                             MTProtoClient tmpClient, MTProtoClientGroup clientGroup,
-                                             StoreLayout storeLayout, DcOptions dcOptions) {
-        return Mono.defer(() -> {
-            String msg = rpcExc.getError().errorMessage();
-            if (!msg.startsWith("USER_MIGRATE_"))
-                return Mono.error(new IllegalStateException("Unexpected type of DC redirection", rpcExc));
+    private static Mono<Authorization> redirectToDc(RpcException rpcExc,
+                                                    MTProtoClient tmpClient, MTProtoClientManager clientManager,
+                                                    StoreLayout storeLayout, DcOptions dcOptions,
+                                                    MTProtoBootstrap copy) {
+        String msg = rpcExc.getError().errorMessage();
+        if (!msg.startsWith("USER_MIGRATE_"))
+            return Mono.error(new IllegalStateException("Unexpected type of DC redirection", rpcExc));
 
-            int dcId = Integer.parseInt(msg.substring(13));
-            log.info("Redirecting to the DC {}", dcId);
+        int dcId = Integer.parseInt(msg.substring(13));
+        log.info("Redirecting to the DC {}", dcId);
 
-            return Mono.justOrEmpty(dcOptions.find(DataCenter.Type.REGULAR, dcId))
-                    // We used default DcOptions which may be outdated.
-                    // Well, let's request dc config and store it
-                    .switchIfEmpty(tmpClient.send(GetConfig.instance())
-                            .flatMap(cfg -> storeLayout.onUpdateConfig(cfg)
-                                    .then(storeLayout.getDcOptions()))
-                            .flatMap(newOpts -> Mono.justOrEmpty(newOpts.find(DataCenter.Type.REGULAR, dcId))
-                                    .switchIfEmpty(Mono.error(() -> new IllegalStateException(
-                                            "Could not find DC " + dcId + " for redirecting main client in received options: " + newOpts)))))
-                    .flatMap(clientGroup::setMain)
-                    .flatMap(client -> client.send(ImmutableImportBotAuthorization.of(0,
-                            authResources.getApiId(), authResources.getApiHash(),
-                            authResources.getBotAuthToken().orElseThrow())));
-        });
+        return Mono.justOrEmpty(dcOptions.find(DataCenter.Type.REGULAR, dcId))
+                // We used default DcOptions which may be outdated.
+                // Well, let's request dc config and store it
+                .switchIfEmpty(tmpClient.send(GetConfig.instance())
+                        .flatMap(cfg -> storeLayout.onUpdateConfig(cfg)
+                                .then(storeLayout.getDcOptions()))
+                        .flatMap(newOpts -> Mono.justOrEmpty(newOpts.find(DataCenter.Type.REGULAR, dcId))
+                                .switchIfEmpty(Mono.error(() -> new IllegalStateException(
+                                        "Could not find DC " + dcId + " for redirecting main client in received options: " + newOpts)))))
+                .flatMap(clientManager::setMain)
+                .flatMap(client -> client.send(ImmutableImportBotAuthorization.of(0,
+                        copy.authResources.getApiId(), copy.authResources.getApiHash(),
+                        copy.authResources.getBotAuthToken().orElseThrow())));
     }
 
     // Resources initialization
@@ -590,28 +684,21 @@ public final class MTProtoBootstrap {
         return TcpClientResources.create();
     }
 
-    private Scheduler initUpdatesPublisher() {
-        if (updatesPublisher != null) {
-            return updatesPublisher;
-        }
-        return Schedulers.newParallel("t4j-events", 4, true);
-    }
-
-    private EventDispatcher initEventDispatcher(Scheduler updatesPublisher) {
+    private EventDispatcher initEventDispatcher(Scheduler defaultUpdatesPublisher) {
         if (eventDispatcher != null) {
             return eventDispatcher;
         }
-        return new DefaultEventDispatcher(updatesPublisher,
-                Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
+        return new DefaultEventDispatcher(defaultUpdatesPublisher,
+                true, Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 new ParkEmitFailureHandler(100));
     }
 
-    private UpdateDispatcher initUpdateDispatcher(Scheduler updatesPublisher) {
+    private UpdateDispatcher initUpdateDispatcher(Scheduler defaultUpdatesPublisher) {
         if (updateDispatcher != null) {
             return updateDispatcher;
         }
-        return new SinksUpdateDispatcher(updatesPublisher,
-                Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
+        return new SinksUpdateDispatcher(defaultUpdatesPublisher,
+                true, Sinks.many().multicast().onBackpressureBuffer(Queues.SMALL_BUFFER_SIZE, false),
                 new ParkEmitFailureHandler(100));
     }
 

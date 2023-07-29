@@ -1,6 +1,7 @@
 package telegram4j.mtproto.client;
 
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Scheduler;
 import telegram4j.tl.Updates;
@@ -8,13 +9,16 @@ import telegram4j.tl.Updates;
 import java.util.Objects;
 
 public class SinksUpdateDispatcher implements UpdateDispatcher {
-    private final Scheduler scheduler;
-    private final Sinks.Many<Updates> sink;
-    private final Sinks.EmitFailureHandler emitFailureHandler;
+    protected final Scheduler scheduler;
+    protected final boolean disposeScheduler;
+    protected final Sinks.Many<Updates> sink;
+    protected final Sinks.EmitFailureHandler emitFailureHandler;
 
-    public SinksUpdateDispatcher(Scheduler scheduler, Sinks.Many<Updates> sink,
+    public SinksUpdateDispatcher(Scheduler scheduler, boolean disposeScheduler,
+                                 Sinks.Many<Updates> sink,
                                  Sinks.EmitFailureHandler emitFailureHandler) {
         this.scheduler = Objects.requireNonNull(scheduler);
+        this.disposeScheduler = disposeScheduler;
         this.sink = Objects.requireNonNull(sink);
         this.emitFailureHandler = Objects.requireNonNull(emitFailureHandler);
     }
@@ -31,9 +35,14 @@ public class SinksUpdateDispatcher implements UpdateDispatcher {
     }
 
     @Override
-    public void shutdown() {
-        // TODO how?
-//        sink.emitComplete(emitFailureHandler);
-        scheduler.dispose();
+    public Mono<Void> close() {
+        return Mono.defer(() -> {
+            sink.emitComplete(emitFailureHandler);
+
+            if (disposeScheduler) {
+                return scheduler.disposeGracefully();
+            }
+            return Mono.empty();
+        });
     }
 }

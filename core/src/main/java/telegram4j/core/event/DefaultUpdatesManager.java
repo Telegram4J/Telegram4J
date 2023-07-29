@@ -17,19 +17,17 @@ import telegram4j.core.event.dispatcher.UpdatesMapper;
 import telegram4j.core.event.domain.Event;
 import telegram4j.core.event.domain.message.SendMessageEvent;
 import telegram4j.core.internal.EntityFactory;
-import telegram4j.core.internal.MappingUtil;
 import telegram4j.core.object.Message;
 import telegram4j.core.object.PeerEntity;
 import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.chat.PrivateChat;
 import telegram4j.core.util.Id;
+import telegram4j.core.util.Timeout;
 import telegram4j.core.util.Variant2;
 import telegram4j.mtproto.DcId;
 import telegram4j.mtproto.RpcException;
-import telegram4j.mtproto.util.ResettableInterval;
 import telegram4j.tl.*;
-import telegram4j.tl.messages.ChatFull;
 import telegram4j.tl.request.updates.GetChannelDifference;
 import telegram4j.tl.request.updates.GetState;
 import telegram4j.tl.request.updates.ImmutableGetChannelDifference;
@@ -41,7 +39,6 @@ import java.lang.invoke.VarHandle;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -64,11 +61,11 @@ public class DefaultUpdatesManager implements UpdatesManager {
         }
     }
 
+    protected final Timeout stateTimeout = Timeout.create(Schedulers.single(),
+            Sinks.many().unicast().onBackpressureError());
+
     protected final MTProtoTelegramClient client;
     protected final Options options;
-    protected final ResettableInterval stateInterval =
-            new ResettableInterval(Schedulers.single(),
-                    Sinks.many().unicast().onBackpressureError());
 
     protected volatile int pts = -1;
     protected volatile int qts = -1;
@@ -85,11 +82,9 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Override
     public Mono<Void> start() {
-        Mono<Void> checkinInterval = stateInterval.ticks()
-                .flatMap(t -> fillGap())
+        return stateTimeout.asFlux()
+                .concatMap(t -> fillGap())
                 .then();
-
-        return Mono.when(checkinInterval);
     }
 
     @Override
@@ -116,7 +111,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
 
     @Override
     public Flux<Event> handle(Updates updates) {
-        stateInterval.start(options.checkin, options.checkin);
+        stateTimeout.restart(options.checkin);
 
         return switch (updates.identifier()) {
             case UpdatesTooLong.ID -> getDifference();
@@ -275,8 +270,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
     }
 
     @Override
-    public void shutdown() {
-        stateInterval.dispose();
+    public Mono<Void> close() {
+        return Mono.fromRunnable(stateTimeout::close);
     }
 
     protected Mono<Void> saveStateIf(boolean needSave) {
@@ -340,12 +335,13 @@ public class DefaultUpdatesManager implements UpdatesManager {
             return Flux.empty();
         }
 
-        if (!requestingDifference && (boolean)REQUESTING_DIFFERENCE.compareAndSet(this, false, true)) {
+        if (!requestingDifference && REQUESTING_DIFFERENCE.compareAndSet(this, false, true)) {
             if (log.isDebugEnabled()) {
                 log.debug("Getting difference, pts: {}, qts: {}, date: {}", pts, qts, Instant.ofEpochSecond(date));
             }
 
-            stateInterval.start(options.checkin, options.checkin);
+            stateTimeout.restart(options.checkin);
+
             return client.getMtProtoClientGroup()
                     .send(DcId.main(), ImmutableGetDifference.of(pts, date, qts))
                     .flatMapMany(this::handleDifference)
@@ -461,9 +457,8 @@ public class DefaultUpdatesManager implements UpdatesManager {
                     // TODO: this is unnecessary but required for file contexts
                     return Mono.justOrEmpty(chat)
                             .map(Chat::getId)
-                            .switchIfEmpty(client.asInputPeer(peerId)
+                            .switchIfEmpty(client.asInputPeerExact(peerId)
                                     .map(p -> Id.of(p, client.getSelfId())))
-                            .switchIfEmpty(MappingUtil.unresolvedPeer(peerId))
                             .map(i -> new Message(client, data, i))
                             .map(m -> new SendMessageEvent(client, m, chat, author));
                 });
@@ -634,7 +629,7 @@ public class DefaultUpdatesManager implements UpdatesManager {
                             return new SendMessageEvent(client, msg, chat, author);
                         });
 
-                Mono<Void> saveContacts = client.getMtProtoResources()
+                var saveContacts = client.getMtProtoResources()
                         .getStoreLayout().onContacts(diff0.chats(), diff0.users());
 
                 yield updatePts.and(saveContacts)

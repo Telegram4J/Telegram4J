@@ -22,10 +22,10 @@ import java.util.function.BiConsumer;
 import static telegram4j.mtproto.internal.Preconditions.requireArgument;
 
 /**
- * Default implementation of {@code MTProtoClientGroup} with fixed
+ * Default implementation of {@code MTProtoClientManager} with fixed
  * count of download/upload clients.
  */
-public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
+public class DefaultMTProtoClientGroup implements MTProtoClientManager {
 
     // TODO:
     //  Client load should be determined by load on the socket,
@@ -54,7 +54,7 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
     public DefaultMTProtoClientGroup(Options options) {
         this.options = options;
 
-        MAIN.set(this, options.clientFactory.create(this, DcId.Type.MAIN, options.mainDc));
+        MAIN.set(this, createClient(DcId.Type.MAIN, options.mainDc));
     }
 
     @Override
@@ -83,29 +83,58 @@ public class DefaultMTProtoClientGroup implements MTProtoClientGroup {
 
     @Override
     public Mono<Void> close() {
-        terminated = true;
+        return Mono.defer(() -> {
+            terminated = true;
 
-        activityMonitoring.close();
+            activityMonitoring.close();
 
-        var closeAll = new ArrayList<Mono<Void>>();
-        for (Dc dc : dcs.values()) {
-            dc.all((kind, clientSet) -> {
-                for (int i = 0; i < clientSet.size(); i++) {
-                    var old = clientSet.get(i);
-                    if (old != null) {
-                        closeAll.add(old.close());
+            var closeAll = new ArrayList<Mono<Void>>();
+            for (Dc dc : dcs.values()) {
+                dc.all((kind, clientSet) -> {
+                    for (int i = 0; i < clientSet.size(); i++) {
+                        var old = clientSet.get(i);
+                        if (old != null) {
+                            closeAll.add(old.close());
+                        }
                     }
+                });
+            }
+            closeAll.add(main.close());
+
+            closeAll.add(options.updateDispatcher.close());
+
+            closeAll.add(Mono.defer(() -> {
+                if (options.mtProtoOptions.disposeResultPublisher()) {
+                    options.mtProtoOptions.resultPublisher().shutdown();
+                }
+                return shutdownEventLoopGroup();
+            }));
+
+            return Mono.whenDelayError(closeAll);
+        });
+    }
+
+    private Mono<Void> shutdownEventLoopGroup() {
+
+        return Mono.create(sink -> {
+            var group = options.mtProtoOptions.tcpClientResources().eventLoopGroup();
+
+            var handle = group.shutdownGracefully();
+
+            sink.onCancel(() -> handle.cancel(false));
+
+            handle.addListener(future -> {
+                if (handle.isCancelled()) {
+                    return;
+                }
+                var t = future.cause();
+                if (t != null) {
+                    sink.error(t);
+                } else {
+                    sink.success();
                 }
             });
-        }
-        closeAll.add(main.close());
-
-        return Mono.whenDelayError(closeAll)
-                .then(Mono.fromRunnable(() -> {
-                    options.updateDispatcher().shutdown();
-                    options.mtProtoOptions().tcpClientResources().dispose();
-                    options.mtProtoOptions().resultPublisher().shutdown();
-                }));
+        });
     }
 
     @Override
