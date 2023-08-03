@@ -518,26 +518,41 @@ public final class MTProtoBootstrap {
                         return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
                                 .map(ign -> extractId(ign.get(0)))
                                 .onErrorResume(RpcException.isErrorCode(401), t ->
-                                        copy.authHandler.process(new AuthorizationHandler.Resources(
-                                                clientManager, storeLayout, copy.authResources))
-                                                // users can emit empty signals if they want to gracefully destroy the client
-                                                .switchIfEmpty(Mono.defer(clientManager::close)
-                                                        .then(Mono.empty()))
-                                                .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                                        .then(Mono.fromSupplier(() -> extractId(auth.user())))));
+                                        authorizeUser(clientManager, storeLayout, copy));
                     }
-                    return mainClient.send(ImmutableImportBotAuthorization.of(0,
-                                    copy.authResources.getApiId(), copy.authResources.getApiHash(),
-                                    copy.authResources.getBotAuthToken().orElseThrow()))
-                            .onErrorResume(RpcException.isErrorCode(303),
-                                    e -> redirectToDc((RpcException) e, mainClient,
-                                            clientManager, storeLayout, dcOptions, copy))
-                            .cast(BaseAuthorization.class)
-                            .flatMap(auth -> storeLayout.onAuthorization(auth)
-                                    .then(Mono.fromSupplier(() -> extractId(auth.user()))));
+                    return mainClient.send(ImmutableGetUsers.of(List.of(InputUserSelf.instance())))
+                            .map(ign -> extractId(ign.get(0)))
+                            .onErrorResume(RpcException.isErrorCode(401), e ->
+                                    authorizeBot(mainClient, clientManager, storeLayout, dcOptions, copy));
                 }))
                 .onErrorResume(e -> clientManager.close()
                         .then(Mono.error(e)));
+    }
+
+    private static Mono<Id> authorizeUser(MTProtoClientManager clientManager,
+                                          StoreLayout storeLayout,
+                                          MTProtoBootstrap copy) {
+        return copy.authHandler.process(new AuthorizationHandler.Resources(
+                        clientManager, storeLayout, copy.authResources))
+                // users can emit empty signals if they want to gracefully destroy the client
+                .switchIfEmpty(Mono.defer(clientManager::close)
+                        .then(Mono.empty()))
+                .flatMap(auth -> storeLayout.onAuthorization(auth)
+                        .then(Mono.fromSupplier(() -> extractId(auth.user()))));
+    }
+
+    private static Mono<Id> authorizeBot(MTProtoClient mainClient, MTProtoClientManager clientManager,
+                                         StoreLayout storeLayout, DcOptions dcOptions,
+                                         MTProtoBootstrap copy) {
+        return mainClient.send(ImmutableImportBotAuthorization.of(0,
+                        copy.authResources.getApiId(), copy.authResources.getApiHash(),
+                        copy.authResources.getBotAuthToken().orElseThrow()))
+                .onErrorResume(RpcException.isErrorCode(303),
+                        retry -> redirectToDc((RpcException) retry, mainClient,
+                                clientManager, storeLayout, dcOptions, copy))
+                .cast(BaseAuthorization.class)
+                .flatMap(auth -> storeLayout.onAuthorization(auth)
+                        .then(Mono.fromSupplier(() -> extractId(auth.user()))));
     }
 
     private static Id extractId(User user) {
