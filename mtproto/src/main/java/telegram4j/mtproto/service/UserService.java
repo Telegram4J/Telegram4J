@@ -97,18 +97,6 @@ public class UserService extends RpcService {
         return Mono.defer(() -> sendMain(ImmutableDeleteByPhones.of(phones)));
     }
 
-    public Mono<Boolean> block(InputPeer peer) {
-        return sendMain(ImmutableBlock.of(peer));
-    }
-
-    public Mono<Boolean> unblock(InputPeer peer) {
-        return sendMain(ImmutableUnblock.of(peer));
-    }
-
-    public Mono<Blocked> getBlocked(int offset, int limit) {
-        return sendMain(ImmutableGetBlocked.of(offset, limit));
-    }
-
     public Mono<Found> search(String query, int limit) {
         return sendMain(ImmutableSearch.of(query, limit));
     }
