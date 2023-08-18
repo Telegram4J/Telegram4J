@@ -126,8 +126,8 @@ subprojects {
 
                     licenses {
                         license {
-                            name.set("GPL-3.0")
-                            url.set("https://github.com/Telegram4J/Telegram4J/LICENSE")
+                            name.set("Apache License, Version 2.0")
+                            url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                             distribution.set("repo")
                         }
                     }
