@@ -1110,7 +1110,7 @@ public class StoreLayoutImpl implements StoreLayout {
                 savePeer(p, copy);
             }
         } else {
-            throw new IllegalStateException();
+            return null;
         }
 
         return old;
