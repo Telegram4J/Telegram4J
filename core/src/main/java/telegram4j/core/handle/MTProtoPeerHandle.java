@@ -221,6 +221,7 @@ public class MTProtoPeerHandle extends MTProtoHandle {
                             throw new IllegalStateException("Received MessageEmpty on SendMedia updates");
                         }
                         message = m;
+                        break;
                     }
                 }
 
@@ -374,14 +375,13 @@ public class MTProtoPeerHandle extends MTProtoHandle {
                             throw new IllegalStateException("Received MessageEmpty on SendMedia updates");
                         }
                         message = m;
+                        break;
                     }
                 }
 
                 if (message == null) {
                     throw new IllegalStateException("No message in BaseUpdates: " + casted);
                 }
-
-                throw new IllegalStateException("No message updates in " + casted);
             }
             default -> throw new IllegalArgumentException("Unknown Updates type: " + updates);
         }
