@@ -160,7 +160,8 @@ class MessageUpdateHandlers {
             data = Variant2.ofT2(s);
             peerId = Id.of(s.peerId());
         } else {
-            return Flux.error(new IllegalStateException("Received MessageEmpty in UpdateNewMessage"));
+            // Message been deleted (?)
+            return Flux.empty();
         }
 
         Chat chat = ctx.getChatEntity(peerId).orElse(null);
