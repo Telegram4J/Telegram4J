@@ -22,7 +22,6 @@ import telegram4j.core.event.domain.message.*;
 import telegram4j.core.internal.EntityFactory;
 import telegram4j.core.object.MentionablePeer;
 import telegram4j.core.object.Message;
-import telegram4j.core.object.User;
 import telegram4j.core.object.chat.Chat;
 import telegram4j.core.object.media.Poll;
 import telegram4j.core.object.media.PollResults;
@@ -35,7 +34,6 @@ import telegram4j.tl.*;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static telegram4j.core.internal.MappingUtil.getAuthor;
 
@@ -124,7 +122,9 @@ class MessageUpdateHandlers {
             data = Variant2.ofT2(s);
             peerId = Id.of(s.peerId());
         } else {
-            return Flux.error(new IllegalStateException("Received MessageEmpty in UpdateNewMessage"));
+            // Why? I have no idea, but it occurs.
+            // MessageEmpty objects are literally useless and harm an API
+            return Flux.empty();
         }
 
         Chat chat = ctx.getChatEntity(peerId).orElse(null);
