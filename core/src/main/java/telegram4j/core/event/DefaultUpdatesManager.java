@@ -725,6 +725,14 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 var m = (MessageService) message;
                 yield ((PeerChannel) m.peerId()).channelId();
             }
+            case MessageEmpty.ID -> {
+                var m = (MessageEmpty) message;
+                var peer = (PeerChannel) m.peerId();
+                if (peer == null) {
+                    yield -1;
+                }
+                yield peer.channelId();
+            }
             default -> throw new IllegalStateException("Unexpected channel message type: " + message);
         };
     }
@@ -838,6 +846,10 @@ public class DefaultUpdatesManager implements UpdatesManager {
                 default -> throw new IllegalStateException("Unexpected channel pts update type: " + u);
             }
             // endregion
+
+            if (channelId == -1) {
+                return Flux.empty();
+            }
 
             return client.getMtProtoResources()
                     .getStoreLayout().getChannelFullById(channelId)
