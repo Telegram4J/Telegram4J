@@ -111,7 +111,11 @@ public class CodeAuthorizationHandler implements AuthorizationHandler {
                     return ActionType.STOP;
                 }
 
-                ctx.log("Specified phone number is invalid, retrying...");
+                switch (rpcError.errorMessage()) {
+                    case "PHONE_NUMBER_INVALID" -> ctx.log("Specified phone number is invalid, retrying...");
+                    default -> ctx.log("Specified phone number is invalid (" + rpcError.errorMessage() + "), retrying...");
+                }
+
                 return ActionType.RETRY;
             });
         }
@@ -135,17 +139,42 @@ public class CodeAuthorizationHandler implements AuthorizationHandler {
          * @return A {@link Mono} emitting on successful completion action to do.
          * Any emitted errors or empty signals will terminate auth flow.
          */
-        default Mono<ActionType> onSentCodeError(Resources res, PhoneCodeContext ctx, RpcError rpcError) {
+        default Mono<CodeActionType> onSentCodeError(Resources res, PhoneCodeContext ctx, RpcError rpcError) {
             return Mono.fromSupplier(() -> {
                 if (rpcError.errorCode() == 500) {
                     ctx.log("Internal error occurred during authorization, code: " + rpcError.errorCode()
                             + ", message: " + rpcError.errorMessage());
-                    return ActionType.STOP;
+                    return CodeActionType.STOP;
                 }
 
-                ctx.log("Specified phone code is invalid, resending new...");
-                return ActionType.RETRY;
+                switch (rpcError.errorMessage()) {
+                    case "PHONE_CODE_INVALID" -> {
+                        ctx.log("Specified phone code is invalid, please try again");
+                        return CodeActionType.RETRY;
+                    }
+                    case "PHONE_CODE_EXPIRED" -> {
+                        ctx.log("Specified phone code has expired, resending new...");
+                        return CodeActionType.RESEND;
+                    }
+                    default -> {
+                        ctx.log("Unexpected error on sent code step, " +
+                                "code: " + rpcError.errorCode() + ", message: " + rpcError.errorMessage());
+                        return CodeActionType.RETRY;
+                    }
+                }
             });
+        }
+
+        enum CodeActionType {
+
+            /** Retry code verification with new input value. */
+            RETRY,
+
+            /** Resend auth code. */
+            RESEND,
+
+            /** Cancel and stop current auth. */
+            STOP
         }
     }
 
@@ -342,10 +371,12 @@ public class CodeAuthorizationHandler implements AuthorizationHandler {
                         throw new IllegalStateException();
                     }
                 })
-                .onErrorResume(RpcException.class, e ->
-                        callback.onSentCodeError(res, ctx, e.getError())
+                .onErrorResume(e -> e instanceof RpcException r &&
+                        !r.getError().errorMessage().equals("SESSION_PASSWORD_NEEDED"), e ->
+                        callback.onSentCodeError(res, ctx, ((RpcException) e).getError())
                                 .flatMap(actionType -> switch (actionType) {
-                                    case RETRY -> resendCode(res, ctx);
+                                    case RESEND -> resendCode(res, ctx);
+                                    case RETRY -> sentCode(res, ctx);
                                     case STOP -> this.<Authorization>cancelCode(res, ctx);
                                 }));
     }
