@@ -60,6 +60,30 @@ public final class CryptoUtil {
         return Unpooled.wrappedBuffer(res);
     }
 
+    /**
+     * Renders a non-negative value as exactly {@code size} big-endian bytes, left-padded with
+     * zeroes.
+     *
+     * <p> {@link #toByteBuf(BigInteger)} gives the shortest representation there is, which is the
+     * right answer wherever the value goes on the wire to be read back as a number. It is the
+     * wrong one wherever a value of a fixed width is hashed or used as key material, because
+     * there the leading zeroes are part of what is hashed.
+     *
+     * @throws IllegalArgumentException if the value does not fit in {@code size} bytes.
+     */
+    public static ByteBuf toFixedWidth(BigInteger val, int size) {
+        byte[] res = val.toByteArray();
+        int from = res[0] == 0 ? 1 : 0;
+        int length = res.length - from;
+        if (length > size) {
+            throw new IllegalArgumentException("Value is " + length + " bytes wide, expected " + size);
+        }
+
+        byte[] padded = new byte[size];
+        System.arraycopy(res, from, padded, size - length, length);
+        return Unpooled.wrappedBuffer(padded);
+    }
+
     public static byte[] toByteArray(ByteBuf buf) {
         try {
             return ByteBufUtil.getBytes(buf);

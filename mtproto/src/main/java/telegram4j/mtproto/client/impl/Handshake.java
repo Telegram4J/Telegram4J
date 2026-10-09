@@ -51,6 +51,9 @@ final class Handshake extends ChannelInboundHandlerAdapter {
 
     private static final long RESPONSE_TIMEOUT = 3000;
 
+    /** Width of the authorization key, which the 2048-bit Diffie-Hellman modulus fixes. */
+    private static final int AUTH_KEY_SIZE = 256;
+
     private final String clientId;
     private final AuthData authData;
     private final HandshakeContext context;
@@ -335,7 +338,7 @@ final class Handshake extends ChannelInboundHandlerAdapter {
             }
         }
 
-        byte[] bs = new byte[256];
+        byte[] bs = new byte[AUTH_KEY_SIZE];
         random.nextBytes(bs);
 
         BigInteger b = fromByteArray(bs);
@@ -363,7 +366,11 @@ final class Handshake extends ChannelInboundHandlerAdapter {
         BigInteger authKey = ga.modPow(b, dhPrime);
 
         context.serverTimeDiff(serverDHInnerData.serverTime() - Math.toIntExact(System.currentTimeMillis()/1000));
-        context.authKey(toByteBuf(authKey));
+        // to a fixed width, not to the shortest representation: the key is hashed as bytes, both
+        // here for auth_key_id and by the server for the nonce hashes it answers with, and the
+        // server renders it in full. One key in about two hundred is numerically small enough to
+        // come out shorter than this, and those handshakes fail on a newNonceHash mismatch
+        context.authKey(toFixedWidth(authKey, AUTH_KEY_SIZE));
         context.authKeyHash(sha1Digest(context.authKey()).slice(0, 8));
         context.serverSalt(Long.reverseBytes(context.newNonce().getLong(0) ^ context.serverNonce().getLong(1)));
 
