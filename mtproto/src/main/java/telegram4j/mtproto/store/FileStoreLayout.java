@@ -16,6 +16,7 @@
 package telegram4j.mtproto.store;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.util.NetUtil;
 import reactor.core.publisher.Flux;
@@ -25,6 +26,9 @@ import reactor.util.Loggers;
 import reactor.util.annotation.Nullable;
 import telegram4j.mtproto.*;
 import telegram4j.mtproto.auth.AuthKey;
+import telegram4j.mtproto.secret.RekeyState;
+import telegram4j.mtproto.secret.SecretChatState;
+import telegram4j.mtproto.secret.SeqNoState;
 import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.*;
@@ -43,6 +47,7 @@ import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -51,7 +56,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import static telegram4j.mtproto.util.CryptoUtil.toByteBuf;
 
-public class FileStoreLayout implements StoreLayout {
+public class FileStoreLayout implements StoreLayout, SecretChatStore {
 
     protected static final Logger log = Loggers.getLogger(FileStoreLayout.class);
 
@@ -60,6 +65,7 @@ public class FileStoreLayout implements StoreLayout {
     protected final StoreLayout entityDelegate;
     protected final Path dataFile;
     protected final ConcurrentHashMap<Integer, AuthKey> authKeys = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<Integer, SecretChatState> secretChats = new ConcurrentHashMap<>();
     protected final AtomicBoolean saving = new AtomicBoolean();
     protected final ExecutorService persistExecutor;
 
@@ -97,6 +103,100 @@ public class FileStoreLayout implements StoreLayout {
         buf.writeByte(computeFlags(dc));
         buf.writeBytes(NetUtil.createByteArrayFromIpAddressString(dc.getAddress()));
         dc.getSecret().ifPresent(secret -> TlSerialUtil.serializeBytes(buf, secret));
+    }
+
+
+    protected static final byte CREATOR_MASK   = 0b0001;
+    protected static final byte SECRET_SET     = 0b0010;
+    protected static final byte KEY_SET        = 0b0100;
+    protected static final byte OLD_KEY_SET    = 0b1000;
+    protected static final byte KEY_HASH_SET   = 0b10000;
+
+    protected static void serializeSecretChat(ByteBuf buf, SecretChatState c) {
+        buf.writeIntLE(c.id());
+        buf.writeLongLE(c.accessHash());
+        buf.writeLongLE(c.peerId());
+        buf.writeByte(c.status().ordinal());
+
+        byte flags = 0;
+        flags |= c.creator() ? CREATOR_MASK : 0;
+        flags |= c.secret() != null ? SECRET_SET : 0;
+        flags |= c.key() != null ? KEY_SET : 0;
+        flags |= c.oldKey() != null ? OLD_KEY_SET : 0;
+        flags |= c.keyHash() != null ? KEY_HASH_SET : 0;
+        buf.writeByte(flags);
+
+        if (c.secret() != null) TlSerialUtil.serializeBytes(buf, toByteBuf(c.secret()));
+        if (c.key() != null) TlSerialUtil.serializeBytes(buf, c.key().value());
+        if (c.oldKey() != null) TlSerialUtil.serializeBytes(buf, c.oldKey().value());
+        if (c.keyHash() != null) TlSerialUtil.serializeBytes(buf, Unpooled.wrappedBuffer(c.keyHash()));
+
+        buf.writeLongLE(c.keyCreatedAt() != null ? c.keyCreatedAt().getEpochSecond() : 0);
+        buf.writeIntLE(c.remainingMessages());
+        buf.writeIntLE(c.layer());
+        buf.writeIntLE(c.ttl());
+
+        buf.writeIntLE(c.seqNo().inSeqNo());
+        buf.writeIntLE(c.seqNo().outSeqNo());
+        buf.writeIntLE(c.seqNo().remoteInSeqNo());
+
+        var rekey = c.rekey();
+        buf.writeByte(rekey.status().ordinal());
+        if (rekey.status() !=
+            RekeyState.Status.IDLE) {
+            buf.writeLongLE(rekey.exchangeId());
+            if (rekey.status() == RekeyState.Status.REQUESTED) {
+                TlSerialUtil.serializeBytes(buf, toByteBuf(Objects.requireNonNull(rekey.secret())));
+            } else {
+                TlSerialUtil.serializeBytes(buf, Objects.requireNonNull(rekey.pendingKey()).value());
+            }
+        }
+    }
+
+    protected static SecretChatState deserializeSecretChat(ByteBuf buf) {
+        int id = buf.readIntLE();
+        long accessHash = buf.readLongLE();
+        long peerId = buf.readLongLE();
+        var status = SecretChatState.Status.values()[buf.readUnsignedByte()];
+        byte flags = buf.readByte();
+        boolean creator = (flags & CREATOR_MASK) != 0;
+
+        BigInteger secret = (flags & SECRET_SET) != 0
+                ? CryptoUtil.fromByteBuf(TlSerialUtil.deserializeBytes(buf).retain()) : null;
+        AuthKey key = (flags & KEY_SET) != 0 ? new AuthKey(TlSerialUtil.deserializeBytes(buf)) : null;
+        AuthKey oldKey = (flags & OLD_KEY_SET) != 0 ? new AuthKey(TlSerialUtil.deserializeBytes(buf)) : null;
+        byte[] keyHash = (flags & KEY_HASH_SET) != 0
+                ? ByteBufUtil.getBytes(TlSerialUtil.deserializeBytes(buf)) : null;
+
+        long keyCreatedAt = buf.readLongLE();
+        int remainingMessages = buf.readIntLE();
+        int layer = buf.readIntLE();
+        int ttl = buf.readIntLE();
+
+        var seqNo = new SeqNoState(creator, buf.readIntLE(), buf.readIntLE(), buf.readIntLE());
+
+        // restoreKey rather than key: this is putting back what was written, not the bookkeeping
+        // that goes with negotiating a new one
+        var chat = SecretChatState.builder(id, accessHash, peerId, creator)
+                .status(status)
+                .restoreKey(key, keyCreatedAt != 0 ? Instant.ofEpochSecond(keyCreatedAt) : null)
+                .oldKey(oldKey)
+                .secret(secret)
+                .remainingMessages(remainingMessages)
+                .layer(layer)
+                .ttl(ttl)
+                .seqNo(seqNo)
+                .keyHash(keyHash);
+
+        var rekeyStatus = RekeyState.Status.values()[buf.readUnsignedByte()];
+        if (rekeyStatus != RekeyState.Status.IDLE) {
+            long exchangeId = buf.readLongLE();
+            ByteBuf param = TlSerialUtil.deserializeBytes(buf);
+            chat.rekey(rekeyStatus == RekeyState.Status.REQUESTED
+                    ? RekeyState.requested(exchangeId, CryptoUtil.fromByteBuf(param.retain()))
+                    : RekeyState.accepted(exchangeId, new AuthKey(param)));
+        }
+        return chat.build();
     }
 
     protected interface Deserializer {
@@ -150,7 +250,7 @@ public class FileStoreLayout implements StoreLayout {
             }
             var publicRsaKeyRegister = PublicRsaKeyRegister.create(keys);
             State state = buf.readByte() == 1 ? TlDeserializer.deserialize(buf) : null;
-            return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state);
+            return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state, Map.of());
         }
     }
 
@@ -198,14 +298,33 @@ public class FileStoreLayout implements StoreLayout {
             }
             var publicRsaKeyRegister = PublicRsaKeyRegister.create(keys);
             State state = buf.readByte() == 1 ? TlDeserializer.deserialize(buf) : null;
-            return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state);
+            return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state, Map.of());
+        }
+    }
+
+
+    static class Rev2Deserializer implements Deserializer {
+
+        @Override
+        public Settings deserialize(ByteBuf buf) {
+            var base = new Rev1Deserializer().deserialize(buf);
+
+            int count = buf.readUnsignedShortLE();
+            var secretChats = new HashMap<Integer, SecretChatState>(count);
+            for (int i = 0; i < count; i++) {
+                var chat = deserializeSecretChat(buf);
+                secretChats.put(chat.id(), chat);
+            }
+            return new Settings(base.mainDcId(), base.selfId(), base.authKeys(), base.dcOptions(),
+                    base.publicRsaKeyRegister(), base.state(), secretChats);
         }
     }
 
     protected enum Version {
         REVISION0(new Rev0Deserializer()),
         REVISION1(new Rev1Deserializer()),
-        CURRENT(REVISION1);
+        REVISION2(new Rev2Deserializer()),
+        CURRENT(REVISION2);
 
         final Deserializer deser;
         final short revision;
@@ -224,6 +343,7 @@ public class FileStoreLayout implements StoreLayout {
             return switch (s) {
                 case 0 ->  REVISION0;
                 case 1 -> REVISION1;
+                case 2 -> REVISION2;
                 default -> throw new IllegalStateException("Unknown version id: " + s);
             };
         }
@@ -257,10 +377,12 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     protected record Settings(int mainDcId, long selfId, Map<Integer, AuthKey> authKeys, DcOptions dcOptions,
-                              PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state) {
+                              PublicRsaKeyRegister publicRsaKeyRegister, @Nullable State state,
+                              Map<Integer, SecretChatState> secretChats) {
 
         protected Settings {
             requireSize(authKeys, "authKeys");
+            requireSize(secretChats, "secretChats");
             requireSize(dcOptions.getBackingList(), "dcOptions");
             requireSize(publicRsaKeyRegister.getBackingMap(), "pubRsaKeyRegister");
         }
@@ -290,6 +412,10 @@ public class FileStoreLayout implements StoreLayout {
             } else {
                 buf.writeByte(0);
             }
+            buf.writeShortLE(secretChats.size());
+            for (SecretChatState chat : secretChats.values()) {
+                serializeSecretChat(buf, chat);
+            }
         }
     }
 
@@ -310,7 +436,7 @@ public class FileStoreLayout implements StoreLayout {
     // endregion
 
     protected Settings copySettings() {
-        return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state);
+        return new Settings(mainDcId, selfId, authKeys, dcOptions, publicRsaKeyRegister, state, secretChats);
     }
 
     protected boolean isAssociatedToUser() {
@@ -318,13 +444,26 @@ public class FileStoreLayout implements StoreLayout {
     }
 
     protected Mono<Void> trySave() {
+        return trySave(false);
+    }
+
+    /**
+     * Writes the current settings to {@link #getDataFile()}.
+     *
+     * @param forced whether this change must reach the disk. When {@code false} a save that is
+     * already running is taken to cover this change too and nothing is written, which leaves the
+     * change in memory until something else triggers a save.
+     * @return A {@link Mono} completing when the settings are on disk, or immediately if this
+     * save was left to one already in progress.
+     */
+    protected Mono<Void> trySave(boolean forced) {
         return Mono.create(sink -> {
             if (!isAssociatedToUser()) {
                 sink.success();
                 return;
             }
 
-            if (!saving.get() && saving.compareAndSet(false, true)) {
+            if (forced || (!saving.get() && saving.compareAndSet(false, true))) {
                 Settings settings = copySettings();
 
                 persistExecutor.execute(() -> {
@@ -366,6 +505,7 @@ public class FileStoreLayout implements StoreLayout {
                 mainDcId = sett.mainDcId;
                 selfId = sett.selfId;
                 authKeys.putAll(sett.authKeys);
+                secretChats.putAll(sett.secretChats);
                 dcOptions = sett.dcOptions;
                 publicRsaKeyRegister = sett.publicRsaKeyRegister;
                 state = sett.state;
@@ -383,7 +523,9 @@ public class FileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> close() {
         return entityDelegate.close()
-                .and(trySave()
+                // forced: an unforced save is skipped when another is already running, which
+                // would shut the executor down having written nothing
+                .and(trySave(true)
                         .then(Mono.fromRunnable(persistExecutor::shutdown)));
     }
 
@@ -658,6 +800,34 @@ public class FileStoreLayout implements StoreLayout {
     @Override
     public Mono<Void> onChatParticipants(ChatParticipants payload) {
         return entityDelegate.onChatParticipants(payload);
+    }
+
+    @Override
+    public Mono<SecretChatState> getSecretChat(int chatId) {
+        return Mono.fromSupplier(() -> secretChats.get(chatId));
+    }
+
+    @Override
+    public Flux<SecretChatState> getSecretChats() {
+        return Flux.fromIterable(secretChats.values());
+    }
+
+    @Override
+    public Mono<Void> updateSecretChat(SecretChatState state) {
+        return Mono.defer(() -> {
+            secretChats.put(state.id(), state);
+            return trySave(true);
+        });
+    }
+
+    @Override
+    public Mono<Void> deleteSecretChat(int chatId) {
+        return Mono.defer(() -> {
+            secretChats.remove(chatId);
+            // rewrites the file without this chat; the keys are gone from the store, though
+            // neither the freed heap nor the old disk blocks are scrubbed
+            return trySave(true);
+        });
     }
 
     @Override

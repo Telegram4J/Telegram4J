@@ -26,6 +26,7 @@ import reactor.util.Loggers;
 import telegram4j.mtproto.PublicRsaKey;
 import telegram4j.mtproto.auth.AuthKey;
 import telegram4j.mtproto.auth.AuthorizationException;
+import telegram4j.mtproto.auth.DhParameters;
 import telegram4j.mtproto.util.AES256IGECipher;
 import telegram4j.mtproto.util.CryptoUtil;
 import telegram4j.tl.TlDeserializer;
@@ -273,97 +274,17 @@ final class Handshake extends ChannelInboundHandlerAdapter {
         if (!serverDHInnerData.nonce().equals(context.nonce())) throw new AuthorizationException("nonce mismatch");
         if (!serverDHInnerData.serverNonce().equals(context.serverNonce())) throw new AuthorizationException("serverNonce mismatch");
 
-        BigInteger dhPrime = fromByteBuf(serverDHInnerData.dhPrime());
-        // region dh checks
-        if (dhPrime.bitLength() != 2048) {
-            throw new AuthorizationException("dhPrime is not 2048-bit number");
-        }
+        var dh = DhParameters.create(serverDHInnerData.dhPrime(), serverDHInnerData.g(), context.dhPrimeChecker());
 
-        // g generates a cyclic subgroup of prime order (p - 1) / 2, i.e. is a quadratic residue mod p.
-        // Since g is always equal to 2, 3, 4, 5, 6 or 7, this is easily done using quadratic reciprocity law,
-        // yielding a simple condition on
-        // * p mod 4g - namely, p mod 8 = 7 for g = 2; p mod 3 = 2 for g = 3;
-        // * no extra condition for g = 4;
-        // * p mod 5 = 1 or 4 for g = 5;
-        // * p mod 24 = 19 or 23 for g = 6;
-        // * p mod 7 = 3, 5 or 6 for g = 7.
-
-        boolean modOk = switch (serverDHInnerData.g()) {
-            case 2 -> dhPrime.remainder(BigInteger.valueOf(8)).equals(BigInteger.valueOf(7));
-            case 3 -> dhPrime.remainder(BigInteger.valueOf(3)).equals(BigInteger.TWO);
-            case 4 -> true;
-            case 5 -> {
-                long remainder = dhPrime.remainder(BigInteger.valueOf(5)).longValueExact();
-                yield remainder == 1 || remainder == 4;
-            }
-            case 6 -> {
-                long remainder = dhPrime.remainder(BigInteger.valueOf(24)).longValueExact();
-                yield remainder == 19 || remainder == 23;
-            }
-            case 7 -> {
-                long remainder = dhPrime.remainder(BigInteger.valueOf(7)).longValueExact();
-                yield remainder == 3 || remainder == 5 || remainder == 6;
-            }
-            default -> false;
-        };
-
-        if (!modOk) {
-            throw new AuthorizationException("Bad dhPrime mod 4g");
-        }
-
-        // check whether dhPrime is a safe prime (meaning that both dhPrime and (dhPrime - 1) / 2 are prime)
-        var primeStatus = context.dhPrimeChecker().lookup(serverDHInnerData.dhPrime());
-        switch (primeStatus) {
-            case GOOD -> {}
-            case BAD -> throw new AuthorizationException("dhPrime or (dhPrime - 1) / 2 is not a prime number");
-            case UNKNOWN -> {
-                // The certainty for isProbablyPrime() is selected from TD's is_prime() method
-                // And inlined as `num.bitLength() > 2048 ? 128 : 64`
-                // But received dhPrime is a safe 2048-bit number
-                // https://github.com/tdlib/td/blob/cf1984844be7ec0c06762d8d617cbb20352ec9a2/tdutils/td/utils/BigNum.cpp#L150-#L159
-                if (!dhPrime.isProbablePrime(64)) {
-                    context.dhPrimeChecker().addBadPrime(serverDHInnerData.dhPrime());
-                    throw new AuthorizationException("dhPrime is not a prime number");
-                }
-
-                BigInteger halfDhPrime = dhPrime.subtract(BigInteger.ONE).divide(BigInteger.TWO);
-                if (!halfDhPrime.isProbablePrime(64)) {
-                    context.dhPrimeChecker().addBadPrime(serverDHInnerData.dhPrime());
-                    throw new AuthorizationException("(dhPrime - 1) / 2 is not a prime number");
-                }
-                context.dhPrimeChecker().addGoodPrime(serverDHInnerData.dhPrime());
-            }
-        }
-
-        byte[] bs = new byte[256];
-        random.nextBytes(bs);
-
-        BigInteger b = fromByteArray(bs);
-        BigInteger g = BigInteger.valueOf(serverDHInnerData.g());
-        BigInteger gb = g.modPow(b, dhPrime);
+        BigInteger b = DhParameters.generateSecret();
+        BigInteger gb = dh.computePublicKey(b);
         BigInteger ga = fromByteBuf(serverDHInnerData.gA());
 
-        BigInteger ubound = dhPrime.subtract(BigInteger.ONE);
-        if (g.compareTo(BigInteger.ONE) < 1 || g.compareTo(ubound) >= 0)
-            throw new AuthorizationException("g parameter is out of bounds");
-        if (ga.compareTo(BigInteger.ONE) < 1 || ga.compareTo(ubound) >= 0)
-            throw new AuthorizationException("gA parameter is out of bounds");
-        if (gb.compareTo(BigInteger.ONE) < 1 || gb.compareTo(ubound) >= 0)
-            throw new AuthorizationException("gB parameter is out of bounds");
-
-        BigInteger safetyRange = BigInteger.TWO.pow(2048 - 64);
-        BigInteger usafeBound = dhPrime.subtract(safetyRange);
-        if (ga.compareTo(safetyRange) <= 0 || ga.compareTo(usafeBound) > 0)
-            throw new AuthorizationException("gA parameter is out of safety range");
-        if (gb.compareTo(safetyRange) <= 0 || gb.compareTo(usafeBound) > 0)
-            throw new AuthorizationException("gB parameter is out of safety range");
-
-        // endregion
-
-        BigInteger authKey = ga.modPow(b, dhPrime);
+        dh.checkPublicKey(ga, "gA");
+        dh.checkPublicKey(gb, "gB");
 
         context.serverTimeDiff(serverDHInnerData.serverTime() - Math.toIntExact(System.currentTimeMillis()/1000));
-        context.authKey(toByteBuf(authKey));
+        context.authKey(dh.computeSharedKeyData(ga, b));
         context.authKeyHash(sha1Digest(context.authKey()).slice(0, 8));
         context.serverSalt(Long.reverseBytes(context.newNonce().getLong(0) ^ context.serverNonce().getLong(1)));
 

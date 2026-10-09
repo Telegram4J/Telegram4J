@@ -35,6 +35,7 @@ module telegram4j.mtproto {
     exports telegram4j.mtproto;
     exports telegram4j.mtproto.file;
     exports telegram4j.mtproto.auth;
+    exports telegram4j.mtproto.secret;
     exports telegram4j.mtproto.service;
     exports telegram4j.mtproto.store;
     exports telegram4j.mtproto.transport;

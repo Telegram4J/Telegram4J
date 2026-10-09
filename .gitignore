@@ -1,8 +1,18 @@
 .idea
 .gradle
 build
+.DS_Store
 
 logs
 /core/src/test/resources/t4j.bin
 /core/src/test/resources/t4j-bot.bin
 /core/src/test/resources/stash
+
+# SecretChatConsole: the settings are local, and the session holds the account's authorization
+# key and every secret chat key in the clear
+secret-chat-console*.bin
+secret-chat-console.properties
+
+# SecretChatConsole: the messages kept for resending, still encrypted but under keys which are in
+# the session file beside them
+encrypted-messages/

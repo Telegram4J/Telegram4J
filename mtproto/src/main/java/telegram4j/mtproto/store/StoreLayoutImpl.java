@@ -24,6 +24,7 @@ import telegram4j.mtproto.DataCenter;
 import telegram4j.mtproto.DcOptions;
 import telegram4j.mtproto.PublicRsaKeyRegister;
 import telegram4j.mtproto.auth.AuthKey;
+import telegram4j.mtproto.secret.SecretChatState;
 import telegram4j.mtproto.store.object.*;
 import telegram4j.mtproto.util.TlEntityUtil;
 import telegram4j.tl.ChatFull;
@@ -51,13 +52,14 @@ import static telegram4j.mtproto.util.TlEntityUtil.getUserId;
 import static telegram4j.mtproto.util.TlEntityUtil.stripUsername;
 
 /** Default in-memory store implementation. */
-public class StoreLayoutImpl implements StoreLayout {
+public class StoreLayoutImpl implements StoreLayout, SecretChatStore {
 
     protected final Cache<MessageId, Message> messages;
     protected final ConcurrentMap<Long, ChatInfo> chats = new ConcurrentHashMap<>();
     protected final ConcurrentMap<Long, ChannelInfo> channels = new ConcurrentHashMap<>();
     protected final ConcurrentMap<Long, PartialFields<ImmutableBaseUser, ImmutableUserFull>> users = new ConcurrentHashMap<>();
     protected final ConcurrentMap<Long, MessagePoll> polls = new ConcurrentHashMap<>();
+    protected final ConcurrentMap<Integer, SecretChatState> secretChats = new ConcurrentHashMap<>();
     // TODO: make weak or limit by size?
     protected final ConcurrentMap<String, Peer> usernames = new ConcurrentHashMap<>();
     protected final ConcurrentMap<Peer, InputPeer> peers = new ConcurrentHashMap<>();
@@ -619,6 +621,28 @@ public class StoreLayoutImpl implements StoreLayout {
     @Override
     public Mono<Void> registerPoll(Peer peerId, int messageId, InputMediaPoll poll) {
         return Mono.fromRunnable(() -> polls.put(poll.poll().id(), new MessagePoll(poll, peerId, messageId)));
+    }
+
+    @Override
+    public Mono<SecretChatState> getSecretChat(int chatId) {
+        return Mono.fromSupplier(() -> secretChats.get(chatId));
+    }
+
+    @Override
+    public Flux<SecretChatState> getSecretChats() {
+        return Flux.fromIterable(secretChats.values());
+    }
+
+    @Override
+    public Mono<Void> updateSecretChat(SecretChatState state) {
+        // this store keeps everything in memory, so nothing here outlives the process; the
+        // durability updateSecretChat() promises is FileStoreLayout's to provide
+        return Mono.fromRunnable(() -> secretChats.put(state.id(), state));
+    }
+
+    @Override
+    public Mono<Void> deleteSecretChat(int chatId) {
+        return Mono.fromRunnable(() -> secretChats.remove(chatId));
     }
 
     @Override
